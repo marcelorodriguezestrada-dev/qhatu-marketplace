@@ -28,6 +28,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
+    // Si auth es null (todavía no estamos en el navegador, o faltan las
+    // variables NEXT_PUBLIC_FIREBASE_*), no hay sesión que escuchar —
+    // dejamos de "cargar" para no bloquear el resto de la app.
+    if (!auth) {
+      setCargando(false)
+      return
+    }
     const unsub = onAuthStateChanged(auth, (u) => {
       setUsuario(u)
       setCargando(false)
@@ -36,19 +43,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function login(email: string, password: string) {
+    if (!auth) throw new Error('Firebase Auth no está configurado (revisá las variables NEXT_PUBLIC_FIREBASE_*).')
     await signInWithEmailAndPassword(auth, email, password)
   }
 
   async function registrarse(email: string, password: string) {
+    if (!auth) throw new Error('Firebase Auth no está configurado (revisá las variables NEXT_PUBLIC_FIREBASE_*).')
     await createUserWithEmailAndPassword(auth, email, password)
   }
 
   async function logout() {
+    if (!auth) return
     await signOut(auth)
   }
 
   async function obtenerToken() {
-    if (!auth.currentUser) return null
+    if (!auth || !auth.currentUser) return null
     return auth.currentUser.getIdToken()
   }
 

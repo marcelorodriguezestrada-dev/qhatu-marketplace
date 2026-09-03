@@ -33,7 +33,7 @@ export default function LoginPage() {
         'auth/weak-password': 'La contraseña necesita al menos 6 caracteres.',
         'auth/invalid-email': 'Ese email no es válido.',
       }
-      setError(mensajes[codigo] || 'Ocurrió un error. Probá de nuevo.')
+      setError(mensajes[codigo] || err?.message || 'Ocurrió un error. Probá de nuevo.')
     } finally {
       setCargando(false)
     }
