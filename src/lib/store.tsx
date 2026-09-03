@@ -8,8 +8,8 @@ export type ItemCarrito = Producto & { cantidad: number }
 type CarritoContextType = {
   items: ItemCarrito[]
   agregar: (p: Producto) => void
-  cambiarCantidad: (id: number, delta: number) => void
-  quitar: (id: number) => void
+  cambiarCantidad: (id: number | string, delta: number) => void
+  quitar: (id: number | string) => void
   vaciar: () => void
   total: number
 }
@@ -47,13 +47,13 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  function cambiarCantidad(id: number, delta: number) {
+  function cambiarCantidad(id: number | string, delta: number) {
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, cantidad: Math.max(1, i.cantidad + delta) } : i))
     )
   }
 
-  function quitar(id: number) {
+  function quitar(id: number | string) {
     setItems((prev) => prev.filter((i) => i.id !== id))
   }
 
