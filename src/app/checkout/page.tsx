@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCarrito } from '@/lib/store'
+import { useAuth } from '@/lib/auth'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -20,6 +21,7 @@ const BANK_ACCOUNT_NUMBER = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || ''
 
 export default function CheckoutPage() {
   const { items, total, vaciar } = useCarrito()
+  const { usuario, cargando: authCargando } = useAuth()
   const router = useRouter()
   const [paso, setPaso] = useState<Paso>('creando')
   const [pedidoId, setPedidoId] = useState<string | null>(null)
@@ -28,13 +30,18 @@ export default function CheckoutPage() {
 
   // Al entrar al checkout, creamos el pedido en Firestore como
   // "pendiente_pago". Todavía no hay QR dinámico — mostramos el QR fijo
-  // de tu cuenta, configurado por variable de entorno.
+  // de tu cuenta, configurado por variable de entorno. Si el comprador
+  // está logueado, el pedido queda asociado a su email — no es
+  // obligatorio estar logueado para comprar. Esperamos a que termine de
+  // resolverse el estado de sesión (authCargando) antes de crear el
+  // pedido, para no perder el dato del comprador por una carrera de
+  // timing.
   useEffect(() => {
-    if (items.length === 0) return
+    if (items.length === 0 || authCargando || pedidoId) return
     fetch('/api/pedidos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, total }),
+      body: JSON.stringify({ items, total, comprador: usuario?.email || null }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -51,7 +58,7 @@ export default function CheckoutPage() {
         setError('No se pudo conectar con el servidor.')
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [authCargando])
 
   function declararPago() {
     if (!pedidoId) return

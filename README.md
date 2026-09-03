@@ -29,20 +29,15 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 
 ## Cómo está armado
 
-- `/` — catálogo público con buscador, filtro por categoría y carrito.
-- `/checkout` — crea el pedido, muestra tu QR (o los datos de tu cuenta)
-  y espera que confirmes el pago desde `/admin`.
-- `/admin` — panel protegido por contraseña: lista los pedidos y te deja
-  marcar "Confirmar pago" a mano.
-- `/api/productos` — catálogo (GET público, POST para dar de alta — hoy
-  sin autenticación, sumale algo antes de exponerlo a vendedores
-  externos).
-- `/api/pedidos` — GET (lista, protegido con contraseña) y POST (crea un
-  pedido nuevo, lo llama el checkout).
-- `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del
-  comprador) y PATCH (cambia el estado: el comprador puede marcar
-  "informado_pago" sin contraseña; solo vos podés marcar "pagado", con
-  la contraseña de admin).
+- `/` — catálogo público con buscador, filtro por categoría y carrito (ve los productos de todos los vendedores).
+- `/login` — registro e inicio de sesión (email + contraseña, vía Firebase Auth).
+- `/vender` — panel para que cualquier usuario logueado publique y borre sus propios productos. Redirige a `/login` si no estás logueado.
+- `/checkout` — crea el pedido (asociado a tu cuenta si estás logueado, o como invitado si no), muestra tu QR y espera que confirmes el pago desde `/admin`.
+- `/admin` — tu panel único como dueño de la tienda: lista los pedidos y te deja marcar "Confirmar pago" a mano.
+- `/api/productos` — GET público (catálogo completo). POST requiere estar logueado (header `Authorization: Bearer <token>`) y asocia el producto al usuario.
+- `/api/productos/[id]` — DELETE y PATCH, solo para el usuario dueño del producto.
+- `/api/pedidos` — GET (lista completa, protegida con `ADMIN_PASSWORD`) y POST (crea un pedido, lo llama el checkout).
+- `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del comprador) y PATCH (el comprador puede marcar "informado_pago" sin contraseña; solo vos podés marcar "pagado", con `ADMIN_PASSWORD`).
 
 ## 1. Instalar dependencias
 
@@ -50,13 +45,15 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 npm install
 ```
 
-## 2. Configurar Firebase (Firestore) — gratis
+## 2. Configurar Firebase (Firestore + Auth) — gratis
 
 1. Andá a [console.firebase.google.com](https://console.firebase.google.com) → **Crear proyecto**.
 2. **Compilación → Firestore Database** → **Crear base de datos** → modo producción → elegí una región cercana a Bolivia (ej. `southamerica-east1`).
    - No hace falta crear colecciones a mano — se crean solas (`productos`, `pedidos`) la primera vez que la app escribe en ellas. Si `productos` está vacía, el catálogo cae automáticamente a los datos de ejemplo de `src/data/productos.ts`.
-   - El plan gratuito (Spark) de Firestore alcanza sobra para un catálogo chico/mediano — no necesitás activar facturación.
-3. **⚙️ Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada** → descarga un `.json`. De ahí sacás `project_id`, `client_email` y `private_key`.
+   - El plan gratuito (Spark) alcanza sobra para arrancar.
+3. **Compilación → Authentication** → **Comenzar** → en la pestaña "Sign-in method", habilitá el proveedor **Correo electrónico/contraseña**. Sin este paso, `/login` no va a funcionar.
+4. **⚙️ Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada** → descarga un `.json`. De ahí sacás `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`.
+5. **⚙️ Configuración del proyecto → Tus apps** → si no tenés una "app web" todavía, creá una (el ícono `</>`). Ahí te muestran `apiKey` y `authDomain` — van en `NEXT_PUBLIC_FIREBASE_API_KEY` y `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`.
 
 ## 3. Configurar tu cobro por QR
 
@@ -92,8 +89,9 @@ Podés probar el catálogo y el carrito sin tener Firebase configurado todavía 
 
 ## Qué falta para un negocio más grande (no incluido todavía)
 
-- **Panel de vendedor multi-usuario**: hoy `/admin` es un panel único para vos como dueño de toda la tienda, y `/api/productos` (POST) no tiene login — para un marketplace real con múltiples vendedores, cada uno necesita su propio login y solo poder editar lo suyo.
+- **Recuperar contraseña / verificar email**: `/login` hoy solo tiene registro e inicio de sesión simples — Firebase Auth soporta reset de contraseña y verificación de email, pero no está conectado en la UI todavía.
+- **Perfil de vendedor público**: hoy podés ver quién publicó cada producto (su email), pero no hay una página tipo "todos los productos de este vendedor".
 - **Envíos**: no hay ningún módulo de logística — hay que definir cómo se entrega cada pedido.
-- **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano. El día que te aprueben OpenBCB (o decidas pagar CUCU u otro proveedor), ese paso se puede automatizar reemplazando la lógica de `/checkout` y agregando un endpoint de webhook — el resto del proyecto (Firestore, carrito, catálogo) no cambia.
-- **Página de detalle de producto** y **historial de pedidos del comprador** — hoy el catálogo es solo una grilla con carrito.
-# qhatu-marketplace
+- **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano. El día que te aprueben OpenBCB (o decidas pagar CUCU u otro proveedor), ese paso se puede automatizar.
+- **Página de detalle de producto** y **"mis compras" para el comprador** — hoy el catálogo es solo una grilla con carrito, y el comprador no tiene una pantalla para ver el historial de lo que compró.
+- **Moderación**: cualquier usuario logueado puede publicar lo que quiera — no hay revisión ni reporte de productos inapropiados.

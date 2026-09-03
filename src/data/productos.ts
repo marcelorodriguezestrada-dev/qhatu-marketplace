@@ -1,7 +1,8 @@
 export type Producto = {
-  id: number
+  id: number | string
   nombre: string
   vendedor: string
+  vendedorId?: string
   categoria: 'Calzado' | 'Ropa' | 'Accesorios' | 'Hogar'
   precio: number // en Bolivianos
   icono: string

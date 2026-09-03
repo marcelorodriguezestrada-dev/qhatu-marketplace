@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Producto } from '@/data/productos'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
 import { CartDrawer } from '@/components/CartDrawer'
 import { useCarrito } from '@/lib/store'
+import { useAuth } from '@/lib/auth'
 
 const CATEGORIAS = ['Todo', 'Calzado', 'Ropa', 'Accesorios', 'Hogar']
 
@@ -15,6 +17,7 @@ export default function CatalogoPage() {
   const [busqueda, setBusqueda] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
+  const { usuario, logout } = useAuth()
 
   useEffect(() => {
     fetch('/api/productos')
@@ -41,17 +44,32 @@ export default function CatalogoPage() {
   return (
     <div className="min-h-screen">
       <div className="bg-ink px-5 py-3.5">
-        <div className="max-w-[960px] mx-auto flex items-center gap-4">
-          <span className="font-display text-xl font-bold text-white">Qhatu</span>
+        <div className="max-w-[960px] mx-auto flex items-center gap-3">
+          <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar productos o vendedores"
-            className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50"
+            className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
           />
+          <Link
+            href="/vender"
+            className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
+          >
+            Vender
+          </Link>
+          {usuario ? (
+            <button onClick={() => logout()} className="border-none bg-transparent text-white/70 font-body text-xs shrink-0 whitespace-nowrap">
+              {usuario.email?.split('@')[0]} · salir
+            </button>
+          ) : (
+            <Link href="/login" className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap">
+              Iniciar sesión
+            </Link>
+          )}
           <button
             onClick={() => setCarritoAbierto(true)}
-            className="border-none bg-white/10 text-white px-4 py-2 rounded-lg font-body text-sm"
+            className="border-none bg-white/10 text-white px-4 py-2 rounded-lg font-body text-sm shrink-0"
           >
             Carrito {cantidadCarrito > 0 && `(${cantidadCarrito})`}
           </button>
