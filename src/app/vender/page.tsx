@@ -31,6 +31,7 @@ export default function VenderPage() {
   const [categoria, setCategoria] = useState(CATEGORIAS[0])
   const [precio, setPrecio] = useState('')
   const [precioOriginal, setPrecioOriginal] = useState('')
+  const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [icono, setIcono] = useState(ICONOS[0])
   const [imagenUrl, setImagenUrl] = useState('')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
@@ -110,8 +111,13 @@ export default function VenderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          nombre, categoria, precio: Number(precio), icono, imagenUrl,
+          nombre,
+          categoria,
+          precio: Number(precio),
+          icono,
+          imagenUrl,
           precioOriginal: precioOriginal ? Number(precioOriginal) : null,
+          plan,
         }),
       })
       const data = await res.json()
@@ -185,6 +191,31 @@ export default function VenderPage() {
             Dejalo vacío si no tenés descuento. Si lo completás, tiene que ser mayor al precio actual.
           </div>
         </div>
+        <div className="mb-4">
+          <div className="font-body text-xs text-inksoft mb-1.5">Plan del vendedor</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPlan('basico')}
+              className={`px-3 py-2 rounded-lg border font-body text-sm ${plan === 'basico' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'}`}
+            >
+              Básico
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlan('premium')}
+              className={`px-3 py-2 rounded-lg border font-body text-sm ${plan === 'premium' ? 'border-ochre bg-ochresoft text-ochre' : 'border-line text-inksoft'}`}
+            >
+              Premium
+            </button>
+          </div>
+          <div className="font-body text-[11px] text-inksoft mt-1.5">
+            {plan === 'premium'
+              ? 'Tu producto aparece destacado y arriba del catálogo.'
+              : 'Tu producto se publica como estándar.'}
+          </div>
+        </div>
+
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Foto del producto</div>
           <div className="flex items-center gap-3 flex-wrap">

@@ -9,6 +9,7 @@ export type Producto = {
   icono: string
   imagenUrl?: string
   createdAt?: string
+  plan?: 'basico' | 'premium'
 }
 
 // Catálogo semilla. En producción esto vive en Firestore (colección

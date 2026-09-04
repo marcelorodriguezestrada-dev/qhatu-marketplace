@@ -39,6 +39,11 @@ export function ProductCard({ p }: { p: Producto }) {
         ) : (
           <ProductIcon kind={p.icono} size={44} />
         )}
+        {p.plan === 'premium' && (
+          <span className="absolute top-2.5 left-2.5 bg-ochre text-white text-[11px] font-bold px-2 py-0.5 rounded font-body">
+            Premium
+          </span>
+        )}
         {tieneDescuento && (
           <span className="absolute top-2.5 left-2.5 bg-teal text-white text-[11px] font-bold px-2 py-0.5 rounded font-body">
             {porcentajeOff}% OFF

@@ -18,7 +18,11 @@ export async function GET() {
     const productos = snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter((p: any) => p.estado !== 'rechazado' && p.estado !== 'oculto')
-      .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .sort((a: any, b: any) => {
+        const premiumDiff = Number(b.plan === 'premium') - Number(a.plan === 'premium')
+        if (premiumDiff !== 0) return premiumDiff
+        return (b.createdAt || '').localeCompare(a.createdAt || '')
+      })
     return NextResponse.json({ productos, fuente: 'firestore' })
   } catch (err) {
     console.error('GET /api/productos', err)
@@ -36,10 +40,11 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan } = body
     if (!nombre || !categoria || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
+    const planValido = plan === 'premium' ? 'premium' : 'basico'
     // El descuento tiene que ser real: si mandan un precioOriginal, tiene
     // que ser mayor al precio actual, o lo ignoramos.
     const precioOriginalValido =
@@ -55,6 +60,7 @@ export async function POST(req: NextRequest) {
       imagenUrl: imagenUrl || '',
       vendedorId: usuario.uid,
       vendedor: usuario.email,
+      plan: planValido,
       estado: 'activo',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
