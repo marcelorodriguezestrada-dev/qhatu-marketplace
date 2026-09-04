@@ -19,6 +19,7 @@ export default function VenderPage() {
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState(CATEGORIAS[0])
   const [precio, setPrecio] = useState('')
+  const [precioOriginal, setPrecioOriginal] = useState('')
   const [icono, setIcono] = useState(ICONOS[0])
   const [imagenUrl, setImagenUrl] = useState('')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
@@ -74,13 +75,20 @@ export default function VenderPage() {
       setError('Completá el nombre y el precio.')
       return
     }
+    if (precioOriginal && Number(precioOriginal) <= Number(precio)) {
+      setError('El precio anterior tiene que ser mayor al precio actual, o dejalo vacío.')
+      return
+    }
     setPublicando(true)
     try {
       const token = await obtenerToken()
       const res = await fetch('/api/productos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ nombre, categoria, precio: Number(precio), icono, imagenUrl }),
+        body: JSON.stringify({
+          nombre, categoria, precio: Number(precio), icono, imagenUrl,
+          precioOriginal: precioOriginal ? Number(precioOriginal) : null,
+        }),
       })
       const data = await res.json()
       if (data.error) {
@@ -89,6 +97,7 @@ export default function VenderPage() {
       }
       setNombre('')
       setPrecio('')
+      setPrecioOriginal('')
       setImagenUrl('')
       await cargarMisProductos()
     } finally {
@@ -139,6 +148,18 @@ export default function VenderPage() {
             placeholder="Precio en Bs"
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
+        </div>
+        <div className="mb-3">
+          <input
+            type="number"
+            value={precioOriginal}
+            onChange={(e) => setPrecioOriginal(e.target.value)}
+            placeholder="Precio anterior (opcional, para mostrar descuento)"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+          <div className="font-body text-[11px] text-inksoft mt-1.5">
+            Dejalo vacío si no tenés descuento. Si lo completás, tiene que ser mayor al precio actual.
+          </div>
         </div>
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Foto del producto</div>
@@ -206,7 +227,15 @@ export default function VenderPage() {
           </div>
           <div className="flex-1">
             <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
-            <div className="font-body text-xs text-inksoft">{p.categoria} · {bs(p.precio)}</div>
+            <div className="font-body text-xs text-inksoft">
+              {p.categoria} · {p.precioOriginal ? (
+                <>
+                  <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
+                </>
+              ) : (
+                bs(p.precio)
+              )}
+            </div>
           </div>
           <button
             onClick={() => borrar(p.id)}

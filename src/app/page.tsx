@@ -97,7 +97,7 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))' }}>
           {filtrados.map((p) => (
             <ProductCard key={p.id} p={p} />
           ))}

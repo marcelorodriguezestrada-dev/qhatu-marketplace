@@ -5,8 +5,10 @@ export type Producto = {
   vendedorId?: string
   categoria: 'Calzado' | 'Ropa' | 'Accesorios' | 'Hogar'
   precio: number // en Bolivianos
+  precioOriginal?: number // opcional — si el vendedor carga un precio "antes de", se muestra tachado con el % de descuento real
   icono: string
   imagenUrl?: string
+  createdAt?: string
 }
 
 // Catálogo semilla. En producción esto vive en Firestore (colección

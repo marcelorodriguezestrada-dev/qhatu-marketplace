@@ -44,13 +44,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Ese producto no te pertenece.' }, { status: 403 })
     }
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal } = body
     const cambios: Record<string, unknown> = {}
     if (nombre !== undefined) cambios.nombre = nombre
     if (categoria !== undefined) cambios.categoria = categoria
     if (precio !== undefined) cambios.precio = precio
     if (icono !== undefined) cambios.icono = icono
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
+    if (precioOriginal !== undefined) cambios.precioOriginal = precioOriginal
     await ref.update(cambios)
     return NextResponse.json({ ok: true })
   } catch (err) {

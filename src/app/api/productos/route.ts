@@ -4,9 +4,10 @@ import { PRODUCTOS_SEED } from '@/data/productos'
 
 export const dynamic = 'force-dynamic'
 
-// GET público: devuelve el catálogo completo (de todos los vendedores).
-// Si todavía no hay productos cargados por usuarios, cae al catálogo
-// semilla para que la tienda no se vea vacía en desarrollo.
+// GET público: devuelve el catálogo completo (de todos los vendedores),
+// ordenado por más recientes primero. Si todavía no hay productos
+// cargados por usuarios, cae al catálogo semilla para que la tienda no
+// se vea vacía en desarrollo.
 export async function GET() {
   try {
     const db = getDb()
@@ -14,7 +15,9 @@ export async function GET() {
     if (snap.empty) {
       return NextResponse.json({ productos: PRODUCTOS_SEED, fuente: 'seed' })
     }
-    const productos = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    const productos = snap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     return NextResponse.json({ productos, fuente: 'firestore' })
   } catch (err) {
     console.error('GET /api/productos', err)
@@ -32,15 +35,21 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal } = body
     if (!nombre || !categoria || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
+    // El descuento tiene que ser real: si mandan un precioOriginal, tiene
+    // que ser mayor al precio actual, o lo ignoramos.
+    const precioOriginalValido =
+      precioOriginal && Number(precioOriginal) > Number(precio) ? Number(precioOriginal) : null
+
     const db = getDb()
     const ref = await db.collection('productos').add({
       nombre,
       categoria,
       precio,
+      precioOriginal: precioOriginalValido,
       icono: icono || 'shoe',
       imagenUrl: imagenUrl || '',
       vendedorId: usuario.uid,
