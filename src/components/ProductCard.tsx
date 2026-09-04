@@ -16,7 +16,7 @@ export function ProductCard({ p }: { p: Producto }) {
 
   return (
     <div className="bg-panel border border-line rounded-[10px] overflow-hidden flex flex-col">
-      <div className="bg-panelalt py-7 flex justify-center items-center text-maroon overflow-hidden h-[104px]">
+      <div className="bg-panelalt flex justify-center items-center text-maroon overflow-hidden h-36">
         {mostrarFoto ? (
           <img
             src={p.imagenUrl}
