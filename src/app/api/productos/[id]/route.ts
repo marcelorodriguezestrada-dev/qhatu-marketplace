@@ -45,9 +45,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 // PATCH: editar precio/nombre/categoría — mismo chequeo de dueño.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
-  if (!usuario) {
+  const password = req.headers.get('x-admin-password')
+  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+
+  if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
   }
+
   try {
     const db = getDb()
     const ref = db.collection('productos').doc(params.id)
@@ -55,18 +59,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!doc.exists) {
       return NextResponse.json({ error: 'Producto no encontrado.' }, { status: 404 })
     }
-    if (doc.data()?.vendedorId !== usuario.uid) {
+
+    if (!esAdmin && doc.data()?.vendedorId !== usuario?.uid) {
       return NextResponse.json({ error: 'Ese producto no te pertenece.' }, { status: 403 })
     }
+
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, estado } = body
     const cambios: Record<string, unknown> = {}
+
     if (nombre !== undefined) cambios.nombre = nombre
     if (categoria !== undefined) cambios.categoria = categoria
     if (precio !== undefined) cambios.precio = precio
     if (icono !== undefined) cambios.icono = icono
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
     if (precioOriginal !== undefined) cambios.precioOriginal = precioOriginal
+    if (estado !== undefined) {
+      if (!esAdmin) {
+        return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado del producto.' }, { status: 403 })
+      }
+      if (!['activo', 'pendiente', 'rechazado', 'oculto'].includes(estado)) {
+        return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
+      }
+      cambios.estado = estado
+    }
+
+    cambios.updatedAt = new Date().toISOString()
     await ref.update(cambios)
     return NextResponse.json({ ok: true })
   } catch (err) {

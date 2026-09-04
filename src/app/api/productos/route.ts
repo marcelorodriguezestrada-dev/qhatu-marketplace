@@ -17,6 +17,7 @@ export async function GET() {
     }
     const productos = snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((p: any) => p.estado !== 'rechazado' && p.estado !== 'oculto')
       .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     return NextResponse.json({ productos, fuente: 'firestore' })
   } catch (err) {
@@ -54,7 +55,9 @@ export async function POST(req: NextRequest) {
       imagenUrl: imagenUrl || '',
       vendedorId: usuario.uid,
       vendedor: usuario.email,
+      estado: 'activo',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     })
     return NextResponse.json({ id: ref.id })
   } catch (err) {

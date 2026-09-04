@@ -11,6 +11,10 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
   pendiente_pago: { texto: 'Esperando que pague', color: 'text-inksoft' },
   informado_pago: { texto: 'Dice que ya pagó — revisar', color: 'text-ochre' },
   pagado: { texto: 'Pagado', color: 'text-teal' },
+  en_preparacion: { texto: 'En preparación', color: 'text-indigo-600' },
+  en_entrega: { texto: 'En entrega', color: 'text-amber-600' },
+  entregado: { texto: 'Entregado', color: 'text-emerald-600' },
+  cancelado: { texto: 'Cancelado', color: 'text-red-600' },
 }
 
 const ICONOS_SERVICIO = ['contador', 'odontologo', 'pintor', 'plomero', 'electricista', 'profesor', 'otro']
@@ -20,9 +24,10 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'servicios'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios'>('pedidos')
 
   const [pedidos, setPedidos] = useState<any[]>([])
+  const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
 
   // Formulario de alta de profesional
@@ -63,6 +68,7 @@ export default function AdminPage() {
         setError('')
         localStorage.setItem('qhatu_admin_pw', pw)
         cargarProfesionales()
+        cargarProductos()
       })
       .catch((e) => {
         setError(e.message)
@@ -77,12 +83,30 @@ export default function AdminPage() {
       .then((data) => setProfesionales(data.profesionales || []))
   }
 
-  function confirmarPago(id: string) {
+  function cargarProductos() {
+    fetch('/api/productos')
+      .then((r) => r.json())
+      .then((data) => setProductos(data.productos || []))
+  }
+
+  function cambiarEstadoProducto(id: string, estado: 'activo' | 'pendiente' | 'rechazado' | 'oculto') {
+    fetch(`/api/productos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ estado }),
+    }).then(() => cargarProductos())
+  }
+
+  function cambiarEstadoPedido(id: string, estado: 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
     fetch(`/api/pedidos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ estado: 'pagado' }),
+      body: JSON.stringify({ estado }),
     }).then(() => entrar(password))
+  }
+
+  function confirmarPago(id: string) {
+    cambiarEstadoPedido(id, 'pagado')
   }
 
   // Mismo endpoint que usan los vendedores en /vender, pero acá nos
@@ -176,12 +200,18 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
-      <div className="flex gap-2 mb-6 border-b border-line">
+      <div className="flex gap-2 mb-6 border-b border-line flex-wrap">
         <button
           onClick={() => setTab('pedidos')}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'pedidos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Pedidos
+        </button>
+        <button
+          onClick={() => setTab('productos')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'productos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Productos
         </button>
         <button
           onClick={() => setTab('servicios')}
@@ -197,23 +227,72 @@ export default function AdminPage() {
           {pedidos.map((p) => {
             const estado = ESTADOS_LABEL[p.estado] || { texto: p.estado, color: 'text-inksoft' }
             return (
-              <div key={p.id} className="bg-panel border border-line rounded-lg p-4 mb-3 flex items-center justify-between">
-                <div>
-                  <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
-                  <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
-                  <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
+              <div key={p.id} className="bg-panel border border-line rounded-lg p-4 mb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
+                    <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
+                    <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
+                  </div>
+                  {p.estado !== 'pagado' && p.estado !== 'en_preparacion' && p.estado !== 'en_entrega' && p.estado !== 'entregado' && p.estado !== 'cancelado' && (
+                    <button
+                      onClick={() => confirmarPago(p.id)}
+                      className="px-3.5 py-2 rounded-md border-none bg-teal text-white font-body text-xs font-semibold shrink-0"
+                    >
+                      Confirmar pago
+                    </button>
+                  )}
                 </div>
-                {p.estado !== 'pagado' && (
-                  <button
-                    onClick={() => confirmarPago(p.id)}
-                    className="px-3.5 py-2 rounded-md border-none bg-teal text-white font-body text-xs font-semibold shrink-0"
-                  >
-                    Confirmar pago
-                  </button>
+
+                {p.estado === 'pagado' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'en_preparacion')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">En preparación</button>
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'en_entrega')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">En entrega</button>
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'entregado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">Entregado</button>
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Cancelar</button>
+                  </div>
+                )}
+
+                {p.estado === 'en_preparacion' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'en_entrega')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">Enviar</button>
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Cancelar</button>
+                  </div>
+                )}
+
+                {p.estado === 'en_entrega' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'entregado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">Marcar entregado</button>
+                  </div>
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {tab === 'productos' && (
+        <div>
+          <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
+          {productos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
+          {productos.map((p) => (
+            <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-3 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
+                {p.imagenUrl ? <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" /> : <span className="font-body text-[10px] text-inksoft">IMG</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
+                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {p.categoria} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
+                <div className="font-body text-[11px] text-inksoft mt-1">Estado: {p.estado || 'activo'}</div>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-end">
+                <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'activo')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Activo</button>
+                <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'pendiente')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Pendiente</button>
+                <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'oculto')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Ocultar</button>
+                <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'rechazado')} className="px-2 py-1 rounded-md border border-line font-body text-[11px] text-maroon">Rechazar</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -26,31 +26,45 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //  - estado: "informado_pago"  → lo dispara el COMPRADOR al apretar
 //    "Ya pagué" en el checkout. No requiere contraseña: es solo un aviso,
 //    todavía no mueve plata ni confirma nada por sí mismo.
-//  - estado: "pagado"          → lo dispara EL VENDEDOR desde /admin,
-//    después de revisar a mano que el QR realmente se pagó. Requiere el
-//    header x-admin-password.
+//  - Estados de operación: "pagado", "en_preparacion", "en_entrega",
+//    "entregado", "cancelado" → los dispara EL VENDEDOR desde /admin,
+//    después de revisar el pago o el avance del pedido. Requieren el header
+//    x-admin-password.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
     const { estado } = body
+    if (!estado) {
+      return NextResponse.json({ error: 'Falta el estado del pedido.' }, { status: 400 })
+    }
+
+    const estadosValidos = ['informado_pago', 'pagado', 'en_preparacion', 'en_entrega', 'entregado', 'cancelado']
+    if (!estadosValidos.includes(estado)) {
+      return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
+    }
+
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
+    const password = req.headers.get('x-admin-password')
 
     if (estado === 'informado_pago') {
-      await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString() })
+      await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       return NextResponse.json({ ok: true })
     }
 
-    if (estado === 'pagado') {
-      const password = req.headers.get('x-admin-password')
-      if (!password || password !== process.env.ADMIN_PASSWORD) {
-        return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
-      }
-      await ref.update({ estado: 'pagado', pagadoAt: new Date().toISOString() })
-      return NextResponse.json({ ok: true })
+    if (!password || password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
     }
 
-    return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
+    const payload: Record<string, string> = { estado, updatedAt: new Date().toISOString() }
+    if (estado === 'pagado') payload.pagadoAt = new Date().toISOString()
+    if (estado === 'en_preparacion') payload.enPreparacionAt = new Date().toISOString()
+    if (estado === 'en_entrega') payload.enEntregaAt = new Date().toISOString()
+    if (estado === 'entregado') payload.entregadoAt = new Date().toISOString()
+    if (estado === 'cancelado') payload.canceladoAt = new Date().toISOString()
+
+    await ref.update(payload)
+    return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/pedidos/[id]', err)
     return NextResponse.json({ error: 'No se pudo actualizar el pedido.' }, { status: 500 })
