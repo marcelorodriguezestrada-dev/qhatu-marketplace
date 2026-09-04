@@ -1,25 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/firebaseAdmin'
+import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
 // GET: lista completa de pedidos, para el panel /admin. Protegido con
 // contraseña porque muestra datos de contacto de compradores.
+// También acepta un token de Firebase para que el vendedor pueda ver solo
+// los pedidos que implican a sus productos.
 export async function GET(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (password && password === process.env.ADMIN_PASSWORD) {
+    try {
+      const db = getDb()
+      const snap = await db.collection('pedidos').get()
+      const pedidos = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      return NextResponse.json({ pedidos })
+    } catch (err) {
+      console.error('GET /api/pedidos admin', err)
+      return NextResponse.json({ error: 'No se pudieron cargar los pedidos.' }, { status: 500 })
+    }
   }
+
+  const usuario = await getUsuarioDesdeRequest(req)
+  if (!usuario) {
+    return NextResponse.json({ error: 'Necesitás iniciar sesión para ver tus pedidos.' }, { status: 401 })
+  }
+
   try {
     const db = getDb()
     const snap = await db.collection('pedidos').get()
     const pedidos = snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((pedido: any) => {
+        const comprador = typeof pedido.comprador === 'string' ? pedido.comprador.toLowerCase() : ''
+        const email = typeof usuario.email === 'string' ? usuario.email.toLowerCase() : ''
+        const items = Array.isArray(pedido.items) ? pedido.items : []
+        const esComprador = comprador === email
+        const esVendedor = items.some((item: any) => item?.vendedorId === usuario.uid || item?.vendedor === usuario.email)
+        return esComprador || esVendedor
+      })
       .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     return NextResponse.json({ pedidos })
   } catch (err) {
-    console.error('GET /api/pedidos', err)
-    return NextResponse.json({ error: 'No se pudieron cargar los pedidos.' }, { status: 500 })
+    console.error('GET /api/pedidos usuario', err)
+    return NextResponse.json({ error: 'No se pudieron cargar tus pedidos.' }, { status: 500 })
   }
 }
 

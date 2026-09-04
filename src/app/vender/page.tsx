@@ -12,10 +12,21 @@ function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
 
+const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
+  pendiente_pago: { texto: 'Esperando pago', color: 'text-inksoft' },
+  informado_pago: { texto: 'Pago avisado', color: 'text-ochre' },
+  pagado: { texto: 'Pagado', color: 'text-teal' },
+  en_preparacion: { texto: 'En preparación', color: 'text-indigo-600' },
+  en_entrega: { texto: 'En entrega', color: 'text-amber-600' },
+  entregado: { texto: 'Entregado', color: 'text-emerald-600' },
+  cancelado: { texto: 'Cancelado', color: 'text-red-600' },
+}
+
 export default function VenderPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
   const router = useRouter()
   const [misProductos, setMisProductos] = useState<any[]>([])
+  const [misPedidos, setMisPedidos] = useState<any[]>([])
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState(CATEGORIAS[0])
   const [precio, setPrecio] = useState('')
@@ -31,7 +42,10 @@ export default function VenderPage() {
   }, [cargando, usuario, router])
 
   useEffect(() => {
-    if (usuario) cargarMisProductos()
+    if (usuario) {
+      cargarMisProductos()
+      cargarMisPedidos()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario])
 
@@ -40,6 +54,16 @@ export default function VenderPage() {
     const data = await res.json()
     const propios = (data.productos || []).filter((p: any) => p.vendedorId === usuario?.uid)
     setMisProductos(propios)
+  }
+
+  async function cargarMisPedidos() {
+    const token = await obtenerToken()
+    if (!token) return
+    const res = await fetch('/api/pedidos', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    setMisPedidos(data.pedidos || [])
   }
 
   // Mismo patrón que el resto de la app: subimos el archivo a nuestro
@@ -211,6 +235,29 @@ export default function VenderPage() {
           {publicando ? 'Publicando...' : 'Publicar producto'}
         </button>
       </form>
+
+      <div className="bg-panel border border-line rounded-xl p-4 mb-8">
+        <div className="font-body text-sm font-semibold text-ink mb-3">Mis pedidos ({misPedidos.length})</div>
+        {misPedidos.length === 0 && (
+          <div className="font-body text-sm text-inksoft">Todavía no tenés pedidos para tus productos.</div>
+        )}
+        {misPedidos.map((p) => {
+          const estado = ESTADOS_LABEL[p.estado] || { texto: p.estado, color: 'text-inksoft' }
+          const itemsVendidos = (p.items || []).filter((it: any) => it.vendedorId === usuario.uid || it.vendedor === usuario.email)
+          return (
+            <div key={p.id} className="border border-line rounded-lg p-3 mb-2.5 bg-white/40">
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <div className="font-body text-xs text-inksoft">Pedido #{p.id.slice(0, 6)}</div>
+                <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
+              </div>
+              <div className="font-body text-sm font-medium text-ink">{itemsVendidos.length} producto(s) · {bs(p.total)}</div>
+              <div className="font-body text-[11px] text-inksoft mt-1">
+                Comprador: {p.comprador || 'Sin email'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
       <div className="font-body text-sm font-semibold text-ink mb-3">Mis productos ({misProductos.length})</div>
       {misProductos.length === 0 && (

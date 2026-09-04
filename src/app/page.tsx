@@ -65,9 +65,14 @@ export default function CatalogoPage() {
             Vender
           </Link>
           {usuario ? (
-            <button onClick={() => logout()} className="border-none bg-transparent text-white/70 font-body text-xs shrink-0 whitespace-nowrap">
-              {usuario.email?.split('@')[0]} · salir
-            </button>
+            <>
+              <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap">
+                Mis pedidos
+              </Link>
+              <button onClick={() => logout()} className="border-none bg-transparent text-white/70 font-body text-xs shrink-0 whitespace-nowrap">
+                {usuario.email?.split('@')[0]} · salir
+              </button>
+            </>
           ) : (
             <Link href="/login" className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap">
               Iniciar sesión
