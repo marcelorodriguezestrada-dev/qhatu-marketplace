@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Producto } from '@/data/productos'
 import { ProductIcon } from './ProductIcon'
 import { useCarrito } from '@/lib/store'
@@ -27,7 +28,7 @@ export function ProductCard({ p }: { p: Producto }) {
 
   return (
     <div className="bg-panel border border-line rounded-xl overflow-hidden flex flex-col transition-shadow hover:shadow-md">
-      <div className="bg-panelalt flex justify-center items-center text-maroon overflow-hidden h-48 relative">
+      <Link href={`/producto/${p.id}`} className="bg-panelalt flex justify-center items-center text-maroon overflow-hidden h-48 relative">
         {mostrarFoto ? (
           <img
             src={p.imagenUrl}
@@ -48,10 +49,12 @@ export function ProductCard({ p }: { p: Producto }) {
             Nuevo
           </span>
         )}
-      </div>
+      </Link>
       <div className="p-4 flex flex-col flex-1">
         <div className="text-[11px] text-inksoft font-body mb-1">{p.vendedor}</div>
-        <div className="font-body text-[14px] font-medium text-ink mb-2 flex-1 leading-snug">{p.nombre}</div>
+        <Link href={`/producto/${p.id}`} className="font-body text-[14px] font-medium text-ink mb-2 flex-1 leading-snug hover:underline">
+          {p.nombre}
+        </Link>
 
         {tieneDescuento && (
           <div className="font-body text-[12px] text-inksoft line-through mb-0.5">

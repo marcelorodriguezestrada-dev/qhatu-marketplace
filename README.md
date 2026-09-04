@@ -39,7 +39,8 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
   - **Pedidos**: lista y confirmación manual de pagos.
   - **Servicios profesionales**: alta y baja de profesionales del directorio. A diferencia de los productos (que cualquier usuario publica solo), los profesionales **solo los cargás vos desde acá** — así lo plantea el negocio: el profesional te contacta a vos, y vos lo subís clasificado.
 - `/api/productos` — GET público (catálogo completo). POST requiere estar logueado y asocia el producto al usuario.
-- `/api/productos/[id]` — DELETE y PATCH, solo para el usuario dueño del producto.
+- `/producto/[id]` — página de detalle de un producto: foto grande, descuento real si tiene, selector de cantidad, "Comprar ahora" o "Agregar al carrito", y productos relacionados de la misma categoría.
+- `/api/productos/[id]` — GET público (detalle de un producto). DELETE y PATCH, solo para el usuario dueño.
 - `/api/upload-image` — sube una foto a ImgBB y devuelve la URL. Requiere estar logueado.
 - `/api/profesionales` — GET público (directorio completo). POST protegido con `ADMIN_PASSWORD`.
 - `/api/profesionales/[id]` — GET público (perfil + reseñas). DELETE protegido con `ADMIN_PASSWORD`.
@@ -114,5 +115,5 @@ Podés probar el catálogo y el carrito sin tener Firebase configurado todavía 
 - **Recuperar contraseña / verificar email**: `/login` hoy solo tiene registro e inicio de sesión simples.
 - **Envíos** para el carrito de productos: no hay ningún módulo de logística.
 - **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano.
-- **Página de detalle de producto** y **"mis compras" para el comprador**.
+- **"Mis compras" para el comprador** — no hay pantalla de historial de lo que compró (sí tiene la de detalle de producto, ya implementada).
 - **Moderación**: cualquier usuario logueado puede publicar productos sin revisión (los profesionales sí quedan controlados, porque solo vos los cargás).

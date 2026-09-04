@@ -3,6 +3,21 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
+// GET: perfil público de un producto, para la página de detalle.
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const db = getDb()
+    const doc = await db.collection('productos').doc(params.id).get()
+    if (!doc.exists) {
+      return NextResponse.json({ error: 'Producto no encontrado.' }, { status: 404 })
+    }
+    return NextResponse.json({ id: doc.id, ...doc.data() })
+  } catch (err) {
+    console.error('GET /api/productos/[id]', err)
+    return NextResponse.json({ error: 'No se pudo cargar el producto.' }, { status: 500 })
+  }
+}
+
 // DELETE: solo el usuario que publicó el producto puede borrarlo.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
