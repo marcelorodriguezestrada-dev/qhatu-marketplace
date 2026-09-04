@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, descripcion, zona, lat, lng, whatsapp, icono, plan } = body
+    const { nombre, rubro, descripcion, zona, lat, lng, whatsapp, icono, plan, imagenUrl, precio, experiencia } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
       lng: lng != null ? Number(lng) : null,
       whatsapp,
       icono: icono || 'otro',
+      imagenUrl: imagenUrl || '',
+      precio: precio ? Number(precio) : null, // null = "Precio a convenir"
+      experiencia: experiencia || '',
       plan: plan === 'premium' ? 'premium' : 'basico',
       ratingPromedio: 0,
       cantidadResenas: 0,

@@ -13,9 +13,16 @@ type Profesional = {
   lat: number | null
   lng: number | null
   icono: string
+  imagenUrl?: string
+  precio?: number | null
+  experiencia?: string
   plan: string
   ratingPromedio: number
   cantidadResenas: number
+}
+
+function bs(n: number) {
+  return 'Bs ' + n.toLocaleString('es-BO')
 }
 
 // Fórmula de Haversine — distancia en km entre dos puntos geográficos.
@@ -151,27 +158,34 @@ export default function ServiciosPage() {
         </div>
         {errorUbicacion && <div className="font-body text-xs text-maroon mb-4">{errorUbicacion}</div>}
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+        <div className="flex flex-col gap-3">
           {filtrados.map((p) => (
             <Link
               key={p.id}
               href={`/servicios/${p.id}`}
-              className="bg-panel border border-line rounded-[10px] overflow-hidden flex flex-col"
+              className="bg-panel border border-line rounded-lg overflow-hidden flex items-stretch gap-4 p-3 hover:shadow-md transition-shadow"
             >
-              <div className="bg-panelalt py-6 flex justify-center text-maroon relative">
-                <ServiceIcon kind={p.icono} />
+              <div className="w-28 h-28 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden relative">
+                {p.imagenUrl ? (
+                  <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                ) : (
+                  <ServiceIcon kind={p.icono} size={40} />
+                )}
                 {p.plan === 'premium' && (
-                  <span className="absolute top-2 right-2 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
+                  <span className="absolute top-1.5 left-1.5 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
                     Destacado
                   </span>
                 )}
               </div>
-              <div className="p-4">
-                <div className="font-body text-[11px] text-inksoft mb-1">
+              <div className="flex-1 py-1 flex flex-col justify-center min-w-0">
+                <div className="font-body text-[11px] text-inksoft mb-0.5">
                   {RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro}
                 </div>
-                <div className="font-display text-[15px] font-semibold text-ink mb-1">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft mb-2">{p.zona}</div>
+                <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
+                <div className="font-body text-sm font-bold text-ink mb-1">
+                  {p.precio ? bs(p.precio) : 'Precio a convenir'}
+                </div>
+                <div className="font-body text-xs text-inksoft mb-1">{p.zona}</div>
                 {p.cantidadResenas > 0 ? (
                   <div className="flex items-center gap-1.5">
                     <Estrellas valor={p.ratingPromedio} />

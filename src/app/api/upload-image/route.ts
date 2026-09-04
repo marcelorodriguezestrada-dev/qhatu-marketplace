@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 
 // Sube una imagen a ImgBB (servicio gratuito de hosting de imágenes) y
-// devuelve la URL pública resultante. Requiere estar logueado — sin
-// esto, cualquiera podría usar tu cuenta de ImgBB como hosting gratuito
-// para lo que sea, no solo para productos de Qhatu.
+// devuelve la URL pública resultante. Acepta dos formas de autenticarse:
+// - Un usuario logueado (Firebase Auth) — así lo usan los vendedores
+//   desde /vender.
+// - La contraseña de administrador — así lo usa el panel /admin al
+//   subir la foto de un profesional (ese panel no tiene login de
+//   Firebase, usa su propio sistema de contraseña).
+// Sin uno de los dos, cualquiera podría usar tu cuenta de ImgBB como
+// hosting gratuito para lo que sea.
 export async function POST(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
-  if (!usuario) {
+  const passwordAdmin = req.headers.get('x-admin-password')
+  const esAdmin = passwordAdmin && passwordAdmin === process.env.ADMIN_PASSWORD
+
+  if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión para subir una imagen.' }, { status: 401 })
   }
 

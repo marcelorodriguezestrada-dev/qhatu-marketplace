@@ -34,6 +34,10 @@ export default function AdminPage() {
   const [lng, setLng] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [icono, setIcono] = useState(ICONOS_SERVICIO[0])
+  const [imagenUrl, setImagenUrl] = useState('')
+  const [subiendoImagen, setSubiendoImagen] = useState(false)
+  const [precio, setPrecio] = useState('')
+  const [experiencia, setExperiencia] = useState('')
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [publicando, setPublicando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
@@ -81,6 +85,31 @@ export default function AdminPage() {
     }).then(() => entrar(password))
   }
 
+  // Mismo endpoint que usan los vendedores en /vender, pero acá nos
+  // autenticamos con la contraseña de admin en vez de un login de
+  // Firebase (este panel no usa ese sistema de cuentas).
+  async function subirImagenProfesional(file: File | null) {
+    if (!file) return
+    setSubiendoImagen(true)
+    setErrorForm('')
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setImagenUrl(data.url)
+    } catch (e: any) {
+      setErrorForm('Error subiendo la imagen: ' + e.message)
+    } finally {
+      setSubiendoImagen(false)
+    }
+  }
+
   async function publicarProfesional(e: React.FormEvent) {
     e.preventDefault()
     setErrorForm('')
@@ -96,7 +125,9 @@ export default function AdminPage() {
         body: JSON.stringify({
           nombre, rubro, descripcion, zona,
           lat: lat || null, lng: lng || null,
-          whatsapp, icono, plan,
+          whatsapp, icono, plan, imagenUrl,
+          precio: precio || null,
+          experiencia,
         }),
       })
       const data = await res.json()
@@ -105,6 +136,7 @@ export default function AdminPage() {
         return
       }
       setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
+      setImagenUrl(''); setPrecio(''); setExperiencia('')
       cargarProfesionales()
     } finally {
       setPublicando(false)
@@ -221,6 +253,49 @@ export default function AdminPage() {
               rows={2}
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
+
+            <div className="mb-3">
+              <div className="font-body text-xs text-inksoft mb-1.5">Foto (opcional)</div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {imagenUrl && (
+                  <img
+                    src={imagenUrl}
+                    alt="Vista previa"
+                    className="w-14 h-14 object-cover rounded-lg border border-line"
+                  />
+                )}
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => subirImagenProfesional(e.target.files?.[0] || null)}
+                    disabled={subiendoImagen}
+                    className="font-body text-xs"
+                  />
+                  {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <input
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                type="number"
+                placeholder="Precio en Bs (opcional)"
+                className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+              />
+              <input
+                value={experiencia}
+                onChange={(e) => setExperiencia(e.target.value)}
+                placeholder="Experiencia (ej: 20 años)"
+                className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+              />
+            </div>
+            <div className="font-body text-[11px] text-inksoft mb-3 -mt-2">
+              Si dejás el precio vacío, se muestra "Precio a convenir".
+            </div>
+
             <input
               value={zona}
               onChange={(e) => setZona(e.target.value)}
@@ -264,7 +339,7 @@ export default function AdminPage() {
             {errorForm && <div className="font-body text-xs text-maroon mb-3">{errorForm}</div>}
             <button
               type="submit"
-              disabled={publicando}
+              disabled={publicando || subiendoImagen}
               className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
             >
               {publicando ? 'Publicando...' : 'Publicar profesional'}
@@ -276,8 +351,12 @@ export default function AdminPage() {
           </div>
           {profesionales.map((p) => (
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0">
-                <ServiceIcon kind={p.icono} size={20} />
+              <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+                {p.imagenUrl ? (
+                  <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                ) : (
+                  <ServiceIcon kind={p.icono} size={20} />
+                )}
               </div>
               <div className="flex-1">
                 <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
