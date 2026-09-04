@@ -232,6 +232,9 @@ export default function AdminPage() {
                   <div>
                     <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
                     <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
+                    <div className="font-body text-[11px] text-inksoft mt-1">
+                      {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
+                    </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
                   </div>
                   {p.estado !== 'pagado' && p.estado !== 'en_preparacion' && p.estado !== 'en_entrega' && p.estado !== 'entregado' && p.estado !== 'cancelado' && (

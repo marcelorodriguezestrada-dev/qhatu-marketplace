@@ -11,6 +11,14 @@ function bs(n: number) {
 
 type Paso = 'creando' | 'esperando_qr' | 'esperando_confirmacion' | 'pagado' | 'error'
 
+const COSTOS_ENVIO: Record<string, number> = {
+  'Centro La Paz': 25,
+  'Sopocachi': 30,
+  'El Alto': 35,
+  'Villa Fátima': 40,
+  'Fuera de la ciudad': 60,
+}
+
 // Datos de tu cuenta bancaria/QR, configurables sin tocar código —ver
 // .env.example. Si no cargás la imagen del QR, igual mostramos los
 // datos de la cuenta en texto para que el comprador transfiera a mano.
@@ -26,7 +34,11 @@ export default function CheckoutPage() {
   const [paso, setPaso] = useState<Paso>('creando')
   const [pedidoId, setPedidoId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
+  const [direccion, setDireccion] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const costoEnvio = COSTOS_ENVIO[zonaEntrega] ?? 0
+  const totalPedido = total + costoEnvio
 
   // Al entrar al checkout, creamos el pedido en Firestore como
   // "pendiente_pago". Todavía no hay QR dinámico — mostramos el QR fijo
@@ -41,7 +53,15 @@ export default function CheckoutPage() {
     fetch('/api/pedidos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, total, comprador: usuario?.email || null }),
+      body: JSON.stringify({
+        items,
+        total: totalPedido,
+        comprador: usuario?.email || null,
+        zonaEntrega,
+        direccion,
+        costoEnvio,
+        metodoEntrega: 'delivery',
+      }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -136,7 +156,34 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          <div className="font-display text-2xl font-bold text-ink mt-4 mb-1">{bs(total)}</div>
+          <div className="bg-panelalt border border-line rounded-lg p-3 text-left mb-4">
+            <div className="font-body text-[11px] text-inksoft mb-2">Entrega</div>
+            <label className="block text-left mb-2">
+              <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
+              <select
+                value={zonaEntrega}
+                onChange={(e) => setZonaEntrega(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+              >
+                {Object.keys(COSTOS_ENVIO).map((zona) => (
+                  <option key={zona} value={zona}>{zona} · {bs(COSTOS_ENVIO[zona])}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-left">
+              <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
+              <input
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+                placeholder="Calle, número, barrio"
+                className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+              />
+            </label>
+          </div>
+
+          <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(total)}</div>
+          <div className="font-body text-[12px] text-inksoft mb-1">Envío: {bs(costoEnvio)}</div>
+          <div className="font-display text-2xl font-bold text-ink mt-2 mb-1">{bs(totalPedido)}</div>
           {pedidoId && (
             <div className="font-body text-xs text-inksoft mb-5">
               Incluí la referencia <strong>#{pedidoId.slice(0, 6)}</strong> en el pago si tu banco lo permite

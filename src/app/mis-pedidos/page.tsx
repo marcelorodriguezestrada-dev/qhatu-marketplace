@@ -81,7 +81,10 @@ export default function MisPedidosPage() {
               <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
               <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
             </div>
-            <div className="font-body text-xs text-inksoft mb-3">{(p.items || []).length} producto(s) · {bs(p.total || 0)}</div>
+            <div className="font-body text-xs text-inksoft mb-1">{(p.items || []).length} producto(s) · {bs(p.total || 0)}</div>
+            <div className="font-body text-[11px] text-inksoft mb-3">
+              Envío: {p.zonaEntrega || 'Sin zona'} · {p.direccion || 'Sin dirección'}
+            </div>
             <div className="space-y-2">
               {(p.items || []).map((item: any) => (
                 <div key={`${p.id}-${item.id}`} className="flex items-center gap-3 border-t border-line pt-2">

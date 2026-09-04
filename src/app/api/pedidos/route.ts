@@ -55,15 +55,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
     const db = getDb()
     const ref = await db.collection('pedidos').add({
-      items, total, comprador: comprador || null,
+      items,
+      total: Number(total),
+      comprador: comprador || null,
+      zonaEntrega: zonaEntrega || 'No especificado',
+      direccion: direccion || null,
+      costoEnvio: Number(costoEnvio || 0),
+      metodoEntrega: metodoEntrega || 'delivery',
       estado: 'pendiente_pago',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     })
     return NextResponse.json({ id: ref.id })
   } catch (err) {
