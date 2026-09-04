@@ -6,6 +6,7 @@ export type Producto = {
   categoria: 'Calzado' | 'Ropa' | 'Accesorios' | 'Hogar'
   precio: number // en Bolivianos
   icono: string
+  imagenUrl?: string
 }
 
 // Catálogo semilla. En producción esto vive en Firestore (colección

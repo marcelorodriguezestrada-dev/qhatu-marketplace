@@ -20,6 +20,8 @@ export default function VenderPage() {
   const [categoria, setCategoria] = useState(CATEGORIAS[0])
   const [precio, setPrecio] = useState('')
   const [icono, setIcono] = useState(ICONOS[0])
+  const [imagenUrl, setImagenUrl] = useState('')
+  const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
 
@@ -39,6 +41,32 @@ export default function VenderPage() {
     setMisProductos(propios)
   }
 
+  // Mismo patrón que el resto de la app: subimos el archivo a nuestro
+  // propio endpoint /api/upload-image, que a su vez lo reenvía a ImgBB
+  // (hosting de imágenes gratuito) y nos devuelve la URL pública.
+  async function subirImagen(file: File | null) {
+    if (!file) return
+    setSubiendoImagen(true)
+    setError('')
+    try {
+      const token = await obtenerToken()
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setImagenUrl(data.url)
+    } catch (e: any) {
+      setError('Error subiendo la imagen: ' + e.message)
+    } finally {
+      setSubiendoImagen(false)
+    }
+  }
+
   async function publicar(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -52,7 +80,7 @@ export default function VenderPage() {
       const res = await fetch('/api/productos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ nombre, categoria, precio: Number(precio), icono }),
+        body: JSON.stringify({ nombre, categoria, precio: Number(precio), icono, imagenUrl }),
       })
       const data = await res.json()
       if (data.error) {
@@ -61,6 +89,7 @@ export default function VenderPage() {
       }
       setNombre('')
       setPrecio('')
+      setImagenUrl('')
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -111,6 +140,33 @@ export default function VenderPage() {
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
         </div>
+        <div className="mb-4">
+          <div className="font-body text-xs text-inksoft mb-1.5">Foto del producto</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {imagenUrl && (
+              <img
+                src={imagenUrl}
+                alt="Vista previa"
+                className="w-14 h-14 object-cover rounded-lg border border-line"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              />
+            )}
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => subirImagen(e.target.files?.[0] || null)}
+                disabled={subiendoImagen}
+                className="font-body text-xs"
+              />
+              {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
+            </div>
+          </div>
+          <div className="font-body text-[11px] text-inksoft mt-1.5">
+            Opcional — si no subís foto, se usa el ícono que elijas abajo.
+          </div>
+        </div>
+
         <div className="flex gap-2 mb-4 flex-wrap">
           {ICONOS.map((i) => (
             <button
@@ -128,8 +184,8 @@ export default function VenderPage() {
         {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
         <button
           type="submit"
-          disabled={publicando}
-          className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+          disabled={publicando || subiendoImagen}
+          className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
         >
           {publicando ? 'Publicando...' : 'Publicar producto'}
         </button>
@@ -141,8 +197,12 @@ export default function VenderPage() {
       )}
       {misProductos.map((p) => (
         <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0">
-            <ProductIcon kind={p.icono} size={20} />
+          <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+            {p.imagenUrl ? (
+              <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+            ) : (
+              <ProductIcon kind={p.icono} size={20} />
+            )}
           </div>
           <div className="flex-1">
             <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>

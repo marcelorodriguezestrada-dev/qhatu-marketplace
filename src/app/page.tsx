@@ -53,6 +53,12 @@ export default function CatalogoPage() {
             className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
           />
           <Link
+            href="/servicios"
+            className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap"
+          >
+            Servicios
+          </Link>
+          <Link
             href="/vender"
             className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
           >

@@ -32,8 +32,12 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto">
           {items.map((it) => (
             <div key={it.id} className="flex gap-2.5 py-3 border-b border-line">
-              <div className="w-11 h-11 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0">
-                <ProductIcon kind={it.icono} size={22} />
+              <div className="w-11 h-11 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+                {it.imagenUrl ? (
+                  <img src={it.imagenUrl} alt={it.nombre} className="w-full h-full object-cover" />
+                ) : (
+                  <ProductIcon kind={it.icono} size={22} />
+                )}
               </div>
               <div className="flex-1">
                 <div className="font-body text-[13px] font-medium text-ink">{it.nombre}</div>

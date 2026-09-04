@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Producto } from '@/data/productos'
 import { ProductIcon } from './ProductIcon'
 import { useCarrito } from '@/lib/store'
@@ -10,10 +11,22 @@ function bs(n: number) {
 
 export function ProductCard({ p }: { p: Producto }) {
   const { agregar } = useCarrito()
+  const [imagenRota, setImagenRota] = useState(false)
+  const mostrarFoto = p.imagenUrl && !imagenRota
+
   return (
     <div className="bg-panel border border-line rounded-[10px] overflow-hidden flex flex-col">
-      <div className="bg-panelalt py-7 flex justify-center text-maroon">
-        <ProductIcon kind={p.icono} />
+      <div className="bg-panelalt py-7 flex justify-center items-center text-maroon overflow-hidden h-[104px]">
+        {mostrarFoto ? (
+          <img
+            src={p.imagenUrl}
+            alt={p.nombre}
+            className="w-full h-full object-cover"
+            onError={() => setImagenRota(true)}
+          />
+        ) : (
+          <ProductIcon kind={p.icono} />
+        )}
       </div>
       <div className="p-4 flex flex-col flex-1">
         <div className="text-[11px] text-inksoft font-body mb-1">{p.vendedor}</div>

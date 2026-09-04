@@ -29,13 +29,21 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 
 ## Cómo está armado
 
-- `/` — catálogo público con buscador, filtro por categoría y carrito (ve los productos de todos los vendedores).
+- `/` — catálogo público de productos, con buscador, filtro por categoría y carrito.
+- `/servicios` — **directorio de servicios profesionales** (contadores, odontólogos, pintores, etc.), separado del carrito de compra. Buscable por nombre/zona, filtrable por rubro, y ordenable por mejor calificados o por cercanía (usando la ubicación del navegador + fórmula de Haversine contra la lat/lng que cargaste de cada profesional).
+- `/servicios/[id]` — perfil público de un profesional: descripción, botón directo a WhatsApp (con mensaje precargado), y reseñas de otros usuarios (requiere estar logueado para dejar una).
 - `/login` — registro e inicio de sesión (email + contraseña, vía Firebase Auth).
-- `/vender` — panel para que cualquier usuario logueado publique y borre sus propios productos. Redirige a `/login` si no estás logueado.
+- `/vender` — panel para que cualquier usuario logueado publique y borre sus propios **productos**, con foto real (sube a ImgBB) o ícono de respaldo si prefiere no subir imagen. Redirige a `/login` si no estás logueado.
 - `/checkout` — crea el pedido (asociado a tu cuenta si estás logueado, o como invitado si no), muestra tu QR y espera que confirmes el pago desde `/admin`.
-- `/admin` — tu panel único como dueño de la tienda: lista los pedidos y te deja marcar "Confirmar pago" a mano.
-- `/api/productos` — GET público (catálogo completo). POST requiere estar logueado (header `Authorization: Bearer <token>`) y asocia el producto al usuario.
+- `/admin` — tu panel único como dueño de la plataforma, con dos pestañas:
+  - **Pedidos**: lista y confirmación manual de pagos.
+  - **Servicios profesionales**: alta y baja de profesionales del directorio. A diferencia de los productos (que cualquier usuario publica solo), los profesionales **solo los cargás vos desde acá** — así lo plantea el negocio: el profesional te contacta a vos, y vos lo subís clasificado.
+- `/api/productos` — GET público (catálogo completo). POST requiere estar logueado y asocia el producto al usuario.
 - `/api/productos/[id]` — DELETE y PATCH, solo para el usuario dueño del producto.
+- `/api/upload-image` — sube una foto a ImgBB y devuelve la URL. Requiere estar logueado.
+- `/api/profesionales` — GET público (directorio completo). POST protegido con `ADMIN_PASSWORD`.
+- `/api/profesionales/[id]` — GET público (perfil + reseñas). DELETE protegido con `ADMIN_PASSWORD`.
+- `/api/profesionales/[id]/resenas` — POST: deja una reseña, requiere estar logueado (mismo sistema de cuentas que productos). El promedio se recalcula automáticamente en cada reseña nueva.
 - `/api/pedidos` — GET (lista completa, protegida con `ADMIN_PASSWORD`) y POST (crea un pedido, lo llama el checkout).
 - `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del comprador) y PATCH (el comprador puede marcar "informado_pago" sin contraseña; solo vos podés marcar "pagado", con `ADMIN_PASSWORD`).
 
@@ -55,14 +63,24 @@ npm install
 4. **⚙️ Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada** → descarga un `.json`. De ahí sacás `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`.
 5. **⚙️ Configuración del proyecto → Tus apps** → si no tenés una "app web" todavía, creá una (el ícono `</>`). Ahí te muestran `apiKey` y `authDomain` — van en `NEXT_PUBLIC_FIREBASE_API_KEY` y `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`.
 
-## 3. Configurar tu cobro por QR
+## 3. Configurar ImgBB (fotos de producto) — gratis
+
+Los vendedores suben la foto de cada producto directo desde `/vender`. Por atrás, la imagen se reenvía a **ImgBB** (hosting de imágenes gratuito, sin límite de tiempo, sin tarjeta):
+
+1. Creá una cuenta gratis en [api.imgbb.com](https://api.imgbb.com/).
+2. Generá tu API key desde ahí mismo.
+3. Cargala en `IMGBB_API_KEY`.
+
+Si no configurás esto, `/vender` sigue funcionando igual (el producto se puede publicar solo con el ícono, sin foto) — pero al intentar subir una imagen va a mostrar un error hasta que cargues la key.
+
+## 4. Configurar tu cobro por QR
 
 Elegí una opción y completá las variables correspondientes en `.env.local`:
 
 - **Con imagen de QR**: subí tu captura a `public/qr-pago.png` (reemplazando el archivo `public/README-qr.txt` de ejemplo) y configurá `NEXT_PUBLIC_QR_IMAGE_URL=/qr-pago.png`.
 - **Sin imagen todavía**: dejá esa variable vacía y completá `NEXT_PUBLIC_BANK_NAME`, `NEXT_PUBLIC_BANK_ACCOUNT_NAME` y `NEXT_PUBLIC_BANK_ACCOUNT_NUMBER` — el checkout va a mostrar esos datos en texto.
 
-## 4. Variables de entorno
+## 5. Variables de entorno
 
 ```bash
 cp .env.example .env.local
@@ -70,7 +88,7 @@ cp .env.example .env.local
 
 Completá cada valor. Ojo con `FIREBASE_PRIVATE_KEY`: copiala tal cual viene en el JSON descargado, entre comillas, con los `\n` literales (el código ya se encarga de convertirlos). `ADMIN_PASSWORD` la elegís vos — es la contraseña para entrar a `/admin`.
 
-## 5. Correr en desarrollo
+## 6. Correr en desarrollo
 
 ```bash
 npm run dev
@@ -80,7 +98,7 @@ Sitio: [http://localhost:3000](http://localhost:3000). Panel de administración:
 
 Podés probar el catálogo y el carrito sin tener Firebase configurado todavía (cae a datos de ejemplo). Para probar el checkout y `/admin` de verdad, necesitás Firebase configurado.
 
-## 6. Desplegar en Vercel — gratis
+## 7. Desplegar en Vercel — gratis
 
 1. Subí este proyecto a un repo de GitHub.
 2. En [vercel.com](https://vercel.com) → **Add New → Project** → importá el repo (el plan Hobby es gratis).
@@ -89,9 +107,12 @@ Podés probar el catálogo y el carrito sin tener Firebase configurado todavía 
 
 ## Qué falta para un negocio más grande (no incluido todavía)
 
-- **Recuperar contraseña / verificar email**: `/login` hoy solo tiene registro e inicio de sesión simples — Firebase Auth soporta reset de contraseña y verificación de email, pero no está conectado en la UI todavía.
-- **Perfil de vendedor público**: hoy podés ver quién publicó cada producto (su email), pero no hay una página tipo "todos los productos de este vendedor".
-- **Envíos**: no hay ningún módulo de logística — hay que definir cómo se entrega cada pedido.
-- **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano. El día que te aprueben OpenBCB (o decidas pagar CUCU u otro proveedor), ese paso se puede automatizar.
-- **Página de detalle de producto** y **"mis compras" para el comprador** — hoy el catálogo es solo una grilla con carrito, y el comprador no tiene una pantalla para ver el historial de lo que compró.
-- **Moderación**: cualquier usuario logueado puede publicar lo que quiera — no hay revisión ni reporte de productos inapropiados.
+- **Suscripciones pagas**: hoy publicar productos y aparecer en el directorio de servicios es gratis. El documento original plantea cobrar una suscripción mensual a vendedores/profesionales — no está implementado (es el siguiente bloque natural a construir).
+- **Verificación de local físico + ocultar datos hasta contacto**: tampoco está implementado — hoy toda la info de contacto (WhatsApp) es pública desde el perfil.
+- **Reparto con "Chepibes"**: no hay ningún sistema de logística — la entrega hoy se coordina fuera de la plataforma (WhatsApp o retiro en el local).
+- **Editar un profesional ya publicado**: desde `/admin` podés dar de alta y borrar, pero no editar — para cambiar algo hay que borrar y volver a cargar.
+- **Recuperar contraseña / verificar email**: `/login` hoy solo tiene registro e inicio de sesión simples.
+- **Envíos** para el carrito de productos: no hay ningún módulo de logística.
+- **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano.
+- **Página de detalle de producto** y **"mis compras" para el comprador**.
+- **Moderación**: cualquier usuario logueado puede publicar productos sin revisión (los profesionales sí quedan controlados, porque solo vos los cargás).

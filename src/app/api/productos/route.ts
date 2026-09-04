@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono } = body
+    const { nombre, categoria, precio, icono, imagenUrl } = body
     if (!nombre || !categoria || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       categoria,
       precio,
       icono: icono || 'shoe',
+      imagenUrl: imagenUrl || '',
       vendedorId: usuario.uid,
       vendedor: usuario.email,
       createdAt: new Date().toISOString(),
