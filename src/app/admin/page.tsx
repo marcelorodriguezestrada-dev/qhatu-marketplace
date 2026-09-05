@@ -19,6 +19,21 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
 
 const ICONOS_SERVICIO = ['contador', 'odontologo', 'pintor', 'plomero', 'electricista', 'profesor', 'otro']
 
+function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motivo: string } | null | undefined }) {
+  if (!moderacionIA) return null
+  const estilos: Record<string, string> = {
+    alto: 'bg-maroonsoft text-maroon border-maroon',
+    medio: 'bg-ochresoft text-ochre border-ochre',
+    bajo: 'bg-tealsoft text-teal border-teal',
+  }
+  const clase = estilos[moderacionIA.riesgo] || 'bg-panelalt text-inksoft border-line'
+  return (
+    <div className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[10px] font-semibold font-body mt-1 ${clase}`} title={moderacionIA.motivo}>
+      IA: riesgo {moderacionIA.riesgo}
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [autenticado, setAutenticado] = useState(false)
@@ -334,7 +349,14 @@ export default function AdminPage() {
         <div>
           <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
           {productos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
-          {productos.map((p) => (
+          {[...productos]
+            .sort((a, b) => {
+              const orden: Record<string, number> = { alto: 0, medio: 1, bajo: 2 }
+              const oa = orden[a.moderacionIA?.riesgo] ?? 3
+              const ob = orden[b.moderacionIA?.riesgo] ?? 3
+              return oa - ob
+            })
+            .map((p) => (
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-3 flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
                 {p.imagenUrl ? <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" /> : <span className="font-body text-[10px] text-inksoft">IMG</span>}
@@ -343,6 +365,7 @@ export default function AdminPage() {
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
                 <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {p.categoria} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
                 <div className="font-body text-[11px] text-inksoft mt-1">Estado: {p.estado || 'activo'}</div>
+                <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
               </div>
               <div className="flex gap-2 flex-wrap justify-end">
                 <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'activo')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Activo</button>
@@ -489,18 +512,27 @@ export default function AdminPage() {
               <div className="font-body text-sm font-semibold text-ochre mb-3">
                 Solicitudes pendientes de revisión ({profesionales.filter((p) => p.estado === 'pendiente_revision').length})
               </div>
-              {profesionales.filter((p) => p.estado === 'pendiente_revision').map((p) => (
+              {[...profesionales]
+                .filter((p) => p.estado === 'pendiente_revision')
+                .sort((a, b) => {
+                  const orden: Record<string, number> = { alto: 0, medio: 1, bajo: 2 }
+                  const oa = orden[a.moderacionIA?.riesgo] ?? 3
+                  const ob = orden[b.moderacionIA?.riesgo] ?? 3
+                  return oa - ob
+                })
+                .map((p) => (
                 <div key={p.id} className="bg-panel border border-ochre rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   <div className="font-body text-xs text-inksoft mb-1">
                     {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                   </div>
                   {p.descripcion && <div className="font-body text-xs text-ink mb-2">{p.descripcion}</div>}
-                  <div className="font-body text-[11px] text-inksoft mb-3">
+                  <div className="font-body text-[11px] text-inksoft mb-2">
                     {p.precio ? `Bs ${Number(p.precio).toLocaleString('es-BO')}` : 'Precio a convenir'}
                     {p.experiencia && ` · Experiencia: ${p.experiencia}`}
                   </div>
-                  <div className="flex gap-2">
+                  <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
+                  <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => cambiarEstadoProfesional(p.id, 'aprobado')}
                       className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"

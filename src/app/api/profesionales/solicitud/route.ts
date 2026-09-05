@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { evaluarConIA } from '@/lib/moderacionIA'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,16 @@ export async function POST(req: NextRequest) {
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
+
+    // Pre-filtro de moderación con IA — solo etiqueta el riesgo para
+    // ayudarte a priorizar en la cola de /admin, nunca aprueba o
+    // rechaza por su cuenta.
+    const moderacionIA = await evaluarConIA(
+      `Solicitud de profesional.\nNombre: ${nombre}\nRubro: ${rubro}\nZona: ${zona || 'no especificada'}\n` +
+      `Descripción: ${descripcion || '(sin descripción)'}\n` +
+      `Precio: ${precio ? `Bs ${precio}` : 'a convenir'}\nExperiencia declarada: ${experiencia || 'no especificada'}`
+    )
+
     const db = getDb()
     const ref = await db.collection('profesionales').add({
       nombre,
@@ -32,6 +43,7 @@ export async function POST(req: NextRequest) {
       experiencia: experiencia || '',
       plan: 'basico',
       estado: 'pendiente_revision',
+      moderacionIA,
       ratingPromedio: 0,
       cantidadResenas: 0,
       createdAt: new Date().toISOString(),

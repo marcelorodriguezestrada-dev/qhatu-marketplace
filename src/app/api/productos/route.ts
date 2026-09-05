@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { PRODUCTOS_SEED } from '@/data/productos'
+import { evaluarConIA } from '@/lib/moderacionIA'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,12 @@ export async function POST(req: NextRequest) {
     const precioOriginalValido =
       precioOriginal && Number(precioOriginal) > Number(precio) ? Number(precioOriginal) : null
 
+    // Pre-filtro de moderación con IA — no bloquea la publicación, solo
+    // le pone una etiqueta de riesgo para priorizar tu revisión en /admin.
+    const moderacionIA = await evaluarConIA(
+      `Producto: ${nombre}\nCategoría: ${categoria}\nPrecio: Bs ${precio}${precioOriginalValido ? ` (antes Bs ${precioOriginalValido})` : ''}`
+    )
+
     const db = getDb()
     const ref = await db.collection('productos').add({
       nombre,
@@ -62,6 +69,7 @@ export async function POST(req: NextRequest) {
       vendedor: usuario.email,
       plan: planValido,
       estado: 'activo',
+      moderacionIA,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
