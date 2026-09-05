@@ -1,9 +1,10 @@
-// Pre-filtro de moderación con IA (API de Claude). Esto NO reemplaza tu
+// Pre-filtro de moderación con IA (API de Groq, gratis — mismo
+// proveedor que ya usa la app de consultorio). Esto NO reemplaza tu
 // revisión manual en /admin — solo le pone una etiqueta de riesgo a
 // cada envío nuevo para que puedas priorizar qué mirar primero. La
 // decisión final (aprobar/rechazar/ocultar) siempre la tomás vos.
 //
-// Si ANTHROPIC_API_KEY no está configurada, o la llamada falla por
+// Si GROQ_API_KEY no está configurada, o la llamada falla por
 // cualquier motivo, devolvemos null y seguimos adelante sin romper el
 // flujo de publicación — la moderación con IA es una ayuda opcional,
 // nunca un bloqueo.
@@ -18,33 +19,35 @@ const SYSTEM_PROMPT =
   '{"riesgo": "bajo" | "medio" | "alto", "motivo": "string de máximo 15 palabras explicando por qué"}'
 
 export async function evaluarConIA(contenido: string): Promise<ResultadoModeracion> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', // el más barato y rápido — alcanza de sobra para clasificar riesgo
+        model: 'llama-3.1-8b-instant', // el más liviano y rápido de Groq — alcanza de sobra para clasificar riesgo
         max_tokens: 150,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: contenido }],
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: contenido },
+        ],
       }),
     })
     if (!res.ok) {
-      console.error('evaluarConIA: API respondió', res.status)
+      console.error('evaluarConIA: Groq respondió', res.status)
       return null
     }
     const data = await res.json()
-    const textBlock = data.content?.find((b: any) => b.type === 'text')
-    if (!textBlock) return null
+    const texto = data.choices?.[0]?.message?.content
+    if (!texto) return null
 
-    const limpio = textBlock.text.replace(/```json|```/g, '').trim()
+    const limpio = texto.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(limpio)
     if (!['bajo', 'medio', 'alto'].includes(parsed.riesgo)) return null
 

@@ -96,14 +96,17 @@ cp .env.example .env.local
 
 Completá cada valor. Ojo con `FIREBASE_PRIVATE_KEY`: copiala tal cual viene en el JSON descargado, entre comillas, con los `\n` literales (el código ya se encarga de convertirlos). `ADMIN_PASSWORD` la elegís vos — es la contraseña para entrar a `/admin`.
 
-## 6. Pre-filtro de moderación con IA (opcional, es pago)
+## 6. Pre-filtro de moderación con IA (opcional, gratis)
 
 Cuando alguien publica un producto (`/vender`) o se autopostula como profesional (`/publicar-servicio`), la IA evalúa el contenido y le pone una etiqueta de riesgo (bajo/medio/alto) visible en `/admin`, para ayudarte a priorizar qué revisar primero. **Nunca aprueba, rechaza ni bloquea nada por su cuenta** — la decisión final siempre es tuya.
 
-1. Creá una cuenta en [console.anthropic.com](https://console.anthropic.com) y generá una API key.
-2. Cargala en `ANTHROPIC_API_KEY`.
+Usa **Groq** (mismo proveedor que ya usa la app de consultorio), con plan gratuito real — sin tarjeta, ~14.400 requests por día:
 
-**A diferencia de todo lo demás en este proyecto, esto sí cuesta plata** (aunque poco — usa el modelo más económico, pensado justo para tareas de clasificación simples como esta). Si dejás la variable vacía, la app funciona exactamente igual, solo que sin la etiqueta de riesgo.
+1. Creá una cuenta en [console.groq.com](https://console.groq.com).
+2. **API Keys → Create API key**.
+3. Cargala en `GROQ_API_KEY`.
+
+Si dejás la variable vacía, la app funciona exactamente igual, solo que sin la etiqueta de riesgo.
 
 ## 7. Correr en desarrollo
 
@@ -135,7 +138,7 @@ Lo que ya está integrado en la base del negocio:
 - **Formulario público de autopostulación para profesionales** (`/publicar-servicio`), con cola de revisión en `/admin` (aprobar/rechazar).
 - **Panel de métricas** en `/admin`: usuarios registrados, facturación, pedidos y productos por estado, reseñas totales, productos más vistos — todo con datos reales de Firestore/Firebase Auth.
 - **Contador de vistas por producto**, usado para el ranking de "más vistos".
-- **Pre-filtro de moderación con IA** (opcional, requiere `ANTHROPIC_API_KEY` — es la única dependencia paga del proyecto): etiqueta cada producto y solicitud de servicio nueva con un riesgo bajo/medio/alto, para priorizar tu revisión manual en `/admin`. Nunca decide por su cuenta.
+- **Pre-filtro de moderación con IA** (opcional, gratis con Groq — `GROQ_API_KEY`): etiqueta cada producto y solicitud de servicio nueva con un riesgo bajo/medio/alto, para priorizar tu revisión manual en `/admin`. Nunca decide por su cuenta.
 
 Lo que todavía no está incluido en esta base:
 

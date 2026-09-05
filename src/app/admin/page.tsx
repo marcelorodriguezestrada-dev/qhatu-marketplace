@@ -92,8 +92,14 @@ export default function AdminPage() {
         setAutenticado(true)
         setError('')
         localStorage.setItem('qhatu_admin_pw', pw)
-        cargarProfesionales()
-        cargarProductos()
+        // Importante: le pasamos "pw" explícito acá, no dependemos del
+        // estado "password" — en el login automático (contraseña
+        // guardada en localStorage), el estado todavía no se actualizó
+        // en este mismo instante, y usar la versión vieja hacía que
+        // estos pedidos salieran sin contraseña válida (mostrando la
+        // vista pública filtrada en vez de la completa).
+        cargarProfesionales(pw)
+        cargarProductos(pw)
       })
       .catch((e) => {
         setError(e.message)
@@ -102,22 +108,22 @@ export default function AdminPage() {
       .finally(() => setCargando(false))
   }
 
-  function cargarProfesionales() {
-    fetch('/api/profesionales', { headers: { 'x-admin-password': password } })
+  function cargarProfesionales(pw?: string) {
+    fetch('/api/profesionales', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
   }
 
-  function cargarMetricas() {
+  function cargarMetricas(pw?: string) {
     setCargandoMetricas(true)
-    fetch('/api/admin/metricas', { headers: { 'x-admin-password': password } })
+    fetch('/api/admin/metricas', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setMetricas(data))
       .finally(() => setCargandoMetricas(false))
   }
 
-  function cargarProductos() {
-    fetch('/api/productos')
+  function cargarProductos(pw?: string) {
+    fetch('/api/productos', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProductos(data.productos || []))
   }
@@ -127,7 +133,7 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ estado }),
-    }).then(() => cargarProductos())
+    }).then(() => cargarProductos(password))
   }
 
   function cambiarEstadoPedido(id: string, estado: 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
