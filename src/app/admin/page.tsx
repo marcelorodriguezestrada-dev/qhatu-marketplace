@@ -651,11 +651,36 @@ export default function AdminPage() {
               {metricas.productosMasVistos?.length > 0 && (
                 <>
                   <div className="font-body text-sm font-semibold text-ink mb-3">Productos más vistos</div>
-                  <div className="mb-4">
+                  <div className="mb-8">
                     {metricas.productosMasVistos.map((p: any, i: number) => (
                       <div key={p.id} className="flex items-center justify-between py-2 border-b border-line">
                         <span className="font-body text-sm text-ink">{i + 1}. {p.nombre}</span>
                         <span className="font-body text-xs text-inksoft">{p.vistas} vistas</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-3 mb-8">
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Vistas de perfiles profesionales</div>
+                  <div className="font-display text-2xl font-bold text-ink">{metricas.profesionales?.totalVistas ?? 0}</div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Clics a WhatsApp (profesionales)</div>
+                  <div className="font-display text-2xl font-bold text-ink">{metricas.profesionales?.totalClicsWhatsapp ?? 0}</div>
+                </div>
+              </div>
+
+              {metricas.profesionalesMasClicWhatsapp?.length > 0 && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-3">Profesionales con más contactos por WhatsApp</div>
+                  <div className="mb-4">
+                    {metricas.profesionalesMasClicWhatsapp.map((p: any, i: number) => (
+                      <div key={p.id} className="flex items-center justify-between py-2 border-b border-line">
+                        <span className="font-body text-sm text-ink">{i + 1}. {p.nombre}</span>
+                        <span className="font-body text-xs text-inksoft">{p.clicsWhatsapp} clics · {p.vistas} vistas</span>
                       </div>
                     ))}
                   </div>

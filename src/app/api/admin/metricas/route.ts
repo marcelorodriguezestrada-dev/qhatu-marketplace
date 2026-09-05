@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
     }
 
     const totalResenas = profesionales.reduce((s, p) => s + (p.cantidadResenas || 0), 0)
+    const totalVistasProfesionales = profesionales.reduce((s, p) => s + (p.vistas || 0), 0)
+    const totalClicsWhatsapp = profesionales.reduce((s, p) => s + (p.clicsWhatsapp || 0), 0)
 
     const productosMasVistos = [...productos]
       .filter((p) => (p.vistas || 0) > 0)
@@ -60,12 +62,25 @@ export async function GET(req: NextRequest) {
       .slice(0, 5)
       .map((p) => ({ id: p.id, nombre: p.nombre, vistas: p.vistas || 0 }))
 
+    const profesionalesMasClicWhatsapp = [...profesionales]
+      .filter((p) => (p.clicsWhatsapp || 0) > 0)
+      .sort((a, b) => (b.clicsWhatsapp || 0) - (a.clicsWhatsapp || 0))
+      .slice(0, 5)
+      .map((p) => ({ id: p.id, nombre: p.nombre, vistas: p.vistas || 0, clicsWhatsapp: p.clicsWhatsapp || 0 }))
+
     return NextResponse.json({
       usuariosTotal,
       productos: { total: productos.length, porEstado: productosPorEstado, premium: productosPremium },
-      profesionales: { total: profesionales.length, porEstado: profesionalesPorEstado, totalResenas },
+      profesionales: {
+        total: profesionales.length,
+        porEstado: profesionalesPorEstado,
+        totalResenas,
+        totalVistas: totalVistasProfesionales,
+        totalClicsWhatsapp,
+      },
       pedidos: { total: pedidos.length, porEstado: pedidosPorEstado, totalFacturado },
       productosMasVistos,
+      profesionalesMasClicWhatsapp,
     })
   } catch (err) {
     console.error('GET /api/admin/metricas', err)

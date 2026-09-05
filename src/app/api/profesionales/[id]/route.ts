@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { FieldValue } from 'firebase-admin/firestore'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,18 +8,21 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getDb()
-    const doc = await db.collection('profesionales').doc(params.id).get()
+    const ref = db.collection('profesionales').doc(params.id)
+    const doc = await ref.get()
     if (!doc.exists) {
       return NextResponse.json({ error: 'No encontrado.' }, { status: 404 })
     }
-    const resenasSnap = await db
-      .collection('profesionales')
-      .doc(params.id)
-      .collection('resenas')
-      .get()
+    const resenasSnap = await ref.collection('resenas').get()
     const resenas = resenasSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+
+    // Sumamos +1 a las vistas del perfil — no esperamos a que termine
+    // (fire-and-forget) para no hacer más lenta la respuesta al
+    // visitante. Si falla, no rompe nada; es solo una métrica.
+    ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
+
     return NextResponse.json({ id: doc.id, ...doc.data(), resenas })
   } catch (err) {
     console.error('GET /api/profesionales/[id]', err)

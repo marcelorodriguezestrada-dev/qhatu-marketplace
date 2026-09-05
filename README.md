@@ -138,6 +138,9 @@ Lo que ya está integrado en la base del negocio:
 - **Formulario público de autopostulación para profesionales** (`/publicar-servicio`), con cola de revisión en `/admin` (aprobar/rechazar).
 - **Panel de métricas** en `/admin`: usuarios registrados, facturación, pedidos y productos por estado, reseñas totales, productos más vistos — todo con datos reales de Firestore/Firebase Auth.
 - **Contador de vistas por producto**, usado para el ranking de "más vistos".
+- **Contador de vistas de perfil y clics a WhatsApp por profesional**, con ranking de "más contactados" en Métricas.
+- **Filtro de insultos en reseñas** (Groq, gratis): si el comentario contiene lenguaje ofensivo, se bloquea antes de publicarse — no llega a una cola de revisión, se rechaza directo con un mensaje pidiendo reformular.
+- **Botones grandes de "Productos" y "Servicios"** en la home, bien distinguidos visualmente.
 - **Pre-filtro de moderación con IA** (opcional, gratis con Groq — `GROQ_API_KEY`): etiqueta cada producto y solicitud de servicio nueva con un riesgo bajo/medio/alto, para priorizar tu revisión manual en `/admin`. Nunca decide por su cuenta.
 
 Lo que todavía no está incluido en esta base:

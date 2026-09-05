@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { contieneInsultos } from '@/lib/moderacionIA'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const comentario = (body.comentario || '').toString().slice(0, 500)
     if (!calificacion || calificacion < 1 || calificacion > 5) {
       return NextResponse.json({ error: 'La calificación tiene que ser de 1 a 5.' }, { status: 400 })
+    }
+
+    // Filtro de insultos — si la IA detecta lenguaje ofensivo, se
+    // bloquea directo, no llega a publicarse. Si Groq no está
+    // configurado o falla, dejamos pasar la reseña (nunca bloqueamos
+    // por un problema técnico ajeno al usuario).
+    if (comentario && (await contieneInsultos(comentario))) {
+      return NextResponse.json(
+        { error: 'Tu comentario parece incluir lenguaje ofensivo. Reformulalo y volvé a intentar.' },
+        { status: 400 }
+      )
     }
 
     const db = getDb()

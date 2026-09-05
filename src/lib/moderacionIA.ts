@@ -57,3 +57,50 @@ export async function evaluarConIA(contenido: string): Promise<ResultadoModeraci
     return null
   }
 }
+
+// Filtro de insultos para reseñas — distinto del pre-filtro de arriba:
+// acá si la IA detecta insultos, la reseña se bloquea directo (no llega
+// a publicarse ni pasa por una cola de revisión), porque un insulto en
+// una reseña pública no aporta nada que valga la pena revisar a mano.
+// Igual que el resto: si GROQ_API_KEY no está configurada o la llamada
+// falla, dejamos pasar la reseña — nunca bloqueamos por un error
+// técnico ajeno al usuario.
+const SYSTEM_PROMPT_RESENA =
+  'Analizá el siguiente comentario de una reseña de un marketplace boliviano. ' +
+  'Determiná si contiene insultos, lenguaje ofensivo, discriminatorio o difamatorio hacia una persona o negocio. ' +
+  'Una crítica negativa pero respetuosa ("tardó mucho", "no me gustó el producto") NO cuenta como ofensiva. ' +
+  'Respondé SOLO JSON válido, sin backticks: {"contieneInsultos": true|false}'
+
+export async function contieneInsultos(comentario: string): Promise<boolean> {
+  if (!comentario || !comentario.trim()) return false
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return false
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 50,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT_RESENA },
+          { role: 'user', content: comentario },
+        ],
+      }),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    const texto = data.choices?.[0]?.message?.content
+    if (!texto) return false
+    const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+    return parsed.contieneInsultos === true
+  } catch (err) {
+    console.error('contieneInsultos', err)
+    return false
+  }
+}

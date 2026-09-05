@@ -172,6 +172,7 @@ export default function PerfilProfesionalPage() {
               href={linkWhatsapp}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => fetch(`/api/profesionales/${id}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
               className="block text-center w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold"
             >
               Contactar por WhatsApp
