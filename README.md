@@ -42,6 +42,7 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 - `/producto/[id]` — página de detalle de un producto: foto grande, descuento real si tiene, selector de cantidad, "Comprar ahora" o "Agregar al carrito", y productos relacionados de la misma categoría.
 - `/api/productos/[id]` — GET público (detalle de un producto). DELETE y PATCH, solo para el usuario dueño.
 - `/api/upload-image` — sube una foto a ImgBB y devuelve la URL. Requiere estar logueado.
+- **Favoritos** (corazón en cada tarjeta de producto): se guardan en `localStorage` del navegador, no en Firestore — es una preferencia liviana del dispositivo. Si en algún momento hace falta que los favoritos viajen entre dispositivos de un mismo usuario, ahí conviene moverlos a Firestore atados al usuario logueado.
 - `/api/profesionales` — GET público (directorio completo). POST protegido con `ADMIN_PASSWORD`.
 - `/api/profesionales/[id]` — GET público (perfil + reseñas). DELETE protegido con `ADMIN_PASSWORD`.
 - `/api/profesionales/[id]/resenas` — POST: deja una reseña, requiere estar logueado (mismo sistema de cuentas que productos). El promedio se recalcula automáticamente en cada reseña nueva.

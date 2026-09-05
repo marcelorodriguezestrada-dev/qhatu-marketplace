@@ -43,51 +43,50 @@ export default function CatalogoPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="bg-ink px-5 py-3.5">
-        <div className="max-w-[960px] mx-auto flex items-center gap-3">
-          <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar productos o vendedores"
-            className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
-          />
-          <Link
-            href="/servicios"
-            className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap"
-          >
-            Servicios
-          </Link>
-          <Link
-            href="/vender"
-            className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
-          >
-            Vender
-          </Link>
-          {usuario ? (
-            <>
-              <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap">
-                Mis pedidos
-              </Link>
-              <button onClick={() => logout()} className="border-none bg-transparent text-white/70 font-body text-xs shrink-0 whitespace-nowrap">
-                {usuario.email?.split('@')[0]} · salir
-              </button>
-            </>
-          ) : (
-            <Link href="/login" className="border-none bg-transparent text-white/80 font-body text-sm shrink-0 whitespace-nowrap">
-              Iniciar sesión
+      <div className="bg-ink px-4 sm:px-5 py-3">
+        <div className="max-w-[960px] mx-auto">
+          <div className="flex items-center gap-3 mb-2.5">
+            <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar productos o vendedores"
+              className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
+            />
+            <button
+              onClick={() => setCarritoAbierto(true)}
+              className="border-none bg-white/10 text-white px-3 sm:px-4 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
+            >
+              🛒 {cantidadCarrito > 0 && `(${cantidadCarrito})`}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
+            <Link href="/servicios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
+              Servicios
             </Link>
-          )}
-          <button
-            onClick={() => setCarritoAbierto(true)}
-            className="border-none bg-white/10 text-white px-4 py-2 rounded-lg font-body text-sm shrink-0"
-          >
-            Carrito {cantidadCarrito > 0 && `(${cantidadCarrito})`}
-          </button>
+            <Link href="/vender" className="border-none bg-white/10 text-white px-3 py-1.5 rounded-lg font-body text-[13px] shrink-0 whitespace-nowrap">
+              Vender
+            </Link>
+            {usuario ? (
+              <>
+                <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
+                  Mis pedidos
+                </Link>
+                <button onClick={() => logout()} className="border-none bg-transparent text-white/60 font-body text-[12px] shrink-0 whitespace-nowrap">
+                  {usuario.email?.split('@')[0]} · salir
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
+                Iniciar sesión
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="max-w-[960px] mx-auto px-5 py-6 pb-12">
+      <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
         <div className="flex gap-2 mb-5 flex-wrap">
           {CATEGORIAS.map((c) => (
             <button
@@ -102,7 +101,7 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {filtrados.map((p) => (
             <ProductCard key={p.id} p={p} />
           ))}
