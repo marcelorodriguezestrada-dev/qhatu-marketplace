@@ -12,7 +12,7 @@
 type ResultadoModeracion = { riesgo: 'bajo' | 'medio' | 'alto'; motivo: string } | null
 
 const SYSTEM_PROMPT =
-  'Sos un moderador de contenido para Qhatu, un marketplace boliviano de productos y servicios profesionales. ' +
+  'Sos un moderador de contenido para Clasi Click, un marketplace boliviano de productos y servicios profesionales. ' +
   'Te paso el contenido que un usuario acaba de enviar (un producto a la venta, o una solicitud de un profesional para aparecer en el directorio). ' +
   'Evaluá el riesgo de que sea contenido inapropiado, spam, datos incompletos o claramente falsos, o un precio irreal para lo que se describe. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +

@@ -1,4 +1,4 @@
-# Qhatu — Marketplace Bolivia (versión 100% gratis)
+# Clasi Click — Marketplace Bolivia (versión 100% gratis)
 
 Tienda online multivendedor tipo Mercado Libre, con cobro por **QR
 manual** (tu propio QR bancario o de Yape) — sin ningún servicio pago

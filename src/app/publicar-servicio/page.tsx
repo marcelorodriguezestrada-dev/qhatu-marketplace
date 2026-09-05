@@ -56,7 +56,7 @@ export default function PublicarServicioPage() {
 
   return (
     <div className="max-w-[480px] mx-auto px-5 py-10">
-      <div className="font-display text-xl font-bold text-ink mb-1">Publicá tu servicio en Qhatu</div>
+      <div className="font-display text-xl font-bold text-ink mb-1">Publicá tu servicio en Clasi Click</div>
       <p className="font-body text-sm text-inksoft mb-6">
         Completá tus datos. Un administrador va a revisar la solicitud antes de que tu perfil quede visible en el directorio.
       </p>

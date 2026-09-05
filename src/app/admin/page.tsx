@@ -73,7 +73,7 @@ export default function AdminPage() {
   const [errorForm, setErrorForm] = useState('')
 
   useEffect(() => {
-    const guardada = typeof window !== 'undefined' ? localStorage.getItem('qhatu_admin_pw') : null
+    const guardada = typeof window !== 'undefined' ? localStorage.getItem('clasiclick_admin_pw') : null
     if (guardada) {
       setPassword(guardada)
       entrar(guardada)
@@ -91,7 +91,7 @@ export default function AdminPage() {
         setPedidos(data.pedidos || [])
         setAutenticado(true)
         setError('')
-        localStorage.setItem('qhatu_admin_pw', pw)
+        localStorage.setItem('clasiclick_admin_pw', pw)
         // Importante: le pasamos "pw" explícito acá, no dependemos del
         // estado "password" — en el login automático (contraseña
         // guardada en localStorage), el estado todavía no se actualizó

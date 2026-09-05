@@ -71,7 +71,7 @@ export default function PerfilProfesionalPage() {
   if (!perfil || perfil.error) return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">No encontramos este perfil.</div>
 
   const linkWhatsapp = `https://wa.me/${perfil.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-    `Hola ${perfil.nombre}, te vi en Qhatu y quería consultarte por tus servicios.`
+    `Hola ${perfil.nombre}, te vi en Clasi Click y quería consultarte por tus servicios.`
   )}`
 
   return (

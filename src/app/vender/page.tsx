@@ -150,7 +150,7 @@ export default function VenderPage() {
 
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
-      <div className="font-display text-xl font-bold text-ink mb-1">Vender en Qhatu</div>
+      <div className="font-display text-xl font-bold text-ink mb-1">Vender en Clasi Click</div>
       <div className="font-body text-[13px] text-inksoft mb-6">Publicando como {usuario.email}</div>
 
       <form onSubmit={publicar} className="bg-panel border border-line rounded-xl p-5 mb-8">

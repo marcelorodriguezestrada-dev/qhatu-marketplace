@@ -16,7 +16,7 @@ type CarritoContextType = {
 
 const CarritoContext = createContext<CarritoContextType | null>(null)
 
-const STORAGE_KEY = 'qhatu_carrito'
+const STORAGE_KEY = 'clasiclick_carrito'
 
 export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ItemCarrito[]>([])

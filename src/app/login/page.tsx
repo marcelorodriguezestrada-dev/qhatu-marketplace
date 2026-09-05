@@ -45,7 +45,7 @@ export default function LoginPage() {
         {modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
       </div>
       <div className="font-body text-[13px] text-inksoft mb-6">
-        {modo === 'login' ? 'Para comprar y vender en Qhatu' : 'Con tu cuenta ya podés publicar productos'}
+        {modo === 'login' ? 'Para comprar y vender en Clasi Click' : 'Con tu cuenta ya podés publicar productos'}
       </div>
 
       <form onSubmit={enviar}>

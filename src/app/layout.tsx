@@ -8,7 +8,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: ['500', '600', 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'Qhatu — Marketplace Bolivia',
+  title: 'Clasi Click — Marketplace Bolivia',
   description: 'Comprá y vendé en Bolivia, con pago por QR interbancario.',
 }
 

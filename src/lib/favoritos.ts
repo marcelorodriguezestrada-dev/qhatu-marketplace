@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 
-const STORAGE_KEY = 'qhatu_favoritos'
+const STORAGE_KEY = 'clasiclick_favoritos'
 
 function leerFavoritos(): string[] {
   if (typeof window === 'undefined') return []

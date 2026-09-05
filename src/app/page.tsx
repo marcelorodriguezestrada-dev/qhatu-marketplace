@@ -46,7 +46,7 @@ export default function CatalogoPage() {
       <div className="bg-ink px-4 sm:px-5 py-3">
         <div className="max-w-[960px] mx-auto">
           <div className="flex items-center gap-3 mb-2.5">
-            <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
+            <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}

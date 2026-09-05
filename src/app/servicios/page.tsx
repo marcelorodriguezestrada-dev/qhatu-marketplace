@@ -105,7 +105,7 @@ export default function ServiciosPage() {
     <div className="min-h-screen">
       <div className="bg-ink px-5 py-3.5">
         <div className="max-w-[960px] mx-auto flex items-center gap-3">
-          <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
+          <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
           <span className="font-body text-sm text-white/70 flex-1">Servicios profesionales</span>
           <Link
             href="/publicar-servicio"
