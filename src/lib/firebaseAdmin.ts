@@ -45,3 +45,12 @@ export async function getUsuarioDesdeRequest(req: NextRequest) {
     return null
   }
 }
+
+// Cuenta los usuarios registrados en Firebase Auth. listUsers pagina de
+// a 1000 — para una app recién arrancando alcanza sobra con una sola
+// vuelta; si en algún momento superás los 1000 usuarios, hay que
+// encadenar las páginas con el nextPageToken que devuelve Firebase.
+export async function contarUsuarios(): Promise<number> {
+  const resultado = await getAuth(getApp()).listUsers(1000)
+  return resultado.users.length
+}

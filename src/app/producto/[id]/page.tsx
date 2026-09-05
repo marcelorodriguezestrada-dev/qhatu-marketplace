@@ -46,6 +46,9 @@ export default function ProductoDetallePage() {
           (p: any) => p.categoria === detalle.categoria && p.id !== detalle.id
         )
         setRelacionados(otros.slice(0, 4))
+        // Sumamos +1 a las vistas de este producto — no bloqueamos la
+        // carga de la página por esto, ni mostramos error si falla.
+        fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
       }
       setCargando(false)
     })

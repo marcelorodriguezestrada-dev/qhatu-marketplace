@@ -24,11 +24,13 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'metricas'>('pedidos')
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
+  const [metricas, setMetricas] = useState<any>(null)
+  const [cargandoMetricas, setCargandoMetricas] = useState(false)
 
   const resumen = {
     pedidosTotal: pedidos.length,
@@ -86,9 +88,17 @@ export default function AdminPage() {
   }
 
   function cargarProfesionales() {
-    fetch('/api/profesionales')
+    fetch('/api/profesionales', { headers: { 'x-admin-password': password } })
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
+  }
+
+  function cargarMetricas() {
+    setCargandoMetricas(true)
+    fetch('/api/admin/metricas', { headers: { 'x-admin-password': password } })
+      .then((r) => r.json())
+      .then((data) => setMetricas(data))
+      .finally(() => setCargandoMetricas(false))
   }
 
   function cargarProductos() {
@@ -182,6 +192,14 @@ export default function AdminPage() {
     }).then(() => cargarProfesionales())
   }
 
+  function cambiarEstadoProfesional(id: string, estado: 'aprobado' | 'rechazado') {
+    fetch(`/api/profesionales/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ estado }),
+    }).then(() => cargarProfesionales())
+  }
+
   if (!autenticado) {
     return (
       <div className="max-w-[360px] mx-auto px-5 py-20">
@@ -245,6 +263,17 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'servicios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Servicios profesionales
+          {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
+            <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {profesionales.filter((p) => p.estado === 'pendiente_revision').length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setTab('metricas'); if (!metricas) cargarMetricas() }}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'metricas' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Métricas
         </button>
       </div>
 
@@ -455,10 +484,45 @@ export default function AdminPage() {
             </button>
           </form>
 
+          {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
+            <div className="mb-8">
+              <div className="font-body text-sm font-semibold text-ochre mb-3">
+                Solicitudes pendientes de revisión ({profesionales.filter((p) => p.estado === 'pendiente_revision').length})
+              </div>
+              {profesionales.filter((p) => p.estado === 'pendiente_revision').map((p) => (
+                <div key={p.id} className="bg-panel border border-ochre rounded-lg p-4 mb-3">
+                  <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
+                  <div className="font-body text-xs text-inksoft mb-1">
+                    {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                  </div>
+                  {p.descripcion && <div className="font-body text-xs text-ink mb-2">{p.descripcion}</div>}
+                  <div className="font-body text-[11px] text-inksoft mb-3">
+                    {p.precio ? `Bs ${Number(p.precio).toLocaleString('es-BO')}` : 'Precio a convenir'}
+                    {p.experiencia && ` · Experiencia: ${p.experiencia}`}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => cambiarEstadoProfesional(p.id, 'aprobado')}
+                      className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
+                    >
+                      Aprobar y publicar
+                    </button>
+                    <button
+                      onClick={() => cambiarEstadoProfesional(p.id, 'rechazado')}
+                      className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="font-body text-sm font-semibold text-ink mb-3">
-            Publicados ({profesionales.length})
+            Publicados ({profesionales.filter((p) => !p.estado || p.estado === 'aprobado').length})
           </div>
-          {profesionales.map((p) => (
+          {profesionales.filter((p) => !p.estado || p.estado === 'aprobado').map((p) => (
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
                 {p.imagenUrl ? (
@@ -481,6 +545,93 @@ export default function AdminPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'metricas' && (
+        <div>
+          {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
+          {!cargandoMetricas && metricas && !metricas.error && (
+            <div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Usuarios registrados</div>
+                  <div className="font-display text-2xl font-bold text-ink">
+                    {metricas.usuariosTotal != null ? metricas.usuariosTotal : '—'}
+                  </div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Total facturado</div>
+                  <div className="font-display text-2xl font-bold text-ink">
+                    Bs {Number(metricas.pedidos?.totalFacturado || 0).toLocaleString('es-BO')}
+                  </div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Pedidos totales</div>
+                  <div className="font-display text-2xl font-bold text-ink">{metricas.pedidos?.total ?? 0}</div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Productos publicados</div>
+                  <div className="font-display text-2xl font-bold text-ink">{metricas.productos?.total ?? 0}</div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Profesionales aprobados</div>
+                  <div className="font-display text-2xl font-bold text-ink">
+                    {metricas.profesionales?.porEstado?.aprobado ?? 0}
+                  </div>
+                </div>
+                <div className="bg-panel border border-line rounded-xl p-4">
+                  <div className="font-body text-[11px] text-inksoft mb-1">Reseñas totales</div>
+                  <div className="font-display text-2xl font-bold text-ink">{metricas.profesionales?.totalResenas ?? 0}</div>
+                </div>
+              </div>
+
+              <div className="font-body text-sm font-semibold text-ink mb-3">Pedidos por estado</div>
+              <div className="flex flex-wrap gap-2 mb-8">
+                {Object.entries(metricas.pedidos?.porEstado || {}).map(([estado, cant]) => (
+                  <div key={estado} className="bg-panelalt border border-line rounded-lg px-3 py-2">
+                    <div className="font-body text-[11px] text-inksoft">{ESTADOS_LABEL[estado]?.texto || estado}</div>
+                    <div className="font-display text-lg font-bold text-ink">{cant as number}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="font-body text-sm font-semibold text-ink mb-3">Productos por estado</div>
+              <div className="flex flex-wrap gap-2 mb-8">
+                {Object.entries(metricas.productos?.porEstado || {}).map(([estado, cant]) => (
+                  <div key={estado} className="bg-panelalt border border-line rounded-lg px-3 py-2">
+                    <div className="font-body text-[11px] text-inksoft capitalize">{estado}</div>
+                    <div className="font-display text-lg font-bold text-ink">{cant as number}</div>
+                  </div>
+                ))}
+                <div className="bg-ochresoft border border-ochre rounded-lg px-3 py-2">
+                  <div className="font-body text-[11px] text-inksoft">premium</div>
+                  <div className="font-display text-lg font-bold text-ink">{metricas.productos?.premium ?? 0}</div>
+                </div>
+              </div>
+
+              {metricas.productosMasVistos?.length > 0 && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-3">Productos más vistos</div>
+                  <div className="mb-4">
+                    {metricas.productosMasVistos.map((p: any, i: number) => (
+                      <div key={p.id} className="flex items-center justify-between py-2 border-b border-line">
+                        <span className="font-body text-sm text-ink">{i + 1}. {p.nombre}</span>
+                        <span className="font-body text-xs text-inksoft">{p.vistas} vistas</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className="font-body text-[11px] text-inksoft mt-4">
+                Todos estos números salen de datos reales de Firestore y Firebase Auth — no hay estimaciones ni cifras infladas.
+              </div>
+            </div>
+          )}
+          {!cargandoMetricas && metricas?.error && (
+            <div className="font-body text-sm text-maroon">{metricas.error}</div>
+          )}
         </div>
       )}
     </div>

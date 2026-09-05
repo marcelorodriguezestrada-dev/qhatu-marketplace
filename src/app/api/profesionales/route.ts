@@ -3,12 +3,23 @@ import { getDb } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
-// GET: directorio completo, público. Cualquiera lo navega sin login.
-export async function GET() {
+// GET: público sin filtrar solo los aprobados (para /servicios). Si se
+// manda la contraseña de admin, devuelve TODOS sin filtrar — así el
+// panel /admin puede ver también las solicitudes pendientes y
+// rechazadas, no solo lo que ya está publicado.
+export async function GET(req: NextRequest) {
   try {
     const db = getDb()
     const snap = await db.collection('profesionales').get()
-    const profesionales = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    let profesionales = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
+
+    const password = req.headers.get('x-admin-password')
+    const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+
+    if (!esAdmin) {
+      profesionales = profesionales.filter((p) => !p.estado || p.estado === 'aprobado')
+    }
+
     return NextResponse.json({ profesionales })
   } catch (err) {
     console.error('GET /api/profesionales', err)
@@ -16,11 +27,11 @@ export async function GET() {
   }
 }
 
-// POST: alta de un profesional nuevo. A diferencia de los productos
-// (que cualquier usuario logueado puede publicar), acá según el
-// planteo del negocio "el profesional debe contactar a la plataforma
-// para que su anuncio sea subido" — o sea, la carga es administrativa,
-// protegida con la misma ADMIN_PASSWORD que usás en /admin.
+// POST: alta directa de un profesional desde /admin — queda aprobado
+// de inmediato, porque quien lo carga sos vos mismo. Para que un
+// profesional se autopostule y quede pendiente de tu revisión, existe
+// el endpoint separado /api/profesionales/solicitud (público, sin
+// contraseña).
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
   if (!password || password !== process.env.ADMIN_PASSWORD) {
@@ -46,6 +57,7 @@ export async function POST(req: NextRequest) {
       precio: precio ? Number(precio) : null, // null = "Precio a convenir"
       experiencia: experiencia || '',
       plan: plan === 'premium' ? 'premium' : 'basico',
+      estado: 'aprobado',
       ratingPromedio: 0,
       cantidadResenas: 0,
       createdAt: new Date().toISOString(),

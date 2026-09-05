@@ -32,20 +32,26 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 - `/` — catálogo público de productos, con buscador, filtro por categoría y carrito.
 - `/servicios` — **directorio de servicios profesionales** (contadores, odontólogos, pintores, etc.), separado del carrito de compra. Buscable por nombre/zona, filtrable por rubro, y ordenable por mejor calificados o por cercanía (usando la ubicación del navegador + fórmula de Haversine contra la lat/lng que cargaste de cada profesional).
 - `/servicios/[id]` — perfil público de un profesional: descripción, botón directo a WhatsApp (con mensaje precargado), y reseñas de otros usuarios (requiere estar logueado para dejar una).
+- `/publicar-servicio` — **formulario público** para que un profesional se autopostule (sin login). Queda con estado `pendiente_revision` y no aparece en `/servicios` hasta que lo apruebes desde `/admin`. No acepta foto en esta etapa (se coordina por WhatsApp después de aprobar), para no exponer el endpoint de subida de imágenes al público sin ningún tipo de autenticación.
 - `/login` — registro e inicio de sesión (email + contraseña, vía Firebase Auth).
 - `/vender` — panel para que cualquier usuario logueado publique y borre sus propios **productos**, con foto real (sube a ImgBB) o ícono de respaldo si prefiere no subir imagen. Redirige a `/login` si no estás logueado.
 - `/checkout` — crea el pedido (asociado a tu cuenta si estás logueado, o como invitado si no), muestra tu QR y espera que confirmes el pago desde `/admin`.
-- `/admin` — tu panel único como dueño de la plataforma, con dos pestañas:
+- `/admin` — tu panel único como dueño de la plataforma, con cuatro pestañas:
   - **Pedidos**: lista y confirmación manual de pagos.
-  - **Servicios profesionales**: alta y baja de profesionales del directorio. A diferencia de los productos (que cualquier usuario publica solo), los profesionales **solo los cargás vos desde acá** — así lo plantea el negocio: el profesional te contacta a vos, y vos lo subís clasificado.
+  - **Productos**: moderación (activo/pendiente/oculto/rechazado).
+  - **Servicios profesionales**: alta directa (queda aprobada al toque) y una cola de **solicitudes pendientes** — las que llegan desde `/publicar-servicio` — con botones "Aprobar y publicar" o "Rechazar".
+  - **Métricas**: usuarios registrados (Firebase Auth), total facturado, pedidos por estado, productos por estado, reseñas totales y productos más vistos. Todo con datos reales — ningún número estimado o inventado; si algo no se puede calcular de forma honesta, directamente no se muestra.
 - `/api/productos` — GET público (catálogo completo). POST requiere estar logueado y asocia el producto al usuario.
-- `/producto/[id]` — página de detalle de un producto: foto grande, descuento real si tiene, selector de cantidad, "Comprar ahora" o "Agregar al carrito", y productos relacionados de la misma categoría.
+- `/producto/[id]` — página de detalle de un producto: foto grande, descuento real si tiene, selector de cantidad, "Comprar ahora" o "Agregar al carrito", y productos relacionados de la misma categoría. Cada visita suma +1 a un contador de vistas (dato real usado en las métricas).
 - `/api/productos/[id]` — GET público (detalle de un producto). DELETE y PATCH, solo para el usuario dueño.
-- `/api/upload-image` — sube una foto a ImgBB y devuelve la URL. Requiere estar logueado.
+- `/api/productos/[id]/vista` — POST público, sin autenticación: suma +1 al contador de vistas del producto. No guarda quién lo vio.
+- `/api/upload-image` — sube una foto a ImgBB y devuelve la URL. Requiere estar logueado (usuario de Firebase) o la contraseña de admin (para las fotos de profesionales que cargás vos).
 - **Favoritos** (corazón en cada tarjeta de producto): se guardan en `localStorage` del navegador, no en Firestore — es una preferencia liviana del dispositivo. Si en algún momento hace falta que los favoritos viajen entre dispositivos de un mismo usuario, ahí conviene moverlos a Firestore atados al usuario logueado.
-- `/api/profesionales` — GET público (directorio completo). POST protegido con `ADMIN_PASSWORD`.
-- `/api/profesionales/[id]` — GET público (perfil + reseñas). DELETE protegido con `ADMIN_PASSWORD`.
+- `/api/profesionales` — GET público (solo aprobados) o completo si se manda `ADMIN_PASSWORD` (para que `/admin` vea también pendientes y rechazados). POST (alta directa, queda aprobada) protegido con `ADMIN_PASSWORD`.
+- `/api/profesionales/solicitud` — POST público, sin login ni contraseña: es el formulario de autopostulación. Crea el profesional con estado `pendiente_revision`.
+- `/api/profesionales/[id]` — GET público (perfil + reseñas). PATCH (cambiar estado, editar datos) y DELETE, protegidos con `ADMIN_PASSWORD`.
 - `/api/profesionales/[id]/resenas` — POST: deja una reseña, requiere estar logueado (mismo sistema de cuentas que productos). El promedio se recalcula automáticamente en cada reseña nueva.
+- `/api/admin/metricas` — GET protegido con `ADMIN_PASSWORD`: devuelve todos los números que se ven en la pestaña Métricas.
 - `/api/pedidos` — GET (lista completa, protegida con `ADMIN_PASSWORD`) y POST (crea un pedido, lo llama el checkout).
 - `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del comprador) y PATCH (el comprador puede marcar "informado_pago" sin contraseña; solo vos podés marcar "pagado", con `ADMIN_PASSWORD`).
 
@@ -117,12 +123,16 @@ Lo que ya está integrado en la base del negocio:
 - Historial de compras para el usuario y panel de ventas para el vendedor.
 - Plan premium del vendedor para destacar productos en el catálogo.
 - Directorio profesional con plan básico/premium y reseñas.
+- **Formulario público de autopostulación para profesionales** (`/publicar-servicio`), con cola de revisión en `/admin` (aprobar/rechazar).
+- **Panel de métricas** en `/admin`: usuarios registrados, facturación, pedidos y productos por estado, reseñas totales, productos más vistos — todo con datos reales de Firestore/Firebase Auth.
+- **Contador de vistas por producto**, usado para el ranking de "más vistos".
 
 Lo que todavía no está incluido en esta base:
 
 - Verificación de local físico + ocultar contacto hasta contacto directo.
 - Reparto con operador externo / chepibes automatizado.
-- Edición de profesionales ya publicados directamente desde el panel.
+- Edición de profesionales ya publicados directamente desde el panel (hoy se puede aprobar/rechazar/borrar, pero no editar los datos ya cargados).
 - Recuperar contraseña / verificar email en el flujo de acceso.
 - Confirmación automática de pago por gateway real.
 - Moderación avanzada de vendedores y contenido con revisión manual más estricta.
+- Página "Mis favoritos" para ver todo lo guardado en un solo lugar (hoy el corazón funciona en cada tarjeta, pero no hay una vista consolidada).

@@ -106,7 +106,13 @@ export default function ServiciosPage() {
       <div className="bg-ink px-5 py-3.5">
         <div className="max-w-[960px] mx-auto flex items-center gap-3">
           <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Qhatu</Link>
-          <span className="font-body text-sm text-white/70">Servicios profesionales</span>
+          <span className="font-body text-sm text-white/70 flex-1">Servicios profesionales</span>
+          <Link
+            href="/publicar-servicio"
+            className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
+          >
+            Publicá tu servicio
+          </Link>
         </div>
       </div>
 

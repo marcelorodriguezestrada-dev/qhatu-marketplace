@@ -9,6 +9,7 @@ export type Producto = {
   icono: string
   imagenUrl?: string
   createdAt?: string
+  vistas?: number
   plan?: 'basico' | 'premium'
 }
 
