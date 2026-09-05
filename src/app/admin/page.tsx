@@ -30,6 +30,14 @@ export default function AdminPage() {
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
 
+  const resumen = {
+    pedidosTotal: pedidos.length,
+    pedidosPagados: pedidos.filter((p) => p.estado === 'pagado' || p.estado === 'en_preparacion' || p.estado === 'en_entrega' || p.estado === 'entregado').length,
+    productosActivos: productos.filter((p) => p.estado === 'activo').length,
+    productosPremium: productos.filter((p) => p.plan === 'premium').length,
+    profesionalesTotal: profesionales.length,
+  }
+
   // Formulario de alta de profesional
   const [nombre, setNombre] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0].id)
@@ -200,6 +208,25 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="bg-panel border border-line rounded-xl p-3.5">
+          <div className="font-body text-[11px] text-inksoft">Pedidos</div>
+          <div className="font-display text-2xl font-bold text-ink">{resumen.pedidosTotal}</div>
+        </div>
+        <div className="bg-panel border border-line rounded-xl p-3.5">
+          <div className="font-body text-[11px] text-inksoft">En proceso</div>
+          <div className="font-display text-2xl font-bold text-ink">{resumen.pedidosPagados}</div>
+        </div>
+        <div className="bg-panel border border-line rounded-xl p-3.5">
+          <div className="font-body text-[11px] text-inksoft">Productos activos</div>
+          <div className="font-display text-2xl font-bold text-ink">{resumen.productosActivos}</div>
+        </div>
+        <div className="bg-panel border border-line rounded-xl p-3.5">
+          <div className="font-body text-[11px] text-inksoft">Premium</div>
+          <div className="font-display text-2xl font-bold text-ink">{resumen.productosPremium}</div>
+        </div>
+      </div>
+
       <div className="flex gap-2 mb-6 border-b border-line flex-wrap">
         <button
           onClick={() => setTab('pedidos')}

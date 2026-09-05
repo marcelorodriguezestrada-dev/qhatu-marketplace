@@ -106,14 +106,22 @@ Podés probar el catálogo y el carrito sin tener Firebase configurado todavía 
 3. En **Settings → Environment Variables**, cargá las mismas variables de `.env.local`.
 4. Deploy.
 
-## Qué falta para un negocio más grande (no incluido todavía)
+## Estado actual del MVP y próximos pasos reales
 
-- **Suscripciones pagas**: hoy publicar productos y aparecer en el directorio de servicios es gratis. El documento original plantea cobrar una suscripción mensual a vendedores/profesionales — no está implementado (es el siguiente bloque natural a construir).
-- **Verificación de local físico + ocultar datos hasta contacto**: tampoco está implementado — hoy toda la info de contacto (WhatsApp) es pública desde el perfil.
-- **Reparto con "Chepibes"**: no hay ningún sistema de logística — la entrega hoy se coordina fuera de la plataforma (WhatsApp o retiro en el local).
-- **Editar un profesional ya publicado**: desde `/admin` podés dar de alta y borrar, pero no editar — para cambiar algo hay que borrar y volver a cargar.
-- **Recuperar contraseña / verificar email**: `/login` hoy solo tiene registro e inicio de sesión simples.
-- **Envíos** para el carrito de productos: no hay ningún módulo de logística.
-- **Confirmación automática de pago**: mientras uses QR manual, siempre vas a tener que entrar a `/admin` a confirmar a mano.
-- **"Mis compras" para el comprador** — no hay pantalla de historial de lo que compró (sí tiene la de detalle de producto, ya implementada).
-- **Moderación**: cualquier usuario logueado puede publicar productos sin revisión (los profesionales sí quedan controlados, porque solo vos los cargás).
+Lo que ya está integrado en la base del negocio:
+
+- Marketplace multivendedor con publicación y moderación básica.
+- Flujo de compra con QR manual, confirmación desde `/admin` y seguimiento por estados.
+- Logística simple con zona, dirección y costo de envío.
+- Historial de compras para el usuario y panel de ventas para el vendedor.
+- Plan premium del vendedor para destacar productos en el catálogo.
+- Directorio profesional con plan básico/premium y reseñas.
+
+Lo que todavía no está incluido en esta base:
+
+- Verificación de local físico + ocultar contacto hasta contacto directo.
+- Reparto con operador externo / chepibes automatizado.
+- Edición de profesionales ya publicados directamente desde el panel.
+- Recuperar contraseña / verificar email en el flujo de acceso.
+- Confirmación automática de pago por gateway real.
+- Moderación avanzada de vendedores y contenido con revisión manual más estricta.
