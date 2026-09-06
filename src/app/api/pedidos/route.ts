@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, vendedorId } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       items,
       total: Number(total),
       comprador: comprador || null,
+      vendedorId: vendedorId || null,
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
       costoEnvio: Number(costoEnvio || 0),

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/firebaseAdmin'
+import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,15 +21,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// PATCH cambia el estado del pedido. Hay dos casos, con distinto nivel
+// PATCH cambia el estado del pedido. Hay tres casos, con distinto nivel
 // de permiso:
 //  - estado: "informado_pago"  → lo dispara el COMPRADOR al apretar
-//    "Ya pagué" en el checkout. No requiere contraseña: es solo un aviso,
+//    "Ya pagué" en el checkout. No requiere nada: es solo un aviso,
 //    todavía no mueve plata ni confirma nada por sí mismo.
-//  - Estados de operación: "pagado", "en_preparacion", "en_entrega",
-//    "entregado", "cancelado" → los dispara EL VENDEDOR desde /admin,
-//    después de revisar el pago o el avance del pedido. Requieren el header
-//    x-admin-password.
+//  - Estados de operación ("pagado", "en_preparacion", "en_entrega",
+//    "entregado", "cancelado") → los puede disparar VOS desde /admin
+//    (con ADMIN_PASSWORD), o EL VENDEDOR de ese pedido en particular
+//    (con su login de Firebase) desde /vender — porque en un pedido con
+//    QR/CBU propio, es el vendedor quien recibe la plata directo y
+//    quien gestiona la entrega, no la plataforma.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
@@ -45,15 +47,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
-    const password = req.headers.get('x-admin-password')
 
     if (estado === 'informado_pago') {
       await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       return NextResponse.json({ ok: true })
     }
 
-    if (!password || password !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+    const password = req.headers.get('x-admin-password')
+    const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+
+    if (!esAdmin) {
+      const usuario = await getUsuarioDesdeRequest(req)
+      const doc = await ref.get()
+      const pedido = doc.data() as any
+      const items = Array.isArray(pedido?.items) ? pedido.items : []
+      const esVendedorDeEstePedido =
+        !!usuario && items.some((item: any) => item?.vendedorId === usuario.uid)
+
+      if (!esVendedorDeEstePedido) {
+        return NextResponse.json({ error: 'No autorizado para cambiar el estado de este pedido.' }, { status: 401 })
+      }
     }
 
     const payload: Record<string, string> = { estado, updatedAt: new Date().toISOString() }

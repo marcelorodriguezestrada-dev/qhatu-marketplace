@@ -35,7 +35,7 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 - `/publicar-servicio` — **formulario público** para que un profesional se autopostule (sin login). Queda con estado `pendiente_revision` y no aparece en `/servicios` hasta que lo apruebes desde `/admin`. No acepta foto en esta etapa (se coordina por WhatsApp después de aprobar), para no exponer el endpoint de subida de imágenes al público sin ningún tipo de autenticación.
 - `/login` — registro e inicio de sesión (email + contraseña, vía Firebase Auth).
 - `/vender` — panel para que cualquier usuario logueado publique y borre sus propios **productos**, con foto real (sube a ImgBB) o ícono de respaldo si prefiere no subir imagen. Redirige a `/login` si no estás logueado.
-- `/checkout` — crea el pedido (asociado a tu cuenta si estás logueado, o como invitado si no), muestra tu QR y espera que confirmes el pago desde `/admin`.
+- `/checkout` — pide zona/dirección de entrega, **separa el carrito por vendedor** (si comprás productos de 2 vendedores distintos, se generan 2 pedidos, uno para cada uno), y te hace pagar a cada vendedor por separado con su propio QR/CBU (o el de la plataforma, como respaldo, si ese vendedor todavía no configuró el suyo). El costo de envío se reparte proporcional entre los pedidos según el subtotal de cada uno.
 - `/admin` — tu panel único como dueño de la plataforma, con cuatro pestañas:
   - **Pedidos**: lista y confirmación manual de pagos.
   - **Productos**: moderación (activo/pendiente/oculto/rechazado).
@@ -52,8 +52,10 @@ Investigué las opciones de pago por QR en Bolivia antes de armar esto:
 - `/api/profesionales/[id]` — GET público (perfil + reseñas). PATCH (cambiar estado, editar datos) y DELETE, protegidos con `ADMIN_PASSWORD`.
 - `/api/profesionales/[id]/resenas` — POST: deja una reseña, requiere estar logueado (mismo sistema de cuentas que productos). El promedio se recalcula automáticamente en cada reseña nueva.
 - `/api/admin/metricas` — GET protegido con `ADMIN_PASSWORD`: devuelve todos los números que se ven en la pestaña Métricas.
-- `/api/pedidos` — GET (lista completa, protegida con `ADMIN_PASSWORD`) y POST (crea un pedido, lo llama el checkout).
-- `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del comprador) y PATCH (el comprador puede marcar "informado_pago" sin contraseña; solo vos podés marcar "pagado", con `ADMIN_PASSWORD`).
+- `/api/pedidos` — GET (lista completa con `ADMIN_PASSWORD`, o los pedidos propios como comprador/vendedor con login de Firebase) y POST (crea un pedido, lo llama el checkout — uno por cada vendedor distinto en el carrito).
+- `/api/pedidos/[id]` — GET (consulta pública, usada para el polling del comprador). PATCH: el comprador marca "informado_pago" sin login; los estados de operación (pagado, en preparación, en entrega, entregado, cancelado) los puede marcar el admin (`ADMIN_PASSWORD`) **o el vendedor de ese pedido en particular** (con su login de Firebase) — porque con QR/CBU propio, es el vendedor quien recibe la plata y gestiona la entrega.
+- `/api/vendedores` — POST (requiere login): el vendedor carga o actualiza su propio QR/CBU/nombre de negocio.
+- `/api/vendedores/[id]` — GET público: perfil de cobro de un vendedor, usado por el checkout para saber a qué cuenta pagarle.
 
 ## 1. Instalar dependencias
 
@@ -141,6 +143,7 @@ Lo que ya está integrado en la base del negocio:
 - **Contador de vistas de perfil y clics a WhatsApp por profesional**, con ranking de "más contactados" en Métricas.
 - **Filtro de insultos en reseñas** (Groq, gratis): si el comentario contiene lenguaje ofensivo, se bloquea antes de publicarse — no llega a una cola de revisión, se rechaza directo con un mensaje pidiendo reformular.
 - **Botones grandes de "Productos" y "Servicios"** en la home, bien distinguidos visualmente.
+- **Pago directo al vendedor**: cada vendedor configura su propio QR/CBU desde `/vender` ("Cobros"), y el checkout separa automáticamente el carrito en un pedido por vendedor si compraste de varios a la vez — cada uno cobra directo a su cuenta, sin pasar la plata por la plataforma. El vendedor confirma el pago recibido y gestiona la entrega de su propio pedido desde `/vender`, sin necesitar la contraseña de admin.
 - **Pre-filtro de moderación con IA** (opcional, gratis con Groq — `GROQ_API_KEY`): etiqueta cada producto y solicitud de servicio nueva con un riesgo bajo/medio/alto, para priorizar tu revisión manual en `/admin`. Nunca decide por su cuenta.
 
 Lo que todavía no está incluido en esta base:
@@ -152,3 +155,5 @@ Lo que todavía no está incluido en esta base:
 - Confirmación automática de pago por gateway real.
 - Moderación avanzada de vendedores y contenido con revisión manual más estricta.
 - Página "Mis favoritos" para ver todo lo guardado en un solo lugar (hoy el corazón funciona en cada tarjeta, pero no hay una vista consolidada).
+- **Ojo con esto**: si un vendedor no configuró su propio QR/CBU en `/vender`, sus ventas caen al QR general de la plataforma como respaldo — en ese caso, la plata te llega a vos (no al vendedor), y como no hay ninguna pasarela de pago real integrada, transferirle esa plata al vendedor es un paso manual tuyo, fuera de la app. Avisale a cada vendedor que configure su cobro apenas empiece a vender, para que esto no pase.
+- Cuponera, turnos con calendario y detección de patrones de búsqueda — quedan pendientes de una próxima vuelta.

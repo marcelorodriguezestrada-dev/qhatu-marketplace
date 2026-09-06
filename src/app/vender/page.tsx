@@ -38,6 +38,15 @@ export default function VenderPage() {
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
 
+  // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
+  // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
+  const [cobroQrUrl, setCobroQrUrl] = useState('')
+  const [cobroCbu, setCobroCbu] = useState('')
+  const [cobroNegocio, setCobroNegocio] = useState('')
+  const [subiendoQrCobro, setSubiendoQrCobro] = useState(false)
+  const [guardandoCobro, setGuardandoCobro] = useState(false)
+  const [cobroGuardado, setCobroGuardado] = useState(false)
+
   useEffect(() => {
     if (!cargando && !usuario) router.push('/login')
   }, [cargando, usuario, router])
@@ -46,9 +55,59 @@ export default function VenderPage() {
     if (usuario) {
       cargarMisProductos()
       cargarMisPedidos()
+      cargarMiCobro()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario])
+
+  async function cargarMiCobro() {
+    if (!usuario) return
+    const res = await fetch(`/api/vendedores/${usuario.uid}`)
+    const data = await res.json()
+    if (data.configurado) {
+      setCobroQrUrl(data.qrImageUrl || '')
+      setCobroCbu(data.cbu || '')
+      setCobroNegocio(data.nombreNegocio || '')
+    }
+  }
+
+  async function subirQrCobro(file: File | null) {
+    if (!file) return
+    setSubiendoQrCobro(true)
+    try {
+      const token = await obtenerToken()
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setCobroQrUrl(data.url)
+    } catch (e: any) {
+      setError('Error subiendo el QR: ' + e.message)
+    } finally {
+      setSubiendoQrCobro(false)
+    }
+  }
+
+  async function guardarCobro() {
+    setGuardandoCobro(true)
+    setCobroGuardado(false)
+    try {
+      const token = await obtenerToken()
+      await fetch('/api/vendedores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio }),
+      })
+      setCobroGuardado(true)
+    } finally {
+      setGuardandoCobro(false)
+    }
+  }
 
   async function cargarMisProductos() {
     const res = await fetch('/api/productos')
@@ -144,6 +203,19 @@ export default function VenderPage() {
     cargarMisProductos()
   }
 
+  // El vendedor confirma el pago que recibió directo en su propio QR/CBU,
+  // y después va avanzando el estado de preparación/entrega — todo sin
+  // necesitar la contraseña de admin, porque es su propia venta.
+  async function avanzarEstadoPedido(id: string, estado: string) {
+    const token = await obtenerToken()
+    await fetch(`/api/pedidos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ estado }),
+    })
+    cargarMisPedidos()
+  }
+
   if (cargando || !usuario) {
     return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
   }
@@ -152,6 +224,50 @@ export default function VenderPage() {
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="font-display text-xl font-bold text-ink mb-1">Vender en Clasi Click</div>
       <div className="font-body text-[13px] text-inksoft mb-6">Publicando como {usuario.email}</div>
+
+      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+        <div className="font-body text-sm font-semibold text-ink mb-1">Cobros — tu QR o CBU</div>
+        <p className="font-body text-[12px] text-inksoft mb-3">
+          Configurá esto para que cuando alguien te compre, pague directo a tu cuenta — no pasa por la plataforma. Si no lo configurás, tus ventas van a mostrar el QR general de Clasi Click como respaldo.
+        </p>
+        <input
+          value={cobroNegocio}
+          onChange={(e) => setCobroNegocio(e.target.value)}
+          placeholder="Nombre de tu negocio (opcional)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <div className="mb-3">
+          <div className="font-body text-xs text-inksoft mb-1.5">Foto de tu QR de cobro</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {cobroQrUrl && (
+              <img src={cobroQrUrl} alt="Tu QR" className="w-16 h-16 object-cover rounded-lg border border-line" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirQrCobro(e.target.files?.[0] || null)}
+              disabled={subiendoQrCobro}
+              className="font-body text-xs"
+            />
+          </div>
+          {subiendoQrCobro && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
+        </div>
+        <input
+          value={cobroCbu}
+          onChange={(e) => setCobroCbu(e.target.value)}
+          placeholder="CBU / número de cuenta (opcional, alternativa al QR)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <button
+          type="button"
+          onClick={guardarCobro}
+          disabled={guardandoCobro || subiendoQrCobro}
+          className="px-4 py-2 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-60"
+        >
+          {guardandoCobro ? 'Guardando...' : 'Guardar datos de cobro'}
+        </button>
+        {cobroGuardado && <span className="font-body text-xs text-teal ml-3">Guardado ✓</span>}
+      </div>
 
       <form onSubmit={publicar} className="bg-panel border border-line rounded-xl p-5 mb-8">
         <div className="font-body text-sm font-semibold text-ink mb-3">Nuevo producto</div>
@@ -275,6 +391,14 @@ export default function VenderPage() {
         {misPedidos.map((p) => {
           const estado = ESTADOS_LABEL[p.estado] || { texto: p.estado, color: 'text-inksoft' }
           const itemsVendidos = (p.items || []).filter((it: any) => it.vendedorId === usuario.uid || it.vendedor === usuario.email)
+          const siguienteAccion: Record<string, { estado: string; texto: string }> = {
+            pendiente_pago: { estado: 'pagado', texto: 'Confirmar pago recibido' },
+            informado_pago: { estado: 'pagado', texto: 'Confirmar pago recibido' },
+            pagado: { estado: 'en_preparacion', texto: 'Marcar en preparación' },
+            en_preparacion: { estado: 'en_entrega', texto: 'Marcar en camino' },
+            en_entrega: { estado: 'entregado', texto: 'Marcar entregado' },
+          }
+          const accion = siguienteAccion[p.estado]
           return (
             <div key={p.id} className="border border-line rounded-lg p-3 mb-2.5 bg-white/40">
               <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -282,9 +406,17 @@ export default function VenderPage() {
                 <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
               </div>
               <div className="font-body text-sm font-medium text-ink">{itemsVendidos.length} producto(s) · {bs(p.total)}</div>
-              <div className="font-body text-[11px] text-inksoft mt-1">
+              <div className="font-body text-[11px] text-inksoft mt-1 mb-2">
                 Comprador: {p.comprador || 'Sin email'}
               </div>
+              {accion && (
+                <button
+                  onClick={() => avanzarEstadoPedido(p.id, accion.estado)}
+                  className="px-3 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
+                >
+                  {accion.texto}
+                </button>
+              )}
             </div>
           )
         })}
