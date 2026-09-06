@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Producto } from '@/data/productos'
 import { ProductIcon } from './ProductIcon'
 import { useCarrito } from '@/lib/store'
 import { useFavoritos } from '@/lib/favoritos'
+import { useAuth } from '@/lib/auth'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -28,9 +30,22 @@ function CorazonIcon({ relleno }: { relleno: boolean }) {
 export function ProductCard({ p }: { p: Producto }) {
   const { agregar } = useCarrito()
   const { esFavorito, toggleFavorito } = useFavoritos()
+  const { usuario } = useAuth()
+  const router = useRouter()
   const [imagenRota, setImagenRota] = useState(false)
   const mostrarFoto = p.imagenUrl && !imagenRota
   const favorito = esFavorito(p.id)
+
+  // Navegar y ver productos es libre, sin login — pero agregar al
+  // carrito sí lo requiere (evita fraudes y asocia el carrito a una
+  // cuenta real, como se definió para toda la plataforma).
+  function agregarAlCarrito() {
+    if (!usuario) {
+      router.push('/login')
+      return
+    }
+    agregar(p)
+  }
 
   const tieneDescuento = p.precioOriginal && p.precioOriginal > p.precio
   const porcentajeOff = tieneDescuento
@@ -95,7 +110,7 @@ export function ProductCard({ p }: { p: Producto }) {
         </div>
 
         <button
-          onClick={() => agregar(p)}
+          onClick={agregarAlCarrito}
           className="w-full py-1.5 sm:py-2 rounded-md bg-maroon text-white font-body text-[11px] sm:text-xs font-semibold"
         >
           Agregar al carrito

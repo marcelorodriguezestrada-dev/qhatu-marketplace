@@ -39,6 +39,11 @@ export default function CatalogoPage() {
     return matchCat && matchBusqueda
   })
 
+  // Solo entran acá los descuentos reales (precioOriginal cargado por
+  // el propio vendedor y mayor al precio actual) — nada de porcentajes
+  // inventados para la sección de ofertas.
+  const ofertas = productos.filter((p) => p.precioOriginal && p.precioOriginal > p.precio).slice(0, 8)
+
   const cantidadCarrito = items.reduce((s, i) => s + i.cantidad, 0)
 
   return (
@@ -102,6 +107,22 @@ export default function CatalogoPage() {
             <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales cerca tuyo</div>
           </Link>
         </div>
+
+        {ofertas.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">🔥</span>
+              <div className="font-display text-base font-bold text-ink">Ofertas</div>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
+              {ofertas.map((p) => (
+                <div key={p.id} className="w-40 sm:w-44 shrink-0">
+                  <ProductCard p={p} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 mb-5 flex-wrap">
           {CATEGORIAS.map((c) => (

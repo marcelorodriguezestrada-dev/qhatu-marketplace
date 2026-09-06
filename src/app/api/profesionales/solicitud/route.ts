@@ -1,23 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/firebaseAdmin'
+import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA } from '@/lib/moderacionIA'
+import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
-// POST público (sin login, sin contraseña) — es el formulario que
-// llena un profesional que quiere aparecer en el directorio. Queda
-// guardado con estado "pendiente_revision": no aparece en /servicios
-// hasta que vos lo apruebes desde /admin. No acepta foto — para evitar
-// abrir el endpoint de subida de imágenes al público sin ningún tipo de
+// POST — formulario que llena un profesional que quiere aparecer en el
+// directorio. Requiere estar logueado (evita perfiles falsos sin
+// ninguna cuenta detrás). Queda guardado con estado
+// "pendiente_revision": no aparece en /servicios hasta que vos lo
+// apruebes desde /admin. No acepta foto — para evitar abrir el
+// endpoint de subida de imágenes al público sin ningún tipo de
 // autenticación, la foto se agrega después, cuando aprobás la
 // solicitud (o coordinándola directamente con el profesional).
 export async function POST(req: NextRequest) {
+  const usuario = await getUsuarioDesdeRequest(req)
+  if (!usuario) {
+    return NextResponse.json({ error: 'Necesitás iniciar sesión para publicar un servicio.' }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
-    const { nombre, rubro, descripcion, zona, whatsapp, precio, experiencia } = body
+    const { nombre, rubro, descripcion, zona, whatsapp, instagram, precio, experiencia, lat, lng } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
+
+    const validacionWhatsapp = validarWhatsappBoliviano(whatsapp)
+    if (!validacionWhatsapp.valido) {
+      return NextResponse.json({ error: validacionWhatsapp.motivo }, { status: 400 })
+    }
+    const whatsappCompleto = numeroLocalABolivia(whatsapp)
 
     // Pre-filtro de moderación con IA — solo etiqueta el riesgo para
     // ayudarte a priorizar en la cola de /admin, nunca aprueba o
@@ -34,18 +47,22 @@ export async function POST(req: NextRequest) {
       rubro,
       descripcion: descripcion || '',
       zona: zona || '',
-      lat: null,
-      lng: null,
-      whatsapp,
-      icono: 'otro',
+      lat: lat != null ? Number(lat) : null,
+      lng: lng != null ? Number(lng) : null,
+      whatsapp: whatsappCompleto,
+      instagram: instagram || '',
+      icono: rubro,
       imagenUrl: '',
       precio: precio ? Number(precio) : null,
       experiencia: experiencia || '',
       plan: 'basico',
       estado: 'pendiente_revision',
       moderacionIA,
+      solicitanteUid: usuario.uid,
       ratingPromedio: 0,
       cantidadResenas: 0,
+      vistas: 0,
+      clicsWhatsapp: 0,
       createdAt: new Date().toISOString(),
     })
     return NextResponse.json({ id: ref.id })

@@ -145,6 +145,13 @@ Lo que ya está integrado en la base del negocio:
 - **Botones grandes de "Productos" y "Servicios"** en la home, bien distinguidos visualmente.
 - **Pago directo al vendedor**: cada vendedor configura su propio QR/CBU desde `/vender` ("Cobros"), y el checkout separa automáticamente el carrito en un pedido por vendedor si compraste de varios a la vez — cada uno cobra directo a su cuenta, sin pasar la plata por la plataforma. El vendedor confirma el pago recibido y gestiona la entrega de su propio pedido desde `/vender`, sin necesitar la contraseña de admin.
 - **Pre-filtro de moderación con IA** (opcional, gratis con Groq — `GROQ_API_KEY`): etiqueta cada producto y solicitud de servicio nueva con un riesgo bajo/medio/alto, para priorizar tu revisión manual en `/admin`. Nunca decide por su cuenta.
+- **Categorías de profesionales ampliadas y alfabéticas**: médico, oftalmólogo, enfermera a domicilio, abogado, estilista, manicurista, además de las que ya había — con un menú desplegable en vez de botones amontonados.
+- **Mapa de profesionales** (Leaflet + OpenStreetMap, 100% gratis, sin API key) en `/servicios` — pide tu ubicación y muestra a los profesionales con coordenadas cargadas en un mapa real, no solo una lista ordenada por cercanía.
+- **Instagram/red social opcional** en el perfil de cada profesional, debajo del botón de WhatsApp.
+- **WhatsApp simplificado**: ahora se carga solo el número local de 8 dígitos (sin +591) — el sistema arma el link completo solo. Incluye una validación básica de formato (rechaza números con todos los dígitos iguales o secuencias obvias como 12345678) — **esto no es una verificación real por SMS** (eso requeriría un servicio pago tipo Twilio, fuera del alcance gratuito del proyecto), solo filtra los casos más obvios de números inventados.
+- **Login obligatorio ampliado**: ahora hace falta estar logueado para agregar productos al carrito, completar una compra, y publicar un servicio en `/publicar-servicio` (antes esta última era pública sin cuenta). Navegar y explorar el catálogo y el directorio sigue siendo 100% libre, sin necesidad de cuenta.
+- **Retiro en tienda o envío** como opciones explícitas en el checkout — si el comprador elige retiro, no se cobra envío y coordina el retiro por WhatsApp con cada vendedor.
+- **Sección de "Ofertas"** destacada en la home, mostrando solo productos con descuento real cargado por el vendedor (nunca porcentajes inventados).
 
 Lo que todavía no está incluido en esta base:
 
@@ -157,3 +164,5 @@ Lo que todavía no está incluido en esta base:
 - Página "Mis favoritos" para ver todo lo guardado en un solo lugar (hoy el corazón funciona en cada tarjeta, pero no hay una vista consolidada).
 - **Ojo con esto**: si un vendedor no configuró su propio QR/CBU en `/vender`, sus ventas caen al QR general de la plataforma como respaldo — en ese caso, la plata te llega a vos (no al vendedor), y como no hay ninguna pasarela de pago real integrada, transferirle esa plata al vendedor es un paso manual tuyo, fuera de la app. Avisale a cada vendedor que configure su cobro apenas empiece a vender, para que esto no pase.
 - Cuponera, turnos con calendario y detección de patrones de búsqueda — quedan pendientes de una próxima vuelta.
+- **Estrategia "mes gratis" + Device ID**: no aplica todavía porque no existe ningún sistema de suscripciones pagas en la plataforma — es prematuro rastrear abuso de una promoción que no existe. Cuando se construya la cuponera/suscripciones, ahí sí tiene sentido retomarlo.
+- **Verificación real de WhatsApp por SMS**: solo hay validación de formato (ver arriba), no una confirmación real de que el número existe — requeriría un servicio pago.

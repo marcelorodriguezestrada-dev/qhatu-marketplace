@@ -17,7 +17,7 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
   cancelado: { texto: 'Cancelado', color: 'text-red-600' },
 }
 
-const ICONOS_SERVICIO = ['contador', 'odontologo', 'pintor', 'plomero', 'electricista', 'profesor', 'otro']
+const ICONOS_SERVICIO = ['abogado', 'contador', 'electricista', 'enfermera', 'estilista', 'manicurista', 'medico', 'odontologo', 'oftalmologo', 'pintor', 'plomero', 'profesor', 'otro']
 
 function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motivo: string } | null | undefined }) {
   if (!moderacionIA) return null
@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [icono, setIcono] = useState(ICONOS_SERVICIO[0])
   const [imagenUrl, setImagenUrl] = useState('')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
@@ -188,7 +189,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           nombre, rubro, descripcion, zona,
           lat: lat || null, lng: lng || null,
-          whatsapp, icono, plan, imagenUrl,
+          whatsapp, instagram, icono, plan, imagenUrl,
           precio: precio || null,
           experiencia,
         }),
@@ -199,7 +200,7 @@ export default function AdminPage() {
         return
       }
       setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
-      setImagenUrl(''); setPrecio(''); setExperiencia('')
+      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram('')
       cargarProfesionales()
     } finally {
       setPublicando(false)
@@ -486,7 +487,13 @@ export default function AdminPage() {
             <input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="WhatsApp con código de país (ej: 59171234567)"
+              placeholder="WhatsApp (ej: 71234567, sin +591)"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
+            <input
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              placeholder="Instagram u otra red social (opcional)"
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <div className="flex gap-2 mb-4 flex-wrap">

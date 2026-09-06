@@ -1,34 +1,79 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { RUBROS } from '@/components/ServiceIcon'
+import { useAuth } from '@/lib/auth'
+import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
 export default function PublicarServicioPage() {
+  const { usuario, cargando, obtenerToken } = useAuth()
+  const router = useRouter()
+
   const [nombre, setNombre] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0].id)
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [precio, setPrecio] = useState('')
   const [experiencia, setExperiencia] = useState('')
+  const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
+  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState('')
 
+  // Dar de alta un servicio requiere estar logueado — así se evita que
+  // cualquiera publique perfiles falsos sin ninguna cuenta detrás.
+  useEffect(() => {
+    if (!cargando && !usuario) router.push('/login')
+  }, [cargando, usuario, router])
+
+  function usarMiUbicacion() {
+    setBuscandoUbicacion(true)
+    setError('')
+    if (!navigator.geolocation) {
+      setError('Tu navegador no soporta geolocalización.')
+      setBuscandoUbicacion(false)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setBuscandoUbicacion(false)
+      },
+      () => {
+        setError('No pudimos acceder a tu ubicación. Revisá los permisos del navegador.')
+        setBuscandoUbicacion(false)
+      }
+    )
+  }
+
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!nombre.trim() || !whatsapp.trim()) {
-      setError('Completá al menos el nombre y tu WhatsApp.')
+    if (!nombre.trim()) {
+      setError('Completá tu nombre o el de tu negocio.')
+      return
+    }
+    const validacion = validarWhatsappBoliviano(whatsapp)
+    if (!validacion.valido) {
+      setError(validacion.motivo || 'Revisá tu número de WhatsApp.')
       return
     }
     setEnviando(true)
     try {
+      const token = await obtenerToken()
       const res = await fetch('/api/profesionales/solicitud', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, rubro, descripcion, zona, whatsapp, precio, experiencia }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          nombre, rubro, descripcion, zona, whatsapp, instagram, precio, experiencia,
+          lat: ubicacion?.lat ?? null,
+          lng: ubicacion?.lng ?? null,
+        }),
       })
       const data = await res.json()
       if (data.error) {
@@ -39,6 +84,10 @@ export default function PublicarServicioPage() {
     } finally {
       setEnviando(false)
     }
+  }
+
+  if (cargando || !usuario) {
+    return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
   }
 
   if (enviado) {
@@ -90,10 +139,31 @@ export default function PublicarServicioPage() {
           placeholder="Zona / barrio (ej: Sopocachi, La Paz)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={usarMiUbicacion}
+            disabled={buscandoUbicacion}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt"
+          >
+            📍 {buscandoUbicacion ? 'Buscando tu ubicación...' : ubicacion ? 'Ubicación capturada ✓' : 'Usar mi ubicación actual'}
+          </button>
+          <div className="font-body text-[11px] text-inksoft mt-1.5">
+            Opcional, pero así aparecés en el mapa de "más cercanos" del directorio.
+          </div>
+        </div>
+
         <input
           value={whatsapp}
           onChange={(e) => setWhatsapp(e.target.value)}
-          placeholder="WhatsApp con código de país (ej: 59171234567)"
+          placeholder="Tu WhatsApp (ej: 71234567, sin +591)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <input
+          value={instagram}
+          onChange={(e) => setInstagram(e.target.value)}
+          placeholder="Instagram u otra red social (opcional)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
         <div className="grid grid-cols-2 gap-3 mb-3">

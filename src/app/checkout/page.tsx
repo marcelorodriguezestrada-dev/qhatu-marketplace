@@ -66,6 +66,7 @@ export default function CheckoutPage() {
   const router = useRouter()
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
+  const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
   const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
   const [direccion, setDireccion] = useState('')
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
@@ -73,7 +74,14 @@ export default function CheckoutPage() {
   const [error, setError] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const costoEnvio = COSTOS_ENVIO[zonaEntrega] ?? 0
+  // Concretar una compra requiere estar logueado (regla de toda la
+  // plataforma) — si alguien llega hasta acá sin cuenta, lo mandamos a
+  // /login antes de dejarlo seguir.
+  useEffect(() => {
+    if (!authCargando && !usuario) router.push('/login')
+  }, [authCargando, usuario, router])
+
+  const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
   async function confirmarEntregaYCrearPedidos() {
@@ -132,7 +140,7 @@ export default function CheckoutPage() {
             zonaEntrega,
             direccion,
             costoEnvio: envioGrupo,
-            metodoEntrega: 'delivery',
+            metodoEntrega,
           }),
         })
         const dataPedido = await resPedido.json()
@@ -222,28 +230,59 @@ export default function CheckoutPage() {
 
       {etapa === 'entrega' && (
         <div className="bg-panel border border-line rounded-xl p-6">
-          <div className="font-display text-lg font-bold text-ink mb-4">Datos de entrega</div>
-          <label className="block text-left mb-3">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
-            <select
-              value={zonaEntrega}
-              onChange={(e) => setZonaEntrega(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+          <div className="font-display text-lg font-bold text-ink mb-4">¿Cómo lo recibís?</div>
+
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setMetodoEntrega('envio')}
+              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
+                metodoEntrega === 'envio' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              }`}
             >
-              {Object.keys(COSTOS_ENVIO).map((zona) => (
-                <option key={zona} value={zona}>{zona} · {bs(COSTOS_ENVIO[zona])}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-left mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
-            <input
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-              placeholder="Calle, número, barrio"
-              className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-            />
-          </label>
+              Envío
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetodoEntrega('retiro')}
+              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
+                metodoEntrega === 'retiro' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              }`}
+            >
+              Retiro en tienda
+            </button>
+          </div>
+
+          {metodoEntrega === 'envio' ? (
+            <>
+              <label className="block text-left mb-3">
+                <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
+                <select
+                  value={zonaEntrega}
+                  onChange={(e) => setZonaEntrega(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                >
+                  {Object.keys(COSTOS_ENVIO).map((zona) => (
+                    <option key={zona} value={zona}>{zona} · {bs(COSTOS_ENVIO[zona])}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-left mb-4">
+                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
+                <input
+                  value={direccion}
+                  onChange={(e) => setDireccion(e.target.value)}
+                  placeholder="Calle, número, barrio"
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                />
+              </label>
+            </>
+          ) : (
+            <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+              Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
+            </div>
+          )}
+
           <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(subtotalCarrito)}</div>
           <div className="font-body text-[12px] text-inksoft mb-3">Envío: {bs(costoEnvio)}</div>
           <div className="font-display text-xl font-bold text-ink mb-4">{bs(subtotalCarrito + costoEnvio)}</div>

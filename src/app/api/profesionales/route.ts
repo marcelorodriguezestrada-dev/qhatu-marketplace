@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +31,7 @@ export async function GET(req: NextRequest) {
 // POST: alta directa de un profesional desde /admin — queda aprobado
 // de inmediato, porque quien lo carga sos vos mismo. Para que un
 // profesional se autopostule y quede pendiente de tu revisión, existe
-// el endpoint separado /api/profesionales/solicitud (público, sin
-// contraseña).
+// el endpoint separado /api/profesionales/solicitud.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
   if (!password || password !== process.env.ADMIN_PASSWORD) {
@@ -39,10 +39,17 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, descripcion, zona, lat, lng, whatsapp, icono, plan, imagenUrl, precio, experiencia } = body
+    const { nombre, rubro, descripcion, zona, lat, lng, whatsapp, instagram, icono, plan, imagenUrl, precio, experiencia } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
+
+    const validacionWhatsapp = validarWhatsappBoliviano(whatsapp)
+    if (!validacionWhatsapp.valido) {
+      return NextResponse.json({ error: validacionWhatsapp.motivo }, { status: 400 })
+    }
+    const whatsappCompleto = numeroLocalABolivia(whatsapp)
+
     const db = getDb()
     const ref = await db.collection('profesionales').add({
       nombre,
@@ -51,8 +58,9 @@ export async function POST(req: NextRequest) {
       zona: zona || '',
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,
-      whatsapp,
-      icono: icono || 'otro',
+      whatsapp: whatsappCompleto,
+      instagram: instagram || '',
+      icono: icono || rubro || 'otro',
       imagenUrl: imagenUrl || '',
       precio: precio ? Number(precio) : null, // null = "Precio a convenir"
       experiencia: experiencia || '',
@@ -60,6 +68,8 @@ export async function POST(req: NextRequest) {
       estado: 'aprobado',
       ratingPromedio: 0,
       cantidadResenas: 0,
+      vistas: 0,
+      clicsWhatsapp: 0,
       createdAt: new Date().toISOString(),
     })
     return NextResponse.json({ id: ref.id })

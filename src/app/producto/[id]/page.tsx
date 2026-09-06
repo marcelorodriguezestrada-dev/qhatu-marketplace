@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ProductIcon } from '@/components/ProductIcon'
 import { useCarrito } from '@/lib/store'
+import { useAuth } from '@/lib/auth'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -21,6 +22,7 @@ export default function ProductoDetallePage() {
   const id = params?.id as string
   const router = useRouter()
   const { agregar } = useCarrito()
+  const { usuario } = useAuth()
 
   const [producto, setProducto] = useState<any>(null)
   const [relacionados, setRelacionados] = useState<any[]>([])
@@ -55,12 +57,20 @@ export default function ProductoDetallePage() {
   }, [id])
 
   function agregarAlCarrito() {
+    if (!usuario) {
+      router.push('/login')
+      return
+    }
     if (!producto) return
     for (let i = 0; i < cantidad; i++) agregar(producto)
     setAgregado(true)
   }
 
   function comprarAhora() {
+    if (!usuario) {
+      router.push('/login')
+      return
+    }
     if (!producto) return
     for (let i = 0; i < cantidad; i++) agregar(producto)
     router.push('/checkout')

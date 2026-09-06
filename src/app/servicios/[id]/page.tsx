@@ -177,6 +177,17 @@ export default function PerfilProfesionalPage() {
             >
               Contactar por WhatsApp
             </a>
+
+            {perfil.instagram && (
+              <a
+                href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink"
+              >
+                📷 {perfil.instagram.replace('https://instagram.com/', '').replace('@', '')}
+              </a>
+            )}
           </div>
 
           <div className="bg-panel border border-line rounded-xl p-5">

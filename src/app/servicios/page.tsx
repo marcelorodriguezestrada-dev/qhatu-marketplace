@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
+
+const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
+  ssr: false,
+  loading: () => <div className="w-full h-[380px] rounded-xl border border-line bg-panelalt flex items-center justify-center font-body text-sm text-inksoft">Cargando mapa...</div>,
+})
 
 type Profesional = {
   id: string
@@ -26,8 +32,6 @@ function bs(n: number) {
 }
 
 // Fórmula de Haversine — distancia en km entre dos puntos geográficos.
-// La usamos para "ordenar por cercanía" cuando el usuario comparte su
-// ubicación del navegador.
 function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371
   const dLat = ((lat2 - lat1) * Math.PI) / 180
@@ -55,6 +59,7 @@ export default function ServiciosPage() {
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [errorUbicacion, setErrorUbicacion] = useState('')
+  const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
 
   useEffect(() => {
     fetch('/api/profesionales')
@@ -62,7 +67,7 @@ export default function ServiciosPage() {
       .then((data) => setProfesionales(data.profesionales || []))
   }, [])
 
-  function ordenarPorCercania() {
+  function pedirUbicacion(luegoMostrarMapa: boolean) {
     setErrorUbicacion('')
     setBuscandoUbicacion(true)
     if (!navigator.geolocation) {
@@ -73,7 +78,8 @@ export default function ServiciosPage() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setOrden('cercania')
+        if (luegoMostrarMapa) setVista('mapa')
+        else setOrden('cercania')
         setBuscandoUbicacion(false)
       },
       () => {
@@ -124,88 +130,101 @@ export default function ServiciosPage() {
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-4"
         />
 
-        <div className="flex gap-2 mb-4 flex-wrap">
-          <button
-            onClick={() => setRubro('Todo')}
-            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-              rubro === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-            }`}
+        <div className="flex gap-3 mb-4 flex-wrap items-center">
+          <select
+            value={rubro}
+            onChange={(e) => setRubro(e.target.value)}
+            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[180px]"
           >
-            Todo
-          </button>
-          {RUBROS.map((r) => (
+            <option value="Todo">Todos los rubros</option>
+            {RUBROS.map((r) => (
+              <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
+          </select>
+
+          <div className="flex gap-1 bg-panelalt border border-line rounded-lg p-1">
             <button
-              key={r.id}
-              onClick={() => setRubro(r.id)}
-              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                rubro === r.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-              }`}
+              onClick={() => setVista('lista')}
+              className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold ${vista === 'lista' ? 'bg-panel text-ink shadow-sm' : 'text-inksoft'}`}
             >
-              {r.label}
+              Lista
             </button>
-          ))}
+            <button
+              onClick={() => (ubicacion ? setVista('mapa') : pedirUbicacion(true))}
+              disabled={buscandoUbicacion}
+              className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold ${vista === 'mapa' ? 'bg-panel text-ink shadow-sm' : 'text-inksoft'}`}
+            >
+              {buscandoUbicacion ? 'Ubicando...' : 'Mapa'}
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 mb-5">
-          <button
-            onClick={() => setOrden('calificacion')}
-            className={`font-body text-xs font-semibold ${orden === 'calificacion' ? 'text-maroon' : 'text-inksoft'}`}
-          >
-            Mejor calificados
-          </button>
-          <span className="text-inksoft text-xs">·</span>
-          <button
-            onClick={ordenarPorCercania}
-            disabled={buscandoUbicacion}
-            className={`font-body text-xs font-semibold ${orden === 'cercania' ? 'text-maroon' : 'text-inksoft'}`}
-          >
-            {buscandoUbicacion ? 'Buscando tu ubicación...' : 'Más cercanos'}
-          </button>
-        </div>
+        {vista === 'lista' && (
+          <div className="flex items-center gap-3 mb-5">
+            <button
+              onClick={() => setOrden('calificacion')}
+              className={`font-body text-xs font-semibold ${orden === 'calificacion' ? 'text-maroon' : 'text-inksoft'}`}
+            >
+              Mejor calificados
+            </button>
+            <span className="text-inksoft text-xs">·</span>
+            <button
+              onClick={() => pedirUbicacion(false)}
+              disabled={buscandoUbicacion}
+              className={`font-body text-xs font-semibold ${orden === 'cercania' ? 'text-maroon' : 'text-inksoft'}`}
+            >
+              {buscandoUbicacion ? 'Buscando tu ubicación...' : 'Más cercanos'}
+            </button>
+          </div>
+        )}
         {errorUbicacion && <div className="font-body text-xs text-maroon mb-4">{errorUbicacion}</div>}
 
-        <div className="flex flex-col gap-3">
-          {filtrados.map((p) => (
-            <Link
-              key={p.id}
-              href={`/servicios/${p.id}`}
-              className="bg-panel border border-line rounded-lg overflow-hidden flex items-stretch gap-4 p-3 hover:shadow-md transition-shadow"
-            >
-              <div className="w-28 h-28 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden relative">
-                {p.imagenUrl ? (
-                  <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
-                ) : (
-                  <ServiceIcon kind={p.icono} size={40} />
-                )}
-                {p.plan === 'premium' && (
-                  <span className="absolute top-1.5 left-1.5 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
-                    Destacado
-                  </span>
-                )}
-              </div>
-              <div className="flex-1 py-1 flex flex-col justify-center min-w-0">
-                <div className="font-body text-[11px] text-inksoft mb-0.5">
-                  {RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro}
+        {vista === 'mapa' ? (
+          <MapaProfesionales profesionales={filtrados} centro={ubicacion} />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filtrados.map((p) => (
+              <Link
+                key={p.id}
+                href={`/servicios/${p.id}`}
+                className="bg-panel border border-line rounded-lg overflow-hidden flex items-stretch gap-4 p-3 hover:shadow-md transition-shadow"
+              >
+                <div className="w-28 h-28 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden relative">
+                  {p.imagenUrl ? (
+                    <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    <ServiceIcon kind={p.icono} size={40} />
+                  )}
+                  {p.plan === 'premium' && (
+                    <span className="absolute top-1.5 left-1.5 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
+                      Destacado
+                    </span>
+                  )}
                 </div>
-                <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
-                <div className="font-body text-sm font-bold text-ink mb-1">
-                  {p.precio ? bs(p.precio) : 'Precio a convenir'}
-                </div>
-                <div className="font-body text-xs text-inksoft mb-1">{p.zona}</div>
-                {p.cantidadResenas > 0 ? (
-                  <div className="flex items-center gap-1.5">
-                    <Estrellas valor={p.ratingPromedio} />
-                    <span className="font-body text-[11px] text-inksoft">({p.cantidadResenas})</span>
+                <div className="flex-1 py-1 flex flex-col justify-center min-w-0">
+                  <div className="font-body text-[11px] text-inksoft mb-0.5">
+                    {RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro}
                   </div>
-                ) : (
-                  <span className="font-body text-[11px] text-inksoft">Sin reseñas todavía</span>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+                  <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
+                  <div className="font-body text-sm font-bold text-ink mb-1">
+                    {p.precio ? bs(p.precio) : 'Precio a convenir'}
+                  </div>
+                  <div className="font-body text-xs text-inksoft mb-1">{p.zona}</div>
+                  {p.cantidadResenas > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <Estrellas valor={p.ratingPromedio} />
+                      <span className="font-body text-[11px] text-inksoft">({p.cantidadResenas})</span>
+                    </div>
+                  ) : (
+                    <span className="font-body text-[11px] text-inksoft">Sin reseñas todavía</span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
 
-        {filtrados.length === 0 && (
+        {vista === 'lista' && filtrados.length === 0 && (
           <div className="text-center py-14 text-inksoft font-body text-sm">
             No hay profesionales publicados en esta categoría todavía.
           </div>
