@@ -40,7 +40,7 @@ export default function VenderPage() {
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [removerFondo, setRemoverFondo] = useState(true)
+  const [removerFondo, setRemoverFondo] = useState(false)
   const [lastFile, setLastFile] = useState<File | null>(null)
   const [previewProcessedUrl, setPreviewProcessedUrl] = useState<string | null>(null)
   const [processingPreview, setProcessingPreview] = useState(false)
@@ -140,21 +140,31 @@ export default function VenderPage() {
   // (hosting de imágenes gratuito) y nos devuelve la URL pública.
   async function subirImagen(file: File | null) {
     if (!file) return
-    setLastFile(file)
+    // Comprimir imagen en cliente antes de cualquier procesamiento para
+    // acelerar subida y segmentación. Guardamos la versión comprimida
+    // en `lastFile` para previsualizar/procesar rápidamente.
+    let workingFile = file
+    try {
+      const compressed = await compressImage(file, 1200, 0.8)
+      if (compressed) workingFile = compressed
+    } catch (err) {
+      console.warn('Compression failed, uploading original', err)
+    }
+    setLastFile(workingFile)
     setSubiendoImagen(true)
     setError('')
     try {
       // Procesamiento cliente gratuito: intenta remover fondo en el navegador
       // Sólo si el usuario tiene activada la opción
-      let processedFile: File = file
+      let processedFile: File = workingFile
       if (removerFondo) {
         try {
-          const processedDataUrl = await removeBgClient(file)
+          const processedDataUrl = await removeBgClient(workingFile)
           // Convertir dataURL a File
           const blob = await (await fetch(processedDataUrl)).blob()
-          processedFile = new File([blob], file.name, { type: blob.type })
+          processedFile = new File([blob], workingFile.name, { type: blob.type })
         } catch (err) {
-          // Si falla la remoción en cliente, seguimos con el archivo original
+          // Si falla la remoción en cliente, seguimos con el archivo comprimido/original
           console.warn('remove-bg client failed', err)
         }
       }
@@ -305,6 +315,40 @@ export default function VenderPage() {
     const dataUrl = canvas.toDataURL('image/png')
     URL.revokeObjectURL(img.src)
     return dataUrl
+  }
+
+  // compressImage: redimensiona la imagen manteniendo proporción y reduce calidad
+  async function compressImage(file: File, maxDim = 1200, quality = 0.8): Promise<File | null> {
+    try {
+      const img = document.createElement('img')
+      img.src = URL.createObjectURL(file)
+      await new Promise((r, rej) => { img.onload = r; img.onerror = rej })
+      const w = img.naturalWidth
+      const h = img.naturalHeight
+      let nw = w
+      let nh = h
+      if (Math.max(w, h) > maxDim) {
+        if (w >= h) {
+          nw = maxDim
+          nh = Math.round((maxDim * h) / w)
+        } else {
+          nh = maxDim
+          nw = Math.round((maxDim * w) / h)
+        }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = nw
+      canvas.height = nh
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, nw, nh)
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+      URL.revokeObjectURL(img.src)
+      if (!blob) return null
+      return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+    } catch (err) {
+      console.warn('compressImage error', err)
+      return null
+    }
   }
 
   async function publicar(e: React.FormEvent) {
