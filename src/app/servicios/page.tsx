@@ -64,6 +64,11 @@ export default function ServiciosPage() {
   const router = useRouter()
   const pathname = usePathname()
 
+  // Filtro geográfico por defecto: Potosí, Bolivia
+  const [soloPotosi, setSoloPotosi] = useState(true)
+  const POTOSI = { lat: -19.5886, lng: -65.7531 }
+  const POTOSI_RADIUS_KM = 50
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -101,6 +106,12 @@ export default function ServiciosPage() {
   }
 
   let filtrados = profesionales.filter((p) => {
+    if (soloPotosi) {
+      if (p.lat == null || p.lng == null) return false
+      const d = distanciaKm(POTOSI.lat, POTOSI.lng, p.lat as number, p.lng as number)
+      if (d > POTOSI_RADIUS_KM) return false
+    }
+
     const matchRubro = rubro === 'Todo' || p.rubro === rubro
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -130,6 +141,12 @@ export default function ServiciosPage() {
           >
             Publicá tu servicio
           </Link>
+          <button
+            onClick={() => setSoloPotosi((s) => !s)}
+            className="border-none bg-white/5 text-white px-3 py-1.5 rounded-md font-body text-xs shrink-0 whitespace-nowrap ml-2"
+          >
+            {soloPotosi ? 'Filtro: Potosí ✓' : 'Mostrar solo Potosí'}
+          </button>
         </div>
       </div>
 

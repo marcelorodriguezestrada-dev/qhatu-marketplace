@@ -42,8 +42,9 @@ export function MapaProfesionales({
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
 
-      const centroInicial = centro || { lat: -16.5, lng: -68.15 } // La Paz, Bolivia — centro por defecto si no hay ubicación
-      const mapa = L.map(contenedorRef.current).setView([centroInicial.lat, centroInicial.lng], centro ? 13 : 6)
+      // Centro por defecto: Potosí, Bolivia (lanzamiento inicial en Potosí)
+      const centroInicial = centro || { lat: -19.5886, lng: -65.7531 }
+      const mapa = L.map(contenedorRef.current).setView([centroInicial.lat, centroInicial.lng], centro ? 13 : 10)
       mapaRef.current = mapa
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
