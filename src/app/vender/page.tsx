@@ -248,6 +248,11 @@ export default function VenderPage() {
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="font-display text-xl font-bold text-ink mb-1">Vender en Clasi Click</div>
       <div className="font-body text-[13px] text-inksoft mb-6">Publicando como {usuario.email}</div>
+      {editingId && (
+        <div className="mb-4 p-3 rounded-lg bg-ochre/10 border border-ochre text-ink font-body text-sm">
+          Estás editando el producto <strong>{editingId}</strong>. Hacé los cambios y presioná "Actualizar producto" o "Cancelar".
+        </div>
+      )}
 
       <div className="bg-panel border border-line rounded-xl p-5 mb-8">
         <div className="font-body text-sm font-semibold text-ink mb-1">Cobros — tu QR o CBU</div>

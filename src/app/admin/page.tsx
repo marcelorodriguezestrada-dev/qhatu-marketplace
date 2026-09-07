@@ -392,6 +392,23 @@ export default function AdminPage() {
                   >
                     Borrar
                   </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nuevoNombre = prompt('Nuevo nombre', p.nombre || '')
+                      if (nuevoNombre === null) return
+                      const nuevoPrecio = prompt('Nuevo precio (Bs)', String(p.precio || ''))
+                      if (nuevoPrecio === null) return
+                      fetch(`/api/productos/${p.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+                        body: JSON.stringify({ nombre: nuevoNombre, precio: Number(nuevoPrecio) }),
+                      }).then(() => cargarProductos())
+                    }}
+                    className="px-2 py-1 rounded-md border border-line font-body text-[11px]"
+                  >
+                    Editar
+                  </button>
               </div>
             </div>
           ))}
