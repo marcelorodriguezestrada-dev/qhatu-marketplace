@@ -17,11 +17,12 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap] = await Promise.all([
+    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
       db.collection('productos').get(),
       db.collection('profesionales').get(),
       db.collection('pedidos').get(),
+      db.collection('analitica_categorias').get(),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
@@ -68,6 +69,12 @@ export async function GET(req: NextRequest) {
       .slice(0, 5)
       .map((p) => ({ id: p.id, nombre: p.nombre, vistas: p.vistas || 0, clicsWhatsapp: p.clicsWhatsapp || 0 }))
 
+    const categoriasMasBuscadas = categoriasSnap.docs
+      .map((d) => d.data() as any)
+      .sort((a, b) => (b.clics || 0) - (a.clics || 0))
+      .slice(0, 8)
+      .map((c) => ({ tipo: c.tipo, valor: c.valor, clics: c.clics || 0 }))
+
     return NextResponse.json({
       usuariosTotal,
       productos: { total: productos.length, porEstado: productosPorEstado, premium: productosPremium },
@@ -81,6 +88,7 @@ export async function GET(req: NextRequest) {
       pedidos: { total: pedidos.length, porEstado: pedidosPorEstado, totalFacturado },
       productosMasVistos,
       profesionalesMasClicWhatsapp,
+      categoriasMasBuscadas,
     })
   } catch (err) {
     console.error('GET /api/admin/metricas', err)

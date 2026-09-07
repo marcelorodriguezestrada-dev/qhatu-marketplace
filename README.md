@@ -152,6 +152,7 @@ Lo que ya está integrado en la base del negocio:
 - **Login obligatorio ampliado**: ahora hace falta estar logueado para agregar productos al carrito, completar una compra, y publicar un servicio en `/publicar-servicio` (antes esta última era pública sin cuenta). Navegar y explorar el catálogo y el directorio sigue siendo 100% libre, sin necesidad de cuenta.
 - **Retiro en tienda o envío** como opciones explícitas en el checkout — si el comprador elige retiro, no se cobra envío y coordina el retiro por WhatsApp con cada vendedor.
 - **Sección de "Ofertas"** destacada en la home, mostrando solo productos con descuento real cargado por el vendedor (nunca porcentajes inventados).
+- **Categorías y rubros más buscados** en Métricas — cuenta cada vez que alguien filtra por una categoría de producto o un rubro de servicio, para identificar nichos rentables con datos reales de uso, no intuición.
 
 Lo que todavía no está incluido en esta base:
 
@@ -166,3 +167,5 @@ Lo que todavía no está incluido en esta base:
 - Cuponera, turnos con calendario y detección de patrones de búsqueda — quedan pendientes de una próxima vuelta.
 - **Estrategia "mes gratis" + Device ID**: no aplica todavía porque no existe ningún sistema de suscripciones pagas en la plataforma — es prematuro rastrear abuso de una promoción que no existe. Cuando se construya la cuponera/suscripciones, ahí sí tiene sentido retomarlo.
 - **Verificación real de WhatsApp por SMS**: solo hay validación de formato (ver arriba), no una confirmación real de que el número existe — requeriría un servicio pago.
+- **Estrategia real de límites de Firestore**: el plan gratuito permite 50.000 lecturas y 20.000 escrituras por día (no "600 usuarios" como número fijo — lo que importa es cuántas lecturas genera cada visita). Hoy `/api/productos` trae todo el catálogo en cada visita a la home, así que el techo real depende de cuántos productos haya cargados — cuando esto crezca, paginar o cachear el catálogo estira mucho el plan gratuito antes de necesitar pagar nada.
+- **No se implementaron "negocios ficticios" para simular actividad** (mencionado como idea en una de las reuniones) — cargar comercios falsos para que la plataforma no se vea vacía es mostrarle a los primeros usuarios reales una actividad que no existe, lo mismo que se evitó deliberadamente con reseñas o "vendidos" falsos en el resto del proyecto. La alternativa honesta es cargar rápido las publicaciones reales ya planeadas (familia, contactos), o linkear recursos externos reales claramente marcados como tales.

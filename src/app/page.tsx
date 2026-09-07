@@ -128,7 +128,16 @@ export default function CatalogoPage() {
           {CATEGORIAS.map((c) => (
             <button
               key={c}
-              onClick={() => setCategoria(c)}
+              onClick={() => {
+                setCategoria(c)
+                if (c !== 'Todo') {
+                  fetch('/api/analitica/categoria', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo: 'producto', valor: c }),
+                  }).catch(() => {})
+                }
+              }}
               className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
                 categoria === c ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}

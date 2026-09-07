@@ -683,11 +683,30 @@ export default function AdminPage() {
               {metricas.profesionalesMasClicWhatsapp?.length > 0 && (
                 <>
                   <div className="font-body text-sm font-semibold text-ink mb-3">Profesionales con más contactos por WhatsApp</div>
-                  <div className="mb-4">
+                  <div className="mb-8">
                     {metricas.profesionalesMasClicWhatsapp.map((p: any, i: number) => (
                       <div key={p.id} className="flex items-center justify-between py-2 border-b border-line">
                         <span className="font-body text-sm text-ink">{i + 1}. {p.nombre}</span>
                         <span className="font-body text-xs text-inksoft">{p.clicsWhatsapp} clics · {p.vistas} vistas</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {metricas.categoriasMasBuscadas?.length > 0 && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-1">Categorías y rubros más buscados</div>
+                  <div className="font-body text-[11px] text-inksoft mb-3">
+                    Para identificar nichos rentables — esto es lo que la gente filtra de verdad, no una suposición.
+                  </div>
+                  <div className="mb-4">
+                    {metricas.categoriasMasBuscadas.map((c: any, i: number) => (
+                      <div key={`${c.tipo}-${c.valor}`} className="flex items-center justify-between py-2 border-b border-line">
+                        <span className="font-body text-sm text-ink">
+                          {i + 1}. {c.valor} <span className="text-inksoft text-xs">({c.tipo === 'producto' ? 'producto' : 'servicio'})</span>
+                        </span>
+                        <span className="font-body text-xs text-inksoft">{c.clics} búsquedas</span>
                       </div>
                     ))}
                   </div>

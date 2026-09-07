@@ -133,7 +133,16 @@ export default function ServiciosPage() {
         <div className="flex gap-3 mb-4 flex-wrap items-center">
           <select
             value={rubro}
-            onChange={(e) => setRubro(e.target.value)}
+            onChange={(e) => {
+              setRubro(e.target.value)
+              if (e.target.value !== 'Todo') {
+                fetch('/api/analitica/categoria', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tipo: 'servicio', valor: e.target.value }),
+                }).catch(() => {})
+              }
+            }}
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[180px]"
           >
             <option value="Todo">Todos los rubros</option>
