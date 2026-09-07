@@ -379,6 +379,19 @@ export default function AdminPage() {
                 <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'pendiente')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Pendiente</button>
                 <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'oculto')} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Ocultar</button>
                 <button type="button" onClick={() => cambiarEstadoProducto(p.id, 'rechazado')} className="px-2 py-1 rounded-md border border-line font-body text-[11px] text-maroon">Rechazar</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm('¿Borrar este producto definitivamente?')) return
+                      fetch(`/api/productos/${p.id}`, {
+                        method: 'DELETE',
+                        headers: { 'x-admin-password': password },
+                      }).then(() => cargarProductos())
+                    }}
+                    className="px-2 py-1 rounded-md border border-line font-body text-[11px] text-maroon"
+                  >
+                    Borrar
+                  </button>
               </div>
             </div>
           ))}

@@ -21,7 +21,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // DELETE: solo el usuario que publicó el producto puede borrarlo.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
-  if (!usuario) {
+  const password = req.headers.get('x-admin-password')
+  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
   }
   try {
@@ -31,7 +33,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (!doc.exists) {
       return NextResponse.json({ error: 'Producto no encontrado.' }, { status: 404 })
     }
-    if (doc.data()?.vendedorId !== usuario.uid) {
+    if (!esAdmin && doc.data()?.vendedorId !== usuario?.uid) {
       return NextResponse.json({ error: 'Ese producto no te pertenece.' }, { status: 403 })
     }
     await ref.delete()
