@@ -3,6 +3,8 @@ export type Producto = {
   nombre: string
   vendedor: string
   vendedorId?: string
+  descripcionCorta?: string
+  descripcionLarga?: string
   categoria: 'Calzado' | 'Ropa' | 'Accesorios' | 'Hogar'
   precio: number // en Bolivianos
   precioOriginal?: number // opcional — si el vendedor carga un precio "antes de", se muestra tachado con el % de descuento real

@@ -44,6 +44,7 @@ export default function VenderPage() {
   const [lastFile, setLastFile] = useState<File | null>(null)
   const [previewProcessedUrl, setPreviewProcessedUrl] = useState<string | null>(null)
   const [processingPreview, setProcessingPreview] = useState(false)
+  const [generandoIA, setGenerandoIA] = useState(false)
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -471,6 +472,36 @@ export default function VenderPage() {
           placeholder="Descripción corta (ej: Botines de cuero, talle 38)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            onClick={async () => {
+              setGenerandoIA(true)
+              try {
+                const res = await fetch('/api/generate-description', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ nombre, categoria, precio, imagenUrl, descripcionLarga }),
+                })
+                const j = await res.json()
+                if (j.error) throw new Error(j.error)
+                if (j.title) setNombre(j.title)
+                if (j.short) setDescripcionCorta(j.short)
+                if (j.long) setDescripcionLarga(j.long)
+              } catch (err) {
+                // @ts-ignore
+                setError('Error generando con IA: ' + (err?.message || err))
+              } finally {
+                setGenerandoIA(false)
+              }
+            }}
+            className="px-3 py-2 rounded-md border font-body text-sm"
+            disabled={generandoIA}
+          >
+            {generandoIA ? 'Generando...' : 'Generar con IA (groq)'}
+          </button>
+          <div className="font-body text-[12px] text-inksoft self-center">Usa IA para proponer título, descripción corta y detallada.</div>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <select
             value={categoria}
