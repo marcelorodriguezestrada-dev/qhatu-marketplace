@@ -39,6 +39,9 @@ export default function VenderPage() {
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [removerFondo, setRemoverFondo] = useState(true)
+  const [lastFile, setLastFile] = useState<File | null>(null)
+  const [previewProcessedUrl, setPreviewProcessedUrl] = useState<string | null>(null)
+  const [processingPreview, setProcessingPreview] = useState(false)
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -134,6 +137,7 @@ export default function VenderPage() {
   // (hosting de imágenes gratuito) y nos devuelve la URL pública.
   async function subirImagen(file: File | null) {
     if (!file) return
+    setLastFile(file)
     setSubiendoImagen(true)
     setError('')
     try {
@@ -166,6 +170,54 @@ export default function VenderPage() {
     } catch (e) {
       // @ts-ignore
       setError('Error subiendo la imagen: ' + (e?.message || e))
+    } finally {
+      setSubiendoImagen(false)
+    }
+  }
+
+  async function previewRemoveBg() {
+    if (!lastFile) {
+      setError('No hay archivo local para procesar. Volvé a seleccionar la imagen.')
+      return
+    }
+    setProcessingPreview(true)
+    setError('')
+    try {
+      const dataUrl = await removeBgClient(lastFile)
+      setPreviewProcessedUrl(dataUrl)
+    } catch (err) {
+      console.error('Preview remove bg failed', err)
+      // @ts-ignore
+      setError('No se pudo generar la previsualización: ' + (err?.message || err))
+    } finally {
+      setProcessingPreview(false)
+    }
+  }
+
+  async function applyPreviewAsImage() {
+    if (!previewProcessedUrl) return
+    setSubiendoImagen(true)
+    setError('')
+    try {
+      const blob = await (await fetch(previewProcessedUrl)).blob()
+      const file = new File([blob], lastFile?.name || 'processed.png', { type: blob.type })
+      const token = await obtenerToken()
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setImagenUrl(data.url)
+      // reemplazamos lastFile con el nuevo file
+      setLastFile(file)
+      setPreviewProcessedUrl(null)
+    } catch (err) {
+      // @ts-ignore
+      setError('Error subiendo la imagen procesada: ' + (err?.message || err))
     } finally {
       setSubiendoImagen(false)
     }
@@ -481,6 +533,16 @@ export default function VenderPage() {
               />
               {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={previewRemoveBg}
+                disabled={!lastFile || processingPreview}
+                className="px-3 py-1 rounded-md border font-body text-xs"
+              >
+                {processingPreview ? 'Procesando...' : 'Sacar fondo (previsualizar)'}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3 mt-2">
             <label className="font-body text-[13px] flex items-center gap-2">
@@ -492,6 +554,19 @@ export default function VenderPage() {
             Opcional — si no subís foto, se usa el ícono que elijas abajo. Si la remoción falla, se sube la imagen original.
           </div>
         </div>
+
+        {previewProcessedUrl && (
+          <div className="mt-3 p-3 border rounded-lg bg-white/50">
+            <div className="font-body text-sm font-semibold mb-2">Previsualización sin fondo</div>
+            <div className="flex items-center gap-3">
+              <img src={previewProcessedUrl} alt="Preview sin fondo" className="w-20 h-20 object-contain rounded-md border" />
+              <div className="flex flex-col gap-2">
+                <button onClick={applyPreviewAsImage} className="px-3 py-1 rounded-md bg-maroon text-white text-sm">Usar esta imagen</button>
+                <button onClick={() => setPreviewProcessedUrl(null)} className="px-3 py-1 rounded-md border text-sm">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 mb-4 flex-wrap">
           {ICONOS.map((i) => (
