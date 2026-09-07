@@ -37,6 +37,7 @@ export default function VenderPage() {
   const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -166,28 +167,51 @@ export default function VenderPage() {
     setPublicando(true)
     try {
       const token = await obtenerToken()
-      const res = await fetch('/api/productos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          nombre,
-          categoria,
-          precio: Number(precio),
-          icono,
-          imagenUrl,
-          precioOriginal: precioOriginal ? Number(precioOriginal) : null,
-          plan,
-        }),
-      })
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        return
+      if (editingId) {
+        const res = await fetch(`/api/productos/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            nombre,
+            categoria,
+            precio: Number(precio),
+            icono,
+            imagenUrl,
+            precioOriginal: precioOriginal ? Number(precioOriginal) : null,
+          }),
+        })
+        const data = await res.json()
+        if (data.error) {
+          setError(data.error)
+          return
+        }
+        setEditingId(null)
+      } else {
+        const res = await fetch('/api/productos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            nombre,
+            categoria,
+            precio: Number(precio),
+            icono,
+            imagenUrl,
+            precioOriginal: precioOriginal ? Number(precioOriginal) : null,
+            plan,
+          }),
+        })
+        const data = await res.json()
+        if (data.error) {
+          setError(data.error)
+          return
+        }
       }
       setNombre('')
       setPrecio('')
       setPrecioOriginal('')
       setImagenUrl('')
+      setIcono(ICONOS[0])
+      setPlan('basico')
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -374,13 +398,33 @@ export default function VenderPage() {
           ))}
         </div>
         {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
-        <button
-          type="submit"
-          disabled={publicando || subiendoImagen}
-          className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
-        >
-          {publicando ? 'Publicando...' : 'Publicar producto'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={publicando || subiendoImagen}
+            className="flex-1 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+          >
+            {publicando ? (editingId ? 'Actualizando...' : 'Publicando...') : (editingId ? 'Actualizar producto' : 'Publicar producto')}
+          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(null)
+                setNombre('')
+                setCategoria(CATEGORIAS[0])
+                setPrecio('')
+                setPrecioOriginal('')
+                setIcono(ICONOS[0])
+                setImagenUrl('')
+                setPlan('basico')
+              }}
+              className="px-4 py-2.5 rounded-lg border border-line font-body text-sm"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
       </form>
 
       <div className="bg-panel border border-line rounded-xl p-4 mb-8">
@@ -447,12 +491,31 @@ export default function VenderPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => borrar(p.id)}
-            className="font-body text-xs text-maroon underline shrink-0"
-          >
-            Borrar
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                // Prefill form for editing
+                setEditingId(p.id)
+                setNombre(p.nombre || '')
+                setCategoria(p.categoria || CATEGORIAS[0])
+                setPrecio(String(p.precio || ''))
+                setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
+                setIcono(p.icono || ICONOS[0])
+                setImagenUrl(p.imagenUrl || '')
+                setPlan(p.plan || 'basico')
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="font-body text-xs text-ink underline"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => borrar(p.id)}
+              className="font-body text-xs text-maroon underline shrink-0"
+            >
+              Borrar
+            </button>
+          </div>
         </div>
       ))}
     </div>
