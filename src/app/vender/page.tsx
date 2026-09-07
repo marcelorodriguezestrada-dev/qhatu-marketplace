@@ -88,8 +88,9 @@ export default function VenderPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setCobroQrUrl(data.url)
-    } catch (e: any) {
-      setError('Error subiendo el QR: ' + e.message)
+    } catch (e) {
+      // @ts-ignore
+      setError('Error subiendo el QR: ' + (e?.message || e))
     } finally {
       setSubiendoQrCobro(false)
     }
@@ -135,6 +136,7 @@ export default function VenderPage() {
     if (!file) return
     setSubiendoImagen(true)
     setError('')
+    try {
       // Procesamiento cliente gratuito: intenta remover fondo en el navegador
       // Sólo si el usuario tiene activada la opción
       let processedFile: File = file
@@ -161,8 +163,9 @@ export default function VenderPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setImagenUrl(data.url)
-    } catch (e: any) {
-      setError('Error subiendo la imagen: ' + e.message)
+    } catch (e) {
+      // @ts-ignore
+      setError('Error subiendo la imagen: ' + (e?.message || e))
     } finally {
       setSubiendoImagen(false)
     }
