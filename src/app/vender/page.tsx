@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { ProductIcon } from '@/components/ProductIcon'
+import ModalIASuggestions from '@/components/ModalIASuggestions'
 
 const CATEGORIAS = ['Calzado', 'Ropa', 'Accesorios', 'Hogar']
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
@@ -45,6 +46,9 @@ export default function VenderPage() {
   const [previewProcessedUrl, setPreviewProcessedUrl] = useState<string | null>(null)
   const [processingPreview, setProcessingPreview] = useState(false)
   const [generandoIA, setGenerandoIA] = useState(false)
+  const [showModalIA, setShowModalIA] = useState(false)
+  const [sugerenciasIA, setSugerenciasIA] = useState<any[]>([])
+  const [fetchingSugerencias, setFetchingSugerencias] = useState(false)
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -520,32 +524,46 @@ export default function VenderPage() {
           <button
             type="button"
             onClick={async () => {
-              setGenerandoIA(true)
+              setError('')
+              setFetchingSugerencias(true)
               try {
                 const res = await fetch('/api/generate-description', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nombre, categoria, precio, imagenUrl, descripcionLarga }),
+                  body: JSON.stringify({ nombre, categoria, precio, imagenUrl, descripcionLarga, variantes: 3 }),
                 })
                 const j = await res.json()
                 if (j.error) throw new Error(j.error)
-                if (j.title) setNombre(j.title)
-                if (j.short) setDescripcionCorta(j.short)
-                if (j.long) setDescripcionLarga(j.long)
+                const list = j.suggestions || (j.title ? [{ title: j.title, short: j.short, long: j.long }] : [])
+                if (list.length === 0) throw new Error('No hay sugerencias')
+                setSugerenciasIA(list)
+                setShowModalIA(true)
               } catch (err) {
                 // @ts-ignore
                 setError('Error generando con IA: ' + (err?.message || err))
               } finally {
-                setGenerandoIA(false)
+                setFetchingSugerencias(false)
               }
             }}
             className="px-3 py-2 rounded-md border font-body text-sm"
-            disabled={generandoIA}
+            disabled={fetchingSugerencias}
           >
-            {generandoIA ? 'Generando...' : 'Generar con IA (groq)'}
+            {fetchingSugerencias ? 'Generando...' : 'Generar con IA (ver 3 sugerencias)'}
           </button>
           <div className="font-body text-[12px] text-inksoft self-center">Usa IA para proponer título, descripción corta y detallada.</div>
         </div>
+
+        <ModalIASuggestions
+          open={showModalIA}
+          onClose={() => setShowModalIA(false)}
+          suggestions={sugerenciasIA}
+          onApply={(s) => {
+            if (s.title) setNombre(s.title)
+            if (s.short) setDescripcionCorta(s.short)
+            if (s.long) setDescripcionLarga(s.long)
+            setShowModalIA(false)
+          }}
+        />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <select
             value={categoria}
