@@ -52,12 +52,22 @@ export default function CatalogoPage() {
         <div className="max-w-[960px] mx-auto">
           <div className="flex items-center gap-3 mb-2.5">
             <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar productos o vendedores"
-              className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
-            />
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar productos o vendedores"
+                className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
+              />
+              <button
+                type="button"
+                onClick={() => {}}
+                className="px-3 py-2 rounded-lg bg-white/20 text-white text-sm"
+                aria-label="Buscar"
+              >
+                🔍
+              </button>
+            </div>
             <button
               onClick={() => setCarritoAbierto(true)}
               className="border-none bg-white/10 text-white px-3 sm:px-4 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"

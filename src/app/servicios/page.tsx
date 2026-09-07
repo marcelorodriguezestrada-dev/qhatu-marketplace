@@ -123,12 +123,22 @@ export default function ServiciosPage() {
       </div>
 
       <div className="max-w-[960px] mx-auto px-5 py-6 pb-12">
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre o zona"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-4"
-        />
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o zona"
+            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => {}}
+            className="px-3 py-2 rounded-lg bg-maroon text-white text-sm"
+            aria-label="Buscar servicios"
+          >
+            🔍
+          </button>
+        </div>
 
         <div className="flex gap-3 mb-4 flex-wrap items-center">
           <select
