@@ -145,7 +145,7 @@ export default function VenderPage() {
     // en `lastFile` para previsualizar/procesar rápidamente.
     let workingFile = file
     try {
-      const compressed = await compressImage(file, 1200, 0.8)
+      const compressed = await compressImage(file, 800, 0.7)
       if (compressed) workingFile = compressed
     } catch (err) {
       console.warn('Compression failed, uploading original', err)
@@ -318,7 +318,7 @@ export default function VenderPage() {
   }
 
   // compressImage: redimensiona la imagen manteniendo proporción y reduce calidad
-  async function compressImage(file: File, maxDim = 1200, quality = 0.8): Promise<File | null> {
+  async function compressImage(file: File, maxDim = 800, quality = 0.7): Promise<File | null> {
     try {
       const img = document.createElement('img')
       img.src = URL.createObjectURL(file)
