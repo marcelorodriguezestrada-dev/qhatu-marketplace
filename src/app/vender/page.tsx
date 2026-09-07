@@ -169,18 +169,37 @@ export default function VenderPage() {
 
   // removeBgClient: ejecuta segmentación con BodyPix y compone la persona
   async function removeBgClient(file: File): Promise<string> {
-    // Cargar TF backend y BodyPix dinámicamente para no penalizar el bundle
-    const tf = await import('@tensorflow/tfjs-backend-webgl')
+    // Carga de TF.js + BodyPix desde CDN en tiempo de ejecución para evitar
+    // que el builder intente resolver dependencias en el servidor.
+    function loadScript(src: string, globalName?: string) {
+      return new Promise<void>((resolve, reject) => {
+        if (globalName && (window as any)[globalName]) return resolve()
+        const s = document.createElement('script')
+        s.src = src
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error('Error cargando ' + src))
+        document.head.appendChild(s)
+      })
+    }
+
+    // Versiones estables en CDN; podés ajustar si necesitás otra.
+    await loadScript('https://unpkg.com/@tensorflow/tfjs@4.9.0/dist/tf.min.js', 'tf')
+    await loadScript('https://unpkg.com/@tensorflow-models/body-pix@2.0.5/dist/body-pix.min.js', 'bodyPix')
+
+    const tf = (window as any).tf
+    const bodyPix = (window as any).bodyPix
+    if (!tf || !bodyPix) throw new Error('No se pudieron cargar las librerías de segmentación')
     await tf.setBackend('webgl')
-    const bodyPix = await import('@tensorflow-models/body-pix')
+    await tf.ready()
 
     // Cargar imagen en elemento HTMLImageElement
     const img = document.createElement('img')
     img.src = URL.createObjectURL(file)
-    await new Promise((r) => (img.onload = r))
+    await new Promise((r, rej) => { img.onload = r; img.onerror = rej })
 
-    const net = await (bodyPix as any).load()
-    const segmentation = await (bodyPix as any).segmentPerson(img, { internalResolution: 'medium' })
+    const net = await bodyPix.load()
+    const segmentation = await net.segmentPerson(img, { internalResolution: 'medium' })
 
     const canvas = document.createElement('canvas')
     canvas.width = img.naturalWidth
@@ -191,21 +210,19 @@ export default function VenderPage() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Crear mask imageData: 1 where person, 0 otherwise
+    // Crear máscara e incorporar la persona sobre el fondo blanco
     const mask = bodyPix.toMask(segmentation)
-    // draw the mask into an offscreen canvas
     const maskCanvas = document.createElement('canvas')
     maskCanvas.width = canvas.width
     maskCanvas.height = canvas.height
     const mctx = maskCanvas.getContext('2d')!
     mctx.putImageData(mask, 0, 0)
 
-    // Use mask as alpha: draw original image with 'source-in' to keep only person
+    // Dibujar la imagen original con la máscara como recorte
     ctx.globalCompositeOperation = 'source-in'
     ctx.drawImage(img, 0, 0)
     ctx.globalCompositeOperation = 'source-over'
 
-    // Exportar como dataURL
     const dataUrl = canvas.toDataURL('image/png')
     URL.revokeObjectURL(img.src)
     return dataUrl
