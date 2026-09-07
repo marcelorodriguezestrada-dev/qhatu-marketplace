@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useSearchParams } from 'next/navigation'
 import { Producto } from '@/data/productos'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
@@ -49,13 +48,13 @@ export default function CatalogoPage() {
   const cantidadCarrito = items.reduce((s, i) => s + i.cantidad, 0)
   const router = useRouter()
   const pathname = usePathname()
-    const searchParams = useSearchParams()
 
-    useEffect(() => {
-      const q = searchParams?.get('q') || ''
-      if (q) setBusqueda(q)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q') || ''
+    if (q) setBusqueda(q)
+  }, [])
 
   return (
     <div className="min-h-screen">

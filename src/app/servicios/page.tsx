@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
@@ -63,13 +63,14 @@ export default function ServiciosPage() {
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const q = searchParams?.get('q') || ''
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q') || ''
     if (q) setBusqueda(q)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [])
 
   useEffect(() => {
     fetch('/api/profesionales')
