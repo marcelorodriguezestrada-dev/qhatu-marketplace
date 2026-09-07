@@ -135,9 +135,23 @@ export default function VenderPage() {
     setSubiendoImagen(true)
     setError('')
     try {
+      // Procesamiento cliente gratuito: intenta remover fondo en el navegador
+      // Requiere instalar: @tensorflow-models/body-pix y @tensorflow/tfjs-backend-webgl
+      // npm i @tensorflow-models/body-pix @tensorflow/tfjs-backend-webgl
+      let processedFile: File = file
+      try {
+        const processedDataUrl = await removeBgClient(file)
+        // Convertir dataURL a File
+        const blob = await (await fetch(processedDataUrl)).blob()
+        processedFile = new File([blob], file.name, { type: blob.type })
+      } catch (err) {
+        // Si falla la remoción en cliente, seguimos con el archivo original
+        console.warn('remove-bg client failed', err)
+      }
+
       const token = await obtenerToken()
       const formData = new FormData()
-      formData.append('image', file)
+      formData.append('image', processedFile)
       const res = await fetch('/api/upload-image', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -151,6 +165,50 @@ export default function VenderPage() {
     } finally {
       setSubiendoImagen(false)
     }
+  }
+
+  // removeBgClient: ejecuta segmentación con BodyPix y compone la persona
+  async function removeBgClient(file: File): Promise<string> {
+    // Cargar TF backend y BodyPix dinámicamente para no penalizar el bundle
+    const tf = await import('@tensorflow/tfjs-backend-webgl')
+    await tf.setBackend('webgl')
+    const bodyPix = await import('@tensorflow-models/body-pix')
+
+    // Cargar imagen en elemento HTMLImageElement
+    const img = document.createElement('img')
+    img.src = URL.createObjectURL(file)
+    await new Promise((r) => (img.onload = r))
+
+    const net = await (bodyPix as any).load()
+    const segmentation = await (bodyPix as any).segmentPerson(img, { internalResolution: 'medium' })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')!
+
+    // Fondo blanco
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Crear mask imageData: 1 where person, 0 otherwise
+    const mask = bodyPix.toMask(segmentation)
+    // draw the mask into an offscreen canvas
+    const maskCanvas = document.createElement('canvas')
+    maskCanvas.width = canvas.width
+    maskCanvas.height = canvas.height
+    const mctx = maskCanvas.getContext('2d')!
+    mctx.putImageData(mask, 0, 0)
+
+    // Use mask as alpha: draw original image with 'source-in' to keep only person
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.drawImage(img, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+
+    // Exportar como dataURL
+    const dataUrl = canvas.toDataURL('image/png')
+    URL.revokeObjectURL(img.src)
+    return dataUrl
   }
 
   async function publicar(e: React.FormEvent) {
