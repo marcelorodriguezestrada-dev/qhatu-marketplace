@@ -33,6 +33,8 @@ export default function VenderPage() {
   const [precioOriginal, setPrecioOriginal] = useState('')
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [icono, setIcono] = useState(ICONOS[0])
+  const [descripcionCorta, setDescripcionCorta] = useState('')
+  const [descripcionLarga, setDescripcionLarga] = useState('')
   const [imagenUrl, setImagenUrl] = useState('')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [publicando, setPublicando] = useState(false)
@@ -329,6 +331,8 @@ export default function VenderPage() {
             icono,
             imagenUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
+            descripcionCorta,
+            descripcionLarga,
           }),
         })
         const data = await res.json()
@@ -349,6 +353,8 @@ export default function VenderPage() {
             imagenUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             plan,
+            descripcionCorta,
+            descripcionLarga,
           }),
         })
         const data = await res.json()
@@ -363,6 +369,8 @@ export default function VenderPage() {
       setImagenUrl('')
       setIcono(ICONOS[0])
       setPlan('basico')
+      setDescripcionCorta('')
+      setDescripcionLarga('')
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -457,6 +465,12 @@ export default function VenderPage() {
           placeholder="Nombre del producto"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+        <input
+          value={descripcionCorta}
+          onChange={(e) => setDescripcionCorta(e.target.value)}
+          placeholder="Descripción corta (ej: Botines de cuero, talle 38)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <select
             value={categoria}
@@ -486,6 +500,15 @@ export default function VenderPage() {
           <div className="font-body text-[11px] text-inksoft mt-1.5">
             Dejalo vacío si no tenés descuento. Si lo completás, tiene que ser mayor al precio actual.
           </div>
+        </div>
+        <div className="mb-3">
+          <div className="font-body text-xs text-inksoft mb-1.5">Descripción detallada</div>
+          <textarea
+            value={descripcionLarga}
+            onChange={(e) => setDescripcionLarga(e.target.value)}
+            placeholder="Detalles: material, estado, envío, medidas, etc."
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm min-h-[100px]"
+          />
         </div>
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Plan del vendedor</div>
@@ -687,6 +710,8 @@ export default function VenderPage() {
                 setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
                 setIcono(p.icono || ICONOS[0])
                 setImagenUrl(p.imagenUrl || '')
+                setDescripcionCorta(p.descripcionCorta || '')
+                setDescripcionLarga(p.descripcionLarga || '')
                 setPlan(p.plan || 'basico')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}

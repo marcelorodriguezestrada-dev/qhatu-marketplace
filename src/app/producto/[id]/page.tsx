@@ -136,6 +136,10 @@ export default function ProductoDetallePage() {
             )}
           </div>
 
+          {producto.descripcionLarga && (
+            <div className="mb-6 font-body text-sm text-inksoft whitespace-pre-line">{producto.descripcionLarga}</div>
+          )}
+
           <div className="flex items-center gap-3 mb-5">
             <span className="font-body text-sm text-inksoft">Cantidad</span>
             <div className="flex items-center gap-2 border border-line rounded-lg px-2 py-1">

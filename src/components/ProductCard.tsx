@@ -97,6 +97,10 @@ export function ProductCard({ p }: { p: Producto }) {
           {p.nombre}
         </Link>
 
+        {p.descripcionCorta && (
+          <div className="font-body text-[12px] text-inksoft mb-2 truncate">{p.descripcionCorta}</div>
+        )}
+
         {tieneDescuento && (
           <div className="font-body text-[11px] sm:text-[12px] text-inksoft line-through mb-0.5">
             {bs(p.precioOriginal as number)}

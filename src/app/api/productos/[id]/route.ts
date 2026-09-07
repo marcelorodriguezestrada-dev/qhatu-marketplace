@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, estado } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
@@ -76,6 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (icono !== undefined) cambios.icono = icono
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
     if (precioOriginal !== undefined) cambios.precioOriginal = precioOriginal
+    if (descripcionCorta !== undefined) cambios.descripcionCorta = descripcionCorta
+    if (descripcionLarga !== undefined) cambios.descripcionLarga = descripcionLarga
     if (estado !== undefined) {
       if (!esAdmin) {
         return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado del producto.' }, { status: 403 })
