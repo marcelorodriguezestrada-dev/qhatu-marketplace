@@ -38,6 +38,7 @@ export default function VenderPage() {
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [removerFondo, setRemoverFondo] = useState(true)
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -134,19 +135,19 @@ export default function VenderPage() {
     if (!file) return
     setSubiendoImagen(true)
     setError('')
-    try {
       // Procesamiento cliente gratuito: intenta remover fondo en el navegador
-      // Requiere instalar: @tensorflow-models/body-pix y @tensorflow/tfjs-backend-webgl
-      // npm i @tensorflow-models/body-pix @tensorflow/tfjs-backend-webgl
+      // Sólo si el usuario tiene activada la opción
       let processedFile: File = file
-      try {
-        const processedDataUrl = await removeBgClient(file)
-        // Convertir dataURL a File
-        const blob = await (await fetch(processedDataUrl)).blob()
-        processedFile = new File([blob], file.name, { type: blob.type })
-      } catch (err) {
-        // Si falla la remoción en cliente, seguimos con el archivo original
-        console.warn('remove-bg client failed', err)
+      if (removerFondo) {
+        try {
+          const processedDataUrl = await removeBgClient(file)
+          // Convertir dataURL a File
+          const blob = await (await fetch(processedDataUrl)).blob()
+          processedFile = new File([blob], file.name, { type: blob.type })
+        } catch (err) {
+          // Si falla la remoción en cliente, seguimos con el archivo original
+          console.warn('remove-bg client failed', err)
+        }
       }
 
       const token = await obtenerToken()
@@ -201,26 +202,46 @@ export default function VenderPage() {
     const net = await bodyPix.load()
     const segmentation = await net.segmentPerson(img, { internalResolution: 'medium' })
 
+    const w = img.naturalWidth
+    const h = img.naturalHeight
     const canvas = document.createElement('canvas')
-    canvas.width = img.naturalWidth
-    canvas.height = img.naturalHeight
+    canvas.width = w
+    canvas.height = h
     const ctx = canvas.getContext('2d')!
 
-    // Fondo blanco
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // Si la máscara detecta casi nada (p. ej. no es una persona), devolvemos
+    // la imagen original sin aplicar la eliminación de fondo para evitar "desaparecer" el objeto.
+    const segData = (segmentation as any).data as Uint8Array
+    let fgCount = 0
+    for (let i = 0; i < segData.length; i++) if (segData[i]) fgCount++
+    const fgRatio = fgCount / (w * h)
+    if (fgRatio < 0.01) {
+      // Fallback: devolver la imagen original (dibujada sobre blanco)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0)
+      const dataUrl = canvas.toDataURL('image/png')
+      URL.revokeObjectURL(img.src)
+      return dataUrl
+    }
 
-    // Crear máscara e incorporar la persona sobre el fondo blanco
+    // Crear máscara e incorporar la persona sobre el fondo blanco correctamente
     const mask = bodyPix.toMask(segmentation)
     const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = canvas.width
-    maskCanvas.height = canvas.height
+    maskCanvas.width = w
+    maskCanvas.height = h
     const mctx = maskCanvas.getContext('2d')!
     mctx.putImageData(mask, 0, 0)
 
-    // Dibujar la imagen original con la máscara como recorte
-    ctx.globalCompositeOperation = 'source-in'
+    // Dibujar la imagen original
     ctx.drawImage(img, 0, 0)
+    // Usar la máscara para recortar la imagen (mantener sólo la persona)
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.drawImage(maskCanvas, 0, 0)
+    // Dibujar fondo blanco debajo
+    ctx.globalCompositeOperation = 'destination-over'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
     ctx.globalCompositeOperation = 'source-over'
 
     const dataUrl = canvas.toDataURL('image/png')
@@ -458,8 +479,14 @@ export default function VenderPage() {
               {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
             </div>
           </div>
+          <div className="flex items-center gap-3 mt-2">
+            <label className="font-body text-[13px] flex items-center gap-2">
+              <input type="checkbox" checked={removerFondo} onChange={(e) => setRemoverFondo(e.target.checked)} />
+              <span className="font-body text-[11px] text-inksoft">Remover fondo (cliente, puede fallar con objetos)</span>
+            </label>
+          </div>
           <div className="font-body text-[11px] text-inksoft mt-1.5">
-            Opcional — si no subís foto, se usa el ícono que elijas abajo.
+            Opcional — si no subís foto, se usa el ícono que elijas abajo. Si la remoción falla, se sube la imagen original.
           </div>
         </div>
 
