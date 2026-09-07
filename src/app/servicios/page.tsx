@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
@@ -60,6 +61,15 @@ export default function ServiciosPage() {
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [errorUbicacion, setErrorUbicacion] = useState('')
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const q = searchParams?.get('q') || ''
+    if (q) setBusqueda(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   useEffect(() => {
     fetch('/api/profesionales')
@@ -127,12 +137,21 @@ export default function ServiciosPage() {
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const q = encodeURIComponent(busqueda || '')
+                router.push(`${pathname}${q ? `?q=${q}` : ''}`)
+              }
+            }}
             placeholder="Buscar por nombre o zona"
             className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
           <button
             type="button"
-            onClick={() => {}}
+            onClick={() => {
+              const q = encodeURIComponent(busqueda || '')
+              router.push(`${pathname}${q ? `?q=${q}` : ''}`)
+            }}
             className="px-3 py-2 rounded-lg bg-maroon text-white text-sm"
             aria-label="Buscar servicios"
           >

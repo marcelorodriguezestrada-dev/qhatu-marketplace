@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Producto } from '@/data/productos'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
@@ -45,6 +47,15 @@ export default function CatalogoPage() {
   const ofertas = productos.filter((p) => p.precioOriginal && p.precioOriginal > p.precio).slice(0, 8)
 
   const cantidadCarrito = items.reduce((s, i) => s + i.cantidad, 0)
+  const router = useRouter()
+  const pathname = usePathname()
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+      const q = searchParams?.get('q') || ''
+      if (q) setBusqueda(q)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
 
   return (
     <div className="min-h-screen">
@@ -56,12 +67,21 @@ export default function CatalogoPage() {
               <input
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const q = encodeURIComponent(busqueda || '')
+                    router.push(`${pathname}${q ? `?q=${q}` : ''}`)
+                  }
+                }}
                 placeholder="Buscar productos o vendedores"
                 className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
               />
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => {
+                  const q = encodeURIComponent(busqueda || '')
+                  router.push(`${pathname}${q ? `?q=${q}` : ''}`)
+                }}
                 className="px-3 py-2 rounded-lg bg-white/20 text-white text-sm"
                 aria-label="Buscar"
               >
