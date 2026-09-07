@@ -209,7 +209,7 @@ export default function ServiciosPage() {
               Lista
             </button>
             <button
-              onClick={() => (ubicacion ? setVista('mapa') : pedirUbicacion(true))}
+              onClick={() => setVista('mapa')}
               disabled={buscandoUbicacion}
               className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold ${vista === 'mapa' ? 'bg-panel text-ink shadow-sm' : 'text-inksoft'}`}
             >
@@ -239,7 +239,7 @@ export default function ServiciosPage() {
         {errorUbicacion && <div className="font-body text-xs text-maroon mb-4">{errorUbicacion}</div>}
 
         {vista === 'mapa' ? (
-          <MapaProfesionales profesionales={filtrados} centro={ubicacion} />
+          <MapaProfesionales profesionales={filtrados} centro={ubicacion ?? (soloPotosi ? POTOSI : null)} />
         ) : (
           <div className="flex flex-col gap-3">
             {filtrados.map((p) => (
