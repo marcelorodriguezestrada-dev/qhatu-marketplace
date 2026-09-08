@@ -37,6 +37,7 @@ export default function VenderPage() {
   const [descripcionCorta, setDescripcionCorta] = useState('')
   const [descripcionLarga, setDescripcionLarga] = useState('')
   const [imagenUrl, setImagenUrl] = useState('')
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
@@ -158,6 +159,22 @@ export default function VenderPage() {
       console.warn('Compression failed, uploading original', err)
     }
     setLastFile(workingFile)
+    // Generar preview pequeño inmediato para mejorar percepción en móviles
+    try {
+      const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+      const previewDim = isMobile ? 300 : 400
+      const previewQuality = isMobile ? 0.6 : 0.7
+      const small = await compressImage(file, previewDim, previewQuality)
+      if (small) {
+        const obj = URL.createObjectURL(small)
+        // mostrar preview local hasta que la subida termine
+        setLocalPreviewUrl(obj)
+        // revoke previo (si existía) al reemplazar después
+      }
+    } catch (err) {
+      console.warn('preview generation failed', err)
+    }
+
     setSubiendoImagen(true)
     setError('')
     try {
@@ -176,6 +193,7 @@ export default function VenderPage() {
         }
       }
 
+      // Subimos la versión media en background (la que se mostrará como imagen final)
       const token = await obtenerToken()
       const formData = new FormData()
       formData.append('image', processedFile)
@@ -186,6 +204,11 @@ export default function VenderPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      // reemplazar preview local por URL remota
+      if (localPreviewUrl) {
+        try { URL.revokeObjectURL(localPreviewUrl) } catch (e) {}
+        setLocalPreviewUrl(null)
+      }
       setImagenUrl(data.url)
     } catch (e) {
       // @ts-ignore
@@ -638,10 +661,12 @@ export default function VenderPage() {
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Foto del producto</div>
           <div className="flex items-center gap-3 flex-wrap">
-            {imagenUrl && (
+            {(localPreviewUrl || imagenUrl) && (
               <img
-                src={imagenUrl}
+                src={localPreviewUrl || imagenUrl}
                 alt="Vista previa"
+                loading="lazy"
+                decoding="async"
                 className="w-14 h-14 object-cover rounded-lg border border-line"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
               />
