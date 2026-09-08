@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
       const arrayBuffer = await f.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
       const uploadBody = new URLSearchParams()
-      uploadBody.append('key', process.env.IMGBB_API_KEY)
+      const key = process.env.IMGBB_API_KEY as string
+      uploadBody.append('key', key)
       uploadBody.append('image', base64)
       const imgbbRes = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
