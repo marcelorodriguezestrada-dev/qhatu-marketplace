@@ -98,13 +98,13 @@ export default function ProductoDetallePage() {
     <div className="max-w-[960px] mx-auto px-5 py-8">
       <Link href="/" className="font-body text-[13px] text-inksoft mb-5 inline-block">← Volver al catálogo</Link>
 
-      <div className="grid gap-8" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[380px] relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[48vh] md:h-[380px] relative">
           {mostrarFoto ? (
             <img
               src={producto.imagenUrl}
               alt={producto.nombre}
-              className="w-full h-full object-cover"
+              className="max-w-full max-h-full object-contain"
               onError={() => setImagenRota(true)}
             />
           ) : (
