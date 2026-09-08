@@ -175,6 +175,60 @@ export default function ProductoDetallePage() {
             </div>
           )}
 
+          {/* Detalle del producto (talles, colores, materiales, compra mínima, rubro, publicado) */}
+          {(producto.talles || producto.colores || producto.materiales || producto.compraMinima || producto.rubro || producto.createdAt) && (
+            <div className="mt-6">
+              <div className="font-display text-lg font-bold text-ink mb-4">Detalle del producto</div>
+              <div className="bg-panel border border-line rounded-lg overflow-hidden">
+                <div className="px-4 py-3">
+                  {producto.talles && (
+                    <div className="py-3 border-b border-line flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">📏 <span>Talles</span></div>
+                      <div className="font-body text-sm text-inksoft">{Array.isArray(producto.talles) ? producto.talles.join(', ') : String(producto.talles)}</div>
+                    </div>
+                  )}
+                  {producto.colores && (
+                    <div className="py-3 border-b border-line flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">🎨 <span>Colores</span></div>
+                      <div className="font-body text-sm text-inksoft">{Array.isArray(producto.colores) ? producto.colores.join(', ') : String(producto.colores)}</div>
+                    </div>
+                  )}
+                  {producto.materiales && (
+                    <div className="py-3 border-b border-line flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">🧵 <span>Materiales</span></div>
+                      <div className="font-body text-sm text-inksoft">{String(producto.materiales)}</div>
+                    </div>
+                  )}
+                  {producto.compraMinima != null && (
+                    <div className="py-3 border-b border-line flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">📦 <span>Compra mínima para envíos</span></div>
+                      <div className="font-body text-sm text-inksoft">{producto.compraMinima}</div>
+                    </div>
+                  )}
+                  {(producto.rubro || producto.categoria) && (
+                    <div className="py-3 border-b border-line flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">📚 <span>Rubro</span></div>
+                      <div className="font-body text-sm text-inksoft">{producto.rubro || producto.categoria}</div>
+                    </div>
+                  )}
+                  {producto.createdAt && (
+                    <div className="py-3 flex items-center justify-between">
+                      <div className="font-body text-sm text-ink flex items-center gap-2">🗓️ <span>Publicado</span></div>
+                      <div className="font-body text-sm text-inksoft">{(() => {
+                        try {
+                          const dias = Math.floor((Date.now() - new Date(producto.createdAt).getTime()) / 86400000)
+                          if (dias <= 0) return 'Hoy'
+                          if (dias === 1) return 'hace 1 día'
+                          return `hace ${dias} días`
+                        } catch (e) { return producto.createdAt }
+                      })()}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 mb-5">
             <span className="font-body text-sm text-inksoft">Cantidad</span>
             <div className="flex items-center gap-2 border border-line rounded-lg px-2 py-1">
