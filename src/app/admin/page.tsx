@@ -807,16 +807,46 @@ export default function AdminPage() {
               <button onClick={() => setShowEditModal(false)} className="text-inksoft">Cerrar</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Nombre" />
-              <input value={editPrecio} onChange={(e) => setEditPrecio(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Precio (Bs)" />
-              <input value={editVendedor} onChange={(e) => setEditVendedor(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Vendedor / Tienda" />
-              <input value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Dirección" />
-              <input value={editZona} onChange={(e) => setEditZona(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Zona / barrio" />
-              <input value={editHorarios} onChange={(e) => setEditHorarios(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Horarios" />
-              <input value={editTipoVentas} onChange={(e) => setEditTipoVentas(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Tipo de ventas" />
-              <input value={editRating} onChange={(e) => setEditRating(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Rating (ej: 4.8)" />
-              <label className="flex items-center gap-2"><input type="checkbox" checked={editTiendaAprobada} onChange={(e) => setEditTiendaAprobada(e.target.checked)} /> Tienda aprobada</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={editVerificado} onChange={(e) => setEditVerificado(e.target.checked)} /> Verificado</label>
+              <div>
+                <input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Nombre" />
+                <div className="font-body text-xs text-inksoft mt-1">Nombre visible del producto que aparecerá en el catálogo.</div>
+              </div>
+              <div>
+                <input value={editPrecio} onChange={(e) => setEditPrecio(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Precio (Bs)" />
+                <div className="font-body text-xs text-inksoft mt-1">Precio en Bolivianos. Dejar vacío para mostrar “Precio a convenir”.</div>
+              </div>
+              <div>
+                <input value={editVendedor} onChange={(e) => setEditVendedor(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Vendedor / Tienda" />
+                <div className="font-body text-xs text-inksoft mt-1">Nombre del vendedor o tienda (opcional).</div>
+              </div>
+              <div>
+                <input value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Dirección" />
+                <div className="font-body text-xs text-inksoft mt-1">Dirección física de la tienda (opcional).</div>
+              </div>
+              <div>
+                <input value={editZona} onChange={(e) => setEditZona(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Zona / barrio" />
+                <div className="font-body text-xs text-inksoft mt-1">Zona o barrio para mostrar en listados (ej: Sopocachi).</div>
+              </div>
+              <div>
+                <input value={editHorarios} onChange={(e) => setEditHorarios(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Horarios" />
+                <div className="font-body text-xs text-inksoft mt-1">Horarios de atención en formato libre (ej: Lun-Vie 9:00-18:00).</div>
+              </div>
+              <div>
+                <input value={editTipoVentas} onChange={(e) => setEditTipoVentas(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Tipo de ventas" />
+                <div className="font-body text-xs text-inksoft mt-1">Texto corto indicando si vende al por mayor, menor, envíos, etc.</div>
+              </div>
+              <div>
+                <input value={editRating} onChange={(e) => setEditRating(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Rating (ej: 4.8)" />
+                <div className="font-body text-xs text-inksoft mt-1">Calificación visible (0–5). Solo admin debería editar esto.</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={editTiendaAprobada} onChange={(e) => setEditTiendaAprobada(e.target.checked)} /> Tienda aprobada</label>
+                <div className="font-body text-xs text-inksoft">Marca la tienda como oficial / aprobada por el sitio.</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={editVerificado} onChange={(e) => setEditVerificado(e.target.checked)} /> Verificado</label>
+                <div className="font-body text-xs text-inksoft">Indica si la tienda fue verificada (documentación o validación).</div>
+              </div>
             </div>
             <div className="mt-4 flex gap-2 justify-end">
               <button onClick={() => setShowEditModal(false)} className="px-3.5 py-2 rounded-lg border border-line">Cancelar</button>
