@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
+import { ProfesionalFoto } from '@/components/ProfesionalFoto'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -64,8 +65,10 @@ export default function ServiciosPage() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Filtro geográfico por defecto: Potosí, Bolivia
-  const [soloPotosi, setSoloPotosi] = useState(true)
+  // Filtro geográfico opcional (Potosí, Bolivia) — apagado por defecto
+  // para que se vean todos los profesionales. El botón para activarlo
+  // sigue disponible más abajo si en algún momento hace falta.
+  const [soloPotosi, setSoloPotosi] = useState(false)
   const POTOSI = { lat: -19.5886, lng: -65.7531 }
   const POTOSI_RADIUS_KM = 50
 
@@ -249,11 +252,7 @@ export default function ServiciosPage() {
                 className="bg-panel border border-line rounded-lg overflow-hidden flex items-stretch gap-4 p-3 hover:shadow-md transition-shadow"
               >
                 <div className="w-28 h-28 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden relative">
-                  {p.imagenUrl ? (
-                    <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                  ) : (
-                    <ServiceIcon kind={p.icono} size={40} />
-                  )}
+                  <ProfesionalFoto imagenUrl={p.imagenUrl} nombre={p.nombre} icono={p.icono} size={40} />
                   {p.plan === 'premium' && (
                     <span className="absolute top-1.5 left-1.5 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
                       Destacado
