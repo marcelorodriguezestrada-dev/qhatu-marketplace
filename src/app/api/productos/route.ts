@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
     const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
 
     let productos = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
+    // Asegurar que exista `thumbUrl` en la respuesta para optimizar listados
+    productos = productos.map((p) => ({ ...p, thumbUrl: p.thumbUrl || p.imagenUrl || '' }))
     if (!esAdmin) {
       productos = productos.filter((p) => p.estado !== 'rechazado' && p.estado !== 'oculto')
     }
