@@ -80,7 +80,7 @@ export default function PerfilProfesionalPage() {
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 300px' }}>
         <div>
-          <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[340px] mb-6">
+          <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[200px] sm:h-[340px] mb-6">
               {perfil.imagenUrl ? (
               <img src={perfil.imagenUrl} alt={perfil.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (

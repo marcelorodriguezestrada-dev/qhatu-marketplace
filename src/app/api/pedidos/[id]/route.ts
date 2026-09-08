@@ -83,3 +83,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'No se pudo actualizar el pedido.' }, { status: 500 })
   }
 }
+
+// DELETE: solo el admin puede eliminar un pedido.
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const password = req.headers.get('x-admin-password')
+  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  if (!esAdmin) {
+    return NextResponse.json({ error: 'Solo el admin puede eliminar pedidos.' }, { status: 401 })
+  }
+  try {
+    const db = getDb()
+    await db.collection('pedidos').doc(params.id).delete()
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('DELETE /api/pedidos/[id]', err)
+    return NextResponse.json({ error: 'No se pudo eliminar el pedido.' }, { status: 500 })
+  }
+}

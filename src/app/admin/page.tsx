@@ -149,6 +149,69 @@ export default function AdminPage() {
     cambiarEstadoPedido(id, 'pagado')
   }
 
+  function eliminarPedido(id: string) {
+    if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return
+    fetch(`/api/pedidos/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': password },
+    }).then(() => entrar(password))
+  }
+
+  const [productoEditando, setProductoEditando] = useState<any>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [editPrecio, setEditPrecio] = useState('')
+  const [editPrecioOriginal, setEditPrecioOriginal] = useState('')
+  const [editCategoria, setEditCategoria] = useState('')
+  const [editDescCorta, setEditDescCorta] = useState('')
+  const [editDescLarga, setEditDescLarga] = useState('')
+  const [editTalles, setEditTalles] = useState('')
+  const [editColores, setEditColores] = useState('')
+  const [editMateriales, setEditMateriales] = useState('')
+  const [editEstado, setEditEstado] = useState('')
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
+
+  function abrirEditarProducto(p: any) {
+    setProductoEditando(p)
+    setEditNombre(p.nombre || '')
+    setEditPrecio(String(p.precio || ''))
+    setEditPrecioOriginal(String(p.precioOriginal || ''))
+    setEditCategoria(p.categoria || '')
+    setEditDescCorta(p.descripcionCorta || '')
+    setEditDescLarga(p.descripcionLarga || '')
+    setEditTalles(Array.isArray(p.talles) ? p.talles.join(', ') : (p.talles || ''))
+    setEditColores(Array.isArray(p.colores) ? p.colores.join(', ') : (p.colores || ''))
+    setEditMateriales(p.materiales || '')
+    setEditEstado(p.estado || 'activo')
+  }
+
+  async function guardarEditProducto() {
+    if (!productoEditando) return
+    setGuardandoEdit(true)
+    const tallesArr = editTalles.split(',').map(s => s.trim()).filter(Boolean)
+    const coloresArr = editColores.split(',').map(s => s.trim()).filter(Boolean)
+    await fetch(`/api/productos/${productoEditando.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({
+        nombre: editNombre,
+        precio: Number(editPrecio),
+        precioOriginal: editPrecioOriginal ? Number(editPrecioOriginal) : null,
+        categoria: editCategoria,
+        descripcionCorta: editDescCorta,
+        descripcionLarga: editDescLarga,
+        talles: tallesArr,
+        colores: coloresArr,
+        materiales: editMateriales,
+        estado: editEstado,
+      }),
+    })
+    setGuardandoEdit(false)
+    setProductoEditando(null)
+    cargarProductos(password)
+  }
+
+
+
   // Mismo endpoint que usan los vendedores en /vender, pero acá nos
   // autenticamos con la contraseña de admin en vez de un login de
   // Firebase (este panel no usa ese sistema de cuentas).
