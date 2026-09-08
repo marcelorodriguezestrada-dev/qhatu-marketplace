@@ -65,7 +65,7 @@ export default function ServiciosPage() {
   const pathname = usePathname()
 
   // Filtro geográfico por defecto: Potosí, Bolivia
-  const [soloPotosi, setSoloPotosi] = useState(true)
+  const [soloPotosi, setSoloPotosi] = useState(false)
   const POTOSI = { lat: -19.5886, lng: -65.7531 }
   const POTOSI_RADIUS_KM = 50
 
@@ -144,12 +144,7 @@ export default function ServiciosPage() {
           >
             Publicá tu servicio
           </Link>
-          <button
-            onClick={() => setSoloPotosi((s) => !s)}
-            className="border-none bg-white/5 text-white px-3 py-1.5 rounded-md font-body text-xs shrink-0 whitespace-nowrap ml-2"
-          >
-            {soloPotosi ? 'Filtro: Potosí (radio + zona) ✓' : 'Mostrar todo'}
-          </button>
+
         </div>
       </div>
 
