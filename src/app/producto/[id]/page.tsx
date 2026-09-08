@@ -126,6 +126,15 @@ export default function ProductoDetallePage() {
           <div className="font-body text-xs text-inksoft mb-1">{producto.categoria} · {producto.vendedor}</div>
           <h1 className="font-display text-2xl font-bold text-ink mb-4">{producto.nombre}</h1>
 
+          <div className="flex items-center gap-2 mb-3">
+            {producto.rating && (
+              <span className="bg-panelalt px-2 py-1 rounded font-body text-sm font-semibold">{producto.rating} ★</span>
+            )}
+            {producto.tiendaAprobada && (
+              <span className="bg-ochre text-white text-xs font-bold px-2.5 py-1 rounded font-body">TIENDA APROBADA</span>
+            )}
+          </div>
+
           {tieneDescuento && (
             <div className="font-body text-sm text-inksoft line-through mb-1">{bs(producto.precioOriginal)}</div>
           )}
@@ -138,6 +147,32 @@ export default function ProductoDetallePage() {
 
           {producto.descripcionLarga && (
             <div className="mb-6 font-body text-sm text-inksoft whitespace-pre-line">{producto.descripcionLarga}</div>
+          )}
+
+          {/* Tarjeta del vendedor / tienda */}
+          <div className="mt-4 bg-panel border border-line rounded-lg p-3.5 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden text-maroon">{producto.vendedor ? producto.vendedor[0] : 'V'}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-body text-sm font-medium text-ink truncate">{producto.vendedor || 'Vendedor'}</div>
+                {producto.direccion && <div className="font-body text-xs text-inksoft">{producto.direccion}</div>}
+                {producto.zona && <div className="font-body text-xs text-inksoft">{producto.zona}</div>}
+              </div>
+              <div className="shrink-0">
+                <button className="font-body text-xs text-maroon underline">Seguir local</button>
+              </div>
+            </div>
+            {producto.followers && <div className="font-body text-xs text-inksoft mt-2 font-semibold">{producto.followers} seguidores</div>}
+          </div>
+
+          {/* Información adicional: horarios / tipo de ventas */}
+          {(producto.horarios || producto.tipoVentas) && (
+            <div className="mb-6">
+              {producto.horarios && <div className="font-body text-sm text-ink mb-1">Horarios</div>}
+              {producto.horarios && <div className="font-body text-sm text-inksoft mb-2">{producto.horarios}</div>}
+              {producto.tipoVentas && <div className="font-body text-sm text-ink mb-1">Tipo de ventas</div>}
+              {producto.tipoVentas && <div className="font-body text-sm text-inksoft">{producto.tipoVentas}</div>}
+            </div>
           )}
 
           <div className="flex items-center gap-3 mb-5">
