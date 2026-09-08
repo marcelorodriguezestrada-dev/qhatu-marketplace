@@ -67,7 +67,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl,
+      vendedor, direccion, zona, horarios, tipoVentas, tiendaAprobada, verificado, rating } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
@@ -79,6 +80,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (precioOriginal !== undefined) cambios.precioOriginal = precioOriginal
     if (descripcionCorta !== undefined) cambios.descripcionCorta = descripcionCorta
     if (descripcionLarga !== undefined) cambios.descripcionLarga = descripcionLarga
+    if (vendedor !== undefined) cambios.vendedor = vendedor
+    if (direccion !== undefined) cambios.direccion = direccion
+    if (zona !== undefined) cambios.zona = zona
+    if (horarios !== undefined) cambios.horarios = horarios
+    if (tipoVentas !== undefined) cambios.tipoVentas = tipoVentas
+    if (thumbUrl !== undefined) cambios.thumbUrl = thumbUrl
     if (estado !== undefined) {
       if (!esAdmin) {
         return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado del producto.' }, { status: 403 })
@@ -87,6 +94,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
       }
       cambios.estado = estado
+    }
+
+    // Campos que solo el admin puede forzar/modificar
+    if (tiendaAprobada !== undefined) {
+      if (!esAdmin) return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado de la tienda.' }, { status: 403 })
+      cambios.tiendaAprobada = tiendaAprobada
+    }
+    if (verificado !== undefined) {
+      if (!esAdmin) return NextResponse.json({ error: 'Solo el administrador puede marcar verificado.' }, { status: 403 })
+      cambios.verificado = verificado
+    }
+    if (rating !== undefined) {
+      if (!esAdmin) return NextResponse.json({ error: 'Solo el administrador puede establecer la calificación.' }, { status: 403 })
+      cambios.rating = rating
     }
 
     cambios.updatedAt = new Date().toISOString()

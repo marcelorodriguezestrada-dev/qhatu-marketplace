@@ -399,10 +399,35 @@ export default function AdminPage() {
                       if (nuevoNombre === null) return
                       const nuevoPrecio = prompt('Nuevo precio (Bs)', String(p.precio || ''))
                       if (nuevoPrecio === null) return
+                      const nuevoVendedor = prompt('Vendedor / tienda (opcional)', p.vendedor || '')
+                      if (nuevoVendedor === null) return
+                      const nuevoDireccion = prompt('Dirección (opcional)', p.direccion || '')
+                      if (nuevoDireccion === null) return
+                      const nuevoZona = prompt('Zona / barrio (opcional)', p.zona || '')
+                      if (nuevoZona === null) return
+                      const nuevoHorarios = prompt('Horarios (texto libre, opcional)', p.horarios || '')
+                      if (nuevoHorarios === null) return
+                      const nuevoTipoVentas = prompt('Tipo de ventas (ej: Mayorista - Minorista)', p.tipoVentas || '')
+                      if (nuevoTipoVentas === null) return
+                      const marcarTienda = confirm('Marcar tienda como aprobada? (Aceptar = sí)')
+                      const establecerVerificado = confirm('Marcar como verificado? (Aceptar = sí)')
+                      const nuevoRatingStr = prompt('Calificación (ej: 4.8) (opcional)', p.rating ? String(p.rating) : '')
+                      if (nuevoRatingStr === null) return
+                      const nuevoRating = nuevoRatingStr === '' ? undefined : Number(nuevoRatingStr)
+
+                      const payload: any = { nombre: nuevoNombre, precio: Number(nuevoPrecio), vendedor: nuevoVendedor }
+                      if (nuevoDireccion) payload.direccion = nuevoDireccion
+                      if (nuevoZona) payload.zona = nuevoZona
+                      if (nuevoHorarios) payload.horarios = nuevoHorarios
+                      if (nuevoTipoVentas) payload.tipoVentas = nuevoTipoVentas
+                      payload.tiendaAprobada = marcarTienda
+                      payload.verificado = establecerVerificado
+                      if (nuevoRating !== undefined && !Number.isNaN(nuevoRating)) payload.rating = nuevoRating
+
                       fetch(`/api/productos/${p.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-                        body: JSON.stringify({ nombre: nuevoNombre, precio: Number(nuevoPrecio) }),
+                        body: JSON.stringify(payload),
                       }).then(() => cargarProductos())
                     }}
                     className="px-2 py-1 rounded-md border border-line font-body text-[11px]"
