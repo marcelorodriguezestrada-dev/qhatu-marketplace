@@ -72,6 +72,19 @@ export default function AdminPage() {
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [publicando, setPublicando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
+  // Edit modal states
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
+  const [editNombre, setEditNombre] = useState('')
+  const [editPrecio, setEditPrecio] = useState('')
+  const [editVendedor, setEditVendedor] = useState('')
+  const [editDireccion, setEditDireccion] = useState('')
+  const [editZona, setEditZona] = useState('')
+  const [editHorarios, setEditHorarios] = useState('')
+  const [editTipoVentas, setEditTipoVentas] = useState('')
+  const [editTiendaAprobada, setEditTiendaAprobada] = useState(false)
+  const [editVerificado, setEditVerificado] = useState(false)
+  const [editRating, setEditRating] = useState<string>('')
 
   useEffect(() => {
     const guardada = typeof window !== 'undefined' ? localStorage.getItem('clasiclick_admin_pw') : null
@@ -220,6 +233,34 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ estado }),
     }).then(() => cargarProfesionales())
+  }
+
+  async function submitEditModal() {
+    if (!editingProduct) return
+    const payload: any = { nombre: editNombre, precio: editPrecio === '' ? null : Number(editPrecio), vendedor: editVendedor }
+    if (editDireccion) payload.direccion = editDireccion
+    if (editZona) payload.zona = editZona
+    if (editHorarios) payload.horarios = editHorarios
+    if (editTipoVentas) payload.tipoVentas = editTipoVentas
+    payload.tiendaAprobada = editTiendaAprobada
+    payload.verificado = editVerificado
+    if (editRating !== '') {
+      const r = Number(editRating)
+      if (!Number.isNaN(r)) payload.rating = r
+    }
+
+    try {
+      await fetch(`/api/productos/${editingProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify(payload),
+      })
+      setShowEditModal(false)
+      setEditingProduct(null)
+      cargarProductos()
+    } catch (e) {
+      alert('Error al guardar: ' + String(e))
+    }
   }
 
   if (!autenticado) {
@@ -394,41 +435,19 @@ export default function AdminPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={async () => {
-                      const nuevoNombre = prompt('Nuevo nombre', p.nombre || '')
-                      if (nuevoNombre === null) return
-                      const nuevoPrecio = prompt('Nuevo precio (Bs)', String(p.precio || ''))
-                      if (nuevoPrecio === null) return
-                      const nuevoVendedor = prompt('Vendedor / tienda (opcional)', p.vendedor || '')
-                      if (nuevoVendedor === null) return
-                      const nuevoDireccion = prompt('Dirección (opcional)', p.direccion || '')
-                      if (nuevoDireccion === null) return
-                      const nuevoZona = prompt('Zona / barrio (opcional)', p.zona || '')
-                      if (nuevoZona === null) return
-                      const nuevoHorarios = prompt('Horarios (texto libre, opcional)', p.horarios || '')
-                      if (nuevoHorarios === null) return
-                      const nuevoTipoVentas = prompt('Tipo de ventas (ej: Mayorista - Minorista)', p.tipoVentas || '')
-                      if (nuevoTipoVentas === null) return
-                      const marcarTienda = confirm('Marcar tienda como aprobada? (Aceptar = sí)')
-                      const establecerVerificado = confirm('Marcar como verificado? (Aceptar = sí)')
-                      const nuevoRatingStr = prompt('Calificación (ej: 4.8) (opcional)', p.rating ? String(p.rating) : '')
-                      if (nuevoRatingStr === null) return
-                      const nuevoRating = nuevoRatingStr === '' ? undefined : Number(nuevoRatingStr)
-
-                      const payload: any = { nombre: nuevoNombre, precio: Number(nuevoPrecio), vendedor: nuevoVendedor }
-                      if (nuevoDireccion) payload.direccion = nuevoDireccion
-                      if (nuevoZona) payload.zona = nuevoZona
-                      if (nuevoHorarios) payload.horarios = nuevoHorarios
-                      if (nuevoTipoVentas) payload.tipoVentas = nuevoTipoVentas
-                      payload.tiendaAprobada = marcarTienda
-                      payload.verificado = establecerVerificado
-                      if (nuevoRating !== undefined && !Number.isNaN(nuevoRating)) payload.rating = nuevoRating
-
-                      fetch(`/api/productos/${p.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-                        body: JSON.stringify(payload),
-                      }).then(() => cargarProductos())
+                    onClick={() => {
+                      setEditingProduct(p)
+                      setEditNombre(p.nombre || '')
+                      setEditPrecio(p.precio ? String(p.precio) : '')
+                      setEditVendedor(p.vendedor || '')
+                      setEditDireccion(p.direccion || '')
+                      setEditZona(p.zona || '')
+                      setEditHorarios(p.horarios || '')
+                      setEditTipoVentas(p.tipoVentas || '')
+                      setEditTiendaAprobada(!!p.tiendaAprobada)
+                      setEditVerificado(!!p.verificado)
+                      setEditRating(p.rating ? String(p.rating) : '')
+                      setShowEditModal(true)
                     }}
                     className="px-2 py-1 rounded-md border border-line font-body text-[11px]"
                   >
@@ -776,6 +795,34 @@ export default function AdminPage() {
           {!cargandoMetricas && metricas?.error && (
             <div className="font-body text-sm text-maroon">{metricas.error}</div>
           )}
+        </div>
+      )}
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditModal(false)} />
+          <div className="bg-white dark:bg-gray-900 w-[92%] max-w-2xl rounded-xl p-4 z-10 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-display text-lg font-bold">Editar producto</div>
+              <button onClick={() => setShowEditModal(false)} className="text-inksoft">Cerrar</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Nombre" />
+              <input value={editPrecio} onChange={(e) => setEditPrecio(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Precio (Bs)" />
+              <input value={editVendedor} onChange={(e) => setEditVendedor(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Vendedor / Tienda" />
+              <input value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Dirección" />
+              <input value={editZona} onChange={(e) => setEditZona(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Zona / barrio" />
+              <input value={editHorarios} onChange={(e) => setEditHorarios(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Horarios" />
+              <input value={editTipoVentas} onChange={(e) => setEditTipoVentas(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Tipo de ventas" />
+              <input value={editRating} onChange={(e) => setEditRating(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line" placeholder="Rating (ej: 4.8)" />
+              <label className="flex items-center gap-2"><input type="checkbox" checked={editTiendaAprobada} onChange={(e) => setEditTiendaAprobada(e.target.checked)} /> Tienda aprobada</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={editVerificado} onChange={(e) => setEditVerificado(e.target.checked)} /> Verificado</label>
+            </div>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button onClick={() => setShowEditModal(false)} className="px-3.5 py-2 rounded-lg border border-line">Cancelar</button>
+              <button onClick={submitEditModal} className="px-3.5 py-2 rounded-lg bg-maroon text-white">Guardar</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
