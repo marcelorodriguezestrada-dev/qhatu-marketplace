@@ -88,14 +88,11 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [editNombre, setEditNombre] = useState('')
   const [editPrecio, setEditPrecio] = useState('')
-  const [editVendedor, setEditVendedor] = useState('')
-  const [editDireccion, setEditDireccion] = useState('')
-  const [editZona, setEditZona] = useState('')
-  const [editHorarios, setEditHorarios] = useState('')
-  const [editTipoVentas, setEditTipoVentas] = useState('')
-  const [editTiendaAprobada, setEditTiendaAprobada] = useState(false)
-  const [editVerificado, setEditVerificado] = useState(false)
-  const [editRating, setEditRating] = useState<string>('')
+  const [editDescripcionCorta, setEditDescripcionCorta] = useState('')
+  const [editDescripcionLarga, setEditDescripcionLarga] = useState('')
+  const [editPrecioOriginal, setEditPrecioOriginal] = useState('')
+  const [editCategoria, setEditCategoria] = useState('')
+  const [editIcono, setEditIcono] = useState('')
 
   useEffect(() => {
     const guardada = typeof window !== 'undefined' ? localStorage.getItem('clasiclick_admin_pw') : null
@@ -254,17 +251,12 @@ export default function AdminPage() {
 
   async function submitEditModal() {
     if (!editingProduct) return
-    const payload: any = { nombre: editNombre, precio: editPrecio === '' ? null : Number(editPrecio), vendedor: editVendedor }
-    if (editDireccion) payload.direccion = editDireccion
-    if (editZona) payload.zona = editZona
-    if (editHorarios) payload.horarios = editHorarios
-    if (editTipoVentas) payload.tipoVentas = editTipoVentas
-    payload.tiendaAprobada = editTiendaAprobada
-    payload.verificado = editVerificado
-    if (editRating !== '') {
-      const r = Number(editRating)
-      if (!Number.isNaN(r)) payload.rating = r
-    }
+    const payload: any = { nombre: editNombre, precio: editPrecio === '' ? null : Number(editPrecio) }
+    if (editPrecioOriginal) payload.precioOriginal = Number(editPrecioOriginal)
+    if (editCategoria) payload.categoria = editCategoria
+    if (editIcono) payload.icono = editIcono
+    if (editDescripcionCorta !== undefined) payload.descripcionCorta = editDescripcionCorta
+    if (editDescripcionLarga !== undefined) payload.descripcionLarga = editDescripcionLarga
 
     try {
       await fetch(`/api/productos/${editingProduct.id}`, {
@@ -462,14 +454,11 @@ export default function AdminPage() {
                       setEditingProduct(p)
                       setEditNombre(p.nombre || '')
                       setEditPrecio(p.precio ? String(p.precio) : '')
-                      setEditVendedor(p.vendedor || '')
-                      setEditDireccion(p.direccion || '')
-                      setEditZona(p.zona || '')
-                      setEditHorarios(p.horarios || '')
-                      setEditTipoVentas(p.tipoVentas || '')
-                      setEditTiendaAprobada(!!p.tiendaAprobada)
-                      setEditVerificado(!!p.verificado)
-                      setEditRating(p.rating ? String(p.rating) : '')
+                      setEditDescripcionCorta(p.descripcionCorta || '')
+                      setEditDescripcionLarga(p.descripcionLarga || '')
+                      setEditPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
+                      setEditCategoria(p.categoria || '')
+                      setEditIcono(p.icono || '')
                       setShowEditModal(true)
                     }}
                     className="px-2 py-1 rounded-md border border-line font-body text-[11px]"
@@ -875,36 +864,24 @@ export default function AdminPage() {
                 <div className="font-body text-xs text-inksoft mt-1">Precio en Bolivianos. Dejar vacío para mostrar “Precio a convenir”.</div>
               </div>
               <div>
-                <input value={editVendedor} onChange={(e) => setEditVendedor(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Vendedor / Tienda" />
-                <div className="font-body text-xs text-inksoft mt-1">Nombre del vendedor o tienda (opcional).</div>
+                <input value={editPrecioOriginal} onChange={(e) => setEditPrecioOriginal(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Precio original (opcional)" />
+                <div className="font-body text-xs text-inksoft mt-1">Precio anterior para mostrar descuento.</div>
               </div>
               <div>
-                <input value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Dirección" />
-                <div className="font-body text-xs text-inksoft mt-1">Dirección física de la tienda (opcional).</div>
+                <input value={editCategoria} onChange={(e) => setEditCategoria(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Categoría" />
+                <div className="font-body text-xs text-inksoft mt-1">Categoría del producto.</div>
+              </div>
+              <div className="md:col-span-2">
+                <textarea value={editDescripcionCorta} onChange={(e) => setEditDescripcionCorta(e.target.value)} rows={2} className="w-full px-3.5 py-2.5 rounded-lg border border-line" placeholder="Descripción corta" />
+                <div className="font-body text-xs text-inksoft mt-1">Descripción breve que aparece en listados.</div>
+              </div>
+              <div className="md:col-span-2">
+                <textarea value={editDescripcionLarga} onChange={(e) => setEditDescripcionLarga(e.target.value)} rows={4} className="w-full px-3.5 py-2.5 rounded-lg border border-line" placeholder="Descripción larga" />
+                <div className="font-body text-xs text-inksoft mt-1">Descripción detallada del producto.</div>
               </div>
               <div>
-                <input value={editZona} onChange={(e) => setEditZona(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Zona / barrio" />
-                <div className="font-body text-xs text-inksoft mt-1">Zona o barrio para mostrar en listados (ej: Sopocachi).</div>
-              </div>
-              <div>
-                <input value={editHorarios} onChange={(e) => setEditHorarios(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Horarios" />
-                <div className="font-body text-xs text-inksoft mt-1">Horarios de atención en formato libre (ej: Lun-Vie 9:00-18:00).</div>
-              </div>
-              <div>
-                <input value={editTipoVentas} onChange={(e) => setEditTipoVentas(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Tipo de ventas" />
-                <div className="font-body text-xs text-inksoft mt-1">Texto corto indicando si vende al por mayor, menor, envíos, etc.</div>
-              </div>
-              <div>
-                <input value={editRating} onChange={(e) => setEditRating(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Rating (ej: 4.8)" />
-                <div className="font-body text-xs text-inksoft mt-1">Calificación visible (0–5). Solo admin debería editar esto.</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={editTiendaAprobada} onChange={(e) => setEditTiendaAprobada(e.target.checked)} /> Tienda aprobada</label>
-                <div className="font-body text-xs text-inksoft">Marca la tienda como oficial / aprobada por el sitio.</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={editVerificado} onChange={(e) => setEditVerificado(e.target.checked)} /> Verificado</label>
-                <div className="font-body text-xs text-inksoft">Indica si la tienda fue verificada (documentación o validación).</div>
+                <input value={editIcono} onChange={(e) => setEditIcono(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Icono (opcional)" />
+                <div className="font-body text-xs text-inksoft mt-1">Icono o etiqueta para el producto.</div>
               </div>
             </div>
             <div className="mt-4 flex gap-2 justify-end">
