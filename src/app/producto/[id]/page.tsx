@@ -195,7 +195,7 @@ export default function ProductoDetallePage() {
               >
                 <div className="bg-panelalt h-32 flex items-center justify-center text-maroon overflow-hidden">
                   {r.imagenUrl ? (
-                    <img src={r.imagenUrl} alt={r.nombre} className="w-full h-full object-cover" />
+                    <img src={r.imagenUrl} alt={r.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <ProductIcon kind={r.icono} size={30} />
                   )}

@@ -149,7 +149,10 @@ export default function VenderPage() {
     // en `lastFile` para previsualizar/procesar rápidamente.
     let workingFile = file
     try {
-      const compressed = await compressImage(file, 800, 0.7)
+      const isMobile = typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent)
+      const maxDim = isMobile ? 600 : 800
+      const quality = isMobile ? 0.6 : 0.7
+      const compressed = await compressImage(file, maxDim, quality)
       if (compressed) workingFile = compressed
     } catch (err) {
       console.warn('Compression failed, uploading original', err)
@@ -345,10 +348,14 @@ export default function VenderPage() {
       canvas.height = nh
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, nw, nh)
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+      // Preferir WebP para mejor compresión en navegadores que lo soporten
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
+      // Si WebP no está disponible, caer a jpeg
+      const finalBlob = blob || (await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality)))
       URL.revokeObjectURL(img.src)
-      if (!blob) return null
-      return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+      if (!finalBlob) return null
+      const ext = finalBlob.type === 'image/webp' ? '.webp' : '.jpg'
+      return new File([finalBlob], file.name.replace(/\.[^.]+$/, ext), { type: finalBlob.type })
     } catch (err) {
       console.warn('compressImage error', err)
       return null
@@ -477,7 +484,7 @@ export default function VenderPage() {
           <div className="font-body text-xs text-inksoft mb-1.5">Foto de tu QR de cobro</div>
           <div className="flex items-center gap-3 flex-wrap">
             {cobroQrUrl && (
-              <img src={cobroQrUrl} alt="Tu QR" className="w-16 h-16 object-cover rounded-lg border border-line" />
+              <img src={cobroQrUrl} alt="Tu QR" loading="lazy" decoding="async" className="w-16 h-16 object-cover rounded-lg border border-line" />
             )}
             <input
               type="file"
@@ -675,7 +682,7 @@ export default function VenderPage() {
           <div className="mt-3 p-3 border rounded-lg bg-white/50">
             <div className="font-body text-sm font-semibold mb-2">Previsualización sin fondo</div>
             <div className="flex items-center gap-3">
-              <img src={previewProcessedUrl} alt="Preview sin fondo" className="w-20 h-20 object-contain rounded-md border" />
+              <img src={previewProcessedUrl} alt="Preview sin fondo" loading="lazy" decoding="async" className="w-20 h-20 object-contain rounded-md border" />
               <div className="flex flex-col gap-2">
                 <button onClick={applyPreviewAsImage} className="px-3 py-1 rounded-md bg-maroon text-white text-sm">Usar esta imagen</button>
                 <button onClick={() => setPreviewProcessedUrl(null)} className="px-3 py-1 rounded-md border text-sm">Cerrar</button>
@@ -775,7 +782,7 @@ export default function VenderPage() {
         <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
             {p.imagenUrl ? (
-              <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+              <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <ProductIcon kind={p.icono} size={20} />
             )}

@@ -250,7 +250,7 @@ export default function ServiciosPage() {
               >
                 <div className="w-28 h-28 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden relative">
                   {p.imagenUrl ? (
-                    <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                    <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <ServiceIcon kind={p.icono} size={40} />
                   )}

@@ -89,7 +89,7 @@ export default function MisPedidosPage() {
               {(p.items || []).map((item: any) => (
                 <div key={`${p.id}-${item.id}`} className="flex items-center gap-3 border-t border-line pt-2">
                   <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
-                    {item.imagenUrl ? <img src={item.imagenUrl} alt={item.nombre} className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-inksoft">IMG</span>}
+                    {item.imagenUrl ? <img src={item.imagenUrl} alt={item.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <span className="font-body text-[9px] text-inksoft">IMG</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-body text-sm text-ink truncate">{item.nombre}</div>

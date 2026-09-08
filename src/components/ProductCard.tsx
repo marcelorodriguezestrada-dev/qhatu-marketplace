@@ -59,6 +59,8 @@ export function ProductCard({ p }: { p: Producto }) {
           <img
             src={p.imagenUrl}
             alt={p.nombre}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
             onError={() => setImagenRota(true)}
           />

@@ -325,7 +325,7 @@ export default function CheckoutPage() {
           </div>
 
           {subPedidos[pasoActual].qrImageUrl ? (
-            <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" className="mx-auto w-48 rounded-lg border border-line" />
+            <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line" />
           ) : (
             <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink">
               {subPedidos[pasoActual].cbu ? (
