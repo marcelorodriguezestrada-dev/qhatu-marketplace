@@ -33,7 +33,7 @@ export function ProductCard({ p }: { p: Producto }) {
   const { usuario } = useAuth()
   const router = useRouter()
   const [imagenRota, setImagenRota] = useState(false)
-  const mostrarFoto = p.imagenUrl && !imagenRota
+  const mostrarFoto = (p.thumbUrl || p.imagenUrl) && !imagenRota
   const favorito = esFavorito(p.id)
 
   // Navegar y ver productos es libre, sin login — pero agregar al
@@ -57,7 +57,7 @@ export function ProductCard({ p }: { p: Producto }) {
       <Link href={`/producto/${p.id}`} className="bg-panelalt flex justify-center items-center text-maroon overflow-hidden h-36 sm:h-48 relative">
         {mostrarFoto ? (
           <img
-            src={p.imagenUrl}
+            src={p.thumbUrl || p.imagenUrl}
             alt={p.nombre}
             loading="lazy"
             decoding="async"

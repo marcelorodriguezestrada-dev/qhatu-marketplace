@@ -33,8 +33,8 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
           {items.map((it) => (
             <div key={it.id} className="flex gap-2.5 py-3 border-b border-line">
               <div className="w-11 h-11 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
-                {it.imagenUrl ? (
-                  <img src={it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                {it.thumbUrl || it.imagenUrl ? (
+                  <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 ) : (
                   <ProductIcon kind={it.icono} size={22} />
                 )}

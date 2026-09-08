@@ -821,9 +821,9 @@ export default function VenderPage() {
       )}
       {misProductos.map((p) => (
         <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
-            {p.imagenUrl ? (
-              <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+            {(p.thumbUrl || p.imagenUrl) ? (
+              <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <ProductIcon kind={p.icono} size={20} />
             )}

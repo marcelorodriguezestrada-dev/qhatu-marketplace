@@ -366,7 +366,7 @@ export default function AdminPage() {
             .map((p) => (
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-3 flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
-                {p.imagenUrl ? <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <span className="font-body text-[10px] text-inksoft">IMG</span>}
+                {p.thumbUrl || p.imagenUrl ? <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <span className="font-body text-[10px] text-inksoft">IMG</span>}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
@@ -601,7 +601,7 @@ export default function AdminPage() {
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
                 {p.imagenUrl ? (
-                  <img src={p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 ) : (
                   <ServiceIcon kind={p.icono} size={20} />
                 )}
