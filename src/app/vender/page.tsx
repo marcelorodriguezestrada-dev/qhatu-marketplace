@@ -37,6 +37,7 @@ export default function VenderPage() {
   const [descripcionCorta, setDescripcionCorta] = useState('')
   const [descripcionLarga, setDescripcionLarga] = useState('')
   const [imagenUrl, setImagenUrl] = useState('')
+  const [thumbUrl, setThumbUrl] = useState('')
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [subiendoImagen, setSubiendoImagen] = useState(false)
   const [publicando, setPublicando] = useState(false)
@@ -196,7 +197,16 @@ export default function VenderPage() {
       // Subimos la versión media en background (la que se mostrará como imagen final)
       const token = await obtenerToken()
       const formData = new FormData()
+      // Subimos la versión media
       formData.append('image', processedFile)
+      // Generar y subir también la miniatura (small) para usar en listados/CDN
+      try {
+        const smallFile = await compressImage(workingFile, 300, 0.6)
+        if (smallFile) formData.append('thumb', smallFile)
+      } catch (err) {
+        console.warn('Could not generate thumb', err)
+      }
+
       const res = await fetch('/api/upload-image', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -209,7 +219,10 @@ export default function VenderPage() {
         try { URL.revokeObjectURL(localPreviewUrl) } catch (e) {}
         setLocalPreviewUrl(null)
       }
+      // data.url = media, data.thumbUrl = thumbnail (si está disponible)
       setImagenUrl(data.url)
+      setThumbUrl(data.thumbUrl || '')
+      // Podríamos guardar data.thumbUrl en el producto si expandimos el modelo
     } catch (e) {
       // @ts-ignore
       setError('Error subiendo la imagen: ' + (e?.message || e))
@@ -255,6 +268,7 @@ export default function VenderPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setImagenUrl(data.url)
+      setThumbUrl(data.thumbUrl || '')
       // reemplazamos lastFile con el nuevo file
       setLastFile(file)
       setPreviewProcessedUrl(null)
@@ -409,6 +423,7 @@ export default function VenderPage() {
             precio: Number(precio),
             icono,
             imagenUrl,
+              thumbUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             descripcionCorta,
             descripcionLarga,
@@ -430,6 +445,7 @@ export default function VenderPage() {
             precio: Number(precio),
             icono,
             imagenUrl,
+              thumbUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             plan,
             descripcionCorta,

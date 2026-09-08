@@ -26,28 +26,40 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData()
     const file = formData.get('image') as File | null
+    const thumb = formData.get('thumb') as File | null
     if (!file) {
       return NextResponse.json({ error: 'No se recibió ninguna imagen.' }, { status: 400 })
     }
 
-    const arrayBuffer = await file.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-
-    const uploadBody = new URLSearchParams()
-    uploadBody.append('key', process.env.IMGBB_API_KEY)
-    uploadBody.append('image', base64)
-
-    const imgbbRes = await fetch('https://api.imgbb.com/1/upload', {
-      method: 'POST',
-      body: uploadBody,
-    })
-    const data = await imgbbRes.json()
-
-    if (!data.success) {
-      return NextResponse.json({ error: data.error?.message || 'ImgBB rechazó la imagen.' }, { status: 500 })
+    async function uploadToImgbb(f: File) {
+      const arrayBuffer = await f.arrayBuffer()
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const uploadBody = new URLSearchParams()
+      uploadBody.append('key', process.env.IMGBB_API_KEY)
+      uploadBody.append('image', base64)
+      const imgbbRes = await fetch('https://api.imgbb.com/1/upload', {
+        method: 'POST',
+        body: uploadBody,
+      })
+      const data = await imgbbRes.json()
+      if (!data.success) throw new Error(data.error?.message || 'ImgBB rechazó la imagen.')
+      return data.data.url as string
     }
 
-    return NextResponse.json({ url: data.data.url })
+    // Subir la imagen principal
+    const url = await uploadToImgbb(file)
+    // Si recibimos thumb, subirlo también (no es obligatorio)
+    let thumbUrl: string | null = null
+    if (thumb) {
+      try {
+        thumbUrl = await uploadToImgbb(thumb)
+      } catch (err) {
+        console.warn('Thumb upload failed', err)
+        thumbUrl = null
+      }
+    }
+
+    return NextResponse.json({ url, thumbUrl })
   } catch (err: any) {
     console.error('POST /api/upload-image', err)
     return NextResponse.json({ error: err.message || 'Error desconocido subiendo la imagen.' }, { status: 500 })

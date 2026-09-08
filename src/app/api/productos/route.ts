@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl } = body
     if (!nombre || !categoria || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       precioOriginal: precioOriginalValido,
       icono: icono || 'shoe',
       imagenUrl: imagenUrl || '',
+      thumbUrl: thumbUrl || '',
       descripcionCorta: descripcionCorta || '',
       descripcionLarga: descripcionLarga || '',
       vendedorId: usuario.uid,
