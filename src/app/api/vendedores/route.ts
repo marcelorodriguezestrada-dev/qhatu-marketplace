@@ -31,3 +31,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No se pudo guardar tu perfil de cobro.' }, { status: 500 })
   }
 }
+
+// GET: listado de vendedores (solo admin).
+export async function GET(req: NextRequest) {
+  const password = req.headers.get('x-admin-password')
+  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  if (!esAdmin) {
+    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+  }
+  try {
+    const db = getDb()
+    const snap = await db.collection('vendedores').get()
+    const vendedores = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    return NextResponse.json({ vendedores })
+  } catch (err) {
+    console.error('GET /api/vendedores', err)
+    return NextResponse.json({ error: 'No se pudo listar vendedores.' }, { status: 500 })
+  }
+}

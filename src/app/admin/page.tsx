@@ -40,6 +40,17 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'metricas'>('pedidos')
+  const [vendedores, setVendedores] = useState<any[]>([])
+  const [showVendorModal, setShowVendorModal] = useState(false)
+  const [editingVendor, setEditingVendor] = useState<any>(null)
+  const [vendorNombreNegocio, setVendorNombreNegocio] = useState('')
+  const [vendorDireccion, setVendorDireccion] = useState('')
+  const [vendorZona, setVendorZona] = useState('')
+  const [vendorHorarios, setVendorHorarios] = useState('')
+  const [vendorTipoVentas, setVendorTipoVentas] = useState('')
+  const [vendorTiendaAprobada, setVendorTiendaAprobada] = useState(false)
+  const [vendorVerificado, setVendorVerificado] = useState(false)
+  const [vendorRating, setVendorRating] = useState('')
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -126,6 +137,12 @@ export default function AdminPage() {
     fetch('/api/profesionales', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
+  }
+
+  function cargarVendedores(pw?: string) {
+    fetch('/api/vendedores', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setVendedores(data.vendedores || []))
   }
 
   function cargarMetricas(pw?: string) {
@@ -320,6 +337,12 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'productos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Productos
+        </button>
+        <button
+          onClick={() => { setTab('vendedores'); cargarVendedores() }}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'vendedores' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Vendedores
         </button>
         <button
           onClick={() => setTab('servicios')}
@@ -667,6 +690,42 @@ export default function AdminPage() {
         </div>
       )}
 
+      {tab === 'vendedores' && (
+        <div>
+          <div className="font-body text-sm font-semibold text-ink mb-3">Vendedores</div>
+          {vendedores.length === 0 && <div className="font-body text-sm text-inksoft">No hay vendedores registrados.</div>}
+          {vendedores.map((v) => (
+            <div key={v.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+                {v.logoUrl ? <img src={v.logoUrl} className="w-full h-full object-cover" /> : <div className="font-body text-sm">{v.nombreNegocio ? v.nombreNegocio[0] : 'V'}</div>}
+              </div>
+              <div className="flex-1">
+                <div className="font-body text-sm font-medium text-ink">{v.nombreNegocio || v.email || v.id}</div>
+                <div className="font-body text-xs text-inksoft">{v.zona || v.direccion || ''}</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  setEditingVendor(v)
+                  setVendorNombreNegocio(v.nombreNegocio || '')
+                  setVendorDireccion(v.direccion || '')
+                  setVendorZona(v.zona || '')
+                  setVendorHorarios(v.horarios || '')
+                  setVendorTipoVentas(v.tipoVentas || '')
+                  setVendorTiendaAprobada(!!v.tiendaAprobada)
+                  setVendorVerificado(!!v.verificado)
+                  setVendorRating(v.rating ? String(v.rating) : '')
+                  setShowVendorModal(true)
+                }} className="px-2 py-1 rounded-md border border-line font-body text-[11px]">Editar</button>
+                <button onClick={() => {
+                  if (!confirm('¿Borrar perfil de vendedor?')) return
+                  fetch(`/api/vendedores/${v.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify({ nombreNegocio: '', direccion: '', zona: '', horarios: '' }) }).then(() => cargarVendedores())
+                }} className="px-2 py-1 rounded-md border border-line text-maroon">Limpiar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {tab === 'metricas' && (
         <div>
           {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
@@ -851,6 +910,48 @@ export default function AdminPage() {
             <div className="mt-4 flex gap-2 justify-end">
               <button onClick={() => setShowEditModal(false)} className="px-3.5 py-2 rounded-lg border border-line">Cancelar</button>
               <button onClick={submitEditModal} className="px-3.5 py-2 rounded-lg bg-maroon text-white">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVendorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowVendorModal(false)} />
+          <div className="bg-white dark:bg-gray-900 w-[92%] max-w-2xl rounded-xl p-4 z-10 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-display text-lg font-bold">Editar vendedor</div>
+              <button onClick={() => setShowVendorModal(false)} className="text-inksoft">Cerrar</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input value={vendorNombreNegocio} onChange={(e) => setVendorNombreNegocio(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Nombre del negocio" />
+              <input value={vendorDireccion} onChange={(e) => setVendorDireccion(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Dirección" />
+              <input value={vendorZona} onChange={(e) => setVendorZona(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Zona / barrio" />
+              <input value={vendorHorarios} onChange={(e) => setVendorHorarios(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Horarios" />
+              <input value={vendorTipoVentas} onChange={(e) => setVendorTipoVentas(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Tipo de ventas" />
+              <input value={vendorRating} onChange={(e) => setVendorRating(e.target.value)} className="px-3.5 py-2.5 rounded-lg border border-line w-full" placeholder="Rating (ej: 4.8)" />
+              <label className="flex items-center gap-2"><input type="checkbox" checked={vendorTiendaAprobada} onChange={(e) => setVendorTiendaAprobada(e.target.checked)} /> Tienda aprobada</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={vendorVerificado} onChange={(e) => setVendorVerificado(e.target.checked)} /> Verificado</label>
+            </div>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button onClick={() => setShowVendorModal(false)} className="px-3.5 py-2 rounded-lg border border-line">Cancelar</button>
+              <button onClick={async () => {
+                if (!editingVendor) return
+                const payload: any = { nombreNegocio: vendorNombreNegocio }
+                if (vendorDireccion) payload.direccion = vendorDireccion
+                if (vendorZona) payload.zona = vendorZona
+                if (vendorHorarios) payload.horarios = vendorHorarios
+                if (vendorTipoVentas) payload.tipoVentas = vendorTipoVentas
+                payload.tiendaAprobada = vendorTiendaAprobada
+                payload.verificado = vendorVerificado
+                if (vendorRating !== '') {
+                  const r = Number(vendorRating)
+                  if (!Number.isNaN(r)) payload.rating = r
+                }
+                await fetch(`/api/vendedores/${editingVendor.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify(payload) })
+                setShowVendorModal(false)
+                cargarVendedores()
+              }} className="px-3.5 py-2 rounded-lg bg-maroon text-white">Guardar</button>
             </div>
           </div>
         </div>
