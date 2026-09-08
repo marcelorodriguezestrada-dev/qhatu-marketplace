@@ -39,7 +39,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'metricas' | 'vendedores'>('pedidos')
   const [vendedores, setVendedores] = useState<any[]>([])
   const [showVendorModal, setShowVendorModal] = useState(false)
   const [editingVendor, setEditingVendor] = useState<any>(null)
