@@ -149,31 +149,21 @@ export default function ProductoDetallePage() {
             <div className="mb-6 font-body text-sm text-inksoft whitespace-pre-line">{producto.descripcionLarga}</div>
           )}
 
-          {/* Tarjeta del vendedor / tienda */}
-          <div className="mt-4 bg-panel border border-line rounded-lg p-3.5 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden text-maroon">{producto.vendedor ? producto.vendedor[0] : 'V'}</div>
-              <div className="flex-1 min-w-0">
-                <div className="font-body text-sm font-medium text-ink truncate">{producto.vendedor || 'Vendedor'}</div>
-                {producto.direccion && <div className="font-body text-xs text-inksoft">{producto.direccion}</div>}
-                {producto.zona && <div className="font-body text-xs text-inksoft">{producto.zona}</div>}
-              </div>
-              <div className="shrink-0">
-                <button className="font-body text-xs text-maroon underline">Seguir local</button>
-              </div>
+          {/* Antes acá se repetía toda la info de la tienda en cada
+              producto. Ahora es un link corto — la info completa vive
+              en /tienda/[id], una sola vez por vendedor. */}
+          <Link
+            href={producto.vendedorId ? `/tienda/${producto.vendedorId}` : '#'}
+            className="mt-4 bg-panel border border-line rounded-lg p-3.5 mb-4 flex items-center gap-3 hover:border-maroon transition-colors"
+          >
+            <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center overflow-hidden text-maroon shrink-0">
+              {producto.vendedor ? producto.vendedor[0] : 'V'}
             </div>
-            {producto.followers && <div className="font-body text-xs text-inksoft mt-2 font-semibold">{producto.followers} seguidores</div>}
-          </div>
-
-          {/* Información adicional: horarios / tipo de ventas */}
-          {(producto.horarios || producto.tipoVentas) && (
-            <div className="mb-6">
-              {producto.horarios && <div className="font-body text-sm text-ink mb-1">Horarios</div>}
-              {producto.horarios && <div className="font-body text-sm text-inksoft mb-2">{producto.horarios}</div>}
-              {producto.tipoVentas && <div className="font-body text-sm text-ink mb-1">Tipo de ventas</div>}
-              {producto.tipoVentas && <div className="font-body text-sm text-inksoft">{producto.tipoVentas}</div>}
+            <div className="flex-1 min-w-0">
+              <div className="font-body text-sm font-medium text-ink truncate">{producto.vendedor || 'Vendedor'}</div>
+              <div className="font-body text-xs text-maroon">Ver tienda →</div>
             </div>
-          )}
+          </Link>
 
           {/* Detalle del producto (talles, colores, materiales, compra mínima, rubro, publicado) */}
           {(producto.talles || producto.colores || producto.materiales || producto.compraMinima || producto.rubro || producto.createdAt) && (

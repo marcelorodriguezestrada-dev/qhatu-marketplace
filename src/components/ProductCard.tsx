@@ -94,7 +94,17 @@ export function ProductCard({ p }: { p: Producto }) {
         </button>
       </Link>
       <div className="p-2.5 sm:p-4 flex flex-col flex-1">
-        <div className="text-[10px] sm:text-[11px] text-inksoft font-body mb-0.5 sm:mb-1 truncate">{p.vendedor}</div>
+        {p.vendedorId ? (
+          <Link
+            href={`/tienda/${p.vendedorId}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[10px] sm:text-[11px] text-inksoft font-body mb-0.5 sm:mb-1 truncate hover:text-maroon hover:underline"
+          >
+            {p.vendedor}
+          </Link>
+        ) : (
+          <div className="text-[10px] sm:text-[11px] text-inksoft font-body mb-0.5 sm:mb-1 truncate">{p.vendedor}</div>
+        )}
         <Link href={`/producto/${p.id}`} className="font-body text-[13px] sm:text-[14px] font-medium text-ink mb-1.5 sm:mb-2 flex-1 leading-snug hover:underline">
           {p.nombre}
         </Link>

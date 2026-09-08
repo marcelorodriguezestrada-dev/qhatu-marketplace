@@ -7,26 +7,43 @@ export const dynamic = 'force-dynamic'
 // este vendedor en particular. Si el vendedor todavía no configuró su
 // cobro, devolvemos "configurado: false" y el checkout cae al QR
 // genérico de la plataforma como respaldo.
+// GET público — usado en dos lugares:
+// 1. El checkout, para saber a qué QR/CBU pagarle a este vendedor.
+//    Si todavía no configuró su cobro, "configurado: false" y el
+//    checkout cae al QR genérico de la plataforma como respaldo.
+// 2. La página /tienda/[id], que muestra el perfil público completo
+//    de la tienda (nombre, dirección, zona, horarios, rating, etc.)
+//    — por eso siempre devolvemos estos campos, tenga o no cobro
+//    configurado.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getDb()
     const doc = await db.collection('vendedores').doc(params.id).get()
     if (!doc.exists) {
-      return NextResponse.json({ configurado: false })
+      return NextResponse.json({ configurado: false, existe: false })
     }
     const data = doc.data() as any
-    if (!data.qrImageUrl && !data.cbu) {
-      return NextResponse.json({ configurado: false })
-    }
+    const configurado = !!(data.qrImageUrl || data.cbu)
+
     return NextResponse.json({
-      configurado: true,
+      existe: true,
+      configurado,
       qrImageUrl: data.qrImageUrl || '',
       cbu: data.cbu || '',
       nombreNegocio: data.nombreNegocio || '',
+      direccion: data.direccion || '',
+      zona: data.zona || '',
+      horarios: data.horarios || '',
+      tipoVentas: data.tipoVentas || '',
+      tiendaAprobada: !!data.tiendaAprobada,
+      verificado: !!data.verificado,
+      rating: data.rating || null,
+      logoUrl: data.logoUrl || '',
+      followers: data.followers || 0,
     })
   } catch (err) {
     console.error('GET /api/vendedores/[id]', err)
-    return NextResponse.json({ configurado: false })
+    return NextResponse.json({ configurado: false, existe: false })
   }
 }
 
