@@ -4,8 +4,9 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 export const dynamic = 'force-dynamic'
 
 // POST: el vendedor logueado carga o actualiza su propio perfil de
-// cobro (QR/CBU/nombre del negocio). Es un "upsert" — un solo documento
-// por vendedor, con su uid como id, en la colección "vendedores".
+// tienda (cobro QR/CBU, dirección, horarios, tipos de venta, logo). Es
+// un "upsert" — un solo documento por vendedor, con su uid como id, en
+// la colección "vendedores".
 export async function POST(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) {
@@ -13,39 +14,42 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, nombreNegocio } = body
+    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl } = body
     const db = getDb()
     await db.collection('vendedores').doc(usuario.uid).set(
       {
         qrImageUrl: qrImageUrl || '',
         cbu: cbu || '',
         nombreNegocio: nombreNegocio || '',
+        direccion: direccion || '',
+        lat: lat != null ? Number(lat) : null,
+        lng: lng != null ? Number(lng) : null,
+        horarios: horarios || '',
+        tiposVenta: tiposVenta && typeof tiposVenta === 'object' ? tiposVenta : {},
+        logoUrl: logoUrl || '',
         email: usuario.email,
         updatedAt: new Date().toISOString(),
       },
       { merge: true }
     )
+
+    // Si el vendedor ya tenía productos publicados, les actualizamos el
+    // nombre/logo de tienda para que se vean consistentes con el
+    // catálogo — sin esto, un producto viejo se quedaría mostrando el
+    // nombre de tienda desactualizado (o el email, si todavía no tenía
+    // tienda configurada cuando lo publicó).
+    const productosDelVendedor = await db.collection('productos').where('vendedorId', '==', usuario.uid).get()
+    if (!productosDelVendedor.empty) {
+      const batch = db.batch()
+      productosDelVendedor.docs.forEach((doc) => {
+        batch.update(doc.ref, { tiendaNombre: nombreNegocio || '', tiendaLogoUrl: logoUrl || '' })
+      })
+      await batch.commit()
+    }
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('POST /api/vendedores', err)
-    return NextResponse.json({ error: 'No se pudo guardar tu perfil de cobro.' }, { status: 500 })
-  }
-}
-
-// GET: listado de vendedores (solo admin).
-export async function GET(req: NextRequest) {
-  const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
-  if (!esAdmin) {
-    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-  }
-  try {
-    const db = getDb()
-    const snap = await db.collection('vendedores').get()
-    const vendedores = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-    return NextResponse.json({ vendedores })
-  } catch (err) {
-    console.error('GET /api/vendedores', err)
-    return NextResponse.json({ error: 'No se pudo listar vendedores.' }, { status: 500 })
+    return NextResponse.json({ error: 'No se pudo guardar tu perfil de tienda.' }, { status: 500 })
   }
 }

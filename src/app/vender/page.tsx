@@ -36,6 +36,10 @@ export default function VenderPage() {
   const [icono, setIcono] = useState(ICONOS[0])
   const [descripcionCorta, setDescripcionCorta] = useState('')
   const [descripcionLarga, setDescripcionLarga] = useState('')
+  const [tallesTexto, setTallesTexto] = useState('')
+  const [coloresTexto, setColoresTexto] = useState('')
+  const [materiales, setMateriales] = useState('')
+  const [compraMinima, setCompraMinima] = useState('1')
   const [imagenUrl, setImagenUrl] = useState('')
   const [thumbUrl, setThumbUrl] = useState('')
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
@@ -61,6 +65,17 @@ export default function VenderPage() {
   const [guardandoCobro, setGuardandoCobro] = useState(false)
   const [cobroGuardado, setCobroGuardado] = useState(false)
 
+  // Datos de la tienda — se muestran en la pestaña "Info. Tienda" de
+  // cada producto (dirección con mapa, horarios, tipos de venta, logo).
+  const [tiendaDireccion, setTiendaDireccion] = useState('')
+  const [tiendaLat, setTiendaLat] = useState<number | null>(null)
+  const [tiendaLng, setTiendaLng] = useState<number | null>(null)
+  const [buscandoUbicacionTienda, setBuscandoUbicacionTienda] = useState(false)
+  const [tiendaHorarios, setTiendaHorarios] = useState('')
+  const [tiendaLogoUrl, setTiendaLogoUrl] = useState('')
+  const [subiendoLogo, setSubiendoLogo] = useState(false)
+  const [tiposVenta, setTiposVenta] = useState<Record<string, boolean>>({})
+
   useEffect(() => {
     if (!cargando && !usuario) router.push('/login')
   }, [cargando, usuario, router])
@@ -78,10 +93,59 @@ export default function VenderPage() {
     if (!usuario) return
     const res = await fetch(`/api/vendedores/${usuario.uid}`)
     const data = await res.json()
-    if (data.configurado) {
+    if (data.existe) {
       setCobroQrUrl(data.qrImageUrl || '')
       setCobroCbu(data.cbu || '')
       setCobroNegocio(data.nombreNegocio || '')
+      setTiendaDireccion(data.direccion || '')
+      setTiendaLat(data.lat ?? null)
+      setTiendaLng(data.lng ?? null)
+      setTiendaHorarios(data.horarios || '')
+      setTiendaLogoUrl(data.logoUrl || '')
+      setTiposVenta(data.tiposVenta || {})
+    }
+  }
+
+  function usarMiUbicacionTienda() {
+    setBuscandoUbicacionTienda(true)
+    if (!navigator.geolocation) {
+      setError('Tu navegador no soporta geolocalización.')
+      setBuscandoUbicacionTienda(false)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setTiendaLat(pos.coords.latitude)
+        setTiendaLng(pos.coords.longitude)
+        setBuscandoUbicacionTienda(false)
+      },
+      () => {
+        setError('No pudimos acceder a tu ubicación.')
+        setBuscandoUbicacionTienda(false)
+      }
+    )
+  }
+
+  async function subirLogoTienda(file: File | null) {
+    if (!file) return
+    setSubiendoLogo(true)
+    try {
+      const token = await obtenerToken()
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setTiendaLogoUrl(data.url)
+    } catch (e) {
+      // @ts-ignore
+      setError('Error subiendo el logo: ' + (e?.message || e))
+    } finally {
+      setSubiendoLogo(false)
     }
   }
 
@@ -116,7 +180,11 @@ export default function VenderPage() {
       await fetch('/api/vendedores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio }),
+        body: JSON.stringify({
+          qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio,
+          direccion: tiendaDireccion, lat: tiendaLat, lng: tiendaLng,
+          horarios: tiendaHorarios, logoUrl: tiendaLogoUrl, tiposVenta,
+        }),
       })
       setCobroGuardado(true)
     } finally {
@@ -427,6 +495,10 @@ export default function VenderPage() {
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             descripcionCorta,
             descripcionLarga,
+            talles: tallesTexto.split(',').map((t) => t.trim()).filter(Boolean),
+            colores: coloresTexto.split(',').map((c) => c.trim()).filter(Boolean),
+            materiales,
+            compraMinima: Number(compraMinima) || 1,
           }),
         })
         const data = await res.json()
@@ -450,6 +522,10 @@ export default function VenderPage() {
             plan,
             descripcionCorta,
             descripcionLarga,
+            talles: tallesTexto.split(',').map((t) => t.trim()).filter(Boolean),
+            colores: coloresTexto.split(',').map((c) => c.trim()).filter(Boolean),
+            materiales,
+            compraMinima: Number(compraMinima) || 1,
           }),
         })
         const data = await res.json()
@@ -466,6 +542,10 @@ export default function VenderPage() {
       setPlan('basico')
       setDescripcionCorta('')
       setDescripcionLarga('')
+      setTallesTexto('')
+      setColoresTexto('')
+      setMateriales('')
+      setCompraMinima('1')
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -509,9 +589,9 @@ export default function VenderPage() {
       )}
 
       <div className="bg-panel border border-line rounded-xl p-5 mb-8">
-        <div className="font-body text-sm font-semibold text-ink mb-1">Cobros — tu QR o CBU</div>
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mi tienda</div>
         <p className="font-body text-[12px] text-inksoft mb-3">
-          Configurá esto para que cuando alguien te compre, pague directo a tu cuenta — no pasa por la plataforma. Si no lo configurás, tus ventas van a mostrar el QR general de Clasi Click como respaldo.
+          Esto se muestra en la pestaña "Info. Tienda" de cada producto tuyo, y define a qué cuenta te paga directo quien te compre.
         </p>
         <input
           value={cobroNegocio}
@@ -519,8 +599,73 @@ export default function VenderPage() {
           placeholder="Nombre de tu negocio (opcional)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+
         <div className="mb-3">
-          <div className="font-body text-xs text-inksoft mb-1.5">Foto de tu QR de cobro</div>
+          <div className="font-body text-xs text-inksoft mb-1.5">Logo de tu negocio (opcional)</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {tiendaLogoUrl && (
+              <img src={tiendaLogoUrl} alt="Tu logo" loading="lazy" decoding="async" className="w-14 h-14 object-cover rounded-lg border border-line" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirLogoTienda(e.target.files?.[0] || null)}
+              disabled={subiendoLogo}
+              className="font-body text-xs"
+            />
+          </div>
+          {subiendoLogo && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
+        </div>
+
+        <input
+          value={tiendaDireccion}
+          onChange={(e) => setTiendaDireccion(e.target.value)}
+          placeholder="Dirección de tu local (ej: Calle Bolívar 123, Potosí)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-2"
+        />
+        <button
+          type="button"
+          onClick={usarMiUbicacionTienda}
+          disabled={buscandoUbicacionTienda}
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt mb-3"
+        >
+          📍 {buscandoUbicacionTienda ? 'Buscando tu ubicación...' : tiendaLat != null ? 'Ubicación capturada ✓' : 'Usar mi ubicación actual'}
+        </button>
+
+        <input
+          value={tiendaHorarios}
+          onChange={(e) => setTiendaHorarios(e.target.value)}
+          placeholder="Horarios (ej: Lunes a sábado, 9:00 a 18:00)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+
+        <div className="mb-3">
+          <div className="font-body text-xs text-inksoft mb-2">Tipo de ventas</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['mayorista', 'Mayorista'],
+              ['minorista', 'Minorista'],
+              ['haceEnvios', 'Hace envíos'],
+              ['aceptaCambios', 'Acepta cambios'],
+              ['permiteProbar', 'Permite probar'],
+              ['pagoQr', 'Pago con QR'],
+              ['videollamada', 'Hace videollamada'],
+              ['pagoTarjeta', 'Pago con tarjeta'],
+            ].map(([clave, label]) => (
+              <label key={clave} className="flex items-center gap-2 font-body text-xs text-ink">
+                <input
+                  type="checkbox"
+                  checked={!!tiposVenta[clave]}
+                  onChange={(e) => setTiposVenta((prev) => ({ ...prev, [clave]: e.target.checked }))}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="font-body text-xs text-inksoft mb-1.5 mt-4">Foto de tu QR de cobro</div>
+        <div className="mb-3">
           <div className="flex items-center gap-3 flex-wrap">
             {cobroQrUrl && (
               <img src={cobroQrUrl} alt="Tu QR" loading="lazy" decoding="async" className="w-16 h-16 object-cover rounded-lg border border-line" />
@@ -544,10 +689,10 @@ export default function VenderPage() {
         <button
           type="button"
           onClick={guardarCobro}
-          disabled={guardandoCobro || subiendoQrCobro}
+          disabled={guardandoCobro || subiendoQrCobro || subiendoLogo}
           className="px-4 py-2 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-60"
         >
-          {guardandoCobro ? 'Guardando...' : 'Guardar datos de cobro'}
+          {guardandoCobro ? 'Guardando...' : 'Guardar datos de mi tienda'}
         </button>
         {cobroGuardado && <span className="font-body text-xs text-teal ml-3">Guardado ✓</span>}
       </div>
@@ -648,6 +793,50 @@ export default function VenderPage() {
             placeholder="Detalles: material, estado, envío, medidas, etc."
             className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm min-h-[100px]"
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <div className="font-body text-xs text-inksoft mb-1.5">Talles (opcional)</div>
+            <input
+              value={tallesTexto}
+              onChange={(e) => setTallesTexto(e.target.value)}
+              placeholder="36, 37, 38, 39"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            />
+          </div>
+          <div>
+            <div className="font-body text-xs text-inksoft mb-1.5">Colores (opcional)</div>
+            <input
+              value={coloresTexto}
+              onChange={(e) => setColoresTexto(e.target.value)}
+              placeholder="Marrón, Negro"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            />
+          </div>
+        </div>
+        <div className="font-body text-[11px] text-inksoft mb-3 -mt-2">Separá cada uno con comas.</div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <div className="font-body text-xs text-inksoft mb-1.5">Materiales (opcional)</div>
+            <input
+              value={materiales}
+              onChange={(e) => setMateriales(e.target.value)}
+              placeholder="Cuero"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            />
+          </div>
+          <div>
+            <div className="font-body text-xs text-inksoft mb-1.5">Compra mínima</div>
+            <input
+              type="number"
+              min={1}
+              value={compraMinima}
+              onChange={(e) => setCompraMinima(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            />
+          </div>
         </div>
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Plan del vendedor</div>
@@ -853,6 +1042,10 @@ export default function VenderPage() {
                 setImagenUrl(p.imagenUrl || '')
                 setDescripcionCorta(p.descripcionCorta || '')
                 setDescripcionLarga(p.descripcionLarga || '')
+                setTallesTexto((p.talles || []).join(', '))
+                setColoresTexto((p.colores || []).join(', '))
+                setMateriales(p.materiales || '')
+                setCompraMinima(String(p.compraMinima || 1))
                 setPlan(p.plan || 'basico')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
-import { ProfesionalFoto } from '@/components/ProfesionalFoto'
 import { useAuth } from '@/lib/auth'
 
 function bs(n: number) {
@@ -82,7 +81,11 @@ export default function PerfilProfesionalPage() {
       <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 300px' }}>
         <div>
           <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[340px] mb-6">
-              <ProfesionalFoto imagenUrl={perfil.imagenUrl} nombre={perfil.nombre} icono={perfil.icono} size={72} />
+              {perfil.imagenUrl ? (
+              <img src={perfil.imagenUrl} alt={perfil.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            ) : (
+              <ServiceIcon kind={perfil.icono} size={72} />
+            )}
           </div>
 
           {perfil.descripcion && (

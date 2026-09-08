@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl } = body
+    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
     if (!nombre || !categoria || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
@@ -67,6 +67,25 @@ export async function POST(req: NextRequest) {
     )
 
     const db = getDb()
+
+    // Copiamos el nombre/logo de la tienda del vendedor (si ya la
+    // configuró) para mostrarlo en el catálogo en vez del email — así
+    // el comprador ve "Zapatería Doña Rosa" en vez de
+    // "marcelo@gmail.com". Si el vendedor todavía no configuró su
+    // tienda, queda vacío y el catálogo cae al email como respaldo.
+    let tiendaNombre = ''
+    let tiendaLogoUrl = ''
+    try {
+      const vendedorDoc = await db.collection('vendedores').doc(usuario.uid).get()
+      if (vendedorDoc.exists) {
+        const vd = vendedorDoc.data() as any
+        tiendaNombre = vd.nombreNegocio || ''
+        tiendaLogoUrl = vd.logoUrl || ''
+      }
+    } catch {
+      // si falla, no bloqueamos la publicación por esto
+    }
+
     const ref = await db.collection('productos').add({
       nombre,
       categoria,
@@ -77,8 +96,14 @@ export async function POST(req: NextRequest) {
       thumbUrl: thumbUrl || '',
       descripcionCorta: descripcionCorta || '',
       descripcionLarga: descripcionLarga || '',
+      talles: Array.isArray(talles) ? talles.filter(Boolean) : [],
+      colores: Array.isArray(colores) ? colores.filter(Boolean) : [],
+      materiales: materiales || '',
+      compraMinima: compraMinima ? Math.max(1, Number(compraMinima)) : 1,
       vendedorId: usuario.uid,
       vendedor: usuario.email,
+      tiendaNombre,
+      tiendaLogoUrl,
       plan: planValido,
       estado: 'activo',
       moderacionIA,

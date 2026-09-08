@@ -3,18 +3,12 @@ import { getDb } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
-// GET público — el checkout lo usa para saber a qué QR/CBU pagarle a
-// este vendedor en particular. Si el vendedor todavía no configuró su
-// cobro, devolvemos "configurado: false" y el checkout cae al QR
-// genérico de la plataforma como respaldo.
-// GET público — usado en dos lugares:
-// 1. El checkout, para saber a qué QR/CBU pagarle a este vendedor.
-//    Si todavía no configuró su cobro, "configurado: false" y el
-//    checkout cae al QR genérico de la plataforma como respaldo.
-// 2. La página /tienda/[id], que muestra el perfil público completo
-//    de la tienda (nombre, dirección, zona, horarios, rating, etc.)
-//    — por eso siempre devolvemos estos campos, tenga o no cobro
-//    configurado.
+// GET público — devuelve el perfil de tienda completo de un vendedor:
+// datos de cobro (para el checkout) y datos de la tienda (para la
+// pestaña "Info. Tienda" de cada producto: dirección, mapa, horarios,
+// tipos de venta). "configurado" indica específicamente si YA cargó su
+// cobro propio (QR o CBU) — eso es lo que usa el checkout para decidir
+// si le paga a él directo o cae al QR general de la plataforma.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getDb()
@@ -23,23 +17,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ configurado: false, existe: false })
     }
     const data = doc.data() as any
-    const configurado = !!(data.qrImageUrl || data.cbu)
-
     return NextResponse.json({
       existe: true,
-      configurado,
+      configurado: !!(data.qrImageUrl || data.cbu),
       qrImageUrl: data.qrImageUrl || '',
       cbu: data.cbu || '',
       nombreNegocio: data.nombreNegocio || '',
       direccion: data.direccion || '',
-      zona: data.zona || '',
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
       horarios: data.horarios || '',
-      tipoVentas: data.tipoVentas || '',
-      tiendaAprobada: !!data.tiendaAprobada,
-      verificado: !!data.verificado,
-      rating: data.rating || null,
+      tiposVenta: data.tiposVenta || {},
       logoUrl: data.logoUrl || '',
-      followers: data.followers || 0,
+      verificado: !!data.verificado,
     })
   } catch (err) {
     console.error('GET /api/vendedores/[id]', err)
@@ -47,52 +37,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// PATCH: permite al admin actualizar datos del perfil de cobro/perfil público.
+// PATCH: solo admin — marca (o desmarca) a un vendedor como
+// "verificado". A diferencia de otras plataformas donde esto es
+// automático, acá es una decisión manual tuya, para que el badge
+// signifique algo real.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
-  if (!esAdmin) {
-    return NextResponse.json({ error: 'Necesitás ser admin.' }, { status: 403 })
+  if (!password || password !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {
     const body = await req.json()
-    const {
-      nombreNegocio,
-      qrImageUrl,
-      cbu,
-      direccion,
-      zona,
-      horarios,
-      tipoVentas,
-      tiendaAprobada,
-      verificado,
-      rating,
-      logoUrl,
-      followers,
-    } = body
-    const db = getDb()
-    const cambios: Record<string, unknown> = {}
-    if (nombreNegocio !== undefined) cambios.nombreNegocio = nombreNegocio
-    if (qrImageUrl !== undefined) cambios.qrImageUrl = qrImageUrl
-    if (cbu !== undefined) cambios.cbu = cbu
-    if (direccion !== undefined) cambios.direccion = direccion
-    if (zona !== undefined) cambios.zona = zona
-    if (horarios !== undefined) cambios.horarios = horarios
-    if (tipoVentas !== undefined) cambios.tipoVentas = tipoVentas
-    if (tiendaAprobada !== undefined) cambios.tiendaAprobada = tiendaAprobada
-    if (verificado !== undefined) cambios.verificado = verificado
-    if (rating !== undefined) cambios.rating = rating
-    if (logoUrl !== undefined) cambios.logoUrl = logoUrl
-    if (followers !== undefined) cambios.followers = followers
-    cambios.updatedAt = new Date().toISOString()
-    await db.collection('vendedores').doc(params.id).set(cambios, { merge: true })
+    const { verificado } = body
+    await getDb().collection('vendedores').doc(params.id).set({ verificado: !!verificado }, { merge: true })
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/vendedores/[id]', err)
-    return NextResponse.json({ error: 'No se pudo actualizar el vendedor.' }, { status: 500 })
+    return NextResponse.json({ error: 'No se pudo actualizar.' }, { status: 500 })
   }
 }
-
-// GET propio con detalle completo para precargar el formulario en
-// /vender — el mismo endpoint de arriba ya alcanza para eso en
-// realidad (es público), así que no hace falta una ruta separada.

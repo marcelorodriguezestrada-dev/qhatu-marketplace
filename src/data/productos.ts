@@ -14,6 +14,12 @@ export type Producto = {
   createdAt?: string
   vistas?: number
   plan?: 'basico' | 'premium'
+  talles?: string[] // ej: ["36","37","38"] — opcional, no todos los productos tienen talle
+  colores?: string[] // ej: ["Marrón","Negro"]
+  materiales?: string // texto libre, ej: "Cuero"
+  compraMinima?: number // cantidad mínima por pedido, por defecto 1
+  tiendaNombre?: string // nombre del negocio del vendedor, copiado de su perfil de tienda al momento de publicar/actualizar
+  tiendaLogoUrl?: string
 }
 
 // Catálogo semilla. En producción esto vive en Firestore (colección
