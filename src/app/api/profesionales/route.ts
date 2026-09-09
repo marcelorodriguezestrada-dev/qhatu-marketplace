@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +75,9 @@ export async function POST(req: NextRequest) {
       precio: precio ? Number(precio) : null, // null = "Precio a convenir"
       experiencia: experiencia || '',
       plan: plan === 'premium' ? 'premium' : 'basico',
+      planEstadoPago: 'ninguno',
+      planVigenciaHasta: plan === 'premium' ? calcularNuevaVigencia(null) : null,
+      fotosAdicionales: [],
       estado: 'aprobado',
       ratingPromedio: 0,
       cantidadResenas: 0,

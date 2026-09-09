@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { useCategorias } from '@/lib/useCategorias'
+import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -425,6 +426,30 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify(notaAdmin !== undefined ? { estado, notaAdmin } : { estado }),
+    }).then(() => cargarProfesionales())
+  }
+
+  // Confirma que el pago de la membresía Premium realmente llegó (lo
+  // revisás vos a mano contra el banco/QR, como con los pedidos de
+  // productos) — activa Premium y extiende la vigencia 30 días desde
+  // hoy, o desde la vigencia actual si todavía no había vencido.
+  function confirmarPagoPremium(p: { id: string; planVigenciaHasta?: string | null }) {
+    fetch(`/api/profesionales/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({
+        plan: 'premium',
+        planEstadoPago: 'ninguno',
+        planVigenciaHasta: calcularNuevaVigencia(p.planVigenciaHasta),
+      }),
+    }).then(() => cargarProfesionales())
+  }
+
+  function rechazarPagoPremium(id: string) {
+    fetch(`/api/profesionales/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ planEstadoPago: 'ninguno' }),
     }).then(() => cargarProfesionales())
   }
 
@@ -994,10 +1019,48 @@ export default function AdminPage() {
             </div>
           )}
 
+          {profesionales.filter((p) => p.planEstadoPago === 'informado_pago').length > 0 && (
+            <div className="mb-8">
+              <div className="font-body text-sm font-semibold text-teal mb-3">
+                💳 Pagos de membresía Premium por confirmar ({profesionales.filter((p) => p.planEstadoPago === 'informado_pago').length})
+              </div>
+              {profesionales
+                .filter((p) => p.planEstadoPago === 'informado_pago')
+                .map((p) => (
+                <div key={p.id} className="bg-panel border border-teal rounded-lg p-4 mb-3">
+                  <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
+                  <div className="font-body text-xs text-inksoft mb-3">
+                    WhatsApp: {p.whatsapp}
+                    {p.planVigenciaHasta && new Date(p.planVigenciaHasta).getTime() > Date.now() && (
+                      <> · Ya tiene Premium vigente hasta {new Date(p.planVigenciaHasta).toLocaleDateString('es-BO')} — confirmar esto se lo extiende 30 días más desde esa fecha</>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => confirmarPagoPremium(p)}
+                      className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
+                    >
+                      Confirmar pago recibido
+                    </button>
+                    <button
+                      onClick={() => rechazarPagoPremium(p.id)}
+                      className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
+                    >
+                      No llegó / rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="font-body text-sm font-semibold text-ink mb-3">
             Publicados ({profesionales.filter((p) => !p.estado || p.estado === 'aprobado').length})
           </div>
-          {profesionales.filter((p) => !p.estado || p.estado === 'aprobado').map((p) => (
+          {[...profesionales]
+            .filter((p) => !p.estado || p.estado === 'aprobado')
+            .sort((a, b) => (b.clicsWhatsapp || 0) - (a.clicsWhatsapp || 0))
+            .map((p) => (
             <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
                 {p.imagenUrl ? (
@@ -1010,6 +1073,9 @@ export default function AdminPage() {
                 <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
                 <div className="font-body text-xs text-inksoft">
                   {buscarRubro(p.rubro)?.label} · {p.zona} · {p.plan === 'premium' ? 'Premium' : 'Básico'}
+                </div>
+                <div className="font-body text-[11px] text-inksoft mt-0.5">
+                  👁 {p.vistas || 0} vistas · 💬 {p.clicsWhatsapp || 0} contactos
                 </div>
               </div>
               <button

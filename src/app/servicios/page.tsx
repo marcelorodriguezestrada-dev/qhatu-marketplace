@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { useCategorias } from '@/lib/useCategorias'
+import { esPremiumVigente } from '@/lib/planPremium'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -156,6 +157,12 @@ export default function ServiciosPage() {
     filtrados = [...filtrados].sort((a, b) => (b.ratingPromedio || 0) - (a.ratingPromedio || 0))
   }
 
+  // Beneficio Premium: aparecer primero, sin importar el criterio de
+  // orden elegido arriba. .sort es estable, así que esto no desordena
+  // lo que ya se ordenó por cercanía/rating dentro de cada grupo
+  // (premium entre sí, básicos entre sí) — solo antepone un grupo al otro.
+  filtrados = [...filtrados].sort((a, b) => (esPremiumVigente(b) ? 1 : 0) - (esPremiumVigente(a) ? 1 : 0))
+
   return (
     <div className="min-h-screen">
       <div className="bg-ink px-5 py-3.5">
@@ -167,6 +174,12 @@ export default function ServiciosPage() {
             className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
           >
             Publicá tu servicio
+          </Link>
+          <Link
+            href="/mi-perfil"
+            className="border border-white/20 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
+          >
+            Mi perfil
           </Link>
 
         </div>
@@ -309,7 +322,7 @@ export default function ServiciosPage() {
                   ) : (
                     <ServiceIcon kind={p.icono} size={40} />
                   )}
-                  {p.plan === 'premium' && (
+                  {esPremiumVigente(p) && (
                     <span className="absolute top-1.5 left-1.5 bg-ochre text-white text-[10px] font-semibold px-2 py-0.5 rounded-full font-body">
                       Destacado
                     </span>

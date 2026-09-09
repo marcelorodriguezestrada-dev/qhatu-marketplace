@@ -104,6 +104,19 @@ export default function PerfilProfesionalPage() {
             </>
           )}
 
+          {perfil.fotosAdicionales && perfil.fotosAdicionales.length > 0 && (
+            <>
+              <div className="font-display text-lg font-bold text-ink mb-2">Fotos</div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-8">
+                {perfil.fotosAdicionales.map((url: string) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-line">
+                    <img src={url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
           <div className="font-body text-sm font-semibold text-ink mb-3">Reseñas</div>
 
           {usuario ? (

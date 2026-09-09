@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
+    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia } = body
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -66,6 +66,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (notaAdmin !== undefined) cambios.notaAdmin = notaAdmin
     if (icono !== undefined) cambios.icono = icono
     if (plan !== undefined) cambios.plan = plan === 'premium' ? 'premium' : 'basico'
+    if (planVigenciaHasta !== undefined) cambios.planVigenciaHasta = planVigenciaHasta
+    if (planEstadoPago !== undefined) cambios.planEstadoPago = planEstadoPago
+    if (fotosAdicionales !== undefined) cambios.fotosAdicionales = fotosAdicionales
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
     if (experiencia !== undefined) cambios.experiencia = experiencia
