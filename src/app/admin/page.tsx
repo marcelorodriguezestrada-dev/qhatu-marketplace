@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
+import { ServiceIcon } from '@/components/ServiceIcon'
+import { useCategorias } from '@/lib/useCategorias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -17,7 +18,7 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
   cancelado: { texto: 'Cancelado', color: 'text-red-600' },
 }
 
-const ICONOS_SERVICIO = ['abogado', 'contador', 'electricista', 'enfermera', 'estilista', 'manicurista', 'medico', 'odontologo', 'oftalmologo', 'pintor', 'plomero', 'profesor', 'otro']
+const ICONOS_SERVICIO = ['abogado', 'contador', 'electricista', 'enfermera', 'estilista', 'ingeniero', 'manicurista', 'medico', 'odontologo', 'oftalmologo', 'pintor', 'plomero', 'profesor', 'otro']
 
 function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motivo: string } | null | undefined }) {
   if (!moderacionIA) return null
@@ -39,7 +40,8 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'metricas'>('pedidos')
+  const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -63,7 +65,8 @@ export default function AdminPage() {
   // se va tipeando ahí.
   const [pidiendoInfoId, setPidiendoInfoId] = useState<string | null>(null)
   const [notaPidiendoInfo, setNotaPidiendoInfo] = useState('')
-  const [rubro, setRubro] = useState(RUBROS[0].id)
+  const [rubro, setRubro] = useState('')
+  const [categoriaSel, setCategoriaSel] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState('')
   const [lat, setLat] = useState('')
@@ -78,6 +81,24 @@ export default function AdminPage() {
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [publicando, setPublicando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
+
+  // Pestaña "Categorías": alta de categoría nueva, alta de rubro dentro
+  // de una categoría, y reubicar un rubro existente a otra categoría.
+  const [nuevaCategoriaLabel, setNuevaCategoriaLabel] = useState('')
+  const [guardandoCategoria, setGuardandoCategoria] = useState(false)
+  const [errorCategorias, setErrorCategorias] = useState('')
+  const [categoriaAbierta, setCategoriaAbierta] = useState<string | null>(null)
+  const [nuevoRubroLabel, setNuevoRubroLabel] = useState('')
+  const [guardandoRubro, setGuardandoRubro] = useState(false)
+  const [renombrandoCategoriaId, setRenombrandoCategoriaId] = useState<string | null>(null)
+  const [nuevoNombreCategoria, setNuevoNombreCategoria] = useState('')
+
+  useEffect(() => {
+    if (categorias.length === 0 || categoriaSel) return
+    setCategoriaSel(categorias[0].id)
+    setRubro(categorias[0].rubros[0]?.id || 'otro')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias])
 
   useEffect(() => {
     const guardada = typeof window !== 'undefined' ? localStorage.getItem('clasiclick_admin_pw') : null
@@ -283,6 +304,73 @@ export default function AdminPage() {
     }).then(() => cargarProfesionales())
   }
 
+  async function crearCategoria(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nuevaCategoriaLabel.trim()) return
+    setGuardandoCategoria(true)
+    setErrorCategorias('')
+    try {
+      const res = await fetch('/api/categorias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'crear_categoria', label: nuevaCategoriaLabel.trim() }),
+      })
+      const data = await res.json()
+      if (data.error) { setErrorCategorias(data.error); return }
+      setNuevaCategoriaLabel('')
+      recargarCategorias()
+    } finally {
+      setGuardandoCategoria(false)
+    }
+  }
+
+  async function crearRubro(categoriaId: string) {
+    if (!nuevoRubroLabel.trim()) return
+    setGuardandoRubro(true)
+    setErrorCategorias('')
+    try {
+      const res = await fetch('/api/categorias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'crear_rubro', categoriaId, label: nuevoRubroLabel.trim() }),
+      })
+      const data = await res.json()
+      if (data.error) { setErrorCategorias(data.error); return }
+      setNuevoRubroLabel('')
+      setCategoriaAbierta(null)
+      recargarCategorias()
+    } finally {
+      setGuardandoRubro(false)
+    }
+  }
+
+  async function moverRubro(rubroId: string, categoriaId: string) {
+    setErrorCategorias('')
+    const res = await fetch('/api/categorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ accion: 'mover_rubro', rubroId, categoriaId }),
+    })
+    const data = await res.json()
+    if (data.error) { setErrorCategorias(data.error); return }
+    recargarCategorias()
+  }
+
+  async function renombrarCategoria(categoriaId: string) {
+    if (!nuevoNombreCategoria.trim()) return
+    setErrorCategorias('')
+    const res = await fetch('/api/categorias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ accion: 'renombrar_categoria', categoriaId, label: nuevoNombreCategoria.trim() }),
+    })
+    const data = await res.json()
+    if (data.error) { setErrorCategorias(data.error); return }
+    setRenombrandoCategoriaId(null)
+    setNuevoNombreCategoria('')
+    recargarCategorias()
+  }
+
   function cambiarEstadoProfesional(
     id: string,
     estado: 'aprobado' | 'rechazado' | 'info_solicitada' | 'pendiente_revision',
@@ -363,6 +451,12 @@ export default function AdminPage() {
               {profesionales.filter((p) => p.estado === 'pendiente_revision').length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setTab('categorias')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'categorias' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Categorías
         </button>
         <button
           onClick={() => { setTab('metricas'); if (!metricas) cargarMetricas() }}
@@ -500,14 +594,33 @@ export default function AdminPage() {
             />
             <div className="grid grid-cols-2 gap-3 mb-3">
               <select
+                value={categoriaSel}
+                onChange={(e) => {
+                  const nuevaCategoria = e.target.value
+                  setCategoriaSel(nuevaCategoria)
+                  const cat = categorias.find((c) => c.id === nuevaCategoria)
+                  setRubro(cat?.rubros[0]?.id || 'otro')
+                }}
+                className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
+              >
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+              <select
                 value={rubro}
                 onChange={(e) => setRubro(e.target.value)}
                 className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
               >
-                {RUBROS.map((r) => (
+                {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
                   <option key={r.id} value={r.id}>{r.label}</option>
                 ))}
               </select>
+            </div>
+            <div className="font-body text-[11px] text-inksoft mb-3 -mt-2">
+              ¿No está el rubro que buscás? Agregalo desde la pestaña "Categorías" y va a aparecer acá.
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <select
                 value={plan}
                 onChange={(e) => setPlan(e.target.value as 'basico' | 'premium')}
@@ -647,7 +760,7 @@ export default function AdminPage() {
                 <div key={p.id} className="bg-panel border border-ochre rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   <div className="font-body text-xs text-inksoft mb-1">
-                    {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
                   {p.descripcion && <div className="font-body text-xs text-ink mb-2">{p.descripcion}</div>}
@@ -723,7 +836,7 @@ export default function AdminPage() {
                 <div key={p.id} className="bg-panel border border-indigo-200 rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   <div className="font-body text-xs text-inksoft mb-1">
-                    {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
                   {p.notaAdmin && (
@@ -814,7 +927,7 @@ export default function AdminPage() {
               <div className="flex-1">
                 <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
                 <div className="font-body text-xs text-inksoft">
-                  {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona} · {p.plan === 'premium' ? 'Premium' : 'Básico'}
+                  {buscarRubro(p.rubro)?.label} · {p.zona} · {p.plan === 'premium' ? 'Premium' : 'Básico'}
                 </div>
               </div>
               <button
@@ -823,6 +936,117 @@ export default function AdminPage() {
               >
                 Borrar
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'categorias' && (
+        <div>
+          <div className="font-body text-sm text-inksoft mb-4">
+            Acá se arma el árbol Categoría → Rubro que se usa en el selector de /servicios y en el formulario de publicar servicio.
+            Salud, Ingeniería, etc. vienen con rubros de base; podés agregar categorías o rubros nuevos, y mover un rubro si quedó en la categoría que no corresponde.
+          </div>
+
+          <form onSubmit={crearCategoria} className="bg-panel border border-line rounded-lg p-4 mb-6 flex gap-2 items-center">
+            <input
+              value={nuevaCategoriaLabel}
+              onChange={(e) => setNuevaCategoriaLabel(e.target.value)}
+              placeholder="Nombre de la categoría nueva (ej: Tecnología)"
+              className="flex-1 px-3 py-2 rounded-md border border-line font-body text-sm"
+            />
+            <button
+              type="submit"
+              disabled={guardandoCategoria}
+              className="px-3.5 py-2 rounded-md border-none bg-maroon text-white font-body text-xs font-semibold shrink-0"
+            >
+              {guardandoCategoria ? 'Agregando...' : '+ Agregar categoría'}
+            </button>
+          </form>
+
+          {errorCategorias && <div className="font-body text-xs text-maroon mb-4">{errorCategorias}</div>}
+
+          {categorias.map((cat) => (
+            <div key={cat.id} className="bg-panel border border-line rounded-lg p-4 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                {renombrandoCategoriaId === cat.id ? (
+                  <div className="flex gap-2 flex-1">
+                    <input
+                      value={nuevoNombreCategoria}
+                      onChange={(e) => setNuevoNombreCategoria(e.target.value)}
+                      className="flex-1 px-2.5 py-1.5 rounded-md border border-line font-body text-sm"
+                    />
+                    <button onClick={() => renombrarCategoria(cat.id)} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold">
+                      Guardar
+                    </button>
+                    <button onClick={() => { setRenombrandoCategoriaId(null); setNuevoNombreCategoria('') }} className="px-2.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="font-display text-base font-bold text-ink">{cat.label}</div>
+                    <button
+                      onClick={() => { setRenombrandoCategoriaId(cat.id); setNuevoNombreCategoria(cat.label) }}
+                      className="font-body text-xs text-inksoft underline shrink-0"
+                    >
+                      Renombrar
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5 mb-3">
+                {cat.rubros.length === 0 && (
+                  <div className="font-body text-xs text-inksoft">Todavía sin rubros.</div>
+                )}
+                {cat.rubros.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-1.5">
+                    <span className="font-body text-sm text-ink">{r.label}</span>
+                    <select
+                      value={cat.id}
+                      onChange={(e) => moverRubro(r.id, e.target.value)}
+                      className="px-2 py-1 rounded-md border border-line font-body text-[11px] bg-panel shrink-0"
+                      title="Mover este rubro a otra categoría"
+                    >
+                      {categorias.map((c2) => (
+                        <option key={c2.id} value={c2.id}>{c2.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {categoriaAbierta === cat.id ? (
+                <div className="flex gap-2">
+                  <input
+                    value={nuevoRubroLabel}
+                    onChange={(e) => setNuevoRubroLabel(e.target.value)}
+                    placeholder="Nombre del rubro (ej: Kinesiólogo)"
+                    className="flex-1 px-2.5 py-1.5 rounded-md border border-line font-body text-sm"
+                  />
+                  <button
+                    onClick={() => crearRubro(cat.id)}
+                    disabled={guardandoRubro}
+                    className="px-3 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold shrink-0"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    onClick={() => { setCategoriaAbierta(null); setNuevoRubroLabel('') }}
+                    className="px-3 py-1.5 rounded-md border border-line font-body text-xs text-inksoft shrink-0"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setCategoriaAbierta(cat.id); setNuevoRubroLabel('') }}
+                  className="font-body text-xs text-maroon underline"
+                >
+                  + Agregar rubro en {cat.label}
+                </button>
+              )}
             </div>
           ))}
         </div>

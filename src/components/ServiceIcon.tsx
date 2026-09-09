@@ -12,6 +12,7 @@ const PATHS: Record<string, string> = {
   pintor: 'M9 3h6v6l3 3v7a2 2 0 01-2 2H8a2 2 0 01-2-2v-7l3-3z M9 3v3h6V3',
   plomero: 'M6 4h5v6H6z M11 7h4v3a3 3 0 003 3v7h-4v-5H9v5H6v-8a3 3 0 013-3z',
   profesor: 'M3 8l9-4 9 4-9 4-9-4z M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5',
+  ingeniero: 'M12 2l3 5h-2v3h3l4 9H4l4-9h3V7H9z M9 12h6',
 }
 
 export function ServiceIcon({ kind, size = 34 }: { kind: string; size?: number }) {
@@ -22,21 +23,15 @@ export function ServiceIcon({ kind, size = 34 }: { kind: string; size?: number }
   )
 }
 
-// Orden alfabético por "label" — así se ve como pide el documento: una
-// lista vertical prolija, no botones amontonados sin criterio. "Otro"
-// siempre queda al final, sea cual sea su posición alfabética.
-export const RUBROS = [
-  { id: 'abogado', label: 'Abogado' },
-  { id: 'contador', label: 'Contador' },
-  { id: 'electricista', label: 'Electricista' },
-  { id: 'enfermera', label: 'Enfermera a domicilio' },
-  { id: 'estilista', label: 'Estilista / peluquero' },
-  { id: 'manicurista', label: 'Manicurista' },
-  { id: 'medico', label: 'Médico' },
-  { id: 'odontologo', label: 'Odontólogo' },
-  { id: 'oftalmologo', label: 'Oftalmólogo' },
-  { id: 'pintor', label: 'Pintor' },
-  { id: 'plomero', label: 'Plomero' },
-  { id: 'profesor', label: 'Profesor / clases' },
-  { id: 'otro', label: 'Otro' },
-].sort((a, b) => (a.id === 'otro' ? 1 : b.id === 'otro' ? -1 : a.label.localeCompare(b.label, 'es')))
+// RUBROS: lista plana de los rubros base (Categoría > Rubro), solo
+// para los lugares que necesitan buscar una etiqueta rápido a partir
+// de un id (ej. un popup del mapa). Ojo: esta lista NO incluye
+// categorías ni rubros agregados desde /admin — para eso, o para
+// armar un selector completo por categorías, usar `useCategorias()`
+// (src/lib/useCategorias.ts), que trae la taxonomía real (base +
+// lo agregado) desde /api/categorias.
+import { CATEGORIAS_BASE } from '@/data/categorias'
+
+export const RUBROS = CATEGORIAS_BASE.flatMap((c) => c.rubros).sort((a, b) =>
+  a.id === 'otro' ? 1 : b.id === 'otro' ? -1 : a.label.localeCompare(b.label, 'es')
+)

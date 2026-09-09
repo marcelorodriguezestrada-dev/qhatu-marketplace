@@ -3,19 +3,27 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { RUBROS } from '@/components/ServiceIcon'
 import { ZONAS_POTOSI } from '@/data/zonasPotosi'
 import { useAuth } from '@/lib/auth'
+import { useCategorias } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+
+// Valor especial del select de rubro: "esta categoría no tiene mi
+// profesión, quiero escribirla yo". Es distinto del "otro" que ya
+// existe como rubro fijo dentro de la categoría "Otros" — este
+// aparece en TODAS las categorías, para poder agregar una profesión
+// nueva sin tener que mandarla justo a "Otros".
+const RUBRO_ESCRIBIR_PROPIO = '__custom__'
 
 export default function PublicarServicioPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
   const router = useRouter()
+  const { categorias } = useCategorias()
 
   const [nombre, setNombre] = useState('')
-  const [rubro, setRubro] = useState(RUBROS[0].id)
+  const [categoriaSel, setCategoriaSel] = useState('')
+  const [rubro, setRubro] = useState('')
   const [rubroPersonalizado, setRubroPersonalizado] = useState('')
-  const [rubrosExtra, setRubrosExtra] = useState<{ id: string; label: string }[]>([])
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
   const [zonaPersonalizada, setZonaPersonalizada] = useState('')
@@ -31,18 +39,24 @@ export default function PublicarServicioPage() {
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState('')
 
-  // Categorías y zonas que otros usuarios ya agregaron a mano —
-  // se suman a la lista base para que no haga falta reescribirlas.
+  // Zonas que otros usuarios ya agregaron a mano — se suman a la lista
+  // base para que no haga falta reescribirlas.
   useEffect(() => {
-    fetch('/api/rubros-personalizados')
-      .then((r) => r.json())
-      .then((d) => setRubrosExtra(d.rubros || []))
-      .catch(() => {})
     fetch('/api/zonas-personalizadas')
       .then((r) => r.json())
       .then((d) => setZonasExtra(d.zonas || []))
       .catch(() => {})
   }, [])
+
+  // En cuanto llega el árbol de categorías, arrancamos con la primera
+  // categoría y su primer rubro seleccionados (el select no puede
+  // quedar vacío).
+  useEffect(() => {
+    if (categorias.length === 0 || categoriaSel) return
+    setCategoriaSel(categorias[0].id)
+    setRubro(categorias[0].rubros[0]?.id || RUBRO_ESCRIBIR_PROPIO)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias])
 
   // Dar de alta un servicio requiere estar logueado — así se evita que
   // cualquiera publique perfiles falsos sin ninguna cuenta detrás.
@@ -77,8 +91,8 @@ export default function PublicarServicioPage() {
       setError('Completá tu nombre o el de tu negocio.')
       return
     }
-    if (rubro === 'otro' && !rubroPersonalizado.trim()) {
-      setError('Escribí el nombre de tu categoría.')
+    if (rubro === RUBRO_ESCRIBIR_PROPIO && !rubroPersonalizado.trim()) {
+      setError('Escribí el nombre de tu profesión u oficio.')
       return
     }
     if (zona === 'otra' && !zonaPersonalizada.trim()) {
@@ -97,11 +111,16 @@ export default function PublicarServicioPage() {
     setEnviando(true)
     try {
       const token = await obtenerToken()
+      const esPersonalizado = rubro === RUBRO_ESCRIBIR_PROPIO
       const res = await fetch('/api/profesionales/solicitud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia,
+          nombre,
+          rubro: esPersonalizado ? 'otro' : rubro,
+          rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
+          categoriaId: categoriaSel,
+          descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -149,23 +168,34 @@ export default function PublicarServicioPage() {
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
         <select
+          value={categoriaSel}
+          onChange={(e) => {
+            const nuevaCategoria = e.target.value
+            setCategoriaSel(nuevaCategoria)
+            const cat = categorias.find((c) => c.id === nuevaCategoria)
+            setRubro(cat?.rubros[0]?.id || RUBRO_ESCRIBIR_PROPIO)
+          }}
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
+        >
+          {categorias.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+        <select
           value={rubro}
           onChange={(e) => setRubro(e.target.value)}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
         >
-          {RUBROS.filter((r) => r.id !== 'otro').map((r) => (
+          {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
             <option key={r.id} value={r.id}>{r.label}</option>
           ))}
-          {rubrosExtra.map((r) => (
-            <option key={r.id} value={r.id}>{r.label}</option>
-          ))}
-          <option value="otro">Otra categoría (especificar)</option>
+          <option value={RUBRO_ESCRIBIR_PROPIO}>Mi profesión no está en la lista (especificar)</option>
         </select>
-        {rubro === 'otro' && (
+        {rubro === RUBRO_ESCRIBIR_PROPIO && (
           <input
             value={rubroPersonalizado}
             onChange={(e) => setRubroPersonalizado(e.target.value)}
-            placeholder="¿Cuál es tu categoría? (ej: Jardinero)"
+            placeholder="¿Cuál es tu profesión u oficio? (ej: Jardinero)"
             className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
           />
         )}

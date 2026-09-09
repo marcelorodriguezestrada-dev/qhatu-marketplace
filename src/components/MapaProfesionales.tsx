@@ -8,6 +8,7 @@ type Profesional = {
   id: string
   nombre: string
   rubro: string
+  rubroLabel?: string
   lat: number | null
   lng: number | null
 }
@@ -60,7 +61,7 @@ export function MapaProfesionales({
       profesionales
         .filter((p) => p.lat != null && p.lng != null)
         .forEach((p) => {
-          const rubroLabel = RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro
+          const rubroLabel = p.rubroLabel || RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro
           L.marker([p.lat as number, p.lng as number])
             .addTo(mapa)
             .bindPopup(`<strong>${p.nombre}</strong><br/>${rubroLabel}<br/><a href="/servicios/${p.id}">Ver perfil</a>`)

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia, lat, lng } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia, lat, lng } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         rubroFinal = slug
         rubroLabel = rubroPersonalizado.trim()
         await db.collection('rubros_personalizados').doc(slug).set(
-          { label: rubroLabel, createdAt: new Date().toISOString() },
+          { label: rubroLabel, categoriaId: categoriaId || 'otros', createdAt: new Date().toISOString() },
           { merge: true }
         )
       }

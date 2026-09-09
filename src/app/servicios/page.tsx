@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
-import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
+import { ServiceIcon } from '@/components/ServiceIcon'
+import { useCategorias } from '@/lib/useCategorias'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -53,7 +54,9 @@ function Estrellas({ valor }: { valor: number }) {
 }
 
 export default function ServiciosPage() {
+  const { categorias, rubrosFlat, buscarRubro } = useCategorias()
   const [profesionales, setProfesionales] = useState<Profesional[]>([])
+  const [categoriaSel, setCategoriaSel] = useState('Todo')
   const [rubro, setRubro] = useState('Todo')
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<'calificacion' | 'cercania'>('calificacion')
@@ -74,6 +77,10 @@ export default function ServiciosPage() {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q') || ''
     if (q) setBusqueda(q)
+    const categoriaParam = params.get('categoria')
+    if (categoriaParam) setCategoriaSel(categoriaParam)
+    const rubroParam = params.get('rubro')
+    if (rubroParam) setRubro(rubroParam)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -105,6 +112,11 @@ export default function ServiciosPage() {
     )
   }
 
+  // Rubros que pertenecen a la categoría elegida — así el filtro "por
+  // categoría" incluye a cualquier profesional cuyo rubro esté en esa
+  // categoría, sea un rubro de la base o uno agregado después.
+  const rubroIdsDeCategoria = categorias.find((c) => c.id === categoriaSel)?.rubros.map((r) => r.id) || []
+
   let filtrados = profesionales.filter((p) => {
     if (soloPotosi) {
       const zonaRaw = (p.zona || '').toLowerCase()
@@ -115,7 +127,17 @@ export default function ServiciosPage() {
       if (!zonaMatch && !withinRadius) return false
     }
 
-    const matchRubro = rubro === 'Todo' || p.rubro === rubro
+    // Todo (sin categoría ni rubro elegido) siempre muestra a todos
+    // los profesionales, incluso los que quedaron con un rubro que
+    // todavía no está en ninguna categoría — así nadie desaparece del
+    // directorio por un dato de taxonomía incompleto.
+    let matchRubro = true
+    if (rubro !== 'Todo') {
+      matchRubro = p.rubro === rubro
+    } else if (categoriaSel !== 'Todo') {
+      matchRubro = rubroIdsDeCategoria.includes(p.rubro)
+    }
+
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       (p.zona || '').toLowerCase().includes(busqueda.toLowerCase())
@@ -175,27 +197,60 @@ export default function ServiciosPage() {
           </button>
         </div>
 
-        <div className="flex gap-3 mb-4 flex-wrap items-center">
+        <div className="flex gap-3 mb-2 flex-wrap items-center">
           <select
-            value={rubro}
+            value={categoriaSel}
             onChange={(e) => {
-              setRubro(e.target.value)
-              if (e.target.value !== 'Todo') {
+              const nuevaCategoria = e.target.value
+              setCategoriaSel(nuevaCategoria)
+              setRubro('Todo')
+              if (nuevaCategoria !== 'Todo') {
                 fetch('/api/analitica/categoria', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ tipo: 'servicio', valor: e.target.value }),
+                  body: JSON.stringify({ tipo: 'servicio', valor: nuevaCategoria }),
                 }).catch(() => {})
               }
             }}
-            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[180px]"
+            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[160px]"
           >
-            <option value="Todo">Todos los rubros</option>
-            {RUBROS.map((r) => (
-              <option key={r.id} value={r.id}>{r.label}</option>
+            <option value="Todo">Todas las categorías</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>
 
+          {categoriaSel !== 'Todo' && (
+            <select
+              value={rubro}
+              onChange={(e) => {
+                setRubro(e.target.value)
+                if (e.target.value !== 'Todo') {
+                  fetch('/api/analitica/categoria', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo: 'servicio', valor: e.target.value }),
+                  }).catch(() => {})
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[160px]"
+            >
+              <option value="Todo">Todos los rubros</option>
+              {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {(categoriaSel !== 'Todo' || rubro !== 'Todo') && (
+          <div className="font-body text-xs text-inksoft mb-4">
+            {categorias.find((c) => c.id === categoriaSel)?.label || 'Todas las categorías'}
+            {rubro !== 'Todo' && <> <span className="text-line">›</span> {buscarRubro(rubro)?.label || rubro}</>}
+          </div>
+        )}
+
+        <div className="flex gap-3 mb-4 flex-wrap items-center">
           <div className="flex gap-1 bg-panelalt border border-line rounded-lg p-1">
             <button
               onClick={() => setVista('lista')}
@@ -234,7 +289,10 @@ export default function ServiciosPage() {
         {errorUbicacion && <div className="font-body text-xs text-maroon mb-4">{errorUbicacion}</div>}
 
         {vista === 'mapa' ? (
-          <MapaProfesionales profesionales={filtrados} centro={ubicacion ?? (soloPotosi ? POTOSI : null)} />
+          <MapaProfesionales
+            profesionales={filtrados.map((p) => ({ ...p, rubroLabel: buscarRubro(p.rubro)?.label }))}
+            centro={ubicacion ?? (soloPotosi ? POTOSI : null)}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {filtrados.map((p) => (
@@ -257,7 +315,7 @@ export default function ServiciosPage() {
                 </div>
                 <div className="flex-1 py-1 flex flex-col justify-center min-w-0">
                   <div className="font-body text-[11px] text-inksoft mb-0.5">
-                    {RUBROS.find((r) => r.id === p.rubro)?.label || p.rubro}
+                    {buscarRubro(p.rubro)?.label || p.rubro}
                   </div>
                   <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
                   <div className="font-body text-sm font-bold text-ink mb-1">

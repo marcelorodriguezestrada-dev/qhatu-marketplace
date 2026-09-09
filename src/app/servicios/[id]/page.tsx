@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ServiceIcon, RUBROS } from '@/components/ServiceIcon'
+import { ServiceIcon } from '@/components/ServiceIcon'
 import { useAuth } from '@/lib/auth'
+import { useCategorias } from '@/lib/useCategorias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -23,6 +24,7 @@ export default function PerfilProfesionalPage() {
   const params = useParams()
   const id = params?.id as string
   const { usuario, obtenerToken } = useAuth()
+  const { buscarRubro } = useCategorias()
   const [perfil, setPerfil] = useState<any>(null)
   const [cargando, setCargando] = useState(true)
   const [calificacion, setCalificacion] = useState(5)
@@ -74,9 +76,25 @@ export default function PerfilProfesionalPage() {
     `Hola ${perfil.nombre}, te vi en Clasi Click y quería consultarte por tus servicios.`
   )}`
 
+  const rubroInfo = buscarRubro(perfil.rubro)
+
   return (
     <div className="max-w-[880px] mx-auto px-5 py-8">
-      <Link href="/servicios" className="font-body text-[13px] text-inksoft mb-5 inline-block">← Volver al directorio</Link>
+      <div className="flex items-center gap-1.5 flex-wrap font-body text-[13px] text-inksoft mb-5">
+        <Link href="/servicios" className="hover:underline">Servicios</Link>
+        {rubroInfo && (
+          <>
+            <span className="text-line">›</span>
+            <Link href={`/servicios?categoria=${rubroInfo.categoriaId}`} className="hover:underline">
+              {rubroInfo.categoriaLabel}
+            </Link>
+            <span className="text-line">›</span>
+            <Link href={`/servicios?categoria=${rubroInfo.categoriaId}&rubro=${rubroInfo.id}`} className="hover:underline">
+              {rubroInfo.label}
+            </Link>
+          </>
+        )}
+      </div>
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 300px' }}>
         <div>
@@ -150,7 +168,7 @@ export default function PerfilProfesionalPage() {
         <div>
           <div className="bg-panel border border-line rounded-xl p-5 mb-4">
             <div className="font-body text-[11px] text-inksoft mb-1">
-              {RUBROS.find((r: any) => r.id === perfil.rubro)?.label || perfil.rubro}
+              {rubroInfo?.label || perfil.rubro}
             </div>
             <div className="font-display text-lg font-bold text-ink mb-2 leading-snug">{perfil.nombre}</div>
             <div className="font-display text-xl font-bold text-ink mb-3">
