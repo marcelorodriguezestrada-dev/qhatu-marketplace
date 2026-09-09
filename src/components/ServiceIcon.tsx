@@ -1,3 +1,5 @@
+import { CATEGORIAS_BASE } from '@/data/categorias'
+
 const PATHS: Record<string, string> = {
   abogado: 'M12 3v18 M7 6h10 M5 6l3 6a3 3 0 006 0l-3-6z M19 6l-3 6a3 3 0 006 0l-3-6z',
   contador: 'M4 3h16v18H4z M8 7h8 M8 11h8 M8 15h5',
@@ -30,8 +32,6 @@ export function ServiceIcon({ kind, size = 34 }: { kind: string; size?: number }
 // armar un selector completo por categorías, usar `useCategorias()`
 // (src/lib/useCategorias.ts), que trae la taxonomía real (base +
 // lo agregado) desde /api/categorias.
-import { CATEGORIAS_BASE } from '@/data/categorias'
-
 export const RUBROS = CATEGORIAS_BASE.flatMap((c) => c.rubros).sort((a, b) =>
   a.id === 'otro' ? 1 : b.id === 'otro' ? -1 : a.label.localeCompare(b.label, 'es')
 )
