@@ -81,6 +81,9 @@ export default function AdminPage() {
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
   const [publicando, setPublicando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
+  // null = formulario en modo "publicar nuevo". Con un id, el mismo
+  // formulario pasa a modo edición de ese profesional ya existente.
+  const [profesionalEditandoId, setProfesionalEditandoId] = useState<string | null>(null)
 
   // Pestaña "Categorías": alta de categoría nueva, alta de rubro dentro
   // de una categoría, y reubicar un rubro existente a otra categoría.
@@ -273,17 +276,22 @@ export default function AdminPage() {
     }
     setPublicando(true)
     try {
-      const res = await fetch('/api/profesionales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({
-          nombre, rubro, descripcion, zona,
-          lat: lat || null, lng: lng || null,
-          whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
-          precio: precio || null,
-          experiencia,
-        }),
-      })
+      const datos = {
+        nombre, rubro, descripcion, zona,
+        lat: lat || null, lng: lng || null,
+        whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
+        precio: precio || null,
+        experiencia,
+      }
+      const editando = !!profesionalEditandoId
+      const res = await fetch(
+        editando ? `/api/profesionales/${profesionalEditandoId}` : '/api/profesionales',
+        {
+          method: editando ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+          body: JSON.stringify(datos),
+        }
+      )
       const data = await res.json()
       if (data.error) {
         setErrorForm(data.error)
@@ -291,10 +299,43 @@ export default function AdminPage() {
       }
       setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional('')
+      setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
       setPublicando(false)
     }
+  }
+
+  // Carga los datos de un profesional ya existente en el mismo
+  // formulario de arriba (que pasa a modo "edición"), para poder
+  // corregir cualquier dato sin tener que borrarlo y volver a cargarlo.
+  function abrirEditarProfesional(p: any) {
+    setProfesionalEditandoId(p.id)
+    setNombre(p.nombre || '')
+    const rubroInfo = buscarRubro(p.rubro)
+    setCategoriaSel(rubroInfo?.categoriaId || categorias[0]?.id || '')
+    setRubro(p.rubro || '')
+    setDescripcion(p.descripcion || '')
+    setZona(p.zona || '')
+    setLat(p.lat != null ? String(p.lat) : '')
+    setLng(p.lng != null ? String(p.lng) : '')
+    setWhatsapp(p.whatsapp || '')
+    setInstagram(p.instagram || '')
+    setEmailProfesional(p.email || '')
+    setIcono(p.icono || ICONOS_SERVICIO[0])
+    setImagenUrl(p.imagenUrl || '')
+    setPrecio(p.precio != null ? String(p.precio) : '')
+    setExperiencia(p.experiencia || '')
+    setPlan(p.plan === 'premium' ? 'premium' : 'basico')
+    setErrorForm('')
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelarEdicionProfesional() {
+    setProfesionalEditandoId(null)
+    setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
+    setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional('')
+    setErrorForm('')
   }
 
   function borrarProfesional(id: string) {
@@ -585,7 +626,20 @@ export default function AdminPage() {
       {tab === 'servicios' && (
         <div>
           <form onSubmit={publicarProfesional} className="bg-panel border border-line rounded-xl p-5 mb-8">
-            <div className="font-body text-sm font-semibold text-ink mb-3">Nuevo profesional</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-body text-sm font-semibold text-ink">
+                {profesionalEditandoId ? 'Editando profesional' : 'Nuevo profesional'}
+              </div>
+              {profesionalEditandoId && (
+                <button
+                  type="button"
+                  onClick={cancelarEdicionProfesional}
+                  className="font-body text-xs text-inksoft underline"
+                >
+                  Cancelar edición
+                </button>
+              )}
+            </div>
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -739,7 +793,7 @@ export default function AdminPage() {
               disabled={publicando || subiendoImagen}
               className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
             >
-              {publicando ? 'Publicando...' : 'Publicar profesional'}
+              {publicando ? (profesionalEditandoId ? 'Guardando...' : 'Publicando...') : (profesionalEditandoId ? 'Guardar cambios' : 'Publicar profesional')}
             </button>
           </form>
 
@@ -811,6 +865,12 @@ export default function AdminPage() {
                         className="px-3.5 py-1.5 rounded-md border border-ochre font-body text-xs text-ochre"
                       >
                         Pedir más info
+                      </button>
+                      <button
+                        onClick={() => abrirEditarProfesional(p)}
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-teal"
+                      >
+                        Editar
                       </button>
                       <button
                         onClick={() => cambiarEstadoProfesional(p.id, 'rechazado')}
@@ -894,6 +954,12 @@ export default function AdminPage() {
                         Aprobar y publicar
                       </button>
                       <button
+                        onClick={() => abrirEditarProfesional(p)}
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-teal"
+                      >
+                        Editar
+                      </button>
+                      <button
                         onClick={() => cambiarEstadoProfesional(p.id, 'pendiente_revision')}
                         className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft"
                       >
@@ -930,6 +996,12 @@ export default function AdminPage() {
                   {buscarRubro(p.rubro)?.label} · {p.zona} · {p.plan === 'premium' ? 'Premium' : 'Básico'}
                 </div>
               </div>
+              <button
+                onClick={() => abrirEditarProfesional(p)}
+                className="font-body text-xs text-teal underline shrink-0"
+              >
+                Editar
+              </button>
               <button
                 onClick={() => borrarProfesional(p.id)}
                 className="font-body text-xs text-maroon underline shrink-0"

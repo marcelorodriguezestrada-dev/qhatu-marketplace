@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, descripcion, zona, whatsapp, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
+    const { estado, nombre, rubro, descripcion, zona, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -52,7 +52,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (rubro !== undefined) cambios.rubro = rubro
     if (descripcion !== undefined) cambios.descripcion = descripcion
     if (zona !== undefined) cambios.zona = zona
+    if (lat !== undefined) cambios.lat = lat === '' || lat === null ? null : Number(lat)
+    if (lng !== undefined) cambios.lng = lng === '' || lng === null ? null : Number(lng)
     if (whatsapp !== undefined) cambios.whatsapp = whatsapp
+    if (instagram !== undefined) cambios.instagram = instagram
     if (email !== undefined) cambios.email = email
     // Nota interna del admin sobre qué le pidió al profesional y está
     // esperando (ej. "le pedí una foto mejor, quedé de escribirle el viernes").
