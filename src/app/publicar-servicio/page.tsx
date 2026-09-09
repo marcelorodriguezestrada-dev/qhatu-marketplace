@@ -21,6 +21,7 @@ export default function PublicarServicioPage() {
   const [zonaPersonalizada, setZonaPersonalizada] = useState('')
   const [zonasExtra, setZonasExtra] = useState<string[]>([])
   const [whatsapp, setWhatsapp] = useState('')
+  const [email, setEmail] = useState('')
   const [instagram, setInstagram] = useState('')
   const [precio, setPrecio] = useState('')
   const [experiencia, setExperiencia] = useState('')
@@ -89,6 +90,10 @@ export default function PublicarServicioPage() {
       setError(validacion.motivo || 'Revisá tu número de WhatsApp.')
       return
     }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Revisá tu email, no parece válido (o dejalo vacío).')
+      return
+    }
     setEnviando(true)
     try {
       const token = await obtenerToken()
@@ -96,7 +101,7 @@ export default function PublicarServicioPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, precio, experiencia,
+          nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -213,6 +218,16 @@ export default function PublicarServicioPage() {
           placeholder="Tu WhatsApp (ej: 71234567, sin +591)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          placeholder="Tu email (opcional)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-1"
+        />
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          El WhatsApp sigue siendo el contacto principal — el email es solo por si preferimos escribirte por ahí para algo puntual.
+        </div>
         <input
           value={instagram}
           onChange={(e) => setInstagram(e.target.value)}

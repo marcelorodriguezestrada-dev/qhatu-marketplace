@@ -39,11 +39,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, descripcion, zona, whatsapp, icono, plan, imagenUrl, precio, experiencia } = body
+    const { estado, nombre, rubro, descripcion, zona, whatsapp, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
-      if (!['pendiente_revision', 'aprobado', 'rechazado'].includes(estado)) {
+      if (!['pendiente_revision', 'info_solicitada', 'aprobado', 'rechazado'].includes(estado)) {
         return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
       }
       cambios.estado = estado
@@ -53,6 +53,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (descripcion !== undefined) cambios.descripcion = descripcion
     if (zona !== undefined) cambios.zona = zona
     if (whatsapp !== undefined) cambios.whatsapp = whatsapp
+    if (email !== undefined) cambios.email = email
+    // Nota interna del admin sobre qué le pidió al profesional y está
+    // esperando (ej. "le pedí una foto mejor, quedé de escribirle el viernes").
+    // No se le manda automáticamente a nadie — es solo para que quede
+    // registrado en vez de perderse en la cabeza del admin.
+    if (notaAdmin !== undefined) cambios.notaAdmin = notaAdmin
     if (icono !== undefined) cambios.icono = icono
     if (plan !== undefined) cambios.plan = plan === 'premium' ? 'premium' : 'basico'
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl

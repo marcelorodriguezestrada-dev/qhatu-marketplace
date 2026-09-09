@@ -57,6 +57,12 @@ export default function AdminPage() {
 
   // Formulario de alta de profesional
   const [nombre, setNombre] = useState('')
+  const [emailProfesional, setEmailProfesional] = useState('')
+  // Id de la solicitud para la que se está escribiendo la nota de "pedir
+  // más info" en este momento (null = ninguna abierta), y el texto que
+  // se va tipeando ahí.
+  const [pidiendoInfoId, setPidiendoInfoId] = useState<string | null>(null)
+  const [notaPidiendoInfo, setNotaPidiendoInfo] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0].id)
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState('')
@@ -252,7 +258,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           nombre, rubro, descripcion, zona,
           lat: lat || null, lng: lng || null,
-          whatsapp, instagram, icono, plan, imagenUrl,
+          whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
           precio: precio || null,
           experiencia,
         }),
@@ -263,7 +269,7 @@ export default function AdminPage() {
         return
       }
       setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
-      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram('')
+      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional('')
       cargarProfesionales()
     } finally {
       setPublicando(false)
@@ -277,11 +283,15 @@ export default function AdminPage() {
     }).then(() => cargarProfesionales())
   }
 
-  function cambiarEstadoProfesional(id: string, estado: 'aprobado' | 'rechazado') {
+  function cambiarEstadoProfesional(
+    id: string,
+    estado: 'aprobado' | 'rechazado' | 'info_solicitada' | 'pendiente_revision',
+    notaAdmin?: string
+  ) {
     fetch(`/api/profesionales/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ estado }),
+      body: JSON.stringify(notaAdmin !== undefined ? { estado, notaAdmin } : { estado }),
     }).then(() => cargarProfesionales())
   }
 
@@ -584,6 +594,13 @@ export default function AdminPage() {
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <input
+              value={emailProfesional}
+              onChange={(e) => setEmailProfesional(e.target.value)}
+              type="email"
+              placeholder="Email (opcional)"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
+            <input
               value={instagram}
               onChange={(e) => setInstagram(e.target.value)}
               placeholder="Instagram u otra red social (opcional)"
@@ -631,6 +648,7 @@ export default function AdminPage() {
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   <div className="font-body text-xs text-inksoft mb-1">
                     {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {p.email && <> · Email: {p.email}</>}
                   </div>
                   {p.descripcion && <div className="font-body text-xs text-ink mb-2">{p.descripcion}</div>}
                   <div className="font-body text-[11px] text-inksoft mb-2">
@@ -638,20 +656,144 @@ export default function AdminPage() {
                     {p.experiencia && ` · Experiencia: ${p.experiencia}`}
                   </div>
                   <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => cambiarEstadoProfesional(p.id, 'aprobado')}
-                      className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
-                    >
-                      Aprobar y publicar
-                    </button>
-                    <button
-                      onClick={() => cambiarEstadoProfesional(p.id, 'rechazado')}
-                      className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
-                    >
-                      Rechazar
-                    </button>
+
+                  {pidiendoInfoId === p.id ? (
+                    <div className="mt-3">
+                      <textarea
+                        value={notaPidiendoInfo}
+                        onChange={(e) => setNotaPidiendoInfo(e.target.value)}
+                        placeholder="¿Qué le pediste? (ej: le pedí una foto más clara, quedé de escribirle el viernes)"
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-md border border-line font-body text-xs mb-2"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            cambiarEstadoProfesional(p.id, 'info_solicitada', notaPidiendoInfo)
+                            setPidiendoInfoId(null)
+                            setNotaPidiendoInfo('')
+                          }}
+                          className="px-3.5 py-1.5 rounded-md border-none bg-ochre text-white font-body text-xs font-semibold"
+                        >
+                          Guardar y marcar en espera
+                        </button>
+                        <button
+                          onClick={() => { setPidiendoInfoId(null); setNotaPidiendoInfo('') }}
+                          className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      <button
+                        onClick={() => cambiarEstadoProfesional(p.id, 'aprobado')}
+                        className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
+                      >
+                        Aprobar y publicar
+                      </button>
+                      <button
+                        onClick={() => { setPidiendoInfoId(p.id); setNotaPidiendoInfo(p.notaAdmin || '') }}
+                        className="px-3.5 py-1.5 rounded-md border border-ochre font-body text-xs text-ochre"
+                      >
+                        Pedir más info
+                      </button>
+                      <button
+                        onClick={() => cambiarEstadoProfesional(p.id, 'rechazado')}
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {profesionales.filter((p) => p.estado === 'info_solicitada').length > 0 && (
+            <div className="mb-8">
+              <div className="font-body text-sm font-semibold text-indigo-600 mb-3">
+                ⏳ Esperando respuesta ({profesionales.filter((p) => p.estado === 'info_solicitada').length})
+              </div>
+              {profesionales
+                .filter((p) => p.estado === 'info_solicitada')
+                .map((p) => (
+                <div key={p.id} className="bg-panel border border-indigo-200 rounded-lg p-4 mb-3">
+                  <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
+                  <div className="font-body text-xs text-inksoft mb-1">
+                    {RUBROS.find((r) => r.id === p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {p.email && <> · Email: {p.email}</>}
                   </div>
+                  {p.notaAdmin && (
+                    <div className="font-body text-xs text-indigo-700 bg-indigo-50 rounded-md px-2.5 py-2 mb-2">
+                      📝 {p.notaAdmin}
+                    </div>
+                  )}
+                  {pidiendoInfoId === p.id ? (
+                    <div className="mt-1">
+                      <textarea
+                        value={notaPidiendoInfo}
+                        onChange={(e) => setNotaPidiendoInfo(e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-md border border-line font-body text-xs mb-2"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            cambiarEstadoProfesional(p.id, 'info_solicitada', notaPidiendoInfo)
+                            setPidiendoInfoId(null)
+                            setNotaPidiendoInfo('')
+                          }}
+                          className="px-3.5 py-1.5 rounded-md border-none bg-indigo-600 text-white font-body text-xs font-semibold"
+                        >
+                          Actualizar nota
+                        </button>
+                        <button
+                          onClick={() => { setPidiendoInfoId(null); setNotaPidiendoInfo('') }}
+                          className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 flex-wrap">
+                      <a
+                        href={`https://wa.me/${p.whatsapp}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-teal"
+                      >
+                        💬 Escribirle de nuevo
+                      </a>
+                      <button
+                        onClick={() => { setPidiendoInfoId(p.id); setNotaPidiendoInfo(p.notaAdmin || '') }}
+                        className="px-3.5 py-1.5 rounded-md border border-indigo-200 font-body text-xs text-indigo-600"
+                      >
+                        Editar nota
+                      </button>
+                      <button
+                        onClick={() => cambiarEstadoProfesional(p.id, 'aprobado')}
+                        className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold"
+                      >
+                        Aprobar y publicar
+                      </button>
+                      <button
+                        onClick={() => cambiarEstadoProfesional(p.id, 'pendiente_revision')}
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft"
+                      >
+                        Volver a pendiente
+                      </button>
+                      <button
+                        onClick={() => cambiarEstadoProfesional(p.id, 'rechazado')}
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

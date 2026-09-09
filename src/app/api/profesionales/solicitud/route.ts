@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, precio, experiencia, lat, lng } = body
+    const { nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia, lat, lng } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validacionWhatsapp.motivo }, { status: 400 })
     }
     const whatsappCompleto = numeroLocalABolivia(whatsapp)
+
+    // El email es opcional (el contacto principal sigue siendo WhatsApp),
+    // pero si escribió algo, que al menos tenga forma de email.
+    const emailLimpio = (email || '').trim()
+    if (emailLimpio && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpio)) {
+      return NextResponse.json({ error: 'El email no parece válido. Dejalo vacío si preferís que te contactemos solo por WhatsApp.' }, { status: 400 })
+    }
 
     const db = getDb()
 
@@ -106,6 +113,7 @@ export async function POST(req: NextRequest) {
       lng: lng != null ? Number(lng) : null,
       whatsapp: whatsappCompleto,
       instagram: instagram || '',
+      email: emailLimpio,
       icono: rubroFinal,
       imagenUrl: '',
       precio: precio ? Number(precio) : null,
