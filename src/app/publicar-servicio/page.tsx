@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { RUBROS } from '@/components/ServiceIcon'
+import { ZONAS_POTOSI } from '@/data/zonasPotosi'
 import { useAuth } from '@/lib/auth'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
@@ -13,8 +14,12 @@ export default function PublicarServicioPage() {
 
   const [nombre, setNombre] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0].id)
+  const [rubroPersonalizado, setRubroPersonalizado] = useState('')
+  const [rubrosExtra, setRubrosExtra] = useState<{ id: string; label: string }[]>([])
   const [descripcion, setDescripcion] = useState('')
-  const [zona, setZona] = useState('')
+  const [zona, setZona] = useState(ZONAS_POTOSI[0])
+  const [zonaPersonalizada, setZonaPersonalizada] = useState('')
+  const [zonasExtra, setZonasExtra] = useState<string[]>([])
   const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState('')
   const [precio, setPrecio] = useState('')
@@ -24,6 +29,19 @@ export default function PublicarServicioPage() {
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState('')
+
+  // Categorías y zonas que otros usuarios ya agregaron a mano —
+  // se suman a la lista base para que no haga falta reescribirlas.
+  useEffect(() => {
+    fetch('/api/rubros-personalizados')
+      .then((r) => r.json())
+      .then((d) => setRubrosExtra(d.rubros || []))
+      .catch(() => {})
+    fetch('/api/zonas-personalizadas')
+      .then((r) => r.json())
+      .then((d) => setZonasExtra(d.zonas || []))
+      .catch(() => {})
+  }, [])
 
   // Dar de alta un servicio requiere estar logueado — así se evita que
   // cualquiera publique perfiles falsos sin ninguna cuenta detrás.
@@ -58,6 +76,14 @@ export default function PublicarServicioPage() {
       setError('Completá tu nombre o el de tu negocio.')
       return
     }
+    if (rubro === 'otro' && !rubroPersonalizado.trim()) {
+      setError('Escribí el nombre de tu categoría.')
+      return
+    }
+    if (zona === 'otra' && !zonaPersonalizada.trim()) {
+      setError('Escribí el nombre de tu zona.')
+      return
+    }
     const validacion = validarWhatsappBoliviano(whatsapp)
     if (!validacion.valido) {
       setError(validacion.motivo || 'Revisá tu número de WhatsApp.')
@@ -70,7 +96,7 @@ export default function PublicarServicioPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          nombre, rubro, descripcion, zona, whatsapp, instagram, precio, experiencia,
+          nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -122,10 +148,22 @@ export default function PublicarServicioPage() {
           onChange={(e) => setRubro(e.target.value)}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
         >
-          {RUBROS.map((r) => (
+          {RUBROS.filter((r) => r.id !== 'otro').map((r) => (
             <option key={r.id} value={r.id}>{r.label}</option>
           ))}
+          {rubrosExtra.map((r) => (
+            <option key={r.id} value={r.id}>{r.label}</option>
+          ))}
+          <option value="otro">Otra categoría (especificar)</option>
         </select>
+        {rubro === 'otro' && (
+          <input
+            value={rubroPersonalizado}
+            onChange={(e) => setRubroPersonalizado(e.target.value)}
+            placeholder="¿Cuál es tu categoría? (ej: Jardinero)"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+          />
+        )}
         <textarea
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
@@ -133,12 +171,27 @@ export default function PublicarServicioPage() {
           rows={3}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
-        <input
+        <select
           value={zona}
           onChange={(e) => setZona(e.target.value)}
-          placeholder="Zona / barrio (ej: Sopocachi, La Paz)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
+        >
+          {ZONAS_POTOSI.map((z) => (
+            <option key={z} value={z}>{z}</option>
+          ))}
+          {zonasExtra.map((z) => (
+            <option key={z} value={z}>{z}</option>
+          ))}
+          <option value="otra">Otra zona (especificar)</option>
+        </select>
+        {zona === 'otra' && (
+          <input
+            value={zonaPersonalizada}
+            onChange={(e) => setZonaPersonalizada(e.target.value)}
+            placeholder="¿Cuál es tu zona/barrio?"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+          />
+        )}
 
         <div className="mb-3">
           <button

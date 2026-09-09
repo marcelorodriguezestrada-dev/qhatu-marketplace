@@ -61,7 +61,7 @@ export function ProductCard({ p }: { p: Producto }) {
             alt={p.nombre}
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain p-2"
             onError={() => setImagenRota(true)}
           />
         ) : (

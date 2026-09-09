@@ -5,6 +5,21 @@ import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhat
 
 export const dynamic = 'force-dynamic'
 
+// Convierte "Jardinero a domicilio" en "jardinero-a-domicilio" — así usamos
+// el mismo texto como id del documento en Firestore: si dos personas
+// escriben la misma categoría (con distintas mayúsculas/tildes), se
+// pisan entre sí en vez de crear duplicados.
+function slugify(texto: string) {
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+}
+
 // POST — formulario que llena un profesional que quiere aparecer en el
 // directorio. Requiere estar logueado (evita perfiles falsos sin
 // ninguna cuenta detrás). Queda guardado con estado
@@ -21,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, descripcion, zona, whatsapp, instagram, precio, experiencia, lat, lng } = body
+    const { nombre, rubro, rubroPersonalizado, descripcion, zona, zonaPersonalizada, whatsapp, instagram, precio, experiencia, lat, lng } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -32,26 +47,66 @@ export async function POST(req: NextRequest) {
     }
     const whatsappCompleto = numeroLocalABolivia(whatsapp)
 
+    const db = getDb()
+
+    // Igual que con el rubro: si escribió una zona nueva que no estaba
+    // en la lista, la guardamos para que aparezca como opción de acá
+    // en más para cualquier usuario.
+    let zonaFinal = zona || ''
+    if (zona === 'otra' && zonaPersonalizada?.trim()) {
+      const zonaLimpia = zonaPersonalizada.trim()
+      zonaFinal = zonaLimpia
+      const slug = zonaLimpia
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40)
+      if (slug) {
+        await db.collection('zonas_personalizadas').doc(slug).set(
+          { label: zonaLimpia, createdAt: new Date().toISOString() },
+          { merge: true }
+        )
+      }
+    }
+
+    // Si eligió "Otro" y escribió una categoría nueva, la guardamos
+    // (una sola vez, gracias al slug como id) para que de acá en más
+    // aparezca como opción en el selector para cualquier usuario.
+    let rubroFinal = rubro
+    let rubroLabel = ''
+    if (rubro === 'otro' && rubroPersonalizado?.trim()) {
+      const slug = slugify(rubroPersonalizado)
+      if (slug) {
+        rubroFinal = slug
+        rubroLabel = rubroPersonalizado.trim()
+        await db.collection('rubros_personalizados').doc(slug).set(
+          { label: rubroLabel, createdAt: new Date().toISOString() },
+          { merge: true }
+        )
+      }
+    }
+
     // Pre-filtro de moderación con IA — solo etiqueta el riesgo para
     // ayudarte a priorizar en la cola de /admin, nunca aprueba o
     // rechaza por su cuenta.
     const moderacionIA = await evaluarConIA(
-      `Solicitud de profesional.\nNombre: ${nombre}\nRubro: ${rubro}\nZona: ${zona || 'no especificada'}\n` +
+      `Solicitud de profesional.\nNombre: ${nombre}\nRubro: ${rubroLabel || rubro}\nZona: ${zonaFinal || 'no especificada'}\n` +
       `Descripción: ${descripcion || '(sin descripción)'}\n` +
       `Precio: ${precio ? `Bs ${precio}` : 'a convenir'}\nExperiencia declarada: ${experiencia || 'no especificada'}`
     )
 
-    const db = getDb()
     const ref = await db.collection('profesionales').add({
       nombre,
-      rubro,
+      rubro: rubroFinal,
       descripcion: descripcion || '',
-      zona: zona || '',
+      zona: zonaFinal,
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,
       whatsapp: whatsappCompleto,
       instagram: instagram || '',
-      icono: rubro,
+      icono: rubroFinal,
       imagenUrl: '',
       precio: precio ? Number(precio) : null,
       experiencia: experiencia || '',
@@ -71,3 +126,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No se pudo enviar la solicitud.' }, { status: 500 })
   }
 }
+
