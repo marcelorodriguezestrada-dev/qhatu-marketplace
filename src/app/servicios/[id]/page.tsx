@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ServiceIcon } from '@/components/ServiceIcon'
 import { useAuth } from '@/lib/auth'
 import { useCategorias } from '@/lib/useCategorias'
 
@@ -98,14 +97,6 @@ export default function PerfilProfesionalPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
         <div className="order-2 md:order-1 min-w-0">
-          <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[200px] sm:h-[340px] mb-6">
-              {perfil.imagenUrl ? (
-              <img src={perfil.imagenUrl} alt={perfil.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-            ) : (
-              <ServiceIcon kind={perfil.icono} size={72} />
-            )}
-          </div>
-
           {perfil.descripcion && (
             <>
               <div className="font-display text-lg font-bold text-ink mb-2">Descripción</div>
