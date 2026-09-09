@@ -175,15 +175,25 @@ export default function ProductoDetallePage() {
             </div>
 
             <div>
-              <div className="font-body text-xs text-inksoft mb-1 flex items-center gap-1.5">
-                {(tienda?.logoUrl || producto.tiendaLogoUrl) && (
-                  <img
-                    src={tienda?.logoUrl || producto.tiendaLogoUrl}
-                    alt=""
-                    className="w-4 h-4 rounded-full object-cover"
-                  />
+              <div className="font-body text-xs text-inksoft mb-1 flex items-center gap-1.5 flex-wrap">
+                <span>{producto.categoria} ·</span>
+                {producto.vendedorId ? (
+                  <Link
+                    href={`/tienda/${producto.vendedorId}`}
+                    className="inline-flex items-center gap-1.5 text-ink font-semibold hover:underline"
+                  >
+                    {(tienda?.logoUrl || producto.tiendaLogoUrl) && (
+                      <img
+                        src={tienda?.logoUrl || producto.tiendaLogoUrl}
+                        alt=""
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
+                    )}
+                    {tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}
+                  </Link>
+                ) : (
+                  <span>{tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}</span>
                 )}
-                {producto.categoria} · {tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}
                 {tienda?.verificado && (
                   <span className="inline-flex items-center gap-1 text-teal font-semibold">
                     ✓ Verificado
@@ -306,10 +316,20 @@ export default function ProductoDetallePage() {
               <img src={tienda.logoUrl} alt={producto.vendedor} className="w-14 h-14 rounded-full object-cover border border-line" />
             )}
             <div>
-              <div className="font-display text-lg font-bold text-ink flex items-center gap-1.5">
-                {tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}
-                {tienda?.verificado && <span className="text-teal text-sm">✓</span>}
-              </div>
+              {producto.vendedorId ? (
+                <Link
+                  href={`/tienda/${producto.vendedorId}`}
+                  className="font-display text-lg font-bold text-ink flex items-center gap-1.5 hover:underline"
+                >
+                  {tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}
+                  {tienda?.verificado && <span className="text-teal text-sm">✓</span>}
+                </Link>
+              ) : (
+                <div className="font-display text-lg font-bold text-ink flex items-center gap-1.5">
+                  {tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor}
+                  {tienda?.verificado && <span className="text-teal text-sm">✓</span>}
+                </div>
+              )}
               {tienda?.direccion && <div className="font-body text-xs text-inksoft">{tienda.direccion}</div>}
             </div>
           </div>
