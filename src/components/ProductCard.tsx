@@ -9,10 +9,6 @@ import { useCarrito } from '@/lib/store'
 import { useFavoritos } from '@/lib/favoritos'
 import { useAuth } from '@/lib/auth'
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
-}
-
 function esNuevo(createdAt?: string) {
   if (!createdAt) return false
   const dias = (Date.now() - new Date(createdAt).getTime()) / 86400000
@@ -108,17 +104,20 @@ export function ProductCard({ p }: { p: Producto }) {
           <div className="font-body text-[12px] text-inksoft mb-2 truncate">{p.descripcionCorta}</div>
         )}
 
-        {tieneDescuento && (
-          <div className="font-body text-[11px] sm:text-[12px] text-inksoft line-through mb-0.5">
-            {bs(p.precioOriginal as number)}
-          </div>
-        )}
-        <div className="flex items-baseline gap-1.5 mb-2 sm:mb-3 flex-wrap">
-          <span className="font-display text-[16px] sm:text-[19px] font-bold text-ink">{bs(p.precio)}</span>
+        {/* A propósito no se muestra ningún precio acá en la grilla — la
+            idea por ahora es generar curiosidad y que haga falta entrar
+            al producto para verlo. El precio real sigue mostrándose
+            en /producto/[id] y, obviamente, en el carrito antes de
+            pagar — no queda oculto en ningún momento de la compra. */}
+        <Link
+          href={`/producto/${p.id}`}
+          className="font-body text-[12px] sm:text-[13px] font-semibold text-maroon mb-2 sm:mb-3 inline-flex items-center gap-1 hover:underline"
+        >
+          Ver precio
           {tieneDescuento && (
-            <span className="font-body text-[11px] sm:text-[12px] font-semibold text-teal">{porcentajeOff}% OFF</span>
+            <span className="font-body text-[11px] sm:text-[12px] font-semibold text-teal">· {porcentajeOff}% OFF</span>
           )}
-        </div>
+        </Link>
 
         <button
           onClick={agregarAlCarrito}
