@@ -318,9 +318,9 @@ export default function ServiciosPage() {
                     {buscarRubro(p.rubro)?.label || p.rubro}
                   </div>
                   <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
-                  <div className="font-body text-sm font-bold text-ink mb-1">
-                    {p.precio ? bs(p.precio) : 'Precio a convenir'}
-                  </div>
+                  {p.precio ? (
+                    <div className="font-body text-sm font-bold text-ink mb-1">{bs(p.precio)}</div>
+                  ) : null}
                   <div className="font-body text-xs text-inksoft mb-1">{p.zona}</div>
                   {p.cantidadResenas > 0 ? (
                     <div className="flex items-center gap-1.5">

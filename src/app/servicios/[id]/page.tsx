@@ -96,8 +96,8 @@ export default function PerfilProfesionalPage() {
         )}
       </div>
 
-      <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 300px' }}>
-        <div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
+        <div className="order-2 md:order-1 min-w-0">
           <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[200px] sm:h-[340px] mb-6">
               {perfil.imagenUrl ? (
               <img src={perfil.imagenUrl} alt={perfil.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -165,15 +165,22 @@ export default function PerfilProfesionalPage() {
           )}
         </div>
 
-        <div>
+        <div className="order-1 md:order-2">
           <div className="bg-panel border border-line rounded-xl p-5 mb-4">
             <div className="font-body text-[11px] text-inksoft mb-1">
               {rubroInfo?.label || perfil.rubro}
             </div>
             <div className="font-display text-lg font-bold text-ink mb-2 leading-snug">{perfil.nombre}</div>
-            <div className="font-display text-xl font-bold text-ink mb-3">
-              {perfil.precio ? bs(perfil.precio) : 'Precio a convenir'}
-            </div>
+            {(perfil.zona || perfil.experiencia) && (
+              <div className="font-body text-xs text-inksoft mb-3">
+                {perfil.zona}
+                {perfil.zona && perfil.experiencia && ' · '}
+                {perfil.experiencia && `Experiencia: ${perfil.experiencia}`}
+              </div>
+            )}
+            {perfil.precio ? (
+              <div className="font-display text-xl font-bold text-ink mb-3">{bs(perfil.precio)}</div>
+            ) : null}
 
             {perfil.cantidadResenas > 0 ? (
               <div className="flex items-center gap-2 mb-3">
@@ -201,21 +208,10 @@ export default function PerfilProfesionalPage() {
                 href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink"
+                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink break-words"
               >
                 📷 {perfil.instagram.replace('https://instagram.com/', '').replace('@', '')}
               </a>
-            )}
-          </div>
-
-          <div className="bg-panel border border-line rounded-xl p-5">
-            <div className="font-body text-sm font-semibold text-ink mb-3">Información del profesional</div>
-            <div className="font-body text-sm text-ink mb-1">{perfil.nombre}</div>
-            {perfil.experiencia && (
-              <div className="font-body text-xs text-inksoft mb-1">Experiencia: {perfil.experiencia}</div>
-            )}
-            {perfil.zona && (
-              <div className="font-body text-xs text-inksoft">{perfil.zona}</div>
             )}
           </div>
         </div>
