@@ -16,8 +16,10 @@ type Profesional = {
   id: string
   nombre: string
   rubro: string
+  especialidad?: string
   descripcion: string
   zona: string
+  direccion?: string
   lat: number | null
   lng: number | null
   icono: string
@@ -315,13 +317,13 @@ export default function ServiciosPage() {
                 </div>
                 <div className="flex-1 py-1 flex flex-col justify-center min-w-0">
                   <div className="font-body text-[11px] text-inksoft mb-0.5">
-                    {buscarRubro(p.rubro)?.label || p.rubro}
+                    {p.especialidad || buscarRubro(p.rubro)?.label || p.rubro}
                   </div>
                   <div className="font-display text-base font-semibold text-ink mb-1 truncate">{p.nombre}</div>
                   {p.precio ? (
                     <div className="font-body text-sm font-bold text-ink mb-1">{bs(p.precio)}</div>
                   ) : null}
-                  <div className="font-body text-xs text-inksoft mb-1">{p.zona}</div>
+                  {p.zona && <div className="font-body text-xs text-inksoft mb-1">Zona: {p.zona}</div>}
                   {p.cantidadResenas > 0 ? (
                     <div className="flex items-center gap-1.5">
                       <Estrellas valor={p.ratingPromedio} />

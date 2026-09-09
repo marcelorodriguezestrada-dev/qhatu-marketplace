@@ -67,8 +67,10 @@ export default function AdminPage() {
   const [notaPidiendoInfo, setNotaPidiendoInfo] = useState('')
   const [rubro, setRubro] = useState('')
   const [categoriaSel, setCategoriaSel] = useState('')
+  const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState('')
+  const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
@@ -277,7 +279,7 @@ export default function AdminPage() {
     setPublicando(true)
     try {
       const datos = {
-        nombre, rubro, descripcion, zona,
+        nombre, rubro, especialidad, descripcion, zona, direccion,
         lat: lat || null, lng: lng || null,
         whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
@@ -297,8 +299,8 @@ export default function AdminPage() {
         setErrorForm(data.error)
         return
       }
-      setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
-      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional('')
+      setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
+      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -315,8 +317,10 @@ export default function AdminPage() {
     const rubroInfo = buscarRubro(p.rubro)
     setCategoriaSel(rubroInfo?.categoriaId || categorias[0]?.id || '')
     setRubro(p.rubro || '')
+    setEspecialidad(p.especialidad || '')
     setDescripcion(p.descripcion || '')
     setZona(p.zona || '')
+    setDireccion(p.direccion || '')
     setLat(p.lat != null ? String(p.lat) : '')
     setLng(p.lng != null ? String(p.lng) : '')
     setWhatsapp(p.whatsapp || '')
@@ -333,8 +337,8 @@ export default function AdminPage() {
 
   function cancelarEdicionProfesional() {
     setProfesionalEditandoId(null)
-    setNombre(''); setDescripcion(''); setZona(''); setLat(''); setLng(''); setWhatsapp('')
-    setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional('')
+    setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
+    setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
     setErrorForm('')
   }
 
@@ -684,6 +688,12 @@ export default function AdminPage() {
                 <option value="premium">Plan premium (destacado)</option>
               </select>
             </div>
+            <input
+              value={especialidad}
+              onChange={(e) => setEspecialidad(e.target.value)}
+              placeholder="Especialidad (opcional, ej: Médico general - Ecografista)"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
             <textarea
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
@@ -731,13 +741,19 @@ export default function AdminPage() {
               />
             </div>
             <div className="font-body text-[11px] text-inksoft mb-3 -mt-2">
-              Si dejás el precio vacío, se muestra "Precio a convenir".
+              Si dejás el precio vacío, no se muestra ningún precio (hasta que el profesional lo pase por WhatsApp).
             </div>
 
             <input
               value={zona}
               onChange={(e) => setZona(e.target.value)}
               placeholder="Zona / barrio (ej: Sopocachi, La Paz)"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
+            <input
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Dirección (opcional, ej: Fortunato Gumiel)"
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <div className="grid grid-cols-2 gap-3 mb-3">

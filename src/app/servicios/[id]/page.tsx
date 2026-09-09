@@ -158,15 +158,17 @@ export default function PerfilProfesionalPage() {
 
         <div className="order-1 md:order-2">
           <div className="bg-panel border border-line rounded-xl p-5 mb-4">
-            <div className="font-body text-[11px] text-inksoft mb-1">
-              {rubroInfo?.label || perfil.rubro}
-            </div>
-            <div className="font-display text-lg font-bold text-ink mb-2 leading-snug">{perfil.nombre}</div>
-            {(perfil.zona || perfil.experiencia) && (
-              <div className="font-body text-xs text-inksoft mb-3">
-                {perfil.zona}
-                {perfil.zona && perfil.experiencia && ' · '}
-                {perfil.experiencia && `Experiencia: ${perfil.experiencia}`}
+            <div className="font-display text-lg font-bold text-ink mb-1 leading-snug">{perfil.nombre}</div>
+            {(perfil.especialidad || rubroInfo?.label || perfil.rubro) && (
+              <div className="font-body text-sm text-ink mb-2">
+                {perfil.especialidad || rubroInfo?.label || perfil.rubro}
+              </div>
+            )}
+            {(perfil.direccion || perfil.zona || perfil.experiencia) && (
+              <div className="font-body text-xs text-inksoft mb-3 space-y-0.5">
+                {perfil.direccion && <div>Dirección: {perfil.direccion}</div>}
+                {perfil.zona && <div>Zona: {perfil.zona}</div>}
+                {perfil.experiencia && <div>Experiencia: {perfil.experiencia}</div>}
               </div>
             )}
             {perfil.precio ? (

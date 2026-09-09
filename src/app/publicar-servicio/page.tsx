@@ -24,10 +24,12 @@ export default function PublicarServicioPage() {
   const [categoriaSel, setCategoriaSel] = useState('')
   const [rubro, setRubro] = useState('')
   const [rubroPersonalizado, setRubroPersonalizado] = useState('')
+  const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
   const [zonaPersonalizada, setZonaPersonalizada] = useState('')
   const [zonasExtra, setZonasExtra] = useState<string[]>([])
+  const [direccion, setDireccion] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [email, setEmail] = useState('')
   const [instagram, setInstagram] = useState('')
@@ -120,7 +122,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          descripcion, zona, zonaPersonalizada, whatsapp, instagram, email, precio, experiencia,
+          especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -199,6 +201,15 @@ export default function PublicarServicioPage() {
             className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
           />
         )}
+        <input
+          value={especialidad}
+          onChange={(e) => setEspecialidad(e.target.value)}
+          placeholder="Especialidad (opcional, ej: Médico general - Ecografista)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <div className="font-body text-[11px] text-inksoft mb-3 -mt-2">
+          Si lo dejás vacío, se muestra el rubro que elegiste arriba.
+        </div>
         <textarea
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
@@ -227,6 +238,12 @@ export default function PublicarServicioPage() {
             className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
           />
         )}
+        <input
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          placeholder="Dirección (opcional, ej: Fortunato Gumiel)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
 
         <div className="mb-3">
           <button

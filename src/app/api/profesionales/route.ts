@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, descripcion, zona, lat, lng, whatsapp, instagram, email, icono, plan, imagenUrl, precio, experiencia } = body
+    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, icono, plan, imagenUrl, precio, experiencia } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -54,8 +54,16 @@ export async function POST(req: NextRequest) {
     const ref = await db.collection('profesionales').add({
       nombre,
       rubro,
+      // Texto corto y libre para matizar el rubro fijo (ej: rubro
+      // "Médico" + especialidad "Médico general - Ecografista"). Si
+      // queda vacío, en el perfil se muestra directo el label del rubro.
+      especialidad: especialidad || '',
       descripcion: descripcion || '',
       zona: zona || '',
+      // Dirección puntual (calle/número), distinta de "zona" (el
+      // barrio). Las dos son opcionales y se muestran juntas en el
+      // perfil cuando están cargadas.
+      direccion: direccion || '',
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,
       whatsapp: whatsappCompleto,

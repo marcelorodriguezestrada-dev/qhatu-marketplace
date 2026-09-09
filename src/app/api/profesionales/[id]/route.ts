@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, descripcion, zona, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
+    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, imagenUrl, precio, experiencia } = body
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -50,8 +50,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (nombre !== undefined) cambios.nombre = nombre
     if (rubro !== undefined) cambios.rubro = rubro
+    if (especialidad !== undefined) cambios.especialidad = especialidad
     if (descripcion !== undefined) cambios.descripcion = descripcion
     if (zona !== undefined) cambios.zona = zona
+    if (direccion !== undefined) cambios.direccion = direccion
     if (lat !== undefined) cambios.lat = lat === '' || lat === null ? null : Number(lat)
     if (lng !== undefined) cambios.lng = lng === '' || lng === null ? null : Number(lng)
     if (whatsapp !== undefined) cambios.whatsapp = whatsapp
