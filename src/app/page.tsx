@@ -9,10 +9,10 @@ import { ProductCard } from '@/components/ProductCard'
 import { CartDrawer } from '@/components/CartDrawer'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
-
-const CATEGORIAS = ['Todo', 'Calzado', 'Ropa', 'Accesorios', 'Hogar']
+import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 
 export default function CatalogoPage() {
+  const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
   const [productos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
   const [categoria, setCategoria] = useState('Todo')
   const [busqueda, setBusqueda] = useState('')
@@ -33,7 +33,7 @@ export default function CatalogoPage() {
   }, [])
 
   const filtrados = productos.filter((p) => {
-    const matchCat = categoria === 'Todo' || p.categoria === categoria
+    const matchCat = categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.vendedor.toLowerCase().includes(busqueda.toLowerCase())
@@ -154,24 +154,30 @@ export default function CatalogoPage() {
         )}
 
         <div className="flex gap-2 mb-5 flex-wrap">
-          {CATEGORIAS.map((c) => (
+          <button
+            onClick={() => setCategoria('Todo')}
+            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+              categoria === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+            }`}
+          >
+            Todo
+          </button>
+          {categoriasProductos.map((c) => (
             <button
-              key={c}
+              key={c.id}
               onClick={() => {
-                setCategoria(c)
-                if (c !== 'Todo') {
-                  fetch('/api/analitica/categoria', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tipo: 'producto', valor: c }),
-                  }).catch(() => {})
-                }
+                setCategoria(c.id)
+                fetch('/api/analitica/categoria', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tipo: 'producto', valor: c.label }),
+                }).catch(() => {})
               }}
               className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                categoria === c ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                categoria === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
-              {c}
+              {c.label}
             </button>
           ))}
         </div>

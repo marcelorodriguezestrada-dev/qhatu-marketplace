@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { PRODUCTOS_SEED } from '@/data/productos'
+import { LEGACY_CATEGORIA_A_RUBRO } from '@/data/categoriasProductos'
 import { evaluarConIA } from '@/lib/moderacionIA'
 
 export const dynamic = 'force-dynamic'
@@ -24,6 +25,14 @@ export async function GET(req: NextRequest) {
     let productos = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
     // Asegurar que exista `thumbUrl` en la respuesta para optimizar listados
     productos = productos.map((p) => ({ ...p, thumbUrl: p.thumbUrl || p.imagenUrl || '' }))
+    // Compatibilidad: productos publicados antes de la clasificación por
+    // rubro no tienen `rubro`, solo el `categoria` viejo. Les asignamos
+    // el rubro "Otro ___" de esa misma categoría para no perderlos del
+    // filtro nuevo; el vendedor puede después editarlos y elegir uno
+    // más específico.
+    productos = productos.map((p) =>
+      p.rubro ? p : { ...p, rubro: LEGACY_CATEGORIA_A_RUBRO[p.categoria as string] || 'otro-producto' }
+    )
     if (!esAdmin) {
       productos = productos.filter((p) => p.estado !== 'rechazado' && p.estado !== 'oculto')
     }
@@ -50,8 +59,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, categoria, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
-    if (!nombre || !categoria || !precio) {
+    const { nombre, rubro, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    if (!nombre || !rubro || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
     const planValido = plan === 'premium' ? 'premium' : 'basico'
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
     // Pre-filtro de moderación con IA — no bloquea la publicación, solo
     // le pone una etiqueta de riesgo para priorizar tu revisión en /admin.
     const moderacionIA = await evaluarConIA(
-      `Producto: ${nombre}\nCategoría: ${categoria}\nPrecio: Bs ${precio}${precioOriginalValido ? ` (antes Bs ${precioOriginalValido})` : ''}`
+      `Producto: ${nombre}\nRubro: ${rubro}\nPrecio: Bs ${precio}${precioOriginalValido ? ` (antes Bs ${precioOriginalValido})` : ''}`
     )
 
     const db = getDb()
@@ -88,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const ref = await db.collection('productos').add({
       nombre,
-      categoria,
+      rubro,
       precio,
       precioOriginal: precioOriginalValido,
       icono: icono || 'shoe',

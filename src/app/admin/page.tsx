@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
+import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
@@ -58,8 +59,9 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
+  const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -119,6 +121,17 @@ export default function AdminPage() {
   const [guardandoRubro, setGuardandoRubro] = useState(false)
   const [renombrandoCategoriaId, setRenombrandoCategoriaId] = useState<string | null>(null)
   const [nuevoNombreCategoria, setNuevoNombreCategoria] = useState('')
+
+  // Pestaña "Categorías de productos": mismo esquema que la de
+  // servicios de arriba, pero contra /api/categorias-productos.
+  const [nuevaCategoriaProductoLabel, setNuevaCategoriaProductoLabel] = useState('')
+  const [guardandoCategoriaProducto, setGuardandoCategoriaProducto] = useState(false)
+  const [errorCategoriasProductos, setErrorCategoriasProductos] = useState('')
+  const [categoriaProductoAbierta, setCategoriaProductoAbierta] = useState<string | null>(null)
+  const [nuevoRubroProductoLabel, setNuevoRubroProductoLabel] = useState('')
+  const [guardandoRubroProducto, setGuardandoRubroProducto] = useState(false)
+  const [renombrandoCategoriaProductoId, setRenombrandoCategoriaProductoId] = useState<string | null>(null)
+  const [nuevoNombreCategoriaProducto, setNuevoNombreCategoriaProducto] = useState('')
 
   useEffect(() => {
     if (categorias.length === 0 || categoriaSel) return
@@ -229,7 +242,7 @@ export default function AdminPage() {
     setEditNombre(p.nombre || '')
     setEditPrecio(String(p.precio || ''))
     setEditPrecioOriginal(String(p.precioOriginal || ''))
-    setEditCategoria(p.categoria || '')
+    setEditCategoria(p.rubro || p.categoria || '')
     setEditDescCorta(p.descripcionCorta || '')
     setEditDescLarga(p.descripcionLarga || '')
     setEditTalles(Array.isArray(p.talles) ? p.talles.join(', ') : (p.talles || ''))
@@ -250,7 +263,7 @@ export default function AdminPage() {
         nombre: editNombre,
         precio: Number(editPrecio),
         precioOriginal: editPrecioOriginal ? Number(editPrecioOriginal) : null,
-        categoria: editCategoria,
+        rubro: editCategoria,
         descripcionCorta: editDescCorta,
         descripcionLarga: editDescLarga,
         talles: tallesArr,
@@ -438,6 +451,73 @@ export default function AdminPage() {
     recargarCategorias()
   }
 
+  async function crearCategoriaProducto(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nuevaCategoriaProductoLabel.trim()) return
+    setGuardandoCategoriaProducto(true)
+    setErrorCategoriasProductos('')
+    try {
+      const res = await fetch('/api/categorias-productos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'crear_categoria', label: nuevaCategoriaProductoLabel.trim() }),
+      })
+      const data = await res.json()
+      if (data.error) { setErrorCategoriasProductos(data.error); return }
+      setNuevaCategoriaProductoLabel('')
+      recargarCategoriasProductos()
+    } finally {
+      setGuardandoCategoriaProducto(false)
+    }
+  }
+
+  async function crearRubroProducto(categoriaId: string) {
+    if (!nuevoRubroProductoLabel.trim()) return
+    setGuardandoRubroProducto(true)
+    setErrorCategoriasProductos('')
+    try {
+      const res = await fetch('/api/categorias-productos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'crear_rubro', categoriaId, label: nuevoRubroProductoLabel.trim() }),
+      })
+      const data = await res.json()
+      if (data.error) { setErrorCategoriasProductos(data.error); return }
+      setNuevoRubroProductoLabel('')
+      setCategoriaProductoAbierta(null)
+      recargarCategoriasProductos()
+    } finally {
+      setGuardandoRubroProducto(false)
+    }
+  }
+
+  async function moverRubroProducto(rubroId: string, categoriaId: string) {
+    setErrorCategoriasProductos('')
+    const res = await fetch('/api/categorias-productos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ accion: 'mover_rubro', rubroId, categoriaId }),
+    })
+    const data = await res.json()
+    if (data.error) { setErrorCategoriasProductos(data.error); return }
+    recargarCategoriasProductos()
+  }
+
+  async function renombrarCategoriaProducto(categoriaId: string) {
+    if (!nuevoNombreCategoriaProducto.trim()) return
+    setErrorCategoriasProductos('')
+    const res = await fetch('/api/categorias-productos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ accion: 'renombrar_categoria', categoriaId, label: nuevoNombreCategoriaProducto.trim() }),
+    })
+    const data = await res.json()
+    if (data.error) { setErrorCategoriasProductos(data.error); return }
+    setRenombrandoCategoriaProductoId(null)
+    setNuevoNombreCategoriaProducto('')
+    recargarCategoriasProductos()
+  }
+
   function cambiarEstadoProfesional(
     id: string,
     estado: 'aprobado' | 'rechazado' | 'info_solicitada' | 'pendiente_revision',
@@ -550,6 +630,12 @@ export default function AdminPage() {
           Categorías
         </button>
         <button
+          onClick={() => setTab('categorias-productos')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'categorias-productos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Categorías de productos
+        </button>
+        <button
           onClick={() => { setTab('metricas'); if (!metricas) cargarMetricas() }}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'metricas' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
@@ -628,7 +714,7 @@ export default function AdminPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {p.categoria} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
+                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
                 <div className="font-body text-[11px] text-inksoft mt-1">Estado: {p.estado || 'activo'}</div>
                 <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
               </div>
@@ -1217,6 +1303,117 @@ export default function AdminPage() {
               ) : (
                 <button
                   onClick={() => { setCategoriaAbierta(cat.id); setNuevoRubroLabel('') }}
+                  className="font-body text-xs text-maroon underline"
+                >
+                  + Agregar rubro en {cat.label}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'categorias-productos' && (
+        <div>
+          <div className="font-body text-sm text-inksoft mb-4">
+            Acá se arma el árbol Categoría → Rubro que se usa para clasificar los productos (selector en /vender, filtros del catálogo y ficha del producto).
+            Calzado, Ropa, Accesorios y Hogar vienen con rubros de base; podés agregar categorías o rubros nuevos, y mover un rubro si quedó en la categoría que no corresponde.
+          </div>
+
+          <form onSubmit={crearCategoriaProducto} className="bg-panel border border-line rounded-lg p-4 mb-6 flex gap-2 items-center">
+            <input
+              value={nuevaCategoriaProductoLabel}
+              onChange={(e) => setNuevaCategoriaProductoLabel(e.target.value)}
+              placeholder="Nombre de la categoría nueva (ej: Electrónica)"
+              className="flex-1 px-3 py-2 rounded-md border border-line font-body text-sm"
+            />
+            <button
+              type="submit"
+              disabled={guardandoCategoriaProducto}
+              className="px-3.5 py-2 rounded-md border-none bg-maroon text-white font-body text-xs font-semibold shrink-0"
+            >
+              {guardandoCategoriaProducto ? 'Agregando...' : '+ Agregar categoría'}
+            </button>
+          </form>
+
+          {errorCategoriasProductos && <div className="font-body text-xs text-maroon mb-4">{errorCategoriasProductos}</div>}
+
+          {categoriasProductos.map((cat) => (
+            <div key={cat.id} className="bg-panel border border-line rounded-lg p-4 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                {renombrandoCategoriaProductoId === cat.id ? (
+                  <div className="flex gap-2 flex-1">
+                    <input
+                      value={nuevoNombreCategoriaProducto}
+                      onChange={(e) => setNuevoNombreCategoriaProducto(e.target.value)}
+                      className="flex-1 px-2.5 py-1.5 rounded-md border border-line font-body text-sm"
+                    />
+                    <button onClick={() => renombrarCategoriaProducto(cat.id)} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold">
+                      Guardar
+                    </button>
+                    <button onClick={() => { setRenombrandoCategoriaProductoId(null); setNuevoNombreCategoriaProducto('') }} className="px-2.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="font-display text-base font-bold text-ink">{cat.label}</div>
+                    <button
+                      onClick={() => { setRenombrandoCategoriaProductoId(cat.id); setNuevoNombreCategoriaProducto(cat.label) }}
+                      className="font-body text-xs text-inksoft underline shrink-0"
+                    >
+                      Renombrar
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5 mb-3">
+                {cat.rubros.length === 0 && (
+                  <div className="font-body text-xs text-inksoft">Todavía sin rubros.</div>
+                )}
+                {cat.rubros.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-1.5">
+                    <span className="font-body text-sm text-ink">{r.label}</span>
+                    <select
+                      value={cat.id}
+                      onChange={(e) => moverRubroProducto(r.id, e.target.value)}
+                      className="px-2 py-1 rounded-md border border-line font-body text-[11px] bg-panel shrink-0"
+                      title="Mover este rubro a otra categoría"
+                    >
+                      {categoriasProductos.map((c2) => (
+                        <option key={c2.id} value={c2.id}>{c2.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {categoriaProductoAbierta === cat.id ? (
+                <div className="flex gap-2">
+                  <input
+                    value={nuevoRubroProductoLabel}
+                    onChange={(e) => setNuevoRubroProductoLabel(e.target.value)}
+                    placeholder="Nombre del rubro (ej: Mochilas)"
+                    className="flex-1 px-2.5 py-1.5 rounded-md border border-line font-body text-sm"
+                  />
+                  <button
+                    onClick={() => crearRubroProducto(cat.id)}
+                    disabled={guardandoRubroProducto}
+                    className="px-3 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold shrink-0"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    onClick={() => { setCategoriaProductoAbierta(null); setNuevoRubroProductoLabel('') }}
+                    className="px-3 py-1.5 rounded-md border border-line font-body text-xs text-inksoft shrink-0"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setCategoriaProductoAbierta(cat.id); setNuevoRubroProductoLabel('') }}
                   className="font-body text-xs text-maroon underline"
                 >
                   + Agregar rubro en {cat.label}

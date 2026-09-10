@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
+import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 
-const CATEGORIAS = ['Calzado', 'Ropa', 'Accesorios', 'Hogar']
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
 function bs(n: number) {
@@ -28,8 +28,10 @@ export default function VenderPage() {
   const router = useRouter()
   const [misProductos, setMisProductos] = useState<any[]>([])
   const [misPedidos, setMisPedidos] = useState<any[]>([])
+  const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
   const [nombre, setNombre] = useState('')
-  const [categoria, setCategoria] = useState(CATEGORIAS[0])
+  const [categoriaProductoSel, setCategoriaProductoSel] = useState('')
+  const [rubro, setRubro] = useState('')
   const [precio, setPrecio] = useState('')
   const [precioOriginal, setPrecioOriginal] = useState('')
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
@@ -55,6 +57,18 @@ export default function VenderPage() {
   const [showModalIA, setShowModalIA] = useState(false)
   const [sugerenciasIA, setSugerenciasIA] = useState<any[]>([])
   const [fetchingSugerencias, setFetchingSugerencias] = useState(false)
+
+  // En cuanto llega el árbol de categorías de producto, arrancamos con
+  // la primera categoría y su primer rubro seleccionados (el select no
+  // puede quedar vacío).
+  useEffect(() => {
+    if (categoriasProductos.length === 0 || categoriaProductoSel) return
+    setCategoriaProductoSel(categoriasProductos[0].id)
+    setRubro(categoriasProductos[0].rubros[0]?.id || '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriasProductos])
+
+  const rubrosDeCategoriaSel = categoriasProductos.find((c) => c.id === categoriaProductoSel)?.rubros || []
 
   // Perfil de cobro (QR/CBU propio) — con esto, quien te compre paga
   // directo a tu cuenta, no a una cuenta centralizada de la plataforma.
@@ -487,7 +501,7 @@ export default function VenderPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             nombre,
-            categoria,
+            rubro,
             precio: Number(precio),
             icono,
             imagenUrl,
@@ -513,7 +527,7 @@ export default function VenderPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             nombre,
-            categoria,
+            rubro,
             precio: Number(precio),
             icono,
             imagenUrl,
@@ -721,7 +735,7 @@ export default function VenderPage() {
                 const res = await fetch('/api/generate-description', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nombre, categoria, precio, imagenUrl, descripcionLarga, variantes: 3 }),
+                  body: JSON.stringify({ nombre, categoria: buscarRubroProducto(rubro)?.label || rubro, precio, imagenUrl, descripcionLarga, variantes: 3 }),
                 })
                 const j = await res.json()
                 if (j.error) throw new Error(j.error)
@@ -757,21 +771,40 @@ export default function VenderPage() {
         />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            value={categoriaProductoSel}
+            onChange={(e) => {
+              const catId = e.target.value
+              setCategoriaProductoSel(catId)
+              const cat = categoriasProductos.find((c) => c.id === catId)
+              setRubro(cat?.rubros[0]?.id || '')
+            }}
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
           >
-            {CATEGORIAS.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {categoriasProductos.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>
+          <select
+            value={rubro}
+            onChange={(e) => setRubro(e.target.value)}
+            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
+          >
+            {rubrosDeCategoriaSel.map((r) => (
+              <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3">
           <input
             type="number"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
             placeholder="Precio en Bs"
-            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
+        </div>
+        <div className="font-body text-[11px] text-inksoft -mt-2 mb-3">
+          ¿No está el rubro que buscás? Agregalo desde /admin → pestaña &quot;Categorías de productos&quot; y va a aparecer acá.
         </div>
         <div className="mb-3">
           <input
@@ -950,7 +983,8 @@ export default function VenderPage() {
               onClick={() => {
                 setEditingId(null)
                 setNombre('')
-                setCategoria(CATEGORIAS[0])
+                setCategoriaProductoSel(categoriasProductos[0]?.id || '')
+                setRubro(categoriasProductos[0]?.rubros[0]?.id || '')
                 setPrecio('')
                 setPrecioOriginal('')
                 setIcono(ICONOS[0])
@@ -1020,7 +1054,7 @@ export default function VenderPage() {
           <div className="flex-1">
             <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
             <div className="font-body text-xs text-inksoft">
-              {p.categoria} · {p.precioOriginal ? (
+              {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
                 <>
                   <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
                 </>
@@ -1035,7 +1069,11 @@ export default function VenderPage() {
                 // Prefill form for editing
                 setEditingId(p.id)
                 setNombre(p.nombre || '')
-                setCategoria(p.categoria || CATEGORIAS[0])
+                {
+                  const info = buscarRubroProducto(p.rubro)
+                  setCategoriaProductoSel(info?.categoriaId || categoriasProductos[0]?.id || '')
+                  setRubro(p.rubro || categoriasProductos[0]?.rubros[0]?.id || '')
+                }
                 setPrecio(String(p.precio || ''))
                 setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
                 setIcono(p.icono || ICONOS[0])

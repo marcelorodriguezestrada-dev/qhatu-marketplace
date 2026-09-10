@@ -48,6 +48,7 @@ export default function ProductoDetallePage() {
   const router = useRouter()
   const { agregar } = useCarrito()
   const { usuario } = useAuth()
+  const { buscarRubroProducto } = useCategoriasProductos()
 
   const [producto, setProducto] = useState<any>(null)
   const [tienda, setTienda] = useState<any>(null)
@@ -73,7 +74,7 @@ export default function ProductoDetallePage() {
         if (!detalle.error) {
           const catalogo = await fetch('/api/productos').then((r) => r.json())
           const otros = (catalogo.productos || []).filter(
-            (p: any) => p.categoria === detalle.categoria && p.id !== detalle.id
+            (p: any) => p.rubro === detalle.rubro && p.id !== detalle.id
           )
           setRelacionados(otros.slice(0, 4))
           fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
@@ -176,7 +177,7 @@ export default function ProductoDetallePage() {
 
             <div>
               <div className="font-body text-xs text-inksoft mb-1 flex items-center gap-1.5 flex-wrap">
-                <span>{producto.categoria} ·</span>
+                <span>{buscarRubroProducto(producto.rubro)?.label || producto.categoria || 'Sin rubro'} ·</span>
                 {producto.vendedorId ? (
                   <Link
                     href={`/tienda/${producto.vendedorId}`}
@@ -289,7 +290,7 @@ export default function ProductoDetallePage() {
               )}
               <div className="py-3 flex items-center gap-3">
                 <span className="text-lg">📋</span>
-                <span className="font-body text-sm text-ink"><strong>Rubro:</strong> {producto.categoria}</span>
+                <span className="font-body text-sm text-ink"><strong>Rubro:</strong> {buscarRubroProducto(producto.rubro)?.label || producto.categoria || 'Sin rubro'}</span>
               </div>
               <div className="py-3 flex items-center gap-3">
                 <span className="text-lg">📅</span>
@@ -305,7 +306,7 @@ export default function ProductoDetallePage() {
           {tienda?.lat != null && tienda?.lng != null && (
             <div className="mb-5">
               <MapaProfesionales
-                profesionales={[{ id: producto.vendedorId, nombre: tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor, rubro: producto.categoria, lat: tienda.lat, lng: tienda.lng }]}
+                profesionales={[{ id: producto.vendedorId, nombre: tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor, rubro: buscarRubroProducto(producto.rubro)?.label || producto.categoria || '', lat: tienda.lat, lng: tienda.lng }]}
                 centro={{ lat: tienda.lat, lng: tienda.lng }}
               />
             </div>
