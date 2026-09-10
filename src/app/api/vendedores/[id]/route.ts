@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       cbu: data.cbu || '',
       nombreNegocio: data.nombreNegocio || '',
       whatsapp: data.whatsapp || '',
+      whatsappPais: data.whatsappPais || '',
       direccion: data.direccion || '',
       lat: data.lat ?? null,
       lng: data.lng ?? null,

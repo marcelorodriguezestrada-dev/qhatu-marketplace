@@ -7,6 +7,7 @@ import { ZONAS_POTOSI } from '@/data/zonasPotosi'
 import { useAuth } from '@/lib/auth'
 import { useCategorias } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
 
 // Valor especial del select de rubro: "esta categoría no tiene mi
 // profesión, quiero escribirla yo". Es distinto del "otro" que ya
@@ -31,6 +32,7 @@ export default function PublicarServicioPage() {
   const [zonasExtra, setZonasExtra] = useState<string[]>([])
   const [direccion, setDireccion] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [whatsappPais, setWhatsappPais] = useState(PAIS_FALLBACK_ID)
   const [email, setEmail] = useState('')
   const [instagram, setInstagram] = useState('')
   const [precio, setPrecio] = useState('')
@@ -122,7 +124,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, instagram, email, precio, experiencia,
+          especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -259,12 +261,24 @@ export default function PublicarServicioPage() {
           </div>
         </div>
 
-        <input
-          value={whatsapp}
-          onChange={(e) => setWhatsapp(e.target.value)}
-          placeholder="Tu WhatsApp (ej: 71234567, sin +591)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
+        <div className="flex gap-2 items-center mb-3">
+          <select
+            value={whatsappPais}
+            onChange={(e) => setWhatsappPais(e.target.value)}
+            className="px-3 py-2.5 rounded-lg border border-line font-body text-sm bg-panel shrink-0"
+            title="País del número"
+          >
+            {PAISES.map((p) => (
+              <option key={p.id} value={p.id}>{p.bandera} {p.nombre} (+{p.codigo})</option>
+            ))}
+          </select>
+          <input
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            placeholder="Tu WhatsApp (ej: 71234567, sin +591)"
+            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+        </div>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}

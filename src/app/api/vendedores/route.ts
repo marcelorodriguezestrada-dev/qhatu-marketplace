@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
-import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,12 +16,19 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp } = body
+    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais } = body
     // El whatsapp es opcional (no todos quieren que les escriban antes
-    // de comprar), pero si lo cargan, lo validamos igual que en
-    // publicar-servicio para no guardar números inventados.
-    if (whatsapp && !validarWhatsappBoliviano(whatsapp).valido) {
-      return NextResponse.json({ error: validarWhatsappBoliviano(whatsapp).motivo }, { status: 400 })
+    // de comprar), pero si lo cargan, lo validamos según el país
+    // elegido y lo guardamos con su código de país adelante (ver
+    // src/data/paises.ts — hoy solo Bolivia, pero queda listo para más).
+    const paisId = whatsappPais || PAIS_FALLBACK_ID
+    let whatsappCompleto = ''
+    if (whatsapp) {
+      const validacion = validarWhatsappPorPais(whatsapp, paisId)
+      if (!validacion.valido) {
+        return NextResponse.json({ error: validacion.motivo }, { status: 400 })
+      }
+      whatsappCompleto = numeroConCodigoPais(whatsapp, buscarPais(paisId).codigo)
     }
     const db = getDb()
     await db.collection('vendedores').doc(usuario.uid).set(
@@ -28,7 +36,8 @@ export async function POST(req: NextRequest) {
         qrImageUrl: qrImageUrl || '',
         cbu: cbu || '',
         nombreNegocio: nombreNegocio || '',
-        whatsapp: whatsapp || '',
+        whatsapp: whatsappCompleto,
+        whatsappPais: whatsapp ? paisId : '',
         direccion: direccion || '',
         lat: lat != null ? Number(lat) : null,
         lng: lng != null ? Number(lng) : null,

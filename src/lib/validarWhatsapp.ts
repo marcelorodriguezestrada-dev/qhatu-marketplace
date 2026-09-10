@@ -6,6 +6,8 @@
 // iguales, secuencias como 12345678) y el formato correcto de un
 // celular boliviano (8 dígitos, empieza con 6 o 7).
 
+import { PAIS_FALLBACK_ID } from '@/data/paises'
+
 export function validarWhatsappBoliviano(numero: string): { valido: boolean; motivo?: string } {
   const limpio = (numero || '').replace(/\D/g, '')
   // Si lo mandaron con el 591 adelante, lo sacamos para validar el número local de 8 dígitos.
@@ -36,4 +38,20 @@ export function numeroLocalABolivia(numero: string): string {
   const limpio = (numero || '').replace(/\D/g, '')
   if (limpio.startsWith('591') && limpio.length > 8) return limpio
   return '591' + limpio
+}
+
+// Versiones "por país" de las dos funciones de arriba, para cuando el
+// formulario tiene un selector de país al lado del número (ver
+// src/data/paises.ts). Por ahora solo hay reglas de validación para
+// Bolivia ('BO'); cuando se sume otro país, su validación específica
+// se agrega acá.
+export function validarWhatsappPorPais(numero: string, paisId: string = PAIS_FALLBACK_ID): { valido: boolean; motivo?: string } {
+  if (paisId === 'BO') return validarWhatsappBoliviano(numero)
+  return { valido: false, motivo: 'Ese país todavía no está soportado.' }
+}
+
+export function numeroConCodigoPais(numero: string, codigoPais: string): string {
+  const limpio = (numero || '').replace(/\D/g, '')
+  if (limpio.startsWith(codigoPais) && limpio.length > 8) return limpio
+  return codigoPais + limpio
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
-import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
@@ -40,16 +41,17 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, icono, plan, imagenUrl, precio, experiencia } = body
+    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
 
-    const validacionWhatsapp = validarWhatsappBoliviano(whatsapp)
+    const paisId = whatsappPais || PAIS_FALLBACK_ID
+    const validacionWhatsapp = validarWhatsappPorPais(whatsapp, paisId)
     if (!validacionWhatsapp.valido) {
       return NextResponse.json({ error: validacionWhatsapp.motivo }, { status: 400 })
     }
-    const whatsappCompleto = numeroLocalABolivia(whatsapp)
+    const whatsappCompleto = numeroConCodigoPais(whatsapp, buscarPais(paisId).codigo)
 
     const db = getDb()
     const ref = await db.collection('profesionales').add({
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,
       whatsapp: whatsappCompleto,
+      whatsappPais: paisId,
       instagram: instagram || '',
       email: (email || '').trim(),
       icono: icono || rubro || 'otro',

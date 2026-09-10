@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA } from '@/lib/moderacionIA'
-import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,16 +37,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, instagram, email, precio, experiencia, lat, lng } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
 
-    const validacionWhatsapp = validarWhatsappBoliviano(whatsapp)
+    const paisId = whatsappPais || PAIS_FALLBACK_ID
+    const validacionWhatsapp = validarWhatsappPorPais(whatsapp, paisId)
     if (!validacionWhatsapp.valido) {
       return NextResponse.json({ error: validacionWhatsapp.motivo }, { status: 400 })
     }
-    const whatsappCompleto = numeroLocalABolivia(whatsapp)
+    const whatsappCompleto = numeroConCodigoPais(whatsapp, buscarPais(paisId).codigo)
 
     // El email es opcional (el contacto principal sigue siendo WhatsApp),
     // pero si escribió algo, que al menos tenga forma de email.
@@ -114,6 +116,7 @@ export async function POST(req: NextRequest) {
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,
       whatsapp: whatsappCompleto,
+      whatsappPais: paisId,
       instagram: instagram || '',
       email: emailLimpio,
       icono: rubroFinal,

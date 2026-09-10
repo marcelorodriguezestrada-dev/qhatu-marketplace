@@ -8,6 +8,7 @@ import ModalIASuggestions from '@/components/ModalIASuggestions'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
 
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
@@ -79,6 +80,7 @@ export default function VenderPage() {
   const [cobroCbu, setCobroCbu] = useState('')
   const [cobroNegocio, setCobroNegocio] = useState('')
   const [cobroWhatsapp, setCobroWhatsapp] = useState('')
+  const [cobroWhatsappPais, setCobroWhatsappPais] = useState(PAIS_FALLBACK_ID)
   const [subiendoQrCobro, setSubiendoQrCobro] = useState(false)
   const [guardandoCobro, setGuardandoCobro] = useState(false)
   const [cobroGuardado, setCobroGuardado] = useState(false)
@@ -115,7 +117,13 @@ export default function VenderPage() {
       setCobroQrUrl(data.qrImageUrl || '')
       setCobroCbu(data.cbu || '')
       setCobroNegocio(data.nombreNegocio || '')
-      setCobroWhatsapp(data.whatsapp || '')
+      {
+        const paisId = data.whatsappPais || PAIS_FALLBACK_ID
+        const codigo = buscarPais(paisId).codigo
+        const local = (data.whatsapp || '').startsWith(codigo) ? (data.whatsapp as string).slice(codigo.length) : (data.whatsapp || '')
+        setCobroWhatsapp(local)
+        setCobroWhatsappPais(paisId)
+      }
       setTiendaDireccion(data.direccion || '')
       setTiendaLat(data.lat ?? null)
       setTiendaLng(data.lng ?? null)
@@ -207,7 +215,7 @@ export default function VenderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio, whatsapp: cobroWhatsapp,
+          qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio, whatsapp: cobroWhatsapp, whatsappPais: cobroWhatsappPais,
           direccion: tiendaDireccion, lat: tiendaLat, lng: tiendaLng,
           horarios: tiendaHorarios, logoUrl: tiendaLogoUrl, tiposVenta,
         }),
@@ -628,12 +636,24 @@ export default function VenderPage() {
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
 
-        <input
-          value={cobroWhatsapp}
-          onChange={(e) => setCobroWhatsapp(e.target.value)}
-          placeholder="Tu WhatsApp para que te contacten (opcional, ej: 71234567)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-1"
-        />
+        <div className="flex gap-2 items-center mb-1">
+          <select
+            value={cobroWhatsappPais}
+            onChange={(e) => setCobroWhatsappPais(e.target.value)}
+            className="px-3 py-2.5 rounded-lg border border-line font-body text-sm bg-panel shrink-0"
+            title="País del número"
+          >
+            {PAISES.map((p) => (
+              <option key={p.id} value={p.id}>{p.bandera} {p.nombre} (+{p.codigo})</option>
+            ))}
+          </select>
+          <input
+            value={cobroWhatsapp}
+            onChange={(e) => setCobroWhatsapp(e.target.value)}
+            placeholder="Tu WhatsApp para que te contacten (opcional, ej: 71234567)"
+            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+        </div>
         <p className="font-body text-[11px] text-inksoft mb-3">
           Si lo cargás, en cada producto tuyo va a aparecer un botón "Contactar" que abre WhatsApp directo con vos.
         </p>
