@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
+import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
