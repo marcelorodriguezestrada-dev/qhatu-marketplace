@@ -247,12 +247,27 @@ export default function ProductoDetallePage() {
               </div>
 
               <div className="flex flex-col gap-2.5 mb-4">
-                <button
-                  onClick={comprarAhora}
-                  className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
-                >
-                  Comprar ahora
-                </button>
+                <div className={tienda?.whatsapp ? 'grid grid-cols-2 gap-2.5' : ''}>
+                  <button
+                    onClick={comprarAhora}
+                    className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+                  >
+                    Comprar ahora
+                  </button>
+                  {tienda?.whatsapp && (
+                    <a
+                      href={`https://wa.me/${tienda.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Hola! Te escribo por "${producto.nombre}" (Bs ${producto.precio}) que vi en Clasi Click.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => fetch(`/api/vendedores/${producto.vendedorId}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
+                      className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      💬 Contactar
+                    </a>
+                  )}
+                </div>
                 <button
                   onClick={agregarAlCarrito}
                   className="w-full py-3 rounded-lg border border-line bg-panel text-ink font-body text-sm font-semibold"

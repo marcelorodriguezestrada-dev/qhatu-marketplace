@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +15,20 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl } = body
+    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp } = body
+    // El whatsapp es opcional (no todos quieren que les escriban antes
+    // de comprar), pero si lo cargan, lo validamos igual que en
+    // publicar-servicio para no guardar números inventados.
+    if (whatsapp && !validarWhatsappBoliviano(whatsapp).valido) {
+      return NextResponse.json({ error: validarWhatsappBoliviano(whatsapp).motivo }, { status: 400 })
+    }
     const db = getDb()
     await db.collection('vendedores').doc(usuario.uid).set(
       {
         qrImageUrl: qrImageUrl || '',
         cbu: cbu || '',
         nombreNegocio: nombreNegocio || '',
+        whatsapp: whatsapp || '',
         direccion: direccion || '',
         lat: lat != null ? Number(lat) : null,
         lng: lng != null ? Number(lng) : null,

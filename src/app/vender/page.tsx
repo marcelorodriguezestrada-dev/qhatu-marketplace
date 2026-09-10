@@ -7,6 +7,7 @@ import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
+import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
@@ -77,6 +78,7 @@ export default function VenderPage() {
   const [cobroQrUrl, setCobroQrUrl] = useState('')
   const [cobroCbu, setCobroCbu] = useState('')
   const [cobroNegocio, setCobroNegocio] = useState('')
+  const [cobroWhatsapp, setCobroWhatsapp] = useState('')
   const [subiendoQrCobro, setSubiendoQrCobro] = useState(false)
   const [guardandoCobro, setGuardandoCobro] = useState(false)
   const [cobroGuardado, setCobroGuardado] = useState(false)
@@ -113,6 +115,7 @@ export default function VenderPage() {
       setCobroQrUrl(data.qrImageUrl || '')
       setCobroCbu(data.cbu || '')
       setCobroNegocio(data.nombreNegocio || '')
+      setCobroWhatsapp(data.whatsapp || '')
       setTiendaDireccion(data.direccion || '')
       setTiendaLat(data.lat ?? null)
       setTiendaLng(data.lng ?? null)
@@ -189,6 +192,13 @@ export default function VenderPage() {
   }
 
   async function guardarCobro() {
+    if (cobroWhatsapp) {
+      const validacion = validarWhatsappBoliviano(cobroWhatsapp)
+      if (!validacion.valido) {
+        setError(validacion.motivo || 'Revisá el número de WhatsApp.')
+        return
+      }
+    }
     setGuardandoCobro(true)
     setCobroGuardado(false)
     try {
@@ -197,7 +207,7 @@ export default function VenderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio,
+          qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio, whatsapp: cobroWhatsapp,
           direccion: tiendaDireccion, lat: tiendaLat, lng: tiendaLng,
           horarios: tiendaHorarios, logoUrl: tiendaLogoUrl, tiposVenta,
         }),
@@ -617,6 +627,16 @@ export default function VenderPage() {
           placeholder="Nombre de tu negocio (opcional)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+
+        <input
+          value={cobroWhatsapp}
+          onChange={(e) => setCobroWhatsapp(e.target.value)}
+          placeholder="Tu WhatsApp para que te contacten (opcional, ej: 71234567)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-1"
+        />
+        <p className="font-body text-[11px] text-inksoft mb-3">
+          Si lo cargás, en cada producto tuyo va a aparecer un botón "Contactar" que abre WhatsApp directo con vos.
+        </p>
 
         <div className="mb-3">
           <div className="font-body text-xs text-inksoft mb-1.5">Logo de tu negocio (opcional)</div>
