@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
+import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await getDb().collection('productos').doc(params.id).update({
       vistas: FieldValue.increment(1),
     })
+    sumarMetricaDiaria('vistasProductos').catch(() => {})
     return NextResponse.json({ ok: true })
   } catch (err) {
     // Si falla (por ejemplo, el producto no existe más), no rompemos la

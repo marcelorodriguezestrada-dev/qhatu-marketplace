@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
+import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
@@ -20,6 +21,22 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
 }
 
 const ICONOS_SERVICIO = ['abogado', 'contador', 'electricista', 'enfermera', 'estilista', 'ingeniero', 'manicurista', 'medico', 'odontologo', 'oftalmologo', 'pintor', 'plomero', 'profesor', 'otro']
+
+// Qué números se pueden graficar en la línea de tiempo de Métricas, y
+// cómo mostrar cada uno (etiqueta corta para el selector, color de la
+// barra, y si es plata para formatear en Bs en vez de un número pelado).
+const CAMPOS_METRICAS = {
+  visitas: { label: 'Visitas al sitio', color: '#1a7f6e' },
+  vistasProductos: { label: 'Vistas de productos', color: '#8a5a2f' },
+  vistasProfesionales: { label: 'Vistas de profesionales', color: '#8a5a2f' },
+  clicsWhatsapp: { label: 'Clics a WhatsApp', color: '#25a244' },
+  busquedasProductos: { label: 'Búsquedas de productos', color: '#b08900' },
+  busquedasServicios: { label: 'Búsquedas de servicios', color: '#b08900' },
+  pedidos: { label: 'Pedidos', color: '#7a1f2b' },
+  facturado: { label: 'Facturado (Bs)', color: '#7a1f2b', esPlata: true },
+  productosPublicados: { label: 'Productos publicados', color: '#3a5a8a' },
+  profesionalesPublicados: { label: 'Profesionales publicados', color: '#3a5a8a' },
+} as const
 
 function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motivo: string } | null | undefined }) {
   if (!moderacionIA) return null
@@ -49,6 +66,10 @@ export default function AdminPage() {
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [metricas, setMetricas] = useState<any>(null)
   const [cargandoMetricas, setCargandoMetricas] = useState(false)
+  // Línea de tiempo de la pestaña Métricas: qué período se ve
+  // (día/mes/año) y qué número se está graficando.
+  const [periodoMetricas, setPeriodoMetricas] = useState<'dia' | 'mes' | 'anio'>('dia')
+  const [campoMetricas, setCampoMetricas] = useState<keyof typeof CAMPOS_METRICAS>('visitas')
 
   const resumen = {
     pedidosTotal: pedidos.length,
@@ -1211,6 +1232,99 @@ export default function AdminPage() {
           {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
           {!cargandoMetricas && metricas && !metricas.error && (
             <div>
+              <div className="font-body text-sm font-semibold text-ink mb-1">Evolución en el tiempo</div>
+              <div className="font-body text-[11px] text-inksoft mb-3">
+                Visitas, vistas, clics y búsquedas se empiezan a contar día a día desde ahora — antes solo se guardaba un total acumulado, sin saber qué día. Pedidos, productos y profesionales publicados sí muestran toda la historia, porque ya tenían fecha guardada.
+              </div>
+
+              {metricas.comparativaSemanal && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  {(
+                    [
+                      ['Visitas', metricas.comparativaSemanal.estaSemana.visitas, metricas.comparativaSemanal.cambioVisitas],
+                      ['Pedidos', metricas.comparativaSemanal.estaSemana.pedidos, metricas.comparativaSemanal.cambioPedidos],
+                      ['Facturado', metricas.comparativaSemanal.estaSemana.facturado, metricas.comparativaSemanal.cambioFacturado],
+                    ] as [string, number, number | null][]
+                  ).map(([label, valor, cambio]) => (
+                    <div key={label} className="bg-panel border border-line rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">{label} · últimos 7 días</div>
+                      <div className="font-display text-lg font-bold text-ink">
+                        {label === 'Facturado' ? bs(valor) : valor.toLocaleString('es-BO')}
+                      </div>
+                      {cambio != null && (
+                        <div className={`font-body text-[11px] font-semibold ${cambio >= 0 ? 'text-teal' : 'text-maroon'}`}>
+                          {cambio >= 0 ? '↑' : '↓'} {Math.abs(cambio)}% vs. semana anterior
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="bg-panel border border-line rounded-lg p-3">
+                    <div className="font-body text-[10px] text-inksoft mb-0.5">Conversión aprox. · últimos 7 días</div>
+                    <div className="font-display text-lg font-bold text-ink">
+                      {metricas.comparativaSemanal.estaSemana.visitas > 0
+                        ? `${((metricas.comparativaSemanal.estaSemana.pedidos / metricas.comparativaSemanal.estaSemana.visitas) * 100).toFixed(1)}%`
+                        : '—'}
+                    </div>
+                    <div className="font-body text-[11px] text-inksoft">Pedidos / visitas — si baja, el problema es más de conversión que de tráfico.</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mb-3 flex-wrap items-center">
+                <div className="flex gap-1 bg-panelalt border border-line rounded-lg p-1">
+                  {(['dia', 'mes', 'anio'] as const).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPeriodoMetricas(p)}
+                      className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold ${periodoMetricas === p ? 'bg-panel text-ink' : 'text-inksoft'}`}
+                    >
+                      {p === 'dia' ? 'Por día' : p === 'mes' ? 'Por mes' : 'Por año'}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  value={campoMetricas}
+                  onChange={(e) => setCampoMetricas(e.target.value as keyof typeof CAMPOS_METRICAS)}
+                  className="px-3 py-1.5 rounded-lg border border-line font-body text-xs bg-panel"
+                >
+                  {Object.entries(CAMPOS_METRICAS).map(([campo, info]) => (
+                    <option key={campo} value={campo}>{info.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-panel border border-line rounded-xl p-4 mb-8">
+                <GraficoBarras
+                  datos={(
+                    periodoMetricas === 'dia' ? metricas.serieDiaria
+                    : periodoMetricas === 'mes' ? metricas.serieMensual
+                    : metricas.serieAnual
+                  ).map((p: any) => ({ clave: p.clave, valor: p[campoMetricas] || 0 }))}
+                  color={CAMPOS_METRICAS[campoMetricas].color}
+                  formatoEtiqueta={(clave) =>
+                    periodoMetricas === 'dia' ? clave.slice(5).replace('-', '/')
+                    : periodoMetricas === 'mes' ? clave
+                    : clave
+                  }
+                />
+              </div>
+
+              {metricas.porDiaSemana?.length > 0 && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-1">¿Qué día se mueve más?</div>
+                  <div className="font-body text-[11px] text-inksoft mb-3">
+                    Suma de toda la historia disponible, agrupada por día de la semana — para decidir, por ejemplo, qué día conviene publicar una oferta o subir precio de un servicio con más demanda.
+                  </div>
+                  <div className="bg-panel border border-line rounded-xl p-4 mb-8">
+                    <GraficoBarras
+                      datos={metricas.porDiaSemana.map((p: any) => ({ clave: p.clave, valor: p[campoMetricas] || 0 }))}
+                      color={CAMPOS_METRICAS[campoMetricas].color}
+                      formatoEtiqueta={(clave) => clave.slice(0, 3)}
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
                 <div className="bg-panel border border-line rounded-xl p-4">
                   <div className="font-body text-[11px] text-inksoft mb-1">Usuarios registrados</div>

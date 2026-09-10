@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
+import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // (fire-and-forget) para no hacer más lenta la respuesta al
     // visitante. Si falla, no rompe nada; es solo una métrica.
     ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
+    sumarMetricaDiaria('vistasProfesionales').catch(() => {})
 
     return NextResponse.json({ id: doc.id, ...doc.data(), resenas })
   } catch (err) {

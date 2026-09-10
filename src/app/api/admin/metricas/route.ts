@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, contarUsuarios } from '@/lib/firebaseAdmin'
+import { construirSerieDiaria, reagruparPor, agruparPorDiaSemana, compararSemanas, ultimosDiasContinuos } from '@/lib/serieTiempo'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,12 +18,13 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap] = await Promise.all([
+    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
       db.collection('productos').get(),
       db.collection('profesionales').get(),
       db.collection('pedidos').get(),
       db.collection('analitica_categorias').get(),
+      db.collection('metricas_diarias').get(),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
@@ -75,6 +77,24 @@ export async function GET(req: NextRequest) {
       .slice(0, 8)
       .map((c) => ({ tipo: c.tipo, valor: c.valor, clics: c.clics || 0 }))
 
+    // Línea de tiempo: día a día (últimos 90 días, para no mandar un
+    // payload gigante si el sitio ya lleva años), reagrupada también
+    // por mes, por año, y por día de la semana — para responder
+    // "¿qué día se mueve más?" con toda la historia disponible, no
+    // solo los últimos 90 días.
+    const metricasDiariasDocs = metricasDiariasSnap.docs.map((d) => ({ id: d.id, data: d.data() }))
+    const serieDiariaCompleta = construirSerieDiaria({
+      metricasDiariasDocs,
+      pedidos: pedidos.map((p) => ({ createdAt: p.createdAt, total: p.total })),
+      productos: productos.map((p) => ({ createdAt: p.createdAt })),
+      profesionales: profesionales.map((p) => ({ createdAt: p.createdAt })),
+    })
+    const serieDiaria = ultimosDiasContinuos(serieDiariaCompleta, 90)
+    const serieMensual = reagruparPor(serieDiariaCompleta, 'mes')
+    const serieAnual = reagruparPor(serieDiariaCompleta, 'anio')
+    const porDiaSemana = agruparPorDiaSemana(serieDiariaCompleta)
+    const comparativaSemanal = compararSemanas(serieDiariaCompleta)
+
     return NextResponse.json({
       usuariosTotal,
       productos: { total: productos.length, porEstado: productosPorEstado, premium: productosPremium },
@@ -89,6 +109,11 @@ export async function GET(req: NextRequest) {
       productosMasVistos,
       profesionalesMasClicWhatsapp,
       categoriasMasBuscadas,
+      serieDiaria,
+      serieMensual,
+      serieAnual,
+      porDiaSemana,
+      comparativaSemanal,
     })
   } catch (err) {
     console.error('GET /api/admin/metricas', err)

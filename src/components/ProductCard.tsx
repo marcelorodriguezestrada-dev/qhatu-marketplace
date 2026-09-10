@@ -94,7 +94,16 @@ export function ProductCard({ p }: { p: Producto }) {
           {p.tiendaLogoUrl && (
             <img src={p.tiendaLogoUrl} alt="" loading="lazy" decoding="async" className="w-4 h-4 rounded-full object-cover shrink-0" />
           )}
-          <div className="text-[10px] sm:text-[11px] text-inksoft font-body truncate">{p.tiendaNombre || p.vendedor}</div>
+          {p.vendedorId ? (
+            <Link
+              href={`/tienda/${p.vendedorId}`}
+              className="text-[10px] sm:text-[11px] text-inksoft font-body truncate hover:underline hover:text-maroon"
+            >
+              {p.tiendaNombre || p.vendedor}
+            </Link>
+          ) : (
+            <div className="text-[10px] sm:text-[11px] text-inksoft font-body truncate">{p.tiendaNombre || p.vendedor}</div>
+          )}
         </div>
         <Link href={`/producto/${p.id}`} className="font-body text-[13px] sm:text-[14px] font-medium text-ink mb-1.5 sm:mb-2 flex-1 leading-snug hover:underline">
           {p.nombre}
