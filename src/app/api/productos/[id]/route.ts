@@ -67,11 +67,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, rubro, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
     if (rubro !== undefined) cambios.rubro = rubro
+    if (publico !== undefined) {
+      cambios.publico = ['mujer', 'hombre', 'ninos', 'unisex'].includes(publico) ? publico : 'unisex'
+    }
     if (precio !== undefined) cambios.precio = precio
     if (icono !== undefined) cambios.icono = icono
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl

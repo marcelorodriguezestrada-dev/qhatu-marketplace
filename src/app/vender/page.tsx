@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
+import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
 
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
@@ -32,6 +33,7 @@ export default function VenderPage() {
   const [nombre, setNombre] = useState('')
   const [categoriaProductoSel, setCategoriaProductoSel] = useState('')
   const [rubro, setRubro] = useState('')
+  const [publico, setPublico] = useState<string>(PUBLICO_PRODUCTO_FALLBACK)
   const [precio, setPrecio] = useState('')
   const [precioOriginal, setPrecioOriginal] = useState('')
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
@@ -502,6 +504,7 @@ export default function VenderPage() {
           body: JSON.stringify({
             nombre,
             rubro,
+            publico,
             precio: Number(precio),
             icono,
             imagenUrl,
@@ -528,6 +531,7 @@ export default function VenderPage() {
           body: JSON.stringify({
             nombre,
             rubro,
+            publico,
             precio: Number(precio),
             icono,
             imagenUrl,
@@ -769,6 +773,17 @@ export default function VenderPage() {
             setShowModalIA(false)
           }}
         />
+        <div className="mb-3">
+          <select
+            value={publico}
+            onChange={(e) => setPublico(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
+          >
+            {PUBLICOS_PRODUCTO.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <select
             value={categoriaProductoSel}
@@ -985,6 +1000,7 @@ export default function VenderPage() {
                 setNombre('')
                 setCategoriaProductoSel(categoriasProductos[0]?.id || '')
                 setRubro(categoriasProductos[0]?.rubros[0]?.id || '')
+                setPublico(PUBLICO_PRODUCTO_FALLBACK)
                 setPrecio('')
                 setPrecioOriginal('')
                 setIcono(ICONOS[0])
@@ -1054,7 +1070,7 @@ export default function VenderPage() {
           <div className="flex-1">
             <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
             <div className="font-body text-xs text-inksoft">
-              {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
+              {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
                 <>
                   <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
                 </>
@@ -1073,6 +1089,7 @@ export default function VenderPage() {
                   const info = buscarRubroProducto(p.rubro)
                   setCategoriaProductoSel(info?.categoriaId || categoriasProductos[0]?.id || '')
                   setRubro(p.rubro || categoriasProductos[0]?.rubros[0]?.id || '')
+                  setPublico(p.publico || PUBLICO_PRODUCTO_FALLBACK)
                 }
                 setPrecio(String(p.precio || ''))
                 setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')

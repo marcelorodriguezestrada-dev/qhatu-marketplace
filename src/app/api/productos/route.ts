@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
     productos = productos.map((p) =>
       p.rubro ? p : { ...p, rubro: LEGACY_CATEGORIA_A_RUBRO[p.categoria as string] || 'otro-producto' }
     )
+    // Compatibilidad: productos publicados antes del campo `publico`.
+    productos = productos.map((p) => (p.publico ? p : { ...p, publico: 'unisex' }))
     if (!esAdmin) {
       productos = productos.filter((p) => p.estado !== 'rechazado' && p.estado !== 'oculto')
     }
@@ -59,10 +61,12 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
     if (!nombre || !rubro || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
+    const publicosValidos = ['mujer', 'hombre', 'ninos', 'unisex']
+    const publicoValido = publicosValidos.includes(publico) ? publico : 'unisex'
     const planValido = plan === 'premium' ? 'premium' : 'basico'
     // El descuento tiene que ser real: si mandan un precioOriginal, tiene
     // que ser mayor al precio actual, o lo ignoramos.
@@ -98,6 +102,7 @@ export async function POST(req: NextRequest) {
     const ref = await db.collection('productos').add({
       nombre,
       rubro,
+      publico: publicoValido,
       precio,
       precioOriginal: precioOriginalValido,
       icono: icono || 'shoe',

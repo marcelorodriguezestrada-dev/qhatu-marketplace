@@ -10,10 +10,12 @@ import { CartDrawer } from '@/components/CartDrawer'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
+import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
   const [productos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
+  const [publico, setPublico] = useState('Todo')
   const [categoria, setCategoria] = useState('Todo')
   const [busqueda, setBusqueda] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
@@ -33,11 +35,12 @@ export default function CatalogoPage() {
   }, [])
 
   const filtrados = productos.filter((p) => {
+    const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
     const matchCat = categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.vendedor.toLowerCase().includes(busqueda.toLowerCase())
-    return matchCat && matchBusqueda
+    return matchPublico && matchCat && matchBusqueda
   })
 
   // Solo entran acá los descuentos reales (precioOriginal cargado por
@@ -152,6 +155,28 @@ export default function CatalogoPage() {
             </div>
           </div>
         )}
+
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <button
+            onClick={() => setPublico('Todo')}
+            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+              publico === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+            }`}
+          >
+            Todos
+          </button>
+          {PUBLICOS_PRODUCTO.map((pub) => (
+            <button
+              key={pub.id}
+              onClick={() => setPublico(pub.id)}
+              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+                publico === pub.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              }`}
+            >
+              {pub.label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex gap-2 mb-5 flex-wrap">
           <button

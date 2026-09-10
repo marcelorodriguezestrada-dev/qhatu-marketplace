@@ -5,6 +5,7 @@ import { ServiceIcon } from '@/components/ServiceIcon'
 import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
+import { labelPublicoProducto } from '@/data/publicoProducto'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
@@ -714,7 +715,7 @@ export default function AdminPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
+                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
                 <div className="font-body text-[11px] text-inksoft mt-1">Estado: {p.estado || 'activo'}</div>
                 <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
               </div>

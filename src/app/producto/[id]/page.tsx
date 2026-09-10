@@ -8,6 +8,7 @@ import { ProductIcon } from '@/components/ProductIcon'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
+import { labelPublicoProducto } from '@/data/publicoProducto'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -132,7 +133,15 @@ export default function ProductoDetallePage() {
 
   return (
     <div className="max-w-[960px] mx-auto px-5 py-8">
-      <Link href="/" className="font-body text-[13px] text-inksoft mb-5 inline-block">← Volver al catálogo</Link>
+      <div className="font-body text-[13px] text-inksoft mb-5 flex flex-wrap items-center gap-1.5">
+        <Link href="/" className="hover:underline">Volver</Link>
+        <span>|</span>
+        <span>{labelPublicoProducto(producto.publico)}</span>
+        <span>›</span>
+        <span>{buscarRubroProducto(producto.rubro)?.categoriaLabel || 'Categoría'}</span>
+        <span>›</span>
+        <span className="text-ink font-medium">{producto.nombre}</span>
+      </div>
 
       {/* Pestañas */}
       <div className="flex gap-1 mb-6 border-b border-line">
