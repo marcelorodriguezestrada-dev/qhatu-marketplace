@@ -61,7 +61,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'categorias-productos' | 'metricas' | 'usuarios'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -730,6 +730,12 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'metricas' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Métricas
+        </button>
+        <button
+          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Usuarios
         </button>
       </div>
 
@@ -1866,6 +1872,74 @@ export default function AdminPage() {
           )}
           {!cargandoMetricas && metricas?.error && (
             <div className="font-body text-sm text-maroon">{metricas.error}</div>
+          )}
+        </div>
+      )}
+
+      {tab === 'usuarios' && (
+        <div>
+          <input
+            value={filtroUsuarios}
+            onChange={(e) => setFiltroUsuarios(e.target.value)}
+            placeholder="Buscar por email o nombre..."
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-4"
+          />
+
+          {cargandoUsuarios ? (
+            <div className="font-body text-sm text-inksoft">Cargando usuarios...</div>
+          ) : usuarios.length === 0 ? (
+            <div className="font-body text-sm text-inksoft">No hay usuarios registrados todavía.</div>
+          ) : (
+            usuarios
+              .filter((u) => {
+                const q = filtroUsuarios.trim().toLowerCase()
+                if (!q) return true
+                return u.email.toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q)
+              })
+              .map((u) => (
+                <div key={u.uid} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
+                      <div className="font-body text-sm font-medium text-ink truncate">{u.email || u.uid}</div>
+                      {u.displayName && <div className="font-body text-xs text-inksoft">{u.displayName}</div>}
+                      <div className="font-body text-[11px] text-inksoft mt-0.5">
+                        {u.vendedor && <span className="mr-2">🛍️ Vende productos</span>}
+                        {u.profesional && <span>🧰 Servicio profesional</span>}
+                        {!u.vendedor && !u.profesional && <span>Sin publicaciones</span>}
+                      </div>
+                      <div className="font-body text-[11px] text-inksoft mt-0.5">
+                        Registrado: {u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-BO') : '—'}
+                        {u.lastSignIn && <> · Último ingreso: {new Date(u.lastSignIn).toLocaleDateString('es-BO')}</>}
+                      </div>
+                    </div>
+                    <span className={`shrink-0 font-body text-[11px] font-semibold px-2 py-0.5 rounded-full ${u.disabled ? 'bg-maroonsoft text-maroon' : 'bg-tealsoft text-teal'}`}>
+                      {u.disabled ? 'Pausado' : 'Activo'}
+                    </span>
+                  </div>
+
+                  <input
+                    value={notaUsuario[u.uid] ?? ''}
+                    onChange={(e) => setNotaUsuario((prev) => ({ ...prev, [u.uid]: e.target.value }))}
+                    placeholder="Nota interna (opcional, ej: motivo de la pausa)"
+                    className="w-full px-3 py-1.5 rounded-md border border-line font-body text-xs mb-2"
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleUsuario(u.uid, !u.disabled)}
+                      className={`px-3.5 py-1.5 rounded-md border-none font-body text-xs font-semibold text-white ${u.disabled ? 'bg-teal' : 'bg-ochre'}`}
+                    >
+                      {u.disabled ? 'Reactivar' : 'Pausar'}
+                    </button>
+                    <button
+                      onClick={() => eliminarUsuario(u.uid, u.email)}
+                      className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))
           )}
         </div>
       )}
