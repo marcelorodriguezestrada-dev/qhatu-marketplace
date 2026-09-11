@@ -628,6 +628,46 @@ export default function AdminPage() {
     )
   }
 
+
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  const [filtroUsuarios, setFiltroUsuarios] = useState('')
+  const [notaUsuario, setNotaUsuario] = useState<Record<string, string>>({})
+
+  async function cargarUsuarios() {
+    setCargandoUsuarios(true)
+    try {
+      const res = await fetch('/api/admin/usuarios', {
+        headers: { 'x-admin-password': password }
+      })
+      const data = await res.json()
+      setUsuarios(data.usuarios || [])
+    } finally { setCargandoUsuarios(false) }
+  }
+
+  async function toggleUsuario(uid: string, disabled: boolean) {
+    const accion = disabled ? 'pausar' : 'reactivar'
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este usuario?`)) return
+    await fetch('/api/admin/usuarios', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ uid, disabled, nota: notaUsuario[uid] || '' })
+    })
+    setUsuarios(prev => prev.map(u => u.uid === uid ? { ...u, disabled } : u))
+  }
+
+  async function eliminarUsuario(uid: string, email: string) {
+    if (!confirm(`¿ELIMINAR PERMANENTEMENTE el usuario ${email}? Esta acción no se puede deshacer.`)) return
+    if (!confirm('Confirmá una vez más. Se eliminarán todos sus datos.')) return
+    await fetch('/api/admin/usuarios', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ uid })
+    })
+    setUsuarios(prev => prev.filter(u => u.uid !== uid))
+  }
+
+
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="grid grid-cols-2 gap-3 mb-6">
