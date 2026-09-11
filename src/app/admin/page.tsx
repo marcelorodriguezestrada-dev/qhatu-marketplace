@@ -247,6 +247,11 @@ export default function AdminPage() {
   const [editEstado, setEditEstado] = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
 
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  const [filtroUsuarios, setFiltroUsuarios] = useState('')
+  const [notaUsuario, setNotaUsuario] = useState<Record<string, string>>({})
+
   function abrirEditarProducto(p: any) {
     setProductoEditando(p)
     setEditNombre(p.nombre || '')
@@ -628,11 +633,6 @@ export default function AdminPage() {
     )
   }
 
-
-  const [usuarios, setUsuarios] = useState<any[]>([])
-  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
-  const [filtroUsuarios, setFiltroUsuarios] = useState('')
-  const [notaUsuario, setNotaUsuario] = useState<Record<string, string>>({})
 
   async function cargarUsuarios() {
     setCargandoUsuarios(true)
