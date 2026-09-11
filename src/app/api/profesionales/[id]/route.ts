@@ -3,7 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { validarHorario } from '@/data/turnos'
-import { esPremiumVigente, calcularNuevaVigencia } from '@/lib/planPremium'
+import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +104,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     await getDb().collection('profesionales').doc(params.id).update(cambios)
+
+    // Registro contable: solo cuando esto vino del flujo real de
+    // "Confirmar pago recibido" (planEstadoPago:'ninguno' + una
+    // vigencia calculada explícita) — no cuando el admin activa
+    // Premium a mano desde el formulario general de edición (arriba),
+    // porque ahí no hubo necesariamente un pago real de por medio.
+    if (cambios.plan === 'premium' && planEstadoPago === 'ninguno' && planVigenciaHasta !== undefined) {
+      const profDoc = await getDb().collection('profesionales').doc(params.id).get()
+      await getDb().collection('pagos_premium').add({
+        profesionalId: params.id,
+        profesionalNombre: profDoc.data()?.nombre || null,
+        monto: PRECIO_PREMIUM_BS,
+        vigenciaHasta: planVigenciaHasta,
+        fecha: new Date().toISOString(),
+      })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/profesionales/[id]', err)

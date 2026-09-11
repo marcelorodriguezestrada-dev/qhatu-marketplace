@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, contarUsuarios } from '@/lib/firebaseAdmin'
 import { construirSerieDiaria, reagruparPor, agruparPorDiaSemana, compararSemanas, ultimosDiasContinuos } from '@/lib/serieTiempo'
+import { esPremiumVigente, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,13 +19,14 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap] = await Promise.all([
+    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
       db.collection('productos').get(),
       db.collection('profesionales').get(),
       db.collection('pedidos').get(),
       db.collection('analitica_categorias').get(),
       db.collection('metricas_diarias').get(),
+      db.collection('pagos_premium').get(),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
@@ -58,6 +60,38 @@ export async function GET(req: NextRequest) {
     const totalResenas = profesionales.reduce((s, p) => s + (p.cantidadResenas || 0), 0)
     const totalVistasProfesionales = profesionales.reduce((s, p) => s + (p.vistas || 0), 0)
     const totalClicsWhatsapp = profesionales.reduce((s, p) => s + (p.clicsWhatsapp || 0), 0)
+
+    // ── Flujo de caja (Premium de profesionales — es el único ingreso
+    // real y verificado que recibe la plataforma; los pedidos del
+    // marketplace se cobran directo al vendedor por su propio QR, no
+    // pasan por acá). "pagos_premium" es el registro de cada vez que
+    // el admin confirmó un pago; se empezó a llevar recién, así que el
+    // histórico solo cuenta desde que se activó esto.
+    const pagosPremium = pagosPremiumSnap.docs.map((d) => d.data() as any)
+    const inicioMes = new Date()
+    inicioMes.setDate(1)
+    inicioMes.setHours(0, 0, 0, 0)
+    const pagosPremiumEsteMes = pagosPremium.filter((p) => p.fecha && new Date(p.fecha) >= inicioMes)
+
+    const premiumVigentes = profesionales.filter((p) => esPremiumVigente(p))
+    const en7Dias = new Date()
+    en7Dias.setDate(en7Dias.getDate() + 7)
+    const premiumVenciendoPronto = premiumVigentes.filter(
+      (p) => p.planVigenciaHasta && new Date(p.planVigenciaHasta) <= en7Dias
+    )
+    const premiumPagoPorConfirmar = profesionales.filter((p) => p.planEstadoPago === 'informado_pago')
+
+    const flujoCaja = {
+      pagosConfirmadosHistorico: pagosPremium.length,
+      facturadoHistorico: pagosPremium.reduce((s, p) => s + (Number(p.monto) || 0), 0),
+      pagosEsteMes: pagosPremiumEsteMes.length,
+      facturadoEsteMes: pagosPremiumEsteMes.reduce((s, p) => s + (Number(p.monto) || 0), 0),
+      premiumVigentesAhora: premiumVigentes.length,
+      porConfirmar: premiumPagoPorConfirmar.length,
+      venciendoEn7Dias: premiumVenciendoPronto.length,
+      proyeccionProximos30Dias: premiumVigentes.length * PRECIO_PREMIUM_BS,
+      precioPremiumBs: PRECIO_PREMIUM_BS,
+    }
 
     const productosMasVistos = [...productos]
       .filter((p) => (p.vistas || 0) > 0)
@@ -106,6 +140,7 @@ export async function GET(req: NextRequest) {
         totalClicsWhatsapp,
       },
       pedidos: { total: pedidos.length, porEstado: pedidosPorEstado, totalFacturado },
+      flujoCaja,
       productosMasVistos,
       profesionalesMasClicWhatsapp,
       categoriasMasBuscadas,

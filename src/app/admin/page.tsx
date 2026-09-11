@@ -1570,6 +1570,47 @@ export default function AdminPage() {
           {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
           {!cargandoMetricas && metricas && !metricas.error && (
             <div>
+              {metricas.flujoCaja && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-1">💰 Flujo de caja — Premium de profesionales</div>
+                  <div className="font-body text-[11px] text-inksoft mb-3">
+                    Es el único ingreso real y verificado que recibe la plataforma — los pedidos del marketplace se cobran directo al vendedor por su propio QR, no pasan por tu cuenta. El histórico de pagos se empezó a registrar recién, así que "histórico" cuenta solo desde ahora en adelante.
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+                    <div className="bg-panel border border-line rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Pagos confirmados (histórico)</div>
+                      <div className="font-display text-lg font-bold text-ink">{metricas.flujoCaja.pagosConfirmadosHistorico}</div>
+                      <div className="font-body text-[11px] text-inksoft">{bs(metricas.flujoCaja.facturadoHistorico)}</div>
+                    </div>
+                    <div className="bg-panel border border-line rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Pagos este mes</div>
+                      <div className="font-display text-lg font-bold text-ink">{metricas.flujoCaja.pagosEsteMes}</div>
+                      <div className="font-body text-[11px] text-inksoft">{bs(metricas.flujoCaja.facturadoEsteMes)}</div>
+                    </div>
+                    <div className="bg-panel border border-teal rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Premium vigentes ahora</div>
+                      <div className="font-display text-lg font-bold text-teal">{metricas.flujoCaja.premiumVigentesAhora}</div>
+                      <div className="font-body text-[11px] text-inksoft">Tu ingreso recurrente actual</div>
+                    </div>
+                    <div className="bg-ochresoft border border-ochre rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Pagos por confirmar</div>
+                      <div className="font-display text-lg font-bold text-ink">{metricas.flujoCaja.porConfirmar}</div>
+                      <div className="font-body text-[11px] text-inksoft">Dicen que ya pagaron — revisalos abajo, en "Servicios profesionales"</div>
+                    </div>
+                    <div className="bg-panel border border-line rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Vencen en 7 días</div>
+                      <div className="font-display text-lg font-bold text-ink">{metricas.flujoCaja.venciendoEn7Dias}</div>
+                      <div className="font-body text-[11px] text-inksoft">Riesgo de no renovar</div>
+                    </div>
+                    <div className="bg-maroonsoft border border-maroon rounded-lg p-3">
+                      <div className="font-body text-[10px] text-inksoft mb-0.5">Proyección próx. 30 días</div>
+                      <div className="font-display text-lg font-bold text-maroon">{bs(metricas.flujoCaja.proyeccionProximos30Dias)}</div>
+                      <div className="font-body text-[11px] text-inksoft">Si todos los vigentes renuevan</div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="font-body text-sm font-semibold text-ink mb-1">Evolución en el tiempo</div>
               <div className="font-body text-[11px] text-inksoft mb-3">
                 Visitas, vistas, clics y búsquedas se empiezan a contar día a día desde ahora — antes solo se guardaba un total acumulado, sin saber qué día. Pedidos, productos y profesionales publicados sí muestran toda la historia, porque ya tenían fecha guardada.
