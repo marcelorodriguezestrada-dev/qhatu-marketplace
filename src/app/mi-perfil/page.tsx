@@ -66,6 +66,7 @@ export default function MiPerfilPage() {
   const [horarioGuardado, setHorarioGuardado] = useState(false)
   const [turnos, setTurnos] = useState<any[]>([])
   const [cargandoTurnos, setCargandoTurnos] = useState(false)
+  const [mandandoRecordatorioId, setMandandoRecordatorioId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
@@ -98,6 +99,27 @@ export default function MiPerfilPage() {
       setTurnos(data.turnos || [])
     } finally {
       setCargandoTurnos(false)
+    }
+  }
+
+  function linkWhatsappRecordatorio(t: any) {
+    const texto = `Hola ${t.nombre}! Te escribo para recordarte tu turno de mañana ${t.diaLabel} a las ${t.hora}. ¿Seguís confirmado?`
+    return `https://wa.me/${(t.contacto || '').replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
+  }
+
+  async function mandarRecordatorioMail(t: any) {
+    setMandandoRecordatorioId(t.id)
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/turnos/${t.id}/recordatorio`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.error) { setError(data.error); return }
+      setTurnos((prev) => prev.map((x) => (x.id === t.id ? { ...x, recordatorioEnviado: true, recordatorioEnviadoEn: data.recordatorioEnviadoEn } : x)))
+    } finally {
+      setMandandoRecordatorioId(null)
     }
   }
 
@@ -401,6 +423,9 @@ export default function MiPerfilPage() {
             <div className="font-body text-xs text-inksoft mb-3">
               Armá tu agenda por bloques: por ejemplo "Lunes a viernes, 19:00 a 21:00" y "Sábados, 9:00 a 14:00" pueden ser dos bloques distintos, cada uno con su propio rango.
             </div>
+            <div className="font-body text-[11px] text-inksoft mb-3">
+              Los turnos reservados por mail reciben un recordatorio automático un día antes. Los reservados por WhatsApp no se pueden mandar solos — usá el botón "Recordar" de cada turno para abrirle el WhatsApp vos mismo.
+            </div>
 
             {horario.bloques.length > 0 && (
               <div className="flex flex-col gap-1.5 mb-3">
@@ -491,10 +516,35 @@ export default function MiPerfilPage() {
               <div className="flex flex-col gap-2">
                 {turnos.map((t) => (
                   <div key={t.id} className="bg-panelalt rounded-lg p-3">
-                    <div className="font-body text-sm font-semibold text-ink">{t.diaLabel} · {t.hora}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-body text-sm font-semibold text-ink">{t.diaLabel} · {t.hora}</div>
+                      {t.contactoTipo === 'mail' ? (
+                        <button
+                          onClick={() => mandarRecordatorioMail(t)}
+                          disabled={mandandoRecordatorioId === t.id}
+                          className="px-2.5 py-1 rounded-md border border-line font-body text-[11px] text-ink shrink-0 disabled:opacity-50"
+                        >
+                          {mandandoRecordatorioId === t.id ? 'Enviando...' : t.recordatorioEnviado ? '✓ Recordado' : 'Recordar'}
+                        </button>
+                      ) : (
+                        <a
+                          href={linkWhatsappRecordatorio(t)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded-md border border-line font-body text-[11px] text-teal shrink-0"
+                        >
+                          💬 Recordar
+                        </a>
+                      )}
+                    </div>
                     <div className="font-body text-xs text-inksoft">
                       {t.nombre} · {t.contacto} ({t.contactoTipo === 'mail' ? 'mail' : 'WhatsApp'})
                     </div>
+                    {t.recordatorioEnviadoEn && (
+                      <div className="font-body text-[11px] text-inksoft mt-0.5">
+                        Recordatorio enviado {t.recordatorioAutomatico ? 'automáticamente' : ''} el {new Date(t.recordatorioEnviadoEn).toLocaleDateString('es-BO')}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

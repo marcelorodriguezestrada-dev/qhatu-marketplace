@@ -70,3 +70,26 @@ export async function enviarNotificacionTurnoProfesional(destino: string, turno:
     `,
   })
 }
+
+// Recordatorio al CLIENTE, mandado manualmente por el profesional (botón
+// "Recordar" en Mis turnos) o automáticamente 1 día antes (ver
+// /api/turnos/recordatorios-automaticos, que solo puede mandar mail —
+// no hay forma de mandar un WhatsApp sin que la persona lo abra ella misma).
+export async function enviarRecordatorioTurno(destino: string, turno: DatosTurno) {
+  const resend = getResend()
+  if (!resend) return null
+  return resend.emails.send({
+    from: FROM,
+    to: destino,
+    subject: `Recordatorio: tu turno con ${turno.profesionalNombre} es mañana`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color:#2B211D;">
+        <h2 style="color:#7A2E2E;">Recordatorio de tu turno</h2>
+        <p>Hola ${turno.nombre}, te escribimos para recordarte tu turno con <strong>${turno.profesionalNombre}</strong>:</p>
+        <p style="font-size:16px;"><strong>${turno.diaLabel} a las ${turno.hora}</strong></p>
+        <p style="margin-top:20px; font-size:13px; color:#6b5f57;">Si ya no podés asistir, avisale directamente para que pueda ofrecer ese horario a otra persona.</p>
+        <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
+      </div>
+    `,
+  })
+}
