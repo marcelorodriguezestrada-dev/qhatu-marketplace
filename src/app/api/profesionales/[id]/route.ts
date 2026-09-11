@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { validarHorario } from '@/data/turnos'
+import { esPremiumVigente, calcularNuevaVigencia } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         return NextResponse.json({ error: 'Horario inválido.' }, { status: 400 })
       }
       cambios.horarioTurnos = horario
+    }
+
+    // Si el admin activa Premium desde el formulario general de edición
+    // (no desde "Confirmar pago recibido"), y no mandó una vigencia
+    // explícita, la activamos ya mismo — si no, quedaría guardado
+    // plan:'premium' pero sin efecto (esPremiumVigente exige AMBAS
+    // cosas: plan Y una vigencia futura), y el profesional no vería
+    // nada nuevo pese a que el admin cree que ya lo activó.
+    if (cambios.plan === 'premium' && planVigenciaHasta === undefined) {
+      const ref = getDb().collection('profesionales').doc(params.id)
+      const actual = (await ref.get()).data() || {}
+      if (!esPremiumVigente(actual)) {
+        cambios.planVigenciaHasta = calcularNuevaVigencia(actual.planVigenciaHasta)
+      }
     }
 
     await getDb().collection('profesionales').doc(params.id).update(cambios)
