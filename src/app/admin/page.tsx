@@ -6,6 +6,7 @@ import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
+import { DIAS_SEMANA } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
@@ -111,6 +112,11 @@ export default function AdminPage() {
   // null = formulario en modo "publicar nuevo". Con un id, el mismo
   // formulario pasa a modo edición de ese profesional ya existente.
   const [profesionalEditandoId, setProfesionalEditandoId] = useState<string | null>(null)
+  const [editHorarioDias, setEditHorarioDias] = useState<number[]>([])
+  const [editHorarioHoras, setEditHorarioHoras] = useState<string[]>([])
+  const [editNuevaHora, setEditNuevaHora] = useState('')
+  const [guardandoHorarioAdmin, setGuardandoHorarioAdmin] = useState(false)
+  const [horarioAdminGuardado, setHorarioAdminGuardado] = useState(false)
 
   // Pestaña "Categorías": alta de categoría nueva, alta de rubro dentro
   // de una categoría, y reubicar un rubro existente a otra categoría.
@@ -367,6 +373,8 @@ export default function AdminPage() {
     setPrecio(p.precio != null ? String(p.precio) : '')
     setExperiencia(p.experiencia || '')
     setPlan(p.plan === 'premium' ? 'premium' : 'basico')
+    setEditHorarioDias(p.horarioTurnos?.dias || [])
+    setEditHorarioHoras(p.horarioTurnos?.horas || [])
     setErrorForm('')
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -375,10 +383,43 @@ export default function AdminPage() {
     setProfesionalEditandoId(null)
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
+    setEditHorarioDias([]); setEditHorarioHoras([]); setEditNuevaHora('')
     setErrorForm('')
   }
 
-  function borrarProfesional(id: string) {
+  function toggleDiaAdmin(diaId: number) {
+    setEditHorarioDias((dias) => (dias.includes(diaId) ? dias.filter((d) => d !== diaId) : [...dias, diaId].sort()))
+  }
+
+  function agregarHoraAdmin() {
+    const hora = editNuevaHora.trim()
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora) || editHorarioHoras.includes(hora)) return
+    setEditHorarioHoras((horas) => [...horas, hora].sort())
+    setEditNuevaHora('')
+  }
+
+  function quitarHoraAdmin(hora: string) {
+    setEditHorarioHoras((horas) => horas.filter((h) => h !== hora))
+  }
+
+  async function guardarHorarioAdmin() {
+    if (!profesionalEditandoId) return
+    setGuardandoHorarioAdmin(true)
+    setHorarioAdminGuardado(false)
+    try {
+      const res = await fetch(`/api/profesionales/${profesionalEditandoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ horarioTurnos: { dias: editHorarioDias, horas: editHorarioHoras } }),
+      })
+      const data = await res.json()
+      if (data.error) { setErrorForm(data.error); return }
+      setHorarioAdminGuardado(true)
+      cargarProfesionales()
+    } finally {
+      setGuardandoHorarioAdmin(false)
+    }
+  }
     fetch(`/api/profesionales/${id}`, {
       method: 'DELETE',
       headers: { 'x-admin-password': password },
@@ -936,6 +977,60 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
+            {profesionalEditandoId && plan === 'premium' && (
+              <div className="bg-panelalt rounded-lg p-3 mb-4">
+                <div className="font-body text-xs font-semibold text-ink mb-2">Agenda de turnos (Premium)</div>
+                <div className="font-body text-[11px] text-inksoft mb-2">Días que atiende</div>
+                <div className="flex gap-1.5 flex-wrap mb-3">
+                  {DIAS_SEMANA.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleDiaAdmin(d.id)}
+                      className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
+                        editHorarioDias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                      }`}
+                    >
+                      {d.corto}
+                    </button>
+                  ))}
+                </div>
+                <div className="font-body text-[11px] text-inksoft mb-2">Horarios</div>
+                <div className="flex gap-1.5 flex-wrap mb-2">
+                  {editHorarioHoras.map((h) => (
+                    <span key={h} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-panel font-body text-xs text-ink">
+                      {h}
+                      <button type="button" onClick={() => quitarHoraAdmin(h)} className="text-inksoft border-none bg-transparent leading-none">✕</button>
+                    </span>
+                  ))}
+                  {editHorarioHoras.length === 0 && <span className="font-body text-xs text-inksoft">Sin horarios cargados.</span>}
+                </div>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="time"
+                    value={editNuevaHora}
+                    onChange={(e) => setEditNuevaHora(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+                  />
+                  <button type="button" onClick={agregarHoraAdmin} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink shrink-0">
+                    + Agregar hora
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={guardarHorarioAdmin}
+                  disabled={guardandoHorarioAdmin}
+                  className="px-3.5 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-60"
+                >
+                  {guardandoHorarioAdmin ? 'Guardando...' : 'Guardar agenda'}
+                </button>
+                {horarioAdminGuardado && <span className="font-body text-[11px] text-teal ml-2">Guardado ✓</span>}
+                <div className="font-body text-[11px] text-inksoft mt-2">
+                  Esto es lo mismo que el profesional puede cargar solo desde su perfil — se guarda al toque, no hace falta tocar "Guardar cambios" de abajo.
+                </div>
+              </div>
+            )}
+
             {errorForm && <div className="font-body text-xs text-maroon mb-3">{errorForm}</div>}
             <button
               type="submit"

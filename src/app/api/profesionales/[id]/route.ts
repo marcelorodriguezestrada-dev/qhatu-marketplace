@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { validarHorario } from '@/data/turnos'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia } = body
+    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos } = body
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -74,6 +75,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
     if (experiencia !== undefined) cambios.experiencia = experiencia
+    // El admin puede cargar/corregir la agenda de turnos de un
+    // profesional (mismo campo que el self-service de
+    // /api/profesionales/[id]/horarios, pero sin exigirle Premium —
+    // es una herramienta de soporte, por si hay que arreglarle algo
+    // a mano mientras habla con él).
+    if (horarioTurnos !== undefined) {
+      const horario = { dias: horarioTurnos.dias || [], horas: horarioTurnos.horas || [] }
+      if (!validarHorario(horario)) {
+        return NextResponse.json({ error: 'Horario inválido.' }, { status: 400 })
+      }
+      cambios.horarioTurnos = horario
+    }
 
     await getDb().collection('profesionales').doc(params.id).update(cambios)
     return NextResponse.json({ ok: true })
