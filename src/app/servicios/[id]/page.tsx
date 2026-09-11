@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { useCategorias } from '@/lib/useCategorias'
+import { esPremiumVigente } from '@/lib/planPremium'
+import { getProximosDiasSegunHorario } from '@/data/turnos'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -31,6 +33,17 @@ export default function PerfilProfesionalPage() {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
+  // --- Reservar turno (perfiles Premium con horario cargado) ---
+  const [ocupados, setOcupados] = useState<string[]>([])
+  const [diaSel, setDiaSel] = useState<{ iso: string; label: string } | null>(null)
+  const [horaSel, setHoraSel] = useState('')
+  const [nombreReserva, setNombreReserva] = useState('')
+  const [contactoReserva, setContactoReserva] = useState('')
+  const [contactoTipoReserva, setContactoTipoReserva] = useState<'whatsapp' | 'mail'>('whatsapp')
+  const [reservando, setReservando] = useState(false)
+  const [reservado, setReservado] = useState(false)
+  const [errorReserva, setErrorReserva] = useState('')
+
   function cargar() {
     fetch(`/api/profesionales/${id}`)
       .then((r) => r.json())
@@ -44,6 +57,54 @@ export default function PerfilProfesionalPage() {
     if (id) cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    fetch(`/api/turnos/disponibilidad?profesionalId=${id}`)
+      .then((r) => r.json())
+      .then((data) => setOcupados(data.ocupados || []))
+      .catch(() => {})
+  }, [id])
+
+  async function reservarTurno(e: React.FormEvent) {
+    e.preventDefault()
+    setErrorReserva('')
+    if (!diaSel || !horaSel) {
+      setErrorReserva('Elegí un día y una hora.')
+      return
+    }
+    if (!nombreReserva.trim() || !contactoReserva.trim()) {
+      setErrorReserva('Completá tu nombre y tu contacto.')
+      return
+    }
+    setReservando(true)
+    try {
+      const res = await fetch('/api/turnos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profesionalId: id,
+          nombre: nombreReserva.trim(),
+          fecha: diaSel.iso,
+          diaLabel: diaSel.label,
+          hora: horaSel,
+          contacto: contactoReserva.trim(),
+          contactoTipo: contactoTipoReserva,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setErrorReserva(data.error)
+        return
+      }
+      setReservado(true)
+      setOcupados((o) => [...o, `${diaSel.iso}|${horaSel}`])
+    } catch {
+      setErrorReserva('No se pudo reservar el turno. Probá de nuevo.')
+    } finally {
+      setReservando(false)
+    }
+  }
 
   async function enviarResena(e: React.FormEvent) {
     e.preventDefault()
@@ -76,6 +137,14 @@ export default function PerfilProfesionalPage() {
   )}`
 
   const rubroInfo = buscarRubro(perfil.rubro)
+
+  const premiumVigente = esPremiumVigente(perfil)
+  const horarioTurnos = perfil.horarioTurnos || { dias: [], horas: [] }
+  const agendaActiva = premiumVigente && horarioTurnos.dias.length > 0 && horarioTurnos.horas.length > 0
+  const diasDisponibles = agendaActiva ? getProximosDiasSegunHorario(horarioTurnos.dias, 10) : []
+  const horasDelDiaSel = diaSel
+    ? horarioTurnos.horas.filter((h: string) => !ocupados.includes(`${diaSel.iso}|${h}`))
+    : []
 
   return (
     <div className="max-w-[880px] mx-auto px-5 py-8">
@@ -208,6 +277,94 @@ export default function PerfilProfesionalPage() {
             >
               Contactar por WhatsApp
             </a>
+
+            {agendaActiva && (
+              <div className="mt-4 pt-4 border-t border-line">
+                <div className="font-body text-sm font-semibold text-ink mb-3">Reservar turno</div>
+                {reservado ? (
+                  <div className="font-body text-sm text-teal bg-teal/10 rounded-lg p-3">
+                    ¡Listo! Tu turno con {perfil.nombre} quedó para el {diaSel?.label} a las {horaSel}.
+                    {contactoTipoReserva === 'mail' && ' Te mandamos la confirmación por mail.'}
+                  </div>
+                ) : (
+                  <form onSubmit={reservarTurno}>
+                    <div className="font-body text-xs text-inksoft mb-1.5">Elegí el día</div>
+                    <div className="flex gap-1.5 flex-wrap mb-3">
+                      {diasDisponibles.map((d) => (
+                        <button
+                          key={d.iso}
+                          type="button"
+                          onClick={() => { setDiaSel(d); setHoraSel('') }}
+                          className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
+                            diaSel?.iso === d.iso ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panelalt text-inksoft'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {diaSel && (
+                      <>
+                        <div className="font-body text-xs text-inksoft mb-1.5">Elegí la hora</div>
+                        <div className="flex gap-1.5 flex-wrap mb-3">
+                          {horasDelDiaSel.length === 0 && (
+                            <span className="font-body text-xs text-inksoft">No quedan horarios libres ese día.</span>
+                          )}
+                          {horasDelDiaSel.map((h: string) => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => setHoraSel(h)}
+                              className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
+                                horaSel === h ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panelalt text-inksoft'
+                              }`}
+                            >
+                              {h}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {diaSel && horaSel && (
+                      <>
+                        <input
+                          value={nombreReserva}
+                          onChange={(e) => setNombreReserva(e.target.value)}
+                          placeholder="Tu nombre"
+                          className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm mb-2"
+                        />
+                        <div className="flex gap-2 mb-2">
+                          <select
+                            value={contactoTipoReserva}
+                            onChange={(e) => setContactoTipoReserva(e.target.value as 'whatsapp' | 'mail')}
+                            className="px-2 py-2 rounded-lg border border-line font-body text-xs bg-panel shrink-0"
+                          >
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="mail">Mail</option>
+                          </select>
+                          <input
+                            value={contactoReserva}
+                            onChange={(e) => setContactoReserva(e.target.value)}
+                            placeholder={contactoTipoReserva === 'mail' ? 'tu@mail.com' : 'Tu WhatsApp'}
+                            className="flex-1 px-3 py-2 rounded-lg border border-line font-body text-sm"
+                          />
+                        </div>
+                        {errorReserva && <div className="font-body text-xs text-maroon mb-2">{errorReserva}</div>}
+                        <button
+                          type="submit"
+                          disabled={reservando}
+                          className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+                        >
+                          {reservando ? 'Reservando...' : 'Confirmar turno'}
+                        </button>
+                      </>
+                    )}
+                  </form>
+                )}
+              </div>
+            )}
 
             {perfil.instagram && (
               <a

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
+import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO } from '@/data/turnos'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -54,6 +55,14 @@ export default function MiPerfilPage() {
   const [declarando, setDeclarando] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
 
+  // --- Mis turnos (beneficio Premium) ---
+  const [horario, setHorario] = useState<HorarioProfesional>(HORARIO_VACIO)
+  const [nuevaHora, setNuevaHora] = useState('')
+  const [guardandoHorario, setGuardandoHorario] = useState(false)
+  const [horarioGuardado, setHorarioGuardado] = useState(false)
+  const [turnos, setTurnos] = useState<any[]>([])
+  const [cargandoTurnos, setCargandoTurnos] = useState(false)
+
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
   }, [authCargando, usuario, router])
@@ -63,6 +72,71 @@ export default function MiPerfilPage() {
     cargarPerfil()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario])
+
+  useEffect(() => {
+    if (!profesional || !esPremiumVigente(profesional)) return
+    fetch(`/api/profesionales/${profesional.id}/horarios`)
+      .then((r) => r.json())
+      .then((data) => setHorario({ dias: data.dias || [], horas: data.horas || [] }))
+    cargarTurnos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profesional?.id, profesional?.plan, profesional?.planVigenciaHasta])
+
+  async function cargarTurnos() {
+    if (!profesional) return
+    setCargandoTurnos(true)
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/turnos?profesionalId=${profesional.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      setTurnos(data.turnos || [])
+    } finally {
+      setCargandoTurnos(false)
+    }
+  }
+
+  function toggleDia(diaId: number) {
+    setHorario((h) => ({
+      ...h,
+      dias: h.dias.includes(diaId) ? h.dias.filter((d) => d !== diaId) : [...h.dias, diaId].sort(),
+    }))
+  }
+
+  function agregarHora() {
+    const hora = nuevaHora.trim()
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return
+    if (horario.horas.includes(hora)) return
+    setHorario((h) => ({ ...h, horas: [...h.horas, hora].sort() }))
+    setNuevaHora('')
+  }
+
+  function quitarHora(hora: string) {
+    setHorario((h) => ({ ...h, horas: h.horas.filter((x) => x !== hora) }))
+  }
+
+  async function guardarHorario() {
+    if (!profesional) return
+    setGuardandoHorario(true)
+    setHorarioGuardado(false)
+    setError('')
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/profesionales/${profesional.id}/horarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(horario),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setHorarioGuardado(true)
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo guardar tu horario.')
+    } finally {
+      setGuardandoHorario(false)
+    }
+  }
 
   async function cargarPerfil() {
     try {
@@ -305,6 +379,82 @@ export default function MiPerfilPage() {
         ) : (
           <div className="font-body text-xs text-inksoft">
             Con Premium podés agregar hasta {MAX_FOTOS_ADICIONALES_PREMIUM} fotos más a tu perfil, además de la principal.
+          </div>
+        )}
+      </div>
+
+      {/* --- Mis turnos (beneficio Premium) --- */}
+      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+        <div className="font-body text-sm font-semibold text-ink mb-3">Mis turnos</div>
+        {premiumVigente ? (
+          <>
+            <div className="font-body text-xs text-inksoft mb-2">Días que atendés</div>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {DIAS_SEMANA.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => toggleDia(d.id)}
+                  className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
+                    horario.dias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panelalt text-inksoft'
+                  }`}
+                >
+                  {d.corto}
+                </button>
+              ))}
+            </div>
+
+            <div className="font-body text-xs text-inksoft mb-2">Horarios que ofrecés</div>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {horario.horas.map((h) => (
+                <span key={h} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-panelalt font-body text-xs text-ink">
+                  {h}
+                  <button onClick={() => quitarHora(h)} className="text-inksoft border-none bg-transparent leading-none">✕</button>
+                </span>
+              ))}
+              {horario.horas.length === 0 && <span className="font-body text-xs text-inksoft">Todavía no cargaste horarios.</span>}
+            </div>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="time"
+                value={nuevaHora}
+                onChange={(e) => setNuevaHora(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+              />
+              <button onClick={agregarHora} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink shrink-0">
+                + Agregar hora
+              </button>
+            </div>
+
+            <button
+              onClick={guardarHorario}
+              disabled={guardandoHorario}
+              className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60 mb-1"
+            >
+              {guardandoHorario ? 'Guardando...' : 'Guardar horario'}
+            </button>
+            {horarioGuardado && <div className="font-body text-[11px] text-teal mb-3">Guardado ✓ — ya aparece disponible en tu perfil público.</div>}
+
+            <div className="font-body text-xs text-inksoft mt-4 mb-2">Próximos turnos reservados</div>
+            {cargandoTurnos ? (
+              <div className="font-body text-xs text-inksoft">Cargando...</div>
+            ) : turnos.length === 0 ? (
+              <div className="font-body text-xs text-inksoft">Todavía nadie te reservó un turno.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {turnos.map((t) => (
+                  <div key={t.id} className="bg-panelalt rounded-lg p-3">
+                    <div className="font-body text-sm font-semibold text-ink">{t.diaLabel} · {t.hora}</div>
+                    <div className="font-body text-xs text-inksoft">
+                      {t.nombre} · {t.contacto} ({t.contactoTipo === 'mail' ? 'mail' : 'WhatsApp'})
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="font-body text-xs text-inksoft">
+            Con Premium activás una agenda propia: cargás tus días y horarios, y la gente reserva turno directo desde tu perfil.
           </div>
         )}
       </div>
