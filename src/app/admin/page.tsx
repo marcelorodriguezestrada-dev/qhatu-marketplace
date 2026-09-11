@@ -420,6 +420,8 @@ export default function AdminPage() {
       setGuardandoHorarioAdmin(false)
     }
   }
+
+  function borrarProfesional(id: string) {
     fetch(`/api/profesionales/${id}`, {
       method: 'DELETE',
       headers: { 'x-admin-password': password },
