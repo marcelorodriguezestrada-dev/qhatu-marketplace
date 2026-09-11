@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { useCategorias } from '@/lib/useCategorias'
 import { esPremiumVigente } from '@/lib/planPremium'
-import { getProximosDiasSegunHorario } from '@/data/turnos'
+import { getProximosDiasSegunHorario, horasDisponiblesDia, diasConAgenda } from '@/data/turnos'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -139,11 +139,11 @@ export default function PerfilProfesionalPage() {
   const rubroInfo = buscarRubro(perfil.rubro)
 
   const premiumVigente = esPremiumVigente(perfil)
-  const horarioTurnos = perfil.horarioTurnos || { dias: [], horas: [] }
-  const agendaActiva = premiumVigente && horarioTurnos.dias.length > 0 && horarioTurnos.horas.length > 0
-  const diasDisponibles = agendaActiva ? getProximosDiasSegunHorario(horarioTurnos.dias, 10) : []
+  const horarioTurnos = perfil.horarioTurnos || { bloques: [] }
+  const agendaActiva = premiumVigente && diasConAgenda(horarioTurnos).length > 0
+  const diasDisponibles = agendaActiva ? getProximosDiasSegunHorario(horarioTurnos, 10) : []
   const horasDelDiaSel = diaSel
-    ? horarioTurnos.horas.filter((h: string) => !ocupados.includes(`${diaSel.iso}|${h}`))
+    ? horasDisponiblesDia(horarioTurnos, new Date(diaSel.iso + 'T12:00:00').getDay()).filter((h: string) => !ocupados.includes(`${diaSel.iso}|${h}`))
     : []
 
   return (

@@ -81,7 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // es una herramienta de soporte, por si hay que arreglarle algo
     // a mano mientras habla con él).
     if (horarioTurnos !== undefined) {
-      const horario = { dias: horarioTurnos.dias || [], horas: horarioTurnos.horas || [] }
+      const horario = { bloques: horarioTurnos.bloques || [] }
       if (!validarHorario(horario)) {
         return NextResponse.json({ error: 'Horario inválido.' }, { status: 400 })
       }

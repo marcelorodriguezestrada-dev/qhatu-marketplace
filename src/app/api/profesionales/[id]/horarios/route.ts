@@ -18,26 +18,26 @@ async function verificarDueñoPremium(ref: FirebaseFirestore.DocumentReference, 
   return { data }
 }
 
-// GET: público — el horario configurado (días y horas), para armar el
-// selector de "Reservar turno" en la ficha del profesional. Devuelve
-// vacío si todavía no cargó nada o si perdió el Premium.
+// GET: público — el horario configurado (bloques por día), para armar
+// el selector de "Reservar turno" en la ficha del profesional.
+// Devuelve vacío si todavía no cargó nada o si perdió el Premium.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const doc = await getDb().collection('profesionales').doc(params.id).get()
-    if (!doc.exists) return NextResponse.json({ dias: [], horas: [] })
+    if (!doc.exists) return NextResponse.json({ bloques: [] })
     const data = doc.data()!
-    if (!esPremiumVigente(data)) return NextResponse.json({ dias: [], horas: [] })
+    if (!esPremiumVigente(data)) return NextResponse.json({ bloques: [] })
     const horario = data.horarioTurnos
-    if (!validarHorario(horario)) return NextResponse.json({ dias: [], horas: [] })
+    if (!validarHorario(horario)) return NextResponse.json({ bloques: [] })
     return NextResponse.json(horario)
   } catch (err) {
     console.error('GET /api/profesionales/[id]/horarios', err)
-    return NextResponse.json({ dias: [], horas: [] })
+    return NextResponse.json({ bloques: [] })
   }
 }
 
-// POST { dias: number[], horas: string[] } — guarda el horario. Solo
-// el dueño del perfil, y solo si tiene Premium vigente.
+// POST { bloques: BloqueHorario[] } — guarda el horario. Solo el
+// dueño del perfil, y solo si tiene Premium vigente.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
@@ -49,9 +49,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if ('error' in chequeo) return NextResponse.json({ error: chequeo.error }, { status: chequeo.status })
 
     const body = await req.json()
-    const horario = { dias: body.dias || [], horas: body.horas || [] }
+    const horario = { bloques: body.bloques || [] }
     if (!validarHorario(horario)) {
-      return NextResponse.json({ error: 'Horario inválido. Las horas van en formato HH:MM.' }, { status: 400 })
+      return NextResponse.json({ error: 'Horario inválido. Revisá los rangos de horas cargados.' }, { status: 400 })
     }
 
     await ref.update({ horarioTurnos: horario })

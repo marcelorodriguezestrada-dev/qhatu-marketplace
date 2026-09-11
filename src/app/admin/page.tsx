@@ -6,7 +6,7 @@ import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
-import { DIAS_SEMANA } from '@/data/turnos'
+import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
@@ -112,9 +112,12 @@ export default function AdminPage() {
   // null = formulario en modo "publicar nuevo". Con un id, el mismo
   // formulario pasa a modo edición de ese profesional ya existente.
   const [profesionalEditandoId, setProfesionalEditandoId] = useState<string | null>(null)
-  const [editHorarioDias, setEditHorarioDias] = useState<number[]>([])
-  const [editHorarioHoras, setEditHorarioHoras] = useState<string[]>([])
-  const [editNuevaHora, setEditNuevaHora] = useState('')
+  const [editHorarioBloques, setEditHorarioBloques] = useState<BloqueHorario[]>([])
+  const [editNuevoBloqueDias, setEditNuevoBloqueDias] = useState<number[]>([])
+  const [editNuevoBloqueDesde, setEditNuevoBloqueDesde] = useState('09:00')
+  const [editNuevoBloqueHasta, setEditNuevoBloqueHasta] = useState('18:00')
+  const [editNuevoBloqueIntervalo, setEditNuevoBloqueIntervalo] = useState(60)
+  const [editNuevoBloqueTodoElDia, setEditNuevoBloqueTodoElDia] = useState(false)
   const [guardandoHorarioAdmin, setGuardandoHorarioAdmin] = useState(false)
   const [horarioAdminGuardado, setHorarioAdminGuardado] = useState(false)
 
@@ -373,8 +376,7 @@ export default function AdminPage() {
     setPrecio(p.precio != null ? String(p.precio) : '')
     setExperiencia(p.experiencia || '')
     setPlan(p.plan === 'premium' ? 'premium' : 'basico')
-    setEditHorarioDias(p.horarioTurnos?.dias || [])
-    setEditHorarioHoras(p.horarioTurnos?.horas || [])
+    setEditHorarioBloques(p.horarioTurnos?.bloques || [])
     setErrorForm('')
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -383,23 +385,27 @@ export default function AdminPage() {
     setProfesionalEditandoId(null)
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
-    setEditHorarioDias([]); setEditHorarioHoras([]); setEditNuevaHora('')
+    setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
     setErrorForm('')
   }
 
-  function toggleDiaAdmin(diaId: number) {
-    setEditHorarioDias((dias) => (dias.includes(diaId) ? dias.filter((d) => d !== diaId) : [...dias, diaId].sort()))
+  function toggleDiaNuevoBloqueAdmin(diaId: number) {
+    setEditNuevoBloqueDias((dias) => (dias.includes(diaId) ? dias.filter((d) => d !== diaId) : [...dias, diaId].sort()))
   }
 
-  function agregarHoraAdmin() {
-    const hora = editNuevaHora.trim()
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora) || editHorarioHoras.includes(hora)) return
-    setEditHorarioHoras((horas) => [...horas, hora].sort())
-    setEditNuevaHora('')
+  function agregarBloqueAdmin() {
+    if (editNuevoBloqueDias.length === 0) return
+    const desde = editNuevoBloqueTodoElDia ? '00:00' : editNuevoBloqueDesde
+    const hasta = editNuevoBloqueTodoElDia ? '23:30' : editNuevoBloqueHasta
+    if (hasta <= desde) return
+    const nuevo: BloqueHorario = { id: `b${Date.now()}`, dias: editNuevoBloqueDias, desde, hasta, intervaloMin: editNuevoBloqueIntervalo }
+    setEditHorarioBloques((b) => [...b, nuevo])
+    setEditNuevoBloqueDias([])
+    setEditNuevoBloqueTodoElDia(false)
   }
 
-  function quitarHoraAdmin(hora: string) {
-    setEditHorarioHoras((horas) => horas.filter((h) => h !== hora))
+  function quitarBloqueAdmin(id: string) {
+    setEditHorarioBloques((b) => b.filter((x) => x.id !== id))
   }
 
   async function guardarHorarioAdmin() {
@@ -410,7 +416,7 @@ export default function AdminPage() {
       const res = await fetch(`/api/profesionales/${profesionalEditandoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ horarioTurnos: { dias: editHorarioDias, horas: editHorarioHoras } }),
+        body: JSON.stringify({ horarioTurnos: { bloques: editHorarioBloques } }),
       })
       const data = await res.json()
       if (data.error) { setErrorForm(data.error); return }
@@ -982,42 +988,79 @@ export default function AdminPage() {
             {profesionalEditandoId && plan === 'premium' && (
               <div className="bg-panelalt rounded-lg p-3 mb-4">
                 <div className="font-body text-xs font-semibold text-ink mb-2">Agenda de turnos (Premium)</div>
-                <div className="font-body text-[11px] text-inksoft mb-2">Días que atiende</div>
-                <div className="flex gap-1.5 flex-wrap mb-3">
+                <div className="font-body text-[11px] text-inksoft mb-2">
+                  Bloques por día — ej. "Lunes a viernes, 19 a 21" y "Sábados, 9 a 14" son dos bloques distintos.
+                </div>
+                {editHorarioBloques.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mb-3">
+                    {editHorarioBloques.map((b) => (
+                      <div key={b.id} className="flex items-center justify-between gap-2 bg-panel rounded-md px-2.5 py-2">
+                        <div className="font-body text-xs text-ink">
+                          <strong>{b.dias.map((d) => DIAS_SEMANA[d].corto).join(', ')}</strong> · {b.desde}–{b.hasta} · {INTERVALOS_TURNO.find((i) => i.min === b.intervaloMin)?.label || `cada ${b.intervaloMin} min`}
+                        </div>
+                        <button type="button" onClick={() => quitarBloqueAdmin(b.id)} className="text-inksoft border-none bg-transparent leading-none shrink-0">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-1.5 flex-wrap mb-2">
                   {DIAS_SEMANA.map((d) => (
                     <button
                       key={d.id}
                       type="button"
-                      onClick={() => toggleDiaAdmin(d.id)}
+                      onClick={() => toggleDiaNuevoBloqueAdmin(d.id)}
                       className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
-                        editHorarioDias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                        editNuevoBloqueDias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
                       }`}
                     >
                       {d.corto}
                     </button>
                   ))}
                 </div>
-                <div className="font-body text-[11px] text-inksoft mb-2">Horarios</div>
-                <div className="flex gap-1.5 flex-wrap mb-2">
-                  {editHorarioHoras.map((h) => (
-                    <span key={h} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-panel font-body text-xs text-ink">
-                      {h}
-                      <button type="button" onClick={() => quitarHoraAdmin(h)} className="text-inksoft border-none bg-transparent leading-none">✕</button>
-                    </span>
+
+                <label className="flex items-center gap-1.5 mb-2">
+                  <input type="checkbox" checked={editNuevoBloqueTodoElDia} onChange={(e) => setEditNuevoBloqueTodoElDia(e.target.checked)} />
+                  <span className="font-body text-xs text-ink">Todo el día</span>
+                </label>
+
+                {!editNuevoBloqueTodoElDia && (
+                  <div className="flex gap-2 mb-2 items-center">
+                    <input
+                      type="time"
+                      value={editNuevoBloqueDesde}
+                      onChange={(e) => setEditNuevoBloqueDesde(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+                    />
+                    <span className="font-body text-xs text-inksoft">a</span>
+                    <input
+                      type="time"
+                      value={editNuevoBloqueHasta}
+                      onChange={(e) => setEditNuevoBloqueHasta(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+                    />
+                  </div>
+                )}
+
+                <select
+                  value={editNuevoBloqueIntervalo}
+                  onChange={(e) => setEditNuevoBloqueIntervalo(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2"
+                >
+                  {INTERVALOS_TURNO.map((i) => (
+                    <option key={i.min} value={i.min}>{i.label}</option>
                   ))}
-                  {editHorarioHoras.length === 0 && <span className="font-body text-xs text-inksoft">Sin horarios cargados.</span>}
-                </div>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="time"
-                    value={editNuevaHora}
-                    onChange={(e) => setEditNuevaHora(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-line font-body text-sm"
-                  />
-                  <button type="button" onClick={agregarHoraAdmin} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink shrink-0">
-                    + Agregar hora
-                  </button>
-                </div>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={agregarBloqueAdmin}
+                  disabled={editNuevoBloqueDias.length === 0}
+                  className="w-full py-2 rounded-lg border border-line font-body text-xs text-ink disabled:opacity-50 mb-3"
+                >
+                  + Agregar bloque
+                </button>
+
                 <button
                   type="button"
                   onClick={guardarHorarioAdmin}

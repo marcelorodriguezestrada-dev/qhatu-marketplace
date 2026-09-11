@@ -166,22 +166,23 @@ export default function ServiciosPage() {
   return (
     <div className="min-h-screen">
       <div className="bg-ink px-5 py-3.5">
-        <div className="max-w-[960px] mx-auto flex items-center gap-3">
+        <div className="max-w-[960px] mx-auto flex items-center gap-2 flex-wrap">
           <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
-          <span className="font-body text-sm text-white/70 flex-1">Servicios profesionales</span>
-          <Link
-            href="/publicar-servicio"
-            className="border-none bg-white/10 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
-          >
-            Publicá tu servicio
-          </Link>
-          <Link
-            href="/mi-perfil"
-            className="border border-white/20 text-white px-3.5 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
-          >
-            Mi perfil
-          </Link>
-
+          <span className="font-body text-sm text-white/70 hidden sm:inline sm:flex-1">Servicios profesionales</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Link
+              href="/publicar-servicio"
+              className="border-none bg-white/10 text-white px-3 py-2 rounded-lg font-body text-xs sm:text-sm shrink-0 whitespace-nowrap"
+            >
+              Publicá tu servicio
+            </Link>
+            <Link
+              href="/mi-perfil"
+              className="border border-white/20 text-white px-3 py-2 rounded-lg font-body text-xs sm:text-sm shrink-0 whitespace-nowrap"
+            >
+              Mi perfil
+            </Link>
+          </div>
         </div>
       </div>
 

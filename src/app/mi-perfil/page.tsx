@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
-import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO } from '@/data/turnos'
+import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -57,7 +57,11 @@ export default function MiPerfilPage() {
 
   // --- Mis turnos (beneficio Premium) ---
   const [horario, setHorario] = useState<HorarioProfesional>(HORARIO_VACIO)
-  const [nuevaHora, setNuevaHora] = useState('')
+  const [nuevoBloqueDias, setNuevoBloqueDias] = useState<number[]>([])
+  const [nuevoBloqueDesde, setNuevoBloqueDesde] = useState('09:00')
+  const [nuevoBloqueHasta, setNuevoBloqueHasta] = useState('18:00')
+  const [nuevoBloqueIntervalo, setNuevoBloqueIntervalo] = useState(60)
+  const [nuevoBloqueTodoElDia, setNuevoBloqueTodoElDia] = useState(false)
   const [guardandoHorario, setGuardandoHorario] = useState(false)
   const [horarioGuardado, setHorarioGuardado] = useState(false)
   const [turnos, setTurnos] = useState<any[]>([])
@@ -77,7 +81,7 @@ export default function MiPerfilPage() {
     if (!profesional || !esPremiumVigente(profesional)) return
     fetch(`/api/profesionales/${profesional.id}/horarios`)
       .then((r) => r.json())
-      .then((data) => setHorario({ dias: data.dias || [], horas: data.horas || [] }))
+      .then((data) => setHorario({ bloques: data.bloques || [] }))
     cargarTurnos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profesional?.id, profesional?.plan, profesional?.planVigenciaHasta])
@@ -97,23 +101,29 @@ export default function MiPerfilPage() {
     }
   }
 
-  function toggleDia(diaId: number) {
-    setHorario((h) => ({
-      ...h,
-      dias: h.dias.includes(diaId) ? h.dias.filter((d) => d !== diaId) : [...h.dias, diaId].sort(),
-    }))
+  function toggleDiaNuevoBloque(diaId: number) {
+    setNuevoBloqueDias((dias) => (dias.includes(diaId) ? dias.filter((d) => d !== diaId) : [...dias, diaId].sort()))
   }
 
-  function agregarHora() {
-    const hora = nuevaHora.trim()
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return
-    if (horario.horas.includes(hora)) return
-    setHorario((h) => ({ ...h, horas: [...h.horas, hora].sort() }))
-    setNuevaHora('')
+  function agregarBloque() {
+    if (nuevoBloqueDias.length === 0) return
+    const desde = nuevoBloqueTodoElDia ? '00:00' : nuevoBloqueDesde
+    const hasta = nuevoBloqueTodoElDia ? '23:30' : nuevoBloqueHasta
+    if (hasta <= desde) return
+    const nuevo: BloqueHorario = {
+      id: `b${Date.now()}`,
+      dias: nuevoBloqueDias,
+      desde,
+      hasta,
+      intervaloMin: nuevoBloqueIntervalo,
+    }
+    setHorario((h) => ({ bloques: [...h.bloques, nuevo] }))
+    setNuevoBloqueDias([])
+    setNuevoBloqueTodoElDia(false)
   }
 
-  function quitarHora(hora: string) {
-    setHorario((h) => ({ ...h, horas: h.horas.filter((x) => x !== hora) }))
+  function quitarBloque(id: string) {
+    setHorario((h) => ({ bloques: h.bloques.filter((b) => b.id !== id) }))
   }
 
   async function guardarHorario() {
@@ -388,40 +398,78 @@ export default function MiPerfilPage() {
         <div className="font-body text-sm font-semibold text-ink mb-3">Mis turnos</div>
         {premiumVigente ? (
           <>
-            <div className="font-body text-xs text-inksoft mb-2">Días que atendés</div>
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              {DIAS_SEMANA.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => toggleDia(d.id)}
-                  className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
-                    horario.dias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panelalt text-inksoft'
-                  }`}
-                >
-                  {d.corto}
-                </button>
-              ))}
+            <div className="font-body text-xs text-inksoft mb-3">
+              Armá tu agenda por bloques: por ejemplo "Lunes a viernes, 19:00 a 21:00" y "Sábados, 9:00 a 14:00" pueden ser dos bloques distintos, cada uno con su propio rango.
             </div>
 
-            <div className="font-body text-xs text-inksoft mb-2">Horarios que ofrecés</div>
-            <div className="flex gap-1.5 flex-wrap mb-2">
-              {horario.horas.map((h) => (
-                <span key={h} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-panelalt font-body text-xs text-ink">
-                  {h}
-                  <button onClick={() => quitarHora(h)} className="text-inksoft border-none bg-transparent leading-none">✕</button>
-                </span>
-              ))}
-              {horario.horas.length === 0 && <span className="font-body text-xs text-inksoft">Todavía no cargaste horarios.</span>}
-            </div>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="time"
-                value={nuevaHora}
-                onChange={(e) => setNuevaHora(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-line font-body text-sm"
-              />
-              <button onClick={agregarHora} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink shrink-0">
-                + Agregar hora
+            {horario.bloques.length > 0 && (
+              <div className="flex flex-col gap-1.5 mb-3">
+                {horario.bloques.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-2">
+                    <div className="font-body text-xs text-ink">
+                      <strong>{b.dias.map((d) => DIAS_SEMANA[d].corto).join(', ')}</strong> · {b.desde}–{b.hasta} · {INTERVALOS_TURNO.find((i) => i.min === b.intervaloMin)?.label || `cada ${b.intervaloMin} min`}
+                    </div>
+                    <button onClick={() => quitarBloque(b.id)} className="text-inksoft border-none bg-transparent leading-none shrink-0">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="bg-panelalt rounded-lg p-3 mb-3">
+              <div className="font-body text-[11px] text-inksoft mb-1.5">Agregar bloque — días</div>
+              <div className="flex gap-1.5 flex-wrap mb-2">
+                {DIAS_SEMANA.map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => toggleDiaNuevoBloque(d.id)}
+                    className={`px-2.5 py-1.5 rounded-md border font-body text-xs font-medium ${
+                      nuevoBloqueDias.includes(d.id) ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                    }`}
+                  >
+                    {d.corto}
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex items-center gap-1.5 mb-2">
+                <input type="checkbox" checked={nuevoBloqueTodoElDia} onChange={(e) => setNuevoBloqueTodoElDia(e.target.checked)} />
+                <span className="font-body text-xs text-ink">Todo el día</span>
+              </label>
+
+              {!nuevoBloqueTodoElDia && (
+                <div className="flex gap-2 mb-2 items-center">
+                  <input
+                    type="time"
+                    value={nuevoBloqueDesde}
+                    onChange={(e) => setNuevoBloqueDesde(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+                  />
+                  <span className="font-body text-xs text-inksoft">a</span>
+                  <input
+                    type="time"
+                    value={nuevoBloqueHasta}
+                    onChange={(e) => setNuevoBloqueHasta(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-line font-body text-sm"
+                  />
+                </div>
+              )}
+
+              <select
+                value={nuevoBloqueIntervalo}
+                onChange={(e) => setNuevoBloqueIntervalo(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2"
+              >
+                {INTERVALOS_TURNO.map((i) => (
+                  <option key={i.min} value={i.min}>{i.label}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={agregarBloque}
+                disabled={nuevoBloqueDias.length === 0}
+                className="w-full py-2 rounded-lg border border-line font-body text-xs text-ink disabled:opacity-50"
+              >
+                + Agregar bloque
               </button>
             </div>
 
