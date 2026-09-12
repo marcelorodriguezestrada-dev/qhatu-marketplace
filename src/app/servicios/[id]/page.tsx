@@ -139,7 +139,10 @@ export default function PerfilProfesionalPage() {
   const rubroInfo = buscarRubro(perfil.rubro)
 
   const premiumVigente = esPremiumVigente(perfil)
-  const horarioTurnos = perfil.horarioTurnos || { bloques: [] }
+  // Guardamos contra un horarioTurnos guardado sin `bloques` (ej. `{}`
+  // suelto en Firestore) — no alcanza con "|| {bloques:[]}" porque un
+  // objeto sin esa clave sigue siendo truthy y se cuela igual.
+  const horarioTurnos = Array.isArray(perfil.horarioTurnos?.bloques) ? perfil.horarioTurnos : { bloques: [] }
   const agendaActiva = premiumVigente && diasConAgenda(horarioTurnos).length > 0
   const diasDisponibles = agendaActiva ? getProximosDiasSegunHorario(horarioTurnos, 10) : []
   const horasDelDiaSel = diaSel

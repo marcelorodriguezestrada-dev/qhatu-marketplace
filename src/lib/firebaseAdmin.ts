@@ -54,3 +54,10 @@ export async function contarUsuarios(): Promise<number> {
   const resultado = await getAuth(getApp()).listUsers(1000)
   return resultado.users.length
 }
+
+// Acceso directo a Firebase Auth para el panel de administración de
+// usuarios (listar, pausar/reactivar, eliminar). Mismo patrón que
+// getDb(): reutiliza la instancia ya inicializada de la app.
+export function getAuthAdmin() {
+  return getAuth(getApp())
+}

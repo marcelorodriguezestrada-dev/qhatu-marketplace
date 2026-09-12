@@ -61,13 +61,19 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'categorias' | 'categorias-productos' | 'metricas' | 'usuarios'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  // uid del usuario cuya fila está desplegada mostrando el detalle de
+  // sus productos y perfiles profesionales (null = ninguna abierta).
+  const [usuarioExpandidoId, setUsuarioExpandidoId] = useState<string | null>(null)
+  const [buscarUsuario, setBuscarUsuario] = useState('')
   const [metricas, setMetricas] = useState<any>(null)
   const [cargandoMetricas, setCargandoMetricas] = useState(false)
   // Línea de tiempo de la pestaña Métricas: qué período se ve
@@ -206,6 +212,30 @@ export default function AdminPage() {
       .then((data) => setProductos(data.productos || []))
   }
 
+  function cargarUsuarios(pw?: string) {
+    setCargandoUsuarios(true)
+    fetch('/api/admin/usuarios', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setUsuarios(data.usuarios || []))
+      .finally(() => setCargandoUsuarios(false))
+  }
+
+  function pausarUsuario(uid: string, pausado: boolean) {
+    fetch(`/api/admin/usuarios/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ pausado }),
+    }).then(() => cargarUsuarios())
+  }
+
+  function eliminarUsuario(uid: string) {
+    if (!confirm('¿Eliminar esta cuenta definitivamente? El usuario no va a poder volver a entrar con este login. Esta acción no se puede deshacer.')) return
+    fetch(`/api/admin/usuarios/${uid}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': password },
+    }).then(() => cargarUsuarios())
+  }
+
   function cambiarEstadoProducto(id: string, estado: 'activo' | 'pendiente' | 'rechazado' | 'oculto') {
     fetch(`/api/productos/${id}`, {
       method: 'PATCH',
@@ -246,11 +276,6 @@ export default function AdminPage() {
   const [editMateriales, setEditMateriales] = useState('')
   const [editEstado, setEditEstado] = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
-
-  const [usuarios, setUsuarios] = useState<any[]>([])
-  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
-  const [filtroUsuarios, setFiltroUsuarios] = useState('')
-  const [notaUsuario, setNotaUsuario] = useState<Record<string, string>>({})
 
   function abrirEditarProducto(p: any) {
     setProductoEditando(p)
@@ -633,41 +658,6 @@ export default function AdminPage() {
     )
   }
 
-
-  async function cargarUsuarios() {
-    setCargandoUsuarios(true)
-    try {
-      const res = await fetch('/api/admin/usuarios', {
-        headers: { 'x-admin-password': password }
-      })
-      const data = await res.json()
-      setUsuarios(data.usuarios || [])
-    } finally { setCargandoUsuarios(false) }
-  }
-
-  async function toggleUsuario(uid: string, disabled: boolean) {
-    const accion = disabled ? 'pausar' : 'reactivar'
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este usuario?`)) return
-    await fetch('/api/admin/usuarios', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ uid, disabled, nota: notaUsuario[uid] || '' })
-    })
-    setUsuarios(prev => prev.map(u => u.uid === uid ? { ...u, disabled } : u))
-  }
-
-  async function eliminarUsuario(uid: string, email: string) {
-    if (!confirm(`¿ELIMINAR PERMANENTEMENTE el usuario ${email}? Esta acción no se puede deshacer.`)) return
-    if (!confirm('Confirmá una vez más. Se eliminarán todos sus datos.')) return
-    await fetch('/api/admin/usuarios', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ uid })
-    })
-    setUsuarios(prev => prev.filter(u => u.uid !== uid))
-  }
-
-
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -714,6 +704,12 @@ export default function AdminPage() {
           )}
         </button>
         <button
+          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Usuarios
+        </button>
+        <button
           onClick={() => setTab('categorias')}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'categorias' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
@@ -730,12 +726,6 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'metricas' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Métricas
-        </button>
-        <button
-          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Usuarios
         </button>
       </div>
 
@@ -1389,6 +1379,97 @@ export default function AdminPage() {
         </div>
       )}
 
+      {tab === 'usuarios' && (
+        <div>
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <div className="font-body text-sm font-semibold text-ink">
+              Usuarios registrados {usuarios.length > 0 && <span className="text-inksoft font-normal">({usuarios.length})</span>}
+            </div>
+            <input
+              type="text"
+              value={buscarUsuario}
+              onChange={(e) => setBuscarUsuario(e.target.value)}
+              placeholder="Buscar por email o nombre..."
+              className="px-3 py-1.5 rounded-md border border-line font-body text-xs w-64 max-w-full"
+            />
+          </div>
+          {cargandoUsuarios && <div className="font-body text-sm text-inksoft">Cargando...</div>}
+          {!cargandoUsuarios && usuarios.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay usuarios registrados.</div>}
+          {usuarios
+            .filter((u) => {
+              const q = buscarUsuario.trim().toLowerCase()
+              if (!q) return true
+              return (u.email || '').toLowerCase().includes(q) || (u.nombre || '').toLowerCase().includes(q)
+            })
+            .map((u) => {
+              const productosDelUsuario = productos.filter((p) => p.vendedorId === u.uid)
+              const profesionalesDelUsuario = profesionales.filter((p) => p.solicitanteUid === u.uid)
+              const expandido = usuarioExpandidoId === u.uid
+              return (
+                <div key={u.uid} className="bg-panel border border-line rounded-lg p-3.5 mb-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-body text-sm font-medium text-ink truncate flex items-center gap-2">
+                        {u.email || u.nombre || u.uid}
+                        {u.pausado && (
+                          <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pausado</span>
+                        )}
+                      </div>
+                      <div className="font-body text-[11px] text-inksoft mt-0.5">
+                        Registrado: {u.creadoEl ? new Date(u.creadoEl).toLocaleDateString('es-BO') : '—'}
+                        {u.ultimoLogin && <> · Último login: {new Date(u.ultimoLogin).toLocaleDateString('es-BO')}</>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUsuarioExpandidoId(expandido ? null : u.uid)}
+                        className="font-body text-[11px] text-teal font-semibold mt-1"
+                      >
+                        {productosDelUsuario.length} producto(s) · {profesionalesDelUsuario.length} servicio(s) {expandido ? '▲' : '▼'}
+                      </button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      <button
+                        type="button"
+                        onClick={() => pausarUsuario(u.uid, !u.pausado)}
+                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
+                      >
+                        {u.pausado ? 'Reactivar' : 'Pausar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => eliminarUsuario(u.uid)}
+                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+
+                  {expandido && (
+                    <div className="mt-3 pt-3 border-t border-line grid gap-2">
+                      {productosDelUsuario.length === 0 && profesionalesDelUsuario.length === 0 && (
+                        <div className="font-body text-xs text-inksoft">No tiene productos ni perfiles profesionales publicados.</div>
+                      )}
+                      {productosDelUsuario.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 font-body text-xs text-ink">
+                          <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded">Producto</span>
+                          {p.nombre} · Bs {Number(p.precio || 0).toLocaleString('es-BO')} · {p.estado || 'activo'}{p.plan === 'premium' && ' · Premium'}
+                        </div>
+                      ))}
+                      {profesionalesDelUsuario.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2 font-body text-xs text-ink">
+                          <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded">Servicio</span>
+                          {p.nombre} · {p.especialidad || buscarRubro(p.rubro)?.label || 'Sin rubro'} · {p.estado}{p.plan === 'premium' && ' · Premium'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+        </div>
+      )}
+
       {tab === 'categorias' && (
         <div>
           <div className="font-body text-sm text-inksoft mb-4">
@@ -1872,74 +1953,6 @@ export default function AdminPage() {
           )}
           {!cargandoMetricas && metricas?.error && (
             <div className="font-body text-sm text-maroon">{metricas.error}</div>
-          )}
-        </div>
-      )}
-
-      {tab === 'usuarios' && (
-        <div>
-          <input
-            value={filtroUsuarios}
-            onChange={(e) => setFiltroUsuarios(e.target.value)}
-            placeholder="Buscar por email o nombre..."
-            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-4"
-          />
-
-          {cargandoUsuarios ? (
-            <div className="font-body text-sm text-inksoft">Cargando usuarios...</div>
-          ) : usuarios.length === 0 ? (
-            <div className="font-body text-sm text-inksoft">No hay usuarios registrados todavía.</div>
-          ) : (
-            usuarios
-              .filter((u) => {
-                const q = filtroUsuarios.trim().toLowerCase()
-                if (!q) return true
-                return u.email.toLowerCase().includes(q) || (u.displayName || '').toLowerCase().includes(q)
-              })
-              .map((u) => (
-                <div key={u.uid} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="min-w-0">
-                      <div className="font-body text-sm font-medium text-ink truncate">{u.email || u.uid}</div>
-                      {u.displayName && <div className="font-body text-xs text-inksoft">{u.displayName}</div>}
-                      <div className="font-body text-[11px] text-inksoft mt-0.5">
-                        {u.vendedor && <span className="mr-2">🛍️ Vende productos</span>}
-                        {u.profesional && <span>🧰 Servicio profesional</span>}
-                        {!u.vendedor && !u.profesional && <span>Sin publicaciones</span>}
-                      </div>
-                      <div className="font-body text-[11px] text-inksoft mt-0.5">
-                        Registrado: {u.createdAt ? new Date(u.createdAt).toLocaleDateString('es-BO') : '—'}
-                        {u.lastSignIn && <> · Último ingreso: {new Date(u.lastSignIn).toLocaleDateString('es-BO')}</>}
-                      </div>
-                    </div>
-                    <span className={`shrink-0 font-body text-[11px] font-semibold px-2 py-0.5 rounded-full ${u.disabled ? 'bg-maroonsoft text-maroon' : 'bg-tealsoft text-teal'}`}>
-                      {u.disabled ? 'Pausado' : 'Activo'}
-                    </span>
-                  </div>
-
-                  <input
-                    value={notaUsuario[u.uid] ?? ''}
-                    onChange={(e) => setNotaUsuario((prev) => ({ ...prev, [u.uid]: e.target.value }))}
-                    placeholder="Nota interna (opcional, ej: motivo de la pausa)"
-                    className="w-full px-3 py-1.5 rounded-md border border-line font-body text-xs mb-2"
-                  />
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => toggleUsuario(u.uid, !u.disabled)}
-                      className={`px-3.5 py-1.5 rounded-md border-none font-body text-xs font-semibold text-white ${u.disabled ? 'bg-teal' : 'bg-ochre'}`}
-                    >
-                      {u.disabled ? 'Reactivar' : 'Pausar'}
-                    </button>
-                    <button
-                      onClick={() => eliminarUsuario(u.uid, u.email)}
-                      className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-maroon"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              ))
           )}
         </div>
       )}
