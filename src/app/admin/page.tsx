@@ -8,6 +8,7 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
 import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
+import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -62,7 +63,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'reparto' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -255,6 +256,14 @@ export default function AdminPage() {
 
   function confirmarPago(id: string) {
     cambiarEstadoPedido(id, 'pagado')
+  }
+
+  function pagarAlVendedor(id: string, medio: 'efectivo' | 'qr') {
+    fetch(`/api/pedidos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ pagoVendedorMedio: medio }),
+    }).then(() => entrar(password))
   }
 
   function eliminarPedido(id: string) {
@@ -705,6 +714,12 @@ export default function AdminPage() {
           )}
         </button>
         <button
+          onClick={() => setTab('reparto')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'reparto' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Reparto
+        </button>
+        <button
           onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
@@ -760,6 +775,26 @@ export default function AdminPage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'pendiente_pago')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Confirmar stock disponible</button>
                     <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Sin stock / cancelar</button>
+                  </div>
+                )}
+
+                {p.metodoEntrega === 'envio' && ['pagado', 'en_preparacion', 'en_entrega', 'entregado'].includes(p.estado) && (
+                  <div className="mt-3">
+                    {p.pagoVendedorHecho ? (
+                      <div className="font-body text-[11px] text-teal">
+                        ✓ Pagado al vendedor por {p.pagoVendedorMedio === 'efectivo' ? 'efectivo' : 'QR'}{p.pagoVendedorAt && ` el ${new Date(p.pagoVendedorAt).toLocaleDateString('es-BO')}`}
+                      </div>
+                    ) : (
+                      <div className="bg-panelalt border border-line rounded-lg p-2.5">
+                        <div className="font-body text-[11px] text-inksoft mb-1.5">
+                          Este pedido cobró por QR de la plataforma — todavía falta pagarle al vendedor su parte:
+                        </div>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => pagarAlVendedor(p.id, 'efectivo')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] font-semibold">Ya le pagué en efectivo</button>
+                          <button type="button" onClick={() => pagarAlVendedor(p.id, 'qr')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] font-semibold">Ya le pagué por QR</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1384,6 +1419,76 @@ export default function AdminPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'reparto' && (
+        <div>
+          {(() => {
+            // Solo entran acá los pedidos con envío YA pagados (con
+            // stock ya confirmado, porque sin eso ni siquiera llegan a
+            // "pagado") y que todavía no salieron a reparto ni se
+            // entregaron.
+            const listos = pedidos.filter((p: any) => p.metodoEntrega === 'envio' && p.estado === 'pagado')
+            const porFranja = (franja: '08:00' | '14:00') =>
+              ordenarPorCercania(
+                listos.filter((p: any) => calcularFranja(new Date(p.pagadoAt || p.createdAt)) === franja),
+                DEPOSITO
+              )
+            const salida8 = porFranja('08:00')
+            const salida14 = porFranja('14:00')
+
+            const Tanda = ({ titulo, tanda }: { titulo: string; tanda: any[] }) => (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="font-display text-base font-bold text-ink">{titulo}</div>
+                  {tanda.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirm(`¿Marcar ${tanda.length} pedido(s) como "en entrega"? Es para cuando la moto ya salió con todos estos.`)) return
+                        tanda.forEach((p) => cambiarEstadoPedido(p.id, 'en_entrega'))
+                      }}
+                      className="px-2.5 py-1.5 rounded-md border-none bg-maroon text-white font-body text-[11px] font-semibold"
+                    >
+                      Marcar salida de la moto ({tanda.length})
+                    </button>
+                  )}
+                </div>
+                {tanda.length === 0 && (
+                  <div className="font-body text-xs text-inksoft">No hay pedidos pagados esperando esta salida.</div>
+                )}
+                {tanda.map((p: any, i: number) => (
+                  <div key={p.id} className="bg-panel border border-line rounded-lg p-3 mb-2 flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-maroonsoft text-maroon font-body text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-body text-[13px] font-medium text-ink">{p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}</div>
+                      <div className="font-body text-[11px] text-inksoft">
+                        {p.comprador || 'Sin email'} · {bs(p.total)}
+                        {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
+                      className="shrink-0 px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold"
+                    >
+                      Entregado
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+
+            return (
+              <>
+                <Tanda titulo="Salida 08:00" tanda={salida8} />
+                <Tanda titulo="Salida 14:00" tanda={salida14} />
+              </>
+            )
+          })()}
         </div>
       )}
 

@@ -80,6 +80,13 @@ export default function CheckoutPage() {
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
   const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
   const [direccion, setDireccion] = useState('')
+  // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
+  // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
+  // comprador no la comparte, igual puede pedir con envío; su parada
+  // simplemente queda al final de la ruta para confirmar a mano.
+  const [lat, setLat] = useState<number | null>(null)
+  const [lng, setLng] = useState<number | null>(null)
+  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
   const [pasoActual, setPasoActual] = useState(0)
   const [error, setError] = useState('')
@@ -94,6 +101,26 @@ export default function CheckoutPage() {
 
   const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
+
+  function usarMiUbicacion() {
+    setBuscandoUbicacion(true)
+    if (!navigator.geolocation) {
+      setError('Tu navegador no soporta geolocalización.')
+      setBuscandoUbicacion(false)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude)
+        setLng(pos.coords.longitude)
+        setBuscandoUbicacion(false)
+      },
+      () => {
+        setError('No pudimos acceder a tu ubicación. Podés seguir sin ella, solo que la moto va a confirmar tu dirección a mano.')
+        setBuscandoUbicacion(false)
+      }
+    )
+  }
 
   async function confirmarEntregaYCrearPedidos() {
     setEtapa('creando')
@@ -163,6 +190,8 @@ export default function CheckoutPage() {
             vendedorId,
             zonaEntrega,
             direccion,
+            lat: metodoEntrega === 'envio' ? lat : null,
+            lng: metodoEntrega === 'envio' ? lng : null,
             costoEnvio: envioGrupo,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
@@ -325,7 +354,7 @@ export default function CheckoutPage() {
                   ))}
                 </select>
               </label>
-              <label className="block text-left mb-4">
+              <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
                 <input
                   value={direccion}
@@ -334,6 +363,19 @@ export default function CheckoutPage() {
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={usarMiUbicacion}
+                  disabled={buscandoUbicacion}
+                  className="font-body text-[12px] text-teal font-semibold underline disabled:opacity-60"
+                >
+                  {buscandoUbicacion ? 'Buscando ubicación...' : lat != null ? '📍 Ubicación guardada ✓ (volver a compartir)' : '📍 Compartir mi ubicación'}
+                </button>
+                <div className="font-body text-[11px] text-inksoft mt-1">
+                  Ayuda a que la moto arme la ruta más corta para llegar antes.
+                </div>
+              </div>
             </>
           ) : (
             <>

@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -67,6 +67,12 @@ export async function POST(req: NextRequest) {
       vendedorId: vendedorId || null,
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
+      // Ubicación opcional que comparte el comprador al pedir con
+      // envío — la usa /admin (pestaña Reparto) para armar la ruta de
+      // la moto por cercanía. Sin esto, el pedido igual se puede
+      // repartir, solo que a mano.
+      lat: typeof lat === 'number' ? lat : null,
+      lng: typeof lng === 'number' ? lng : null,
       costoEnvio: Number(costoEnvio || 0),
       metodoEntrega: metodoEntrega || 'delivery',
       // 'qr' (default, pago por transferencia/QR) o 'efectivo' — solo

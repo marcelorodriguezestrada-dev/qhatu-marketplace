@@ -35,7 +35,33 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
-    const { estado } = body
+    const { estado, pagoVendedorMedio } = body
+
+    const db = getDb()
+    const ref = db.collection('pedidos').doc(params.id)
+
+    // Acción aparte: nosotros (la plataforma) le pagamos al vendedor lo
+    // que le corresponde por un pedido con envío (esa plata había
+    // entrado a nuestra cuenta, no a la de él, justamente para poder
+    // sostener la garantía hasta que se confirme la entrega). Es
+    // exclusivamente del admin — ni el comprador ni el vendedor pueden
+    // marcarlo ellos mismos.
+    if (pagoVendedorMedio) {
+      if (!['efectivo', 'qr'].includes(pagoVendedorMedio)) {
+        return NextResponse.json({ error: 'Medio de pago inválido.' }, { status: 400 })
+      }
+      const password = req.headers.get('x-admin-password')
+      if (!password || password !== process.env.ADMIN_PASSWORD) {
+        return NextResponse.json({ error: 'Solo el admin puede registrar el pago al vendedor.' }, { status: 401 })
+      }
+      await ref.update({
+        pagoVendedorHecho: true,
+        pagoVendedorMedio,
+        pagoVendedorAt: new Date().toISOString(),
+      })
+      return NextResponse.json({ ok: true })
+    }
+
     if (!estado) {
       return NextResponse.json({ error: 'Falta el estado del pedido.' }, { status: 400 })
     }
@@ -44,9 +70,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!estadosValidos.includes(estado)) {
       return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
     }
-
-    const db = getDb()
-    const ref = db.collection('pedidos').doc(params.id)
 
     if (estado === 'informado_pago') {
       await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
