@@ -14,7 +14,7 @@ const MENSAJES_FIREBASE: Record<string, string> = {
 }
 
 export default function LoginPage() {
-  const { usuario, emailVerificado, login, registrarse, recuperarPassword, obtenerToken, logout } = useAuth()
+  const { usuario, emailVerificado, login, registrarse, recuperarPassword, obtenerToken, logout, marcarEmailVerificado } = useAuth()
   const router = useRouter()
 
   // 'login' / 'registro' → formulario normal. 'verificar' → paso extra
@@ -154,6 +154,11 @@ export default function LoginPage() {
         setError(data.error)
         return
       }
+      // Le avisamos al contexto global YA MISMO, antes de navegar —
+      // si esperamos a que /api/usuarios/estado se vuelva a consultar
+      // solo, el gate global todavía ve el valor viejo (false) durante
+      // ese instante y rebota a la persona de vuelta para acá.
+      marcarEmailVerificado()
       router.push('/')
     } catch {
       setError('No pudimos verificar el código. Probá de nuevo.')

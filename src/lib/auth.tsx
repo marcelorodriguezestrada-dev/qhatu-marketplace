@@ -21,6 +21,12 @@ type AuthContextType = {
   // verificado" — si no, hay una ventana de un instante donde se
   // colaría.
   emailVerificado: boolean | null
+  // Lo llama /login apenas el servidor confirma el código, para que
+  // TODO el resto de la app (el gate global que bloquea a los no
+  // verificados, incluido) se entere en el momento — sin esto, ese
+  // gate seguía viendo el valor viejo (false) después de verificar
+  // bien, y rebotaba a la persona de vuelta al login en un bucle.
+  marcarEmailVerificado: () => void
   login: (email: string, password: string) => Promise<void>
   registrarse: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -98,8 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return auth.currentUser.getIdToken()
   }
 
+  function marcarEmailVerificado() {
+    setEmailVerificado(true)
+  }
+
   return (
-    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, login, registrarse, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, login, registrarse, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )
