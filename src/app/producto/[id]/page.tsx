@@ -9,6 +9,7 @@ import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
+import { CartDrawer } from '@/components/CartDrawer'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -48,7 +49,7 @@ export default function ProductoDetallePage() {
   const params = useParams()
   const id = params?.id as string
   const router = useRouter()
-  const { agregar } = useCarrito()
+  const { agregar, items } = useCarrito()
   const { usuario } = useAuth()
   const { buscarRubroProducto } = useCategoriasProductos()
 
@@ -60,6 +61,7 @@ export default function ProductoDetallePage() {
   const [imagenRota, setImagenRota] = useState(false)
   const [agregado, setAgregado] = useState(false)
   const [tab, setTab] = useState<'publicacion' | 'tienda'>('publicacion')
+  const [carritoAbierto, setCarritoAbierto] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -101,17 +103,6 @@ export default function ProductoDetallePage() {
     setAgregado(true)
   }
 
-  function comprarAhora() {
-    if (!usuario) {
-      router.push('/login')
-      return
-    }
-    if (!producto) return
-    const minimo = producto.compraMinima && producto.compraMinima > 1 ? producto.compraMinima : cantidad
-    for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto)
-    router.push('/checkout')
-  }
-
   if (cargando) {
     return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
   }
@@ -133,14 +124,33 @@ export default function ProductoDetallePage() {
 
   return (
     <div className="max-w-[960px] mx-auto px-5 py-8">
-      <div className="font-body text-[13px] text-inksoft mb-5 flex flex-wrap items-center gap-1.5">
-        <Link href="/" className="hover:underline">Volver</Link>
-        <span>|</span>
-        <span>{labelPublicoProducto(producto.publico)}</span>
-        <span>›</span>
-        <span>{buscarRubroProducto(producto.rubro)?.categoriaLabel || 'Categoría'}</span>
-        <span>›</span>
-        <span className="text-ink font-medium">{producto.nombre}</span>
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="font-body text-[13px] text-inksoft flex flex-wrap items-center gap-1.5">
+          <Link href="/" className="hover:underline">Volver</Link>
+          <span>|</span>
+          <span>{labelPublicoProducto(producto.publico)}</span>
+          <span>›</span>
+          <span>{buscarRubroProducto(producto.rubro)?.categoriaLabel || 'Categoría'}</span>
+          <span>›</span>
+          <span className="text-ink font-medium">{producto.nombre}</span>
+        </div>
+        {/* Acceso directo al carrito desde la ficha del producto — antes
+            solo se podía llegar al carrito volviendo al catálogo, y si
+            alguien ya se decidió a comprar acá mismo no tenía forma de
+            ir directo a pagar. */}
+        <button
+          type="button"
+          onClick={() => setCarritoAbierto(true)}
+          className="relative shrink-0 w-10 h-10 rounded-full border border-line bg-panel flex items-center justify-center text-lg"
+          aria-label="Ver carrito"
+        >
+          🛒
+          {items.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-maroon text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
+              {items.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Pestañas */}
@@ -247,30 +257,22 @@ export default function ProductoDetallePage() {
               </div>
 
               <div className="flex flex-col gap-2.5 mb-4">
-                <div className={tienda?.whatsapp ? 'grid grid-cols-2 gap-2.5' : ''}>
-                  <button
-                    onClick={comprarAhora}
-                    className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+                {tienda?.whatsapp && (
+                  <a
+                    href={`https://wa.me/${tienda.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
+                      `Hola! Te escribo por "${producto.nombre}" (Bs ${producto.precio}) que vi en Clasi Click.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => fetch(`/api/vendedores/${producto.vendedorId}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
+                    className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
                   >
-                    Comprar ahora
-                  </button>
-                  {tienda?.whatsapp && (
-                    <a
-                      href={`https://wa.me/${tienda.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-                        `Hola! Te escribo por "${producto.nombre}" (Bs ${producto.precio}) que vi en Clasi Click.`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => fetch(`/api/vendedores/${producto.vendedorId}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
-                      className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
-                    >
-                      💬 Contactar
-                    </a>
-                  )}
-                </div>
+                    💬 Contactar
+                  </a>
+                )}
                 <button
                   onClick={agregarAlCarrito}
-                  className="w-full py-3 rounded-lg border border-line bg-panel text-ink font-body text-sm font-semibold"
+                  className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
                 >
                   {agregado ? 'Agregado ✓' : 'Agregar al carrito'}
                 </button>
@@ -279,7 +281,7 @@ export default function ProductoDetallePage() {
               {agregado && (
                 <div className="font-body text-xs text-teal">
                   {cantidad > 1 ? `${cantidad} unidades agregadas.` : 'Producto agregado.'}{' '}
-                  <Link href="/checkout" className="underline">Ir a pagar</Link>
+                  <button type="button" onClick={() => setCarritoAbierto(true)} className="underline">Ver mi carrito</button>
                 </div>
               )}
             </div>
@@ -416,6 +418,8 @@ export default function ProductoDetallePage() {
           </div>
         </div>
       )}
+
+      {carritoAbierto && <CartDrawer onClose={() => setCarritoAbierto(false)} />}
     </div>
   )
 }

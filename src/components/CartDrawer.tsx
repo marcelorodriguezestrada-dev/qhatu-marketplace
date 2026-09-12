@@ -29,7 +29,13 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
           <div className="text-inksoft font-body text-sm">Todavía no agregaste productos.</div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        {/* min-h-0 es lo que hace que este bloque realmente scrollee en
+            vez de empujar el total y el botón de abajo fuera de la
+            pantalla — sin esto, en celulares (donde hay menos alto
+            disponible) el carrito quedaba "cortado" apenas había un par
+            de productos, porque el flex item crecía más allá del alto
+            del drawer en lugar de activar su propio scroll. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {items.map((it) => (
             <div key={it.id} className="flex gap-2.5 py-3 border-b border-line">
               <div className="w-11 h-11 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
@@ -53,7 +59,10 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        <div className="border-t border-line pt-3.5 mt-2.5">
+        {/* pb con safe-area para que el botón no quede tapado por la
+            barra de gestos/navegación de Android en celulares con
+            "notch" o barra inferior. */}
+        <div className="border-t border-line pt-3.5 mt-2.5 pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-between mb-3.5 font-display">
             <span className="text-sm text-inksoft">Total</span>
             <span className="text-xl font-bold text-ink">{bs(total)}</span>
@@ -63,7 +72,7 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
             disabled={items.length === 0}
             className={`w-full py-3 rounded-lg font-body text-sm font-semibold text-white ${items.length === 0 ? 'bg-line cursor-default' : 'bg-teal'}`}
           >
-            Ir a pagar
+            Comprar
           </button>
         </div>
       </div>
