@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   User,
 } from 'firebase/auth'
@@ -16,6 +17,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>
   registrarse: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  recuperarPassword: (email: string) => Promise<void>
   // Devuelve el ID token actual, para mandarlo en el header Authorization
   // de los requests a la API que necesitan saber quién sos.
   obtenerToken: () => Promise<string | null>
@@ -57,13 +59,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut(auth)
   }
 
+  async function recuperarPassword(email: string) {
+    if (!auth) throw new Error('Firebase Auth no está configurado (revisá las variables NEXT_PUBLIC_FIREBASE_*).')
+    await sendPasswordResetEmail(auth, email)
+  }
+
   async function obtenerToken() {
     if (!auth || !auth.currentUser) return null
     return auth.currentUser.getIdToken()
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, login, registrarse, logout, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, login, registrarse, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )

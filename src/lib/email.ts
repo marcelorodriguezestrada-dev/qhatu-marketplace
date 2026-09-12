@@ -93,3 +93,26 @@ export async function enviarRecordatorioTurno(destino: string, turno: DatosTurno
     `,
   })
 }
+
+// Código de 6 dígitos para verificar el email al registrarse. Si no hay
+// RESEND_API_KEY configurada, devolvemos null sin romper nada — el
+// endpoint que llama a esto ya sabe mostrarle al usuario un aviso en
+// vez de dejarlo esperando un mail que nunca va a llegar.
+export async function enviarCodigoVerificacion(destino: string, codigo: string) {
+  const resend = getResend()
+  if (!resend) return null
+  return resend.emails.send({
+    from: FROM,
+    to: destino,
+    subject: `${codigo} — Tu código de verificación de Clasi Click`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color:#2B211D;">
+        <h2 style="color:#7A2E2E;">Confirmá tu cuenta</h2>
+        <p>Usá este código para verificar tu email en Clasi Click:</p>
+        <p style="font-size:32px; font-weight:bold; letter-spacing:6px; text-align:center; margin:24px 0; color:#7A2E2E;">${codigo}</p>
+        <p style="font-size:13px; color:#6b5f57;">Vence en 15 minutos. Si no fuiste vos, podés ignorar este mail.</p>
+        <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
+      </div>
+    `,
+  })
+}
