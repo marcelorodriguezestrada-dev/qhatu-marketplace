@@ -119,11 +119,15 @@ export default function LoginPage() {
       await registrarse(email, password)
       const token = await obtenerToken()
       if (token) {
-        await fetch('/api/usuarios/registrar', {
+        const resRegistrar = await fetch('/api/usuarios/registrar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ celular }),
         })
+        if (!resRegistrar.ok) {
+          const dataRegistrar = await resRegistrar.json().catch(() => ({}))
+          console.error('No se pudo guardar el celular al registrarse:', dataRegistrar.error)
+        }
       }
       await enviarCodigoAlMail()
       setModo('verificar')
