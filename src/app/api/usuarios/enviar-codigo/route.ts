@@ -23,12 +23,25 @@ export async function POST(req: NextRequest) {
     )
 
     const resultado = await enviarCodigoVerificacion(usuario.email, codigo)
+
     if (!resultado) {
       // No hay RESEND_API_KEY configurada — el código quedó guardado
       // igual, pero avisamos para no dejar a la persona esperando un
       // mail que nunca va a llegar.
       return NextResponse.json({ ok: true, enviado: false })
     }
+
+    // Ojo: el SDK de Resend NO tira una excepción cuando el envío
+    // falla del lado de ellos (por ejemplo, la cuenta todavía en modo
+    // de prueba solo puede mandar al mail con el que te registraste en
+    // Resend) — devuelve { data: null, error: {...} } normalmente. Si
+    // no revisamos "error" acá, un envío que en realidad falló se lee
+    // como si hubiese salido bien.
+    if (resultado.error) {
+      console.error('Resend rechazó el envío del código:', resultado.error)
+      return NextResponse.json({ ok: true, enviado: false, motivo: resultado.error.message || null })
+    }
+
     return NextResponse.json({ ok: true, enviado: true })
   } catch (err) {
     console.error('POST /api/usuarios/enviar-codigo', err)

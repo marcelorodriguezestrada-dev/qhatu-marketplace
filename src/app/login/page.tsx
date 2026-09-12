@@ -39,7 +39,11 @@ export default function LoginPage() {
     })
     const data = await res.json()
     if (data.enviado === false) {
-      setAviso('Tu cuenta se creó bien, pero no pudimos mandarte el mail con el código (el servicio de mails no está configurado). Escribinos para verificarte manualmente.')
+      setAviso(
+        data.motivo
+          ? `Tu cuenta se creó bien, pero el mail no se pudo enviar: ${data.motivo}`
+          : 'Tu cuenta se creó bien, pero no pudimos mandarte el mail con el código (el servicio de mails no está configurado). Escribinos para verificarte manualmente.'
+      )
     } else {
       setAviso(`Te mandamos un código a ${email}. Puede tardar un minuto en llegar — revisá también spam.`)
     }
