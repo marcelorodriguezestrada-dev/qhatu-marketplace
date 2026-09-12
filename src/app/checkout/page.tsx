@@ -9,7 +9,13 @@ function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
 
-type Etapa = 'entrega' | 'creando' | 'pagando' | 'resumen' | 'error'
+function linkWhatsappRetiroEfectivo(s: SubPedido): string {
+  const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
+  const texto = `Hola! Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
+  return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
+}
+
+type Etapa = 'entrega' | 'creando' | 'pagando' | 'whatsapp' | 'resumen' | 'error'
 
 const COSTOS_ENVIO: Record<string, number> = {
   'Centro La Paz': 25,
@@ -30,6 +36,7 @@ const BANK_ACCOUNT_NUMBER = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || ''
 type SubPedido = {
   vendedorId: string | null
   vendedorNombre: string
+  whatsapp: string
   items: ItemCarrito[]
   subtotal: number
   costoEnvio: number
@@ -67,6 +74,10 @@ export default function CheckoutPage() {
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
+  // Solo aplica cuando metodoEntrega es 'retiro' — con envío siempre es
+  // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
+  // sin verse las caras).
+  const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
   const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
   const [direccion, setDireccion] = useState('')
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
@@ -113,6 +124,7 @@ export default function CheckoutPage() {
         let cbu = BANK_ACCOUNT_NUMBER
         let cobroPropio = false
         let vendedorNombre = clave === 'plataforma' ? 'Clasi Click' : grupoItems[0]?.vendedor || 'Vendedor'
+        let whatsappVendedor = ''
 
         if (vendedorId) {
           try {
@@ -124,10 +136,13 @@ export default function CheckoutPage() {
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
             }
+            whatsappVendedor = data.whatsapp || ''
           } catch {
             // si falla la consulta, seguimos con el QR de la plataforma como respaldo
           }
         }
+
+        const metodoPagoGrupo = metodoEntrega === 'retiro' ? metodoPago : 'qr'
 
         const resPedido = await fetch('/api/pedidos', {
           method: 'POST',
@@ -141,6 +156,7 @@ export default function CheckoutPage() {
             direccion,
             costoEnvio: envioGrupo,
             metodoEntrega,
+            metodoPago: metodoPagoGrupo,
           }),
         })
         const dataPedido = await resPedido.json()
@@ -149,6 +165,7 @@ export default function CheckoutPage() {
         nuevos.push({
           vendedorId,
           vendedorNombre,
+          whatsapp: whatsappVendedor,
           items: grupoItems,
           subtotal,
           costoEnvio: envioGrupo,
@@ -164,7 +181,9 @@ export default function CheckoutPage() {
 
       setSubPedidos(nuevos)
       setPasoActual(0)
-      setEtapa('pagando')
+      // Efectivo en retiro: no hay QR que mostrar — el pago se coordina
+      // directo con el vendedor por WhatsApp cuando pasan a buscarlo.
+      setEtapa(metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'whatsapp' : 'pagando')
     } catch (e: any) {
       setError(e.message || 'No se pudieron crear los pedidos.')
       setEtapa('error')
@@ -278,10 +297,49 @@ export default function CheckoutPage() {
               </label>
             </>
           ) : (
-            <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-              Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
-            </div>
+            <>
+              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
+              </div>
+              <label className="block text-left mb-4">
+                <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('qr')}
+                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                      metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                    }`}
+                  >
+                    QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('efectivo')}
+                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                      metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                    }`}
+                  >
+                    Efectivo
+                  </button>
+                </div>
+              </label>
+            </>
           )}
+
+          {/* Detalle de lo que se está comprando — antes solo se veía el
+              subtotal, sin poder revisar qué productos eran. */}
+          <div className="mb-4">
+            <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
+            <div className="border-t border-line divide-y divide-line">
+              {items.map((it) => (
+                <div key={it.id} className="flex items-center justify-between gap-2 py-2 font-body text-[13px] text-ink">
+                  <span className="flex-1">{it.cantidad} × {it.nombre}</span>
+                  <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(subtotalCarrito)}</div>
           <div className="font-body text-[12px] text-inksoft mb-3">Envío: {bs(costoEnvio)}</div>
@@ -291,7 +349,7 @@ export default function CheckoutPage() {
             disabled={authCargando}
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
           >
-            Continuar al pago
+            {metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
           </button>
         </div>
       )}
@@ -352,6 +410,40 @@ export default function CheckoutPage() {
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
           >
             Ya pagué
+          </button>
+        </div>
+      )}
+
+      {etapa === 'whatsapp' && (
+        <div className="bg-panel border border-line rounded-xl p-7 text-center">
+          <div className="font-display text-lg font-bold text-ink mb-1.5">Coordiná el retiro y el pago</div>
+          <div className="font-body text-[13px] text-inksoft mb-5">
+            Vas a pagar en efectivo cuando retirás. Escribile a {subPedidos.length > 1 ? 'cada vendedor' : 'el vendedor'} por WhatsApp para acordar día y horario.
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {subPedidos.map((s, i) =>
+              s.whatsapp ? (
+                <a
+                  key={i}
+                  href={linkWhatsappRetiroEfectivo(s)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
+                >
+                  💬 Continuar compra por WhatsApp{subPedidos.length > 1 ? ` — ${s.vendedorNombre}` : ''}
+                </a>
+              ) : (
+                <div key={i} className="font-body text-xs text-inksoft bg-panelalt border border-line rounded-lg p-3 text-left">
+                  {s.vendedorNombre} todavía no cargó un WhatsApp de contacto — vas a coordinar el retiro cuando te confirmen el pedido.
+                </div>
+              )
+            )}
+          </div>
+          <button
+            onClick={() => setEtapa('resumen')}
+            className="w-full py-3 rounded-lg border border-line bg-panel text-ink font-body text-sm font-semibold mt-4"
+          >
+            Ya avisé, continuar
           </button>
         </div>
       )}

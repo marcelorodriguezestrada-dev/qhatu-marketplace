@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, vendedorId } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -69,6 +69,10 @@ export async function POST(req: NextRequest) {
       direccion: direccion || null,
       costoEnvio: Number(costoEnvio || 0),
       metodoEntrega: metodoEntrega || 'delivery',
+      // 'qr' (default, pago por transferencia/QR) o 'efectivo' — solo
+      // tiene sentido con retiro en tienda. Le sirve al vendedor para
+      // saber si tiene que esperar una transferencia o cobrar en mano.
+      metodoPago: metodoPago || 'qr',
       estado: 'pendiente_pago',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
