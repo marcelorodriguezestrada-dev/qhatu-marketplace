@@ -20,14 +20,17 @@ function bs(n: number) {
 }
 
 export default function MisPedidosPage() {
-  const { usuario, cargando, obtenerToken } = useAuth()
+  const { usuario, cargando, emailVerificado, obtenerToken } = useAuth()
   const [pedidos, setPedidos] = useState<any[]>([])
   const [cargandoPedidos, setCargandoPedidos] = useState(true)
   const [confirmandoStockId, setConfirmandoStockId] = useState<string | null>(null)
 
   useEffect(() => {
     if (cargando) return
-    if (!usuario) return
+    if (!usuario || emailVerificado === false) {
+      setCargandoPedidos(false)
+      return
+    }
 
     async function cargar() {
       const token = await obtenerToken()
@@ -41,7 +44,7 @@ export default function MisPedidosPage() {
     }
 
     cargar()
-  }, [cargando, usuario, obtenerToken])
+  }, [cargando, usuario, emailVerificado, obtenerToken])
 
   // Solo lo puede tocar el vendedor de ESE pedido en particular — un
   // pedido puede mezclar productos de otro vendedor, así que no alcanza
@@ -76,6 +79,18 @@ export default function MisPedidosPage() {
         <div className="font-body text-sm text-inksoft mb-5">Necesitás una cuenta para ver tus compras.</div>
         <Link href="/login" className="inline-block px-4 py-2.5 rounded-lg bg-maroon text-white font-body text-sm font-semibold">
           Ir al login
+        </Link>
+      </div>
+    )
+  }
+
+  if (emailVerificado === false) {
+    return (
+      <div className="max-w-[420px] mx-auto px-5 py-16 text-center">
+        <div className="font-display text-xl font-bold text-ink mb-3">Verificá tu email</div>
+        <div className="font-body text-sm text-inksoft mb-5">Te falta confirmar el código que te mandamos para poder ver tus pedidos.</div>
+        <Link href="/login" className="inline-block px-4 py-2.5 rounded-lg bg-maroon text-white font-body text-sm font-semibold">
+          Verificar ahora
         </Link>
       </div>
     )

@@ -69,7 +69,7 @@ function repartirEnvio(subtotales: number[], costoEnvioTotal: number): number[] 
 
 export default function CheckoutPage() {
   const { items, vaciar } = useCarrito()
-  const { usuario, cargando: authCargando } = useAuth()
+  const { usuario, cargando: authCargando, emailVerificado } = useAuth()
   const router = useRouter()
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
@@ -92,12 +92,14 @@ export default function CheckoutPage() {
   const [error, setError] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Concretar una compra requiere estar logueado (regla de toda la
-  // plataforma) — si alguien llega hasta acá sin cuenta, lo mandamos a
-  // /login antes de dejarlo seguir.
+  // Concretar una compra requiere estar logueado Y con el email
+  // verificado (regla de toda la plataforma) — si alguien llega hasta
+  // acá sin cuenta, o con una cuenta todavía sin verificar, lo mandamos
+  // a /login antes de dejarlo seguir.
   useEffect(() => {
-    if (!authCargando && !usuario) router.push('/login')
-  }, [authCargando, usuario, router])
+    if (authCargando) return
+    if (!usuario || emailVerificado === false) router.push('/login')
+  }, [authCargando, usuario, emailVerificado, router])
 
   const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)

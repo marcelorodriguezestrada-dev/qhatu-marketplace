@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -14,7 +14,7 @@ const MENSAJES_FIREBASE: Record<string, string> = {
 }
 
 export default function LoginPage() {
-  const { login, registrarse, recuperarPassword, obtenerToken, logout } = useAuth()
+  const { usuario, emailVerificado, login, registrarse, recuperarPassword, obtenerToken, logout } = useAuth()
   const router = useRouter()
 
   // 'login' / 'registro' → formulario normal. 'verificar' → paso extra
@@ -29,6 +29,35 @@ export default function LoginPage() {
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(false)
   const [reenviando, setReenviando] = useState(false)
+  const yaMandoCodigoAlLlegar = useRef(false)
+
+  // Cubre el caso de alguien que ya tiene sesión abierta (no vino de
+  // enviar el formulario de acá) y entra a /login por su cuenta — por
+  // ejemplo, tocando el link "Verificar ahora" desde /mis-pedidos. Si
+  // ya está todo verificado, no tiene sentido mostrarle el formulario
+  // de login de nuevo.
+  useEffect(() => {
+    if (!usuario || emailVerificado === null) return
+    // Durante el flujo de registro, el propio código de más abajo ya se
+    // encarga de mandar el código y pasar a 'verificar' en el momento
+    // justo — si este efecto interviniera también, podría redirigir a
+    // home de pura casualidad de timing, antes de que termine de
+    // guardarse el documento en Firestore (emailVerificado por default
+    // da "true" cuando ese documento todavía no existe, para no trabar
+    // a las cuentas viejas de antes de este sistema).
+    if (modo !== 'login') return
+    if (emailVerificado === true) {
+      router.push('/')
+      return
+    }
+    setEmail(usuario.email || '')
+    setModo('verificar')
+    if (!yaMandoCodigoAlLlegar.current) {
+      yaMandoCodigoAlLlegar.current = true
+      enviarCodigoAlMail()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, emailVerificado, modo])
 
   async function enviarCodigoAlMail() {
     const token = await obtenerToken()
@@ -79,21 +108,9 @@ export default function LoginPage() {
     try {
       if (modo === 'login') {
         await login(email, password)
-        const token = await obtenerToken()
-        if (token) {
-          try {
-            const res = await fetch('/api/usuarios/estado', { headers: { Authorization: `Bearer ${token}` } })
-            const data = await res.json()
-            if (data.emailVerificado === false) {
-              await enviarCodigoAlMail()
-              setModo('verificar')
-              return
-            }
-          } catch {
-            // si falla la consulta, no bloqueamos el login por eso
-          }
-        }
-        router.push('/')
+        // El useEffect de arriba se encarga de a dónde ir después
+        // (según emailVerificado, que se actualiza solo apenas cambia
+        // el usuario de sesión) — acá no hace falta duplicar esa lógica.
         return
       }
 

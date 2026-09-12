@@ -14,6 +14,13 @@ import { auth } from './firebaseClient'
 type AuthContextType = {
   usuario: User | null
   cargando: boolean
+  // null mientras no sabemos todavía (recién nos logueamos y no llegó
+  // la respuesta de /api/usuarios/estado), true/false una vez que sí.
+  // Las páginas que necesitan bloquear a alguien sin verificar tienen
+  // que tratar `null` como "todavía no sé" y esperar, no como "está
+  // verificado" — si no, hay una ventana de un instante donde se
+  // colaría.
+  emailVerificado: boolean | null
   login: (email: string, password: string) => Promise<void>
   registrarse: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -28,6 +35,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<User | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [emailVerificado, setEmailVerificado] = useState<boolean | null>(null)
 
   useEffect(() => {
     // Si auth es null (todavía no estamos en el navegador, o faltan las
@@ -37,9 +45,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCargando(false)
       return
     }
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUsuario(u)
       setCargando(false)
+
+      if (!u) {
+        setEmailVerificado(null)
+        return
+      }
+      // Se chequea acá, una sola vez por sesión iniciada — así CUALQUIER
+      // página que use este contexto (no solo /login) sabe si la cuenta
+      // está verificada, sin tener que pedirlo cada una por su cuenta.
+      // Antes esto solo se consultaba en /login, así que alguien con
+      // sesión ya abierta podía entrar directo a /vender o /checkout sin
+      // haber verificado nunca el código.
+      try {
+        const token = await u.getIdToken()
+        const res = await fetch('/api/usuarios/estado', { headers: { Authorization: `Bearer ${token}` } })
+        const data = await res.json()
+        setEmailVerificado(data.emailVerificado !== false)
+      } catch {
+        // si falla la consulta, no dejamos a la persona trabada sin poder
+        // usar la cuenta por un error nuestro de red
+        setEmailVerificado(true)
+      }
     })
     return () => unsub()
   }, [])
@@ -70,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, login, registrarse, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, login, registrarse, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )
