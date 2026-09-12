@@ -130,11 +130,20 @@ export default function CheckoutPage() {
           try {
             const res = await fetch(`/api/vendedores/${vendedorId}`)
             const data = await res.json()
-            if (data.configurado) {
+            // El QR/CBU propio del vendedor solo se usa con retiro en
+            // tienda — ahí el comprador ve el producto en mano antes de
+            // pagar, así que tiene sentido que le pague directo a él.
+            // Con envío, SIEMPRE se deposita a Clasi Click (nunca al
+            // vendedor), y recién se le libera la plata una vez
+            // confirmada la entrega — así protegemos al comprador si
+            // el envío se complica.
+            if (metodoEntrega === 'retiro' && data.configurado) {
               qrImageUrl = data.qrImageUrl || QR_PLATAFORMA
               cbu = data.cbu || BANK_ACCOUNT_NUMBER
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
+            } else if (data.nombreNegocio) {
+              vendedorNombre = data.nombreNegocio
             }
             whatsappVendedor = data.whatsapp || ''
           } catch {
@@ -175,7 +184,7 @@ export default function CheckoutPage() {
           cobroPropio,
           pedidoId: dataPedido.id,
           declarado: false,
-          estadoActual: 'pendiente_pago',
+          estadoActual: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
         })
       }
 
@@ -206,6 +215,33 @@ export default function CheckoutPage() {
       }
     })
   }
+
+  // Mientras el paso actual está "verificando_stock" (solo pasa con
+  // envío), consultamos cada pocos segundos si el vendedor ya lo
+  // confirmó desde /mis-pedidos o vos desde /admin. En cuanto cambia,
+  // esta misma pantalla pasa sola a mostrar el QR — el comprador no
+  // tiene que hacer nada ni refrescar.
+  useEffect(() => {
+    if (etapa !== 'pagando') return
+    const sub = subPedidos[pasoActual]
+    if (!sub || sub.estadoActual !== 'verificando_stock' || !sub.pedidoId) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/pedidos/${sub.pedidoId}`)
+        const data = await res.json()
+        if (data.estado && data.estado !== 'verificando_stock') {
+          setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, estadoActual: data.estado } : s)))
+        }
+      } catch {
+        // si falla una consulta, probamos de nuevo en el siguiente ciclo
+      }
+    }, 4000)
+    return () => clearInterval(interval)
+    // Solo nos importa si ESTE paso sigue en verificación — no hace
+    // falta re-crear el intervalo por cambios en otros subpedidos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, pasoActual, subPedidos[pasoActual]?.estadoActual, subPedidos[pasoActual]?.pedidoId])
 
   useEffect(() => {
     if (etapa !== 'resumen') return
@@ -274,6 +310,9 @@ export default function CheckoutPage() {
 
           {metodoEntrega === 'envio' ? (
             <>
+              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                Antes de mostrarte el QR, el vendedor confirma que tiene stock — puede demorar unos minutos. El depósito va a la cuenta de Clasi Click, no directo al vendedor.
+              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
                 <select
@@ -366,7 +405,27 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {etapa === 'pagando' && subPedidos[pasoActual] && (
+      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual === 'verificando_stock' && (
+        <div className="bg-panel border border-line rounded-xl p-7 text-center">
+          {subPedidos.length > 1 && (
+            <div className="font-body text-[11px] text-inksoft mb-2">
+              Pedido {pasoActual + 1} de {subPedidos.length}
+            </div>
+          )}
+          <div className="font-display text-lg font-bold text-ink mb-1.5">
+            {subPedidos[pasoActual].vendedorNombre} está verificando el stock
+          </div>
+          <div className="font-body text-[13px] text-inksoft mb-5">
+            Le avisamos a {subPedidos.length > 1 ? 'este vendedor' : 'el vendedor'} y está confirmando que tiene disponible lo que pediste. Puede demorar unos minutos — no hace falta que hagas nada, en cuanto confirme se habilita acá mismo el QR para que deposites.
+          </div>
+          <div className="flex items-center justify-center gap-1.5 font-body text-xs text-inksoft">
+            <span className="w-1.5 h-1.5 rounded-full bg-ochre animate-pulse" />
+            Esperando confirmación...
+          </div>
+        </div>
+      )}
+
+      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
           {subPedidos.length > 1 && (
             <div className="font-body text-[11px] text-inksoft mb-2">
@@ -377,9 +436,11 @@ export default function CheckoutPage() {
             Pagale a {subPedidos[pasoActual].vendedorNombre}
           </div>
           <div className="font-body text-[13px] text-inksoft mb-5">
-            {subPedidos[pasoActual].cobroPropio
-              ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
-              : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
+            {metodoEntrega === 'envio'
+              ? 'Con envío, el depósito va directo a la cuenta de Clasi Click — se lo liberamos al vendedor recién cuando se confirma que te llegó el pedido.'
+              : subPedidos[pasoActual].cobroPropio
+                ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
+                : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
           </div>
 
           {subPedidos[pasoActual].qrImageUrl ? (

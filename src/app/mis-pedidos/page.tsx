@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
+  verificando_stock: { texto: 'Verificando stock', color: 'text-ochre' },
   pendiente_pago: { texto: 'Esperando pago', color: 'text-inksoft' },
   informado_pago: { texto: 'Pago avisado', color: 'text-ochre' },
   pagado: { texto: 'Pagado', color: 'text-teal' },
@@ -22,6 +23,7 @@ export default function MisPedidosPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
   const [pedidos, setPedidos] = useState<any[]>([])
   const [cargandoPedidos, setCargandoPedidos] = useState(true)
+  const [confirmandoStockId, setConfirmandoStockId] = useState<string | null>(null)
 
   useEffect(() => {
     if (cargando) return
@@ -40,6 +42,28 @@ export default function MisPedidosPage() {
 
     cargar()
   }, [cargando, usuario, obtenerToken])
+
+  // Solo lo puede tocar el vendedor de ESE pedido en particular — un
+  // pedido puede mezclar productos de otro vendedor, así que no alcanza
+  // con estar logueado, hay que ser dueño de al menos un item ahí.
+  function esMiPedidoComoVendedor(p: any) {
+    return (p.items || []).some((item: any) => item?.vendedorId === usuario?.uid)
+  }
+
+  async function confirmarStock(pedidoId: string) {
+    setConfirmandoStockId(pedidoId)
+    try {
+      const token = await obtenerToken()
+      await fetch(`/api/pedidos/${pedidoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: 'pendiente_pago' }),
+      })
+      setPedidos((prev) => prev.map((p) => (p.id === pedidoId ? { ...p, estado: 'pendiente_pago' } : p)))
+    } finally {
+      setConfirmandoStockId(null)
+    }
+  }
 
   if (cargando || cargandoPedidos) {
     return <div className="max-w-[640px] mx-auto px-5 py-16 font-body text-sm text-inksoft">Cargando tus pedidos...</div>
@@ -85,6 +109,21 @@ export default function MisPedidosPage() {
             <div className="font-body text-[11px] text-inksoft mb-3">
               Envío: {p.zonaEntrega || 'Sin zona'} · {p.direccion || 'Sin dirección'}
             </div>
+            {p.estado === 'verificando_stock' && esMiPedidoComoVendedor(p) && (
+              <button
+                type="button"
+                onClick={() => confirmarStock(p.id)}
+                disabled={confirmandoStockId === p.id}
+                className="w-full mb-3 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-60"
+              >
+                {confirmandoStockId === p.id ? 'Confirmando...' : 'Confirmar stock disponible'}
+              </button>
+            )}
+            {p.estado === 'verificando_stock' && !esMiPedidoComoVendedor(p) && (
+              <div className="font-body text-[11px] text-inksoft mb-3 bg-panelalt border border-line rounded-lg p-2.5">
+                El vendedor está confirmando que tiene stock — en cuanto lo confirme te habilitamos el QR para pagar.
+              </div>
+            )}
             <div className="space-y-2">
               {(p.items || []).map((item: any) => (
                 <div key={`${p.id}-${item.id}`} className="flex items-center gap-3 border-t border-line pt-2">

@@ -14,6 +14,7 @@ function bs(n: number) {
 }
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
+  verificando_stock: { texto: 'Verificando stock con el vendedor', color: 'text-ochre' },
   pendiente_pago: { texto: 'Esperando que pague', color: 'text-inksoft' },
   informado_pago: { texto: 'Dice que ya pagó — revisar', color: 'text-ochre' },
   pagado: { texto: 'Pagado', color: 'text-teal' },
@@ -244,7 +245,7 @@ export default function AdminPage() {
     }).then(() => cargarProductos(password))
   }
 
-  function cambiarEstadoPedido(id: string, estado: 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
+  function cambiarEstadoPedido(id: string, estado: 'pendiente_pago' | 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
     fetch(`/api/pedidos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
@@ -754,6 +755,13 @@ export default function AdminPage() {
                     </button>
                   )}
                 </div>
+
+                {p.estado === 'verificando_stock' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'pendiente_pago')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Confirmar stock disponible</button>
+                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Sin stock / cancelar</button>
+                  </div>
+                )}
 
                 {p.estado === 'pagado' && (
                   <div className="mt-3 flex flex-wrap gap-2">

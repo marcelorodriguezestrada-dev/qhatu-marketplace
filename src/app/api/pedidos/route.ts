@@ -73,7 +73,12 @@ export async function POST(req: NextRequest) {
       // tiene sentido con retiro en tienda. Le sirve al vendedor para
       // saber si tiene que esperar una transferencia o cobrar en mano.
       metodoPago: metodoPago || 'qr',
-      estado: 'pendiente_pago',
+      // Con envío arrancamos pidiéndole al vendedor que confirme que
+      // tiene stock antes de mostrarle el QR al comprador — así no
+      // depositan por algo que capaz ya no está disponible. Con retiro
+      // en tienda no hace falta este paso: el comprador ve el producto
+      // en mano antes de pagar.
+      estado: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })

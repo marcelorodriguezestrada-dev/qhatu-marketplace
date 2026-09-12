@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Falta el estado del pedido.' }, { status: 400 })
     }
 
-    const estadosValidos = ['informado_pago', 'pagado', 'en_preparacion', 'en_entrega', 'entregado', 'cancelado']
+    const estadosValidos = ['informado_pago', 'pendiente_pago', 'pagado', 'en_preparacion', 'en_entrega', 'entregado', 'cancelado']
     if (!estadosValidos.includes(estado)) {
       return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 })
     }
@@ -70,6 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const payload: Record<string, string> = { estado, updatedAt: new Date().toISOString() }
+    if (estado === 'pendiente_pago') payload.stockConfirmadoAt = new Date().toISOString()
     if (estado === 'pagado') payload.pagadoAt = new Date().toISOString()
     if (estado === 'en_preparacion') payload.enPreparacionAt = new Date().toISOString()
     if (estado === 'en_entrega') payload.enEntregaAt = new Date().toISOString()
