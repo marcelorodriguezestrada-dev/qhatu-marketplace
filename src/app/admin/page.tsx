@@ -1808,6 +1808,14 @@ export default function AdminPage() {
       {tab === 'metricas' && (
         <div>
           {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
+          {!cargandoMetricas && metricas?.error && (
+            <div className="font-body text-sm text-maroon bg-panelalt border border-line rounded-lg p-3">
+              No se pudieron cargar las métricas: {metricas.error}. Probá recargar la pestaña — si sigue igual, revisá los logs de la función /api/admin/metricas en Vercel.
+            </div>
+          )}
+          {!cargandoMetricas && !metricas && (
+            <div className="font-body text-sm text-inksoft">Todavía no se cargó nada — probá cambiar de pestaña y volver acá.</div>
+          )}
           {!cargandoMetricas && metricas && !metricas.error && (
             <div>
               {metricas.flujoCaja && (

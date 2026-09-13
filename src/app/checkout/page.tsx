@@ -4,6 +4,8 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
+import { ZONAS_POTOSI } from '@/data/zonasPotosi'
+import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -17,13 +19,9 @@ function linkWhatsappRetiroEfectivo(s: SubPedido): string {
 
 type Etapa = 'entrega' | 'creando' | 'pagando' | 'whatsapp' | 'resumen' | 'error'
 
-const COSTOS_ENVIO: Record<string, number> = {
-  'Centro La Paz': 25,
-  'Sopocachi': 30,
-  'El Alto': 35,
-  'Villa Fátima': 40,
-  'Fuera de la ciudad': 60,
-}
+// Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
+// las coordenadas y ajustar los precios reales.
+const COSTOS_ENVIO: Record<string, number> = Object.fromEntries(ZONAS_POTOSI.map((z) => [z.nombre, z.costoEnvio]))
 
 // QR/cuenta de la plataforma — se usa como respaldo para los items sin
 // vendedor identificado (datos de ejemplo) o para vendedores que
@@ -103,7 +101,7 @@ function CheckoutContent() {
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
-  const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
+  const [zonaEntrega, setZonaEntrega] = useState(ZONAS_POTOSI[0].nombre)
   const [direccion, setDireccion] = useState('')
   // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
   // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
@@ -381,6 +379,9 @@ function CheckoutContent() {
                   ))}
                 </select>
               </label>
+              <div className="mb-3">
+                <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
+              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
                 <input
