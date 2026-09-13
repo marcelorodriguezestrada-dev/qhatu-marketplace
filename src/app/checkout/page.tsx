@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
@@ -68,6 +68,19 @@ function repartirEnvio(subtotales: number[], costoEnvioTotal: number): number[] 
 }
 
 export default function CheckoutPage() {
+  // useSearchParams() obliga a Next.js a renderizar esta parte del
+  // lado del cliente en vez de poder prerenderizarla en el build — el
+  // Suspense de acá afuera es lo que le permite seguir generando el
+  // resto de la página estáticamente sin romper el build (si no,
+  // "useSearchParams() should be wrapped in a suspense boundary").
+  return (
+    <Suspense fallback={null}>
+      <CheckoutContent />
+    </Suspense>
+  )
+}
+
+function CheckoutContent() {
   const { items: itemsCarrito, vaciarTienda } = useCarrito()
   const { usuario, cargando: authCargando, emailVerificado } = useAuth()
   const router = useRouter()
