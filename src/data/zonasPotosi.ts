@@ -16,7 +16,9 @@ export type ZonaPotosi = {
   costoEnvio: number
 }
 
-export const ZONAS_POTOSI: ZonaPotosi[] = [
+// Lista con precio y coordenadas — la usa el checkout (envío de
+// productos) y el mapita de zonas.
+export const ZONAS_ENVIO_POTOSI: ZonaPotosi[] = [
   { nombre: 'Centro (Plaza 10 de Noviembre)', lat: -19.5893, lng: -65.7535, costoEnvio: 5 },
   { nombre: 'Santa Rosa', lat: -19.5890, lng: -65.7546, costoEnvio: 5 },
   { nombre: 'San Martín', lat: -19.5886, lng: -65.7477, costoEnvio: 5 },
@@ -40,3 +42,10 @@ export const ZONAS_POTOSI: ZonaPotosi[] = [
   { nombre: 'Pampa Ingenio', lat: -19.5926, lng: -65.7424, costoEnvio: 15 },
   { nombre: 'Cerro Rico / Pailaviri', lat: -19.6066, lng: -65.7430, costoEnvio: 15 },
 ]
+
+// Lista simple de nombres nomás — la usan las páginas que solo
+// necesitan elegir una zona sin que importe el precio de envío (por
+// ejemplo, un profesional de /publicar-servicio eligiendo en qué zona
+// de la ciudad trabaja). Se deriva de la misma lista de arriba para no
+// mantener los nombres en dos lugares distintos.
+export const ZONAS_POTOSI: string[] = ZONAS_ENVIO_POTOSI.map((z) => z.nombre)

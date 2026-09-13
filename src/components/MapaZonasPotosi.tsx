@@ -1,6 +1,6 @@
 'use client'
 
-import { ZONAS_POTOSI, ZonaPotosi } from '@/data/zonasPotosi'
+import { ZONAS_ENVIO_POTOSI, ZonaPotosi } from '@/data/zonasPotosi'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -11,8 +11,8 @@ function bs(n: number) {
 // falta ninguna librería de mapas ni API key para esto: alcanza con
 // convertir lat/lng a un x/y relativo dentro del SVG.
 export function MapaZonasPotosi({ zonaSeleccionada }: { zonaSeleccionada?: string }) {
-  const lats = ZONAS_POTOSI.map((z) => z.lat)
-  const lngs = ZONAS_POTOSI.map((z) => z.lng)
+  const lats = ZONAS_ENVIO_POTOSI.map((z) => z.lat)
+  const lngs = ZONAS_ENVIO_POTOSI.map((z) => z.lng)
   const minLat = Math.min(...lats)
   const maxLat = Math.max(...lats)
   const minLng = Math.min(...lngs)
@@ -39,7 +39,7 @@ export function MapaZonasPotosi({ zonaSeleccionada }: { zonaSeleccionada?: strin
   return (
     <div className="bg-panel border border-line rounded-lg p-3">
       <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="w-full h-auto" role="img" aria-label="Mapa de zonas de reparto en Potosí">
-        {ZONAS_POTOSI.map((z) => {
+        {ZONAS_ENVIO_POTOSI.map((z) => {
           const { x, y } = proyectar(z)
           const esSeleccionada = z.nombre === zonaSeleccionada
           return (
