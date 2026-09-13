@@ -55,9 +55,32 @@ export async function contarUsuarios(): Promise<number> {
   return resultado.users.length
 }
 
-// Acceso directo a Firebase Auth para el panel de administración de
-// usuarios (listar, pausar/reactivar, eliminar). Mismo patrón que
-// getDb(): reutiliza la instancia ya inicializada de la app.
-export function getAuthAdmin() {
-  return getAuth(getApp())
+// Lista completa de usuarios para el panel de administración. Igual
+// que contarUsuarios, una sola página de hasta 1000 — alcanza para
+// esta etapa del proyecto.
+export async function listarUsuarios() {
+  const resultado = await getAuth(getApp()).listUsers(1000)
+  return resultado.users.map((u) => ({
+    uid: u.uid,
+    email: u.email || null,
+    creadoEn: u.metadata.creationTime,
+    ultimoLogin: u.metadata.lastSignInTime,
+    pausado: u.disabled,
+  }))
+}
+
+// "Pausar" un usuario = deshabilitarlo en Firebase Auth: no puede
+// volver a iniciar sesión (y si ya tenía una sesión activa, sus
+// próximos pedidos a la API van a fallar la verificación del token),
+// pero no se borra nada de lo que publicó — se puede reactivar en
+// cualquier momento.
+export async function pausarUsuario(uid: string, pausado: boolean) {
+  await getAuth(getApp()).updateUser(uid, { disabled: pausado })
+}
+
+// Borrado definitivo de la cuenta en Firebase Auth. Esto NO borra sus
+// productos/servicios de Firestore (eso lo maneja quien llama a esta
+// función, según lo que decida hacer con ese contenido).
+export async function borrarUsuarioAuth(uid: string) {
+  await getAuth(getApp()).deleteUser(uid)
 }

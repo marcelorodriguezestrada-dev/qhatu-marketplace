@@ -15,18 +15,9 @@ export function GraficoBarras({
   color?: string
 }) {
   const max = Math.max(1, ...datos.map((d) => d.valor))
-  const hayDatos = datos.some((d) => d.valor > 0)
 
   if (datos.length === 0) {
     return <div className="font-body text-xs text-inksoft py-6 text-center">Todavía no hay datos para este período.</div>
-  }
-
-  if (!hayDatos) {
-    return (
-      <div className="font-body text-xs text-inksoft py-10 text-center">
-        Sin actividad registrada en este período todavía — a medida que entre gente al sitio, esto se va a ir llenando solo.
-      </div>
-    )
   }
 
   return (

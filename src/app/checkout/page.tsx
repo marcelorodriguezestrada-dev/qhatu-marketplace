@@ -1,27 +1,25 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
-import { ZONAS_ENVIO_POTOSI } from '@/data/zonasPotosi'
-import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
 
-function linkWhatsappRetiroEfectivo(s: SubPedido): string {
-  const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
-  const texto = `Hola! Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
-  return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
+type Etapa = 'entrega' | 'creando' | 'pagando' | 'resumen' | 'error'
+
+const COSTOS_ENVIO: Record<string, number> = {
+  'Centro La Paz': 25,
+  'Sopocachi': 30,
+  'El Alto': 35,
+  'Villa Fátima': 40,
+  'Fuera de la ciudad': 60,
 }
 
-type Etapa = 'entrega' | 'creando' | 'pagando' | 'whatsapp' | 'resumen' | 'error'
-
-// Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
-// las coordenadas y ajustar los precios reales.
-const COSTOS_ENVIO: Record<string, number> = Object.fromEntries(ZONAS_ENVIO_POTOSI.map((z) => [z.nombre, z.costoEnvio]))
+const FRANJAS_HORARIAS = ['09:00 a 13:00', '14:00 a 18:00', '18:00 a 21:00']
 
 // QR/cuenta de la plataforma — se usa como respaldo para los items sin
 // vendedor identificado (datos de ejemplo) o para vendedores que
@@ -34,7 +32,6 @@ const BANK_ACCOUNT_NUMBER = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || ''
 type SubPedido = {
   vendedorId: string | null
   vendedorNombre: string
-  whatsapp: string
   items: ItemCarrito[]
   subtotal: number
   costoEnvio: number
@@ -66,87 +63,29 @@ function repartirEnvio(subtotales: number[], costoEnvioTotal: number): number[] 
 }
 
 export default function CheckoutPage() {
-  // useSearchParams() obliga a Next.js a renderizar esta parte del
-  // lado del cliente en vez de poder prerenderizarla en el build — el
-  // Suspense de acá afuera es lo que le permite seguir generando el
-  // resto de la página estáticamente sin romper el build (si no,
-  // "useSearchParams() should be wrapped in a suspense boundary").
-  return (
-    <Suspense fallback={null}>
-      <CheckoutContent />
-    </Suspense>
-  )
-}
-
-function CheckoutContent() {
-  const { items: itemsCarrito, vaciarTienda } = useCarrito()
-  const { usuario, cargando: authCargando, emailVerificado } = useAuth()
+  const { items, vaciar } = useCarrito()
+  const { usuario, cargando: authCargando } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
-
-  // Qué tienda se está pagando en esta visita a /checkout — la manda
-  // el carrito como ?tienda=<vendedorId> (o "plataforma" para productos
-  // sin vendedor propio). Cada tienda del carrito se compra por
-  // separado, así que acá solo trabajamos con SUS productos — el resto
-  // del carrito queda intacto para pagarlo en otra visita.
-  const claveTienda = searchParams.get('tienda')
-  const vendedorIdTienda = claveTienda && claveTienda !== 'plataforma' ? claveTienda : null
-  const items = claveTienda
-    ? itemsCarrito.filter((i) => (i.vendedorId || 'plataforma') === claveTienda)
-    : itemsCarrito
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
-  // Solo aplica cuando metodoEntrega es 'retiro' — con envío siempre es
-  // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
-  // sin verse las caras).
-  const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
-  const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
-  const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
+  const [zonaEntrega, setZonaEntrega] = useState('Centro La Paz')
   const [direccion, setDireccion] = useState('')
-  // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
-  // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
-  // comprador no la comparte, igual puede pedir con envío; su parada
-  // simplemente queda al final de la ruta para confirmar a mano.
-  const [lat, setLat] = useState<number | null>(null)
-  const [lng, setLng] = useState<number | null>(null)
-  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
+  const [franjaHoraria, setFranjaHoraria] = useState(FRANJAS_HORARIAS[1])
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
   const [pasoActual, setPasoActual] = useState(0)
   const [error, setError] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Concretar una compra requiere estar logueado Y con el email
-  // verificado (regla de toda la plataforma) — si alguien llega hasta
-  // acá sin cuenta, o con una cuenta todavía sin verificar, lo mandamos
-  // a /login antes de dejarlo seguir.
+  // Concretar una compra requiere estar logueado (regla de toda la
+  // plataforma) — si alguien llega hasta acá sin cuenta, lo mandamos a
+  // /login antes de dejarlo seguir.
   useEffect(() => {
-    if (authCargando) return
-    if (!usuario || emailVerificado === false) router.push('/login')
-  }, [authCargando, usuario, emailVerificado, router])
+    if (!authCargando && !usuario) router.push('/login')
+  }, [authCargando, usuario, router])
 
   const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
-
-  function usarMiUbicacion() {
-    setBuscandoUbicacion(true)
-    if (!navigator.geolocation) {
-      setError('Tu navegador no soporta geolocalización.')
-      setBuscandoUbicacion(false)
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude)
-        setLng(pos.coords.longitude)
-        setBuscandoUbicacion(false)
-      },
-      () => {
-        setError('No pudimos acceder a tu ubicación. Podés seguir sin ella, solo que la moto va a confirmar tu dirección a mano.')
-        setBuscandoUbicacion(false)
-      }
-    )
-  }
 
   async function confirmarEntregaYCrearPedidos() {
     setEtapa('creando')
@@ -177,34 +116,21 @@ function CheckoutContent() {
         let cbu = BANK_ACCOUNT_NUMBER
         let cobroPropio = false
         let vendedorNombre = clave === 'plataforma' ? 'Clasi Click' : grupoItems[0]?.vendedor || 'Vendedor'
-        let whatsappVendedor = ''
 
         if (vendedorId) {
           try {
             const res = await fetch(`/api/vendedores/${vendedorId}`)
             const data = await res.json()
-            // El QR/CBU propio del vendedor solo se usa con retiro en
-            // tienda — ahí el comprador ve el producto en mano antes de
-            // pagar, así que tiene sentido que le pague directo a él.
-            // Con envío, SIEMPRE se deposita a Clasi Click (nunca al
-            // vendedor), y recién se le libera la plata una vez
-            // confirmada la entrega — así protegemos al comprador si
-            // el envío se complica.
-            if (metodoEntrega === 'retiro' && data.configurado) {
+            if (data.configurado) {
               qrImageUrl = data.qrImageUrl || QR_PLATAFORMA
               cbu = data.cbu || BANK_ACCOUNT_NUMBER
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
-            } else if (data.nombreNegocio) {
-              vendedorNombre = data.nombreNegocio
             }
-            whatsappVendedor = data.whatsapp || ''
           } catch {
             // si falla la consulta, seguimos con el QR de la plataforma como respaldo
           }
         }
-
-        const metodoPagoGrupo = metodoEntrega === 'retiro' ? metodoPago : 'qr'
 
         const resPedido = await fetch('/api/pedidos', {
           method: 'POST',
@@ -216,11 +142,9 @@ function CheckoutContent() {
             vendedorId,
             zonaEntrega,
             direccion,
-            lat: metodoEntrega === 'envio' ? lat : null,
-            lng: metodoEntrega === 'envio' ? lng : null,
+            franjaHoraria: metodoEntrega === 'envio' ? franjaHoraria : null,
             costoEnvio: envioGrupo,
             metodoEntrega,
-            metodoPago: metodoPagoGrupo,
           }),
         })
         const dataPedido = await resPedido.json()
@@ -229,7 +153,6 @@ function CheckoutContent() {
         nuevos.push({
           vendedorId,
           vendedorNombre,
-          whatsapp: whatsappVendedor,
           items: grupoItems,
           subtotal,
           costoEnvio: envioGrupo,
@@ -239,15 +162,13 @@ function CheckoutContent() {
           cobroPropio,
           pedidoId: dataPedido.id,
           declarado: false,
-          estadoActual: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
+          estadoActual: 'pendiente_pago',
         })
       }
 
       setSubPedidos(nuevos)
       setPasoActual(0)
-      // Efectivo en retiro: no hay QR que mostrar — el pago se coordina
-      // directo con el vendedor por WhatsApp cuando pasan a buscarlo.
-      setEtapa(metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'whatsapp' : 'pagando')
+      setEtapa('pagando')
     } catch (e: any) {
       setError(e.message || 'No se pudieron crear los pedidos.')
       setEtapa('error')
@@ -271,33 +192,6 @@ function CheckoutContent() {
     })
   }
 
-  // Mientras el paso actual está "verificando_stock" (solo pasa con
-  // envío), consultamos cada pocos segundos si el vendedor ya lo
-  // confirmó desde /mis-pedidos o vos desde /admin. En cuanto cambia,
-  // esta misma pantalla pasa sola a mostrar el QR — el comprador no
-  // tiene que hacer nada ni refrescar.
-  useEffect(() => {
-    if (etapa !== 'pagando') return
-    const sub = subPedidos[pasoActual]
-    if (!sub || sub.estadoActual !== 'verificando_stock' || !sub.pedidoId) return
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/pedidos/${sub.pedidoId}`)
-        const data = await res.json()
-        if (data.estado && data.estado !== 'verificando_stock') {
-          setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, estadoActual: data.estado } : s)))
-        }
-      } catch {
-        // si falla una consulta, probamos de nuevo en el siguiente ciclo
-      }
-    }, 4000)
-    return () => clearInterval(interval)
-    // Solo nos importa si ESTE paso sigue en verificación — no hace
-    // falta re-crear el intervalo por cambios en otros subpedidos.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, pasoActual, subPedidos[pasoActual]?.estadoActual, subPedidos[pasoActual]?.pedidoId])
-
   useEffect(() => {
     if (etapa !== 'resumen') return
     pollRef.current = setInterval(async () => {
@@ -312,7 +206,7 @@ function CheckoutContent() {
       setSubPedidos(actualizados)
       if (actualizados.every((s) => s.estadoActual === 'pagado')) {
         if (pollRef.current) clearInterval(pollRef.current)
-        vaciarTienda(vendedorIdTienda)
+        vaciar()
       }
     }, 4000)
     return () => {
@@ -365,9 +259,6 @@ function CheckoutContent() {
 
           {metodoEntrega === 'envio' ? (
             <>
-              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                Antes de mostrarte el QR, el vendedor confirma que tiene stock — puede demorar unos minutos. El depósito va a la cuenta de Clasi Click, no directo al vendedor.
-              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
                 <select
@@ -380,21 +271,7 @@ function CheckoutContent() {
                   ))}
                 </select>
               </label>
-              <div className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => setMostrarMapaZonas((v) => !v)}
-                  className="font-body text-[12px] text-teal font-semibold underline"
-                >
-                  {mostrarMapaZonas ? 'Ocultar mapa de zonas' : 'Ver mapa de zonas y costos de envío'}
-                </button>
-                {mostrarMapaZonas && (
-                  <div className="mt-2">
-                    <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
-                  </div>
-                )}
-              </div>
-              <label className="block text-left mb-3">
+              <label className="block text-left mb-4">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
                 <input
                   value={direccion}
@@ -403,64 +280,24 @@ function CheckoutContent() {
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>
-              <div className="mb-4">
-                <button
-                  type="button"
-                  onClick={usarMiUbicacion}
-                  disabled={buscandoUbicacion}
-                  className="font-body text-[12px] text-teal font-semibold underline disabled:opacity-60"
-                >
-                  {buscandoUbicacion ? 'Buscando ubicación...' : lat != null ? '📍 Ubicación guardada ✓ (volver a compartir)' : '📍 Compartir mi ubicación'}
-                </button>
-                <div className="font-body text-[11px] text-inksoft mt-1">
-                  Ayuda a que la moto arme la ruta más corta para llegar antes.
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
-              </div>
               <label className="block text-left mb-4">
-                <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('qr')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('efectivo')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    Efectivo
-                  </button>
-                </div>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Horario en el que te encontramos</span>
+                <select
+                  value={franjaHoraria}
+                  onChange={(e) => setFranjaHoraria(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                >
+                  {FRANJAS_HORARIAS.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
               </label>
             </>
-          )}
-
-          {/* Detalle de lo que se está comprando — antes solo se veía el
-              subtotal, sin poder revisar qué productos eran. */}
-          <div className="mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
-            <div className="border-t border-line divide-y divide-line">
-              {items.map((it) => (
-                <div key={it.id} className="flex items-center justify-between gap-2 py-2 font-body text-[13px] text-ink">
-                  <span className="flex-1">{it.cantidad} × {it.nombre}</span>
-                  <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
-                </div>
-              ))}
+          ) : (
+            <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+              Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
             </div>
-          </div>
+          )}
 
           <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(subtotalCarrito)}</div>
           <div className="font-body text-[12px] text-inksoft mb-3">Envío: {bs(costoEnvio)}</div>
@@ -470,7 +307,7 @@ function CheckoutContent() {
             disabled={authCargando}
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
           >
-            {metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
+            Continuar al pago
           </button>
         </div>
       )}
@@ -487,27 +324,7 @@ function CheckoutContent() {
         </div>
       )}
 
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual === 'verificando_stock' && (
-        <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          {subPedidos.length > 1 && (
-            <div className="font-body text-[11px] text-inksoft mb-2">
-              Pedido {pasoActual + 1} de {subPedidos.length}
-            </div>
-          )}
-          <div className="font-display text-lg font-bold text-ink mb-1.5">
-            {subPedidos[pasoActual].vendedorNombre} está verificando el stock
-          </div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            Le avisamos a {subPedidos.length > 1 ? 'este vendedor' : 'el vendedor'} y está confirmando que tiene disponible lo que pediste. Puede demorar unos minutos — no hace falta que hagas nada, en cuanto confirme se habilita acá mismo el QR para que deposites.
-          </div>
-          <div className="flex items-center justify-center gap-1.5 font-body text-xs text-inksoft">
-            <span className="w-1.5 h-1.5 rounded-full bg-ochre animate-pulse" />
-            Esperando confirmación...
-          </div>
-        </div>
-      )}
-
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && (
+      {etapa === 'pagando' && subPedidos[pasoActual] && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
           {subPedidos.length > 1 && (
             <div className="font-body text-[11px] text-inksoft mb-2">
@@ -518,11 +335,9 @@ function CheckoutContent() {
             Pagale a {subPedidos[pasoActual].vendedorNombre}
           </div>
           <div className="font-body text-[13px] text-inksoft mb-5">
-            {metodoEntrega === 'envio'
-              ? 'Con envío, el depósito va directo a la cuenta de Clasi Click — se lo liberamos al vendedor recién cuando se confirma que te llegó el pedido.'
-              : subPedidos[pasoActual].cobroPropio
-                ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
-                : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
+            {subPedidos[pasoActual].cobroPropio
+              ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
+              : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
           </div>
 
           {subPedidos[pasoActual].qrImageUrl ? (
@@ -557,47 +372,23 @@ function CheckoutContent() {
         </div>
       )}
 
-      {etapa === 'whatsapp' && (
-        <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          <div className="font-display text-lg font-bold text-ink mb-1.5">Coordiná el retiro y el pago</div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            Vas a pagar en efectivo cuando retirás. Escribile a {subPedidos.length > 1 ? 'cada vendedor' : 'el vendedor'} por WhatsApp para acordar día y horario.
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {subPedidos.map((s, i) =>
-              s.whatsapp ? (
-                <a
-                  key={i}
-                  href={linkWhatsappRetiroEfectivo(s)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
-                >
-                  💬 Continuar compra por WhatsApp{subPedidos.length > 1 ? ` — ${s.vendedorNombre}` : ''}
-                </a>
-              ) : (
-                <div key={i} className="font-body text-xs text-inksoft bg-panelalt border border-line rounded-lg p-3 text-left">
-                  {s.vendedorNombre} todavía no cargó un WhatsApp de contacto — vas a coordinar el retiro cuando te confirmen el pedido.
-                </div>
-              )
-            )}
-          </div>
-          <button
-            onClick={() => setEtapa('resumen')}
-            className="w-full py-3 rounded-lg border border-line bg-panel text-ink font-body text-sm font-semibold mt-4"
-          >
-            Ya avisé, continuar
-          </button>
-        </div>
-      )}
-
       {etapa === 'resumen' && (
         <div>
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">Todos los pagos confirmados</div>
-              <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">¡Tu pedido está en marcha!</div>
+              <div className="font-body text-[13px] text-inksoft mb-1">
+                {metodoEntrega === 'envio'
+                  ? <>Esperalo en <strong>{direccion || 'la dirección que indicaste'}</strong>, en el horario de <strong>{franjaHoraria}</strong>.</>
+                  : <>Coordiná el retiro con cada vendedor por WhatsApp.</>}
+              </div>
+              <button
+                onClick={() => router.push('/mis-pedidos')}
+                className="mt-4 px-4 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+              >
+                Hacer seguimiento acá
+              </button>
             </div>
           ) : (
             <div className="font-body text-sm text-inksoft mb-4 text-center">

@@ -19,19 +19,14 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    // Cada colección se consulta con su propio catch — si UNA falla
-    // (por el motivo que sea), el resto de las métricas se sigue
-    // mostrando igual, en vez de que todo el tablero quede en blanco
-    // por un solo problema puntual.
-    const snapVacio = { docs: [] as any[] }
     const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
-      db.collection('productos').get().catch((e) => { console.error('metricas: productos', e); return snapVacio }),
-      db.collection('profesionales').get().catch((e) => { console.error('metricas: profesionales', e); return snapVacio }),
-      db.collection('pedidos').get().catch((e) => { console.error('metricas: pedidos', e); return snapVacio }),
-      db.collection('analitica_categorias').get().catch((e) => { console.error('metricas: analitica_categorias', e); return snapVacio }),
-      db.collection('metricas_diarias').get().catch((e) => { console.error('metricas: metricas_diarias', e); return snapVacio }),
-      db.collection('pagos_premium').get().catch((e) => { console.error('metricas: pagos_premium', e); return snapVacio }),
+      db.collection('productos').get(),
+      db.collection('profesionales').get(),
+      db.collection('pedidos').get(),
+      db.collection('analitica_categorias').get(),
+      db.collection('metricas_diarias').get(),
+      db.collection('pagos_premium').get(),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]

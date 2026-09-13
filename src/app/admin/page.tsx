@@ -8,14 +8,12 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
 import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
-import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
-  verificando_stock: { texto: 'Verificando stock con el vendedor', color: 'text-ochre' },
   pendiente_pago: { texto: 'Esperando que pague', color: 'text-inksoft' },
   informado_pago: { texto: 'Dice que ya pagó — revisar', color: 'text-ochre' },
   pagado: { texto: 'Pagado', color: 'text-teal' },
@@ -63,19 +61,13 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'reparto' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
   const [pedidos, setPedidos] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
-  const [usuarios, setUsuarios] = useState<any[]>([])
-  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
-  // uid del usuario cuya fila está desplegada mostrando el detalle de
-  // sus productos y perfiles profesionales (null = ninguna abierta).
-  const [usuarioExpandidoId, setUsuarioExpandidoId] = useState<string | null>(null)
-  const [buscarUsuario, setBuscarUsuario] = useState('')
   const [metricas, setMetricas] = useState<any>(null)
   const [cargandoMetricas, setCargandoMetricas] = useState(false)
   // Línea de tiempo de la pestaña Métricas: qué período se ve
@@ -200,6 +192,47 @@ export default function AdminPage() {
       .then((data) => setProfesionales(data.profesionales || []))
   }
 
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
+  const [accionandoUid, setAccionandoUid] = useState<string | null>(null)
+  const [busquedaUsuario, setBusquedaUsuario] = useState('')
+
+  function cargarUsuarios(pw?: string) {
+    setCargandoUsuarios(true)
+    fetch('/api/admin/usuarios', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setUsuarios(data.usuarios || []))
+      .finally(() => setCargandoUsuarios(false))
+  }
+
+  async function pausarUsuarioAdmin(uid: string, pausado: boolean) {
+    setAccionandoUid(uid)
+    try {
+      await fetch('/api/admin/usuarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ uid, pausado }),
+      })
+      setUsuarios((prev) => prev.map((u) => (u.uid === uid ? { ...u, pausado } : u)))
+    } finally {
+      setAccionandoUid(null)
+    }
+  }
+
+  async function borrarUsuarioAdmin(uid: string, email: string | null) {
+    if (!confirm(`¿Eliminar definitivamente la cuenta de ${email || uid}? No va a poder volver a entrar. Sus productos y servicios se ocultan (no se borran).`)) return
+    setAccionandoUid(uid)
+    try {
+      await fetch(`/api/admin/usuarios?uid=${uid}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': password },
+      })
+      setUsuarios((prev) => prev.filter((u) => u.uid !== uid))
+    } finally {
+      setAccionandoUid(null)
+    }
+  }
+
   function cargarMetricas(pw?: string) {
     setCargandoMetricas(true)
     fetch('/api/admin/metricas', { headers: { 'x-admin-password': pw ?? password } })
@@ -214,30 +247,6 @@ export default function AdminPage() {
       .then((data) => setProductos(data.productos || []))
   }
 
-  function cargarUsuarios(pw?: string) {
-    setCargandoUsuarios(true)
-    fetch('/api/admin/usuarios', { headers: { 'x-admin-password': pw ?? password } })
-      .then((r) => r.json())
-      .then((data) => setUsuarios(data.usuarios || []))
-      .finally(() => setCargandoUsuarios(false))
-  }
-
-  function pausarUsuario(uid: string, pausado: boolean) {
-    fetch(`/api/admin/usuarios/${uid}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ pausado }),
-    }).then(() => cargarUsuarios())
-  }
-
-  function eliminarUsuario(uid: string) {
-    if (!confirm('¿Eliminar esta cuenta definitivamente? El usuario no va a poder volver a entrar con este login. Esta acción no se puede deshacer.')) return
-    fetch(`/api/admin/usuarios/${uid}`, {
-      method: 'DELETE',
-      headers: { 'x-admin-password': password },
-    }).then(() => cargarUsuarios())
-  }
-
   function cambiarEstadoProducto(id: string, estado: 'activo' | 'pendiente' | 'rechazado' | 'oculto') {
     fetch(`/api/productos/${id}`, {
       method: 'PATCH',
@@ -246,7 +255,7 @@ export default function AdminPage() {
     }).then(() => cargarProductos(password))
   }
 
-  function cambiarEstadoPedido(id: string, estado: 'pendiente_pago' | 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
+  function cambiarEstadoPedido(id: string, estado: 'pagado' | 'en_preparacion' | 'en_entrega' | 'entregado' | 'cancelado') {
     fetch(`/api/pedidos/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
@@ -256,14 +265,6 @@ export default function AdminPage() {
 
   function confirmarPago(id: string) {
     cambiarEstadoPedido(id, 'pagado')
-  }
-
-  function pagarAlVendedor(id: string, medio: 'efectivo' | 'qr') {
-    fetch(`/api/pedidos/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({ pagoVendedorMedio: medio }),
-    }).then(() => entrar(password))
   }
 
   function eliminarPedido(id: string) {
@@ -714,12 +715,6 @@ export default function AdminPage() {
           )}
         </button>
         <button
-          onClick={() => setTab('reparto')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'reparto' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Reparto
-        </button>
-        <button
           onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
@@ -770,33 +765,6 @@ export default function AdminPage() {
                     </button>
                   )}
                 </div>
-
-                {p.estado === 'verificando_stock' && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'pendiente_pago')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Confirmar stock disponible</button>
-                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Sin stock / cancelar</button>
-                  </div>
-                )}
-
-                {p.metodoEntrega === 'envio' && ['pagado', 'en_preparacion', 'en_entrega', 'entregado'].includes(p.estado) && (
-                  <div className="mt-3">
-                    {p.pagoVendedorHecho ? (
-                      <div className="font-body text-[11px] text-teal">
-                        ✓ Pagado al vendedor por {p.pagoVendedorMedio === 'efectivo' ? 'efectivo' : 'QR'}{p.pagoVendedorAt && ` el ${new Date(p.pagoVendedorAt).toLocaleDateString('es-BO')}`}
-                      </div>
-                    ) : (
-                      <div className="bg-panelalt border border-line rounded-lg p-2.5">
-                        <div className="font-body text-[11px] text-inksoft mb-1.5">
-                          Este pedido cobró por QR de la plataforma — todavía falta pagarle al vendedor su parte:
-                        </div>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => pagarAlVendedor(p.id, 'efectivo')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] font-semibold">Ya le pagué en efectivo</button>
-                          <button type="button" onClick={() => pagarAlVendedor(p.id, 'qr')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] font-semibold">Ya le pagué por QR</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {p.estado === 'pagado' && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1422,164 +1390,76 @@ export default function AdminPage() {
         </div>
       )}
 
-      {tab === 'reparto' && (
-        <div>
-          {(() => {
-            // Solo entran acá los pedidos con envío YA pagados (con
-            // stock ya confirmado, porque sin eso ni siquiera llegan a
-            // "pagado") y que todavía no salieron a reparto ni se
-            // entregaron.
-            const listos = pedidos.filter((p: any) => p.metodoEntrega === 'envio' && p.estado === 'pagado')
-            const porFranja = (franja: '08:00' | '14:00') =>
-              ordenarPorCercania(
-                listos.filter((p: any) => calcularFranja(new Date(p.pagadoAt || p.createdAt)) === franja),
-                DEPOSITO
-              )
-            const salida8 = porFranja('08:00')
-            const salida14 = porFranja('14:00')
-
-            const Tanda = ({ titulo, tanda }: { titulo: string; tanda: any[] }) => (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="font-display text-base font-bold text-ink">{titulo}</div>
-                  {tanda.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirm(`¿Marcar ${tanda.length} pedido(s) como "en entrega"? Es para cuando la moto ya salió con todos estos.`)) return
-                        tanda.forEach((p) => cambiarEstadoPedido(p.id, 'en_entrega'))
-                      }}
-                      className="px-2.5 py-1.5 rounded-md border-none bg-maroon text-white font-body text-[11px] font-semibold"
-                    >
-                      Marcar salida de la moto ({tanda.length})
-                    </button>
-                  )}
-                </div>
-                {tanda.length === 0 && (
-                  <div className="font-body text-xs text-inksoft">No hay pedidos pagados esperando esta salida.</div>
-                )}
-                {tanda.map((p: any, i: number) => (
-                  <div key={p.id} className="bg-panel border border-line rounded-lg p-3 mb-2 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-maroonsoft text-maroon font-body text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-body text-[13px] font-medium text-ink">{p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}</div>
-                      <div className="font-body text-[11px] text-inksoft">
-                        {p.comprador || 'Sin email'} · {bs(p.total)}
-                        {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
-                      className="shrink-0 px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold"
-                    >
-                      Entregado
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )
-
-            return (
-              <>
-                <Tanda titulo="Salida 08:00" tanda={salida8} />
-                <Tanda titulo="Salida 14:00" tanda={salida14} />
-              </>
-            )
-          })()}
-        </div>
-      )}
-
       {tab === 'usuarios' && (
         <div>
-          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-            <div className="font-body text-sm font-semibold text-ink">
-              Usuarios registrados {usuarios.length > 0 && <span className="text-inksoft font-normal">({usuarios.length})</span>}
-            </div>
-            <input
-              type="text"
-              value={buscarUsuario}
-              onChange={(e) => setBuscarUsuario(e.target.value)}
-              placeholder="Buscar por email o nombre..."
-              className="px-3 py-1.5 rounded-md border border-line font-body text-xs w-64 max-w-full"
-            />
+          <div className="font-body text-sm text-inksoft mb-4">
+            Pausar deja la cuenta sin poder iniciar sesión (se puede reactivar). Eliminar borra la cuenta para siempre y oculta lo que tenía publicado — pero no borra esos productos/servicios de la base, por si hay que revertirlo.
           </div>
-          {cargandoUsuarios && <div className="font-body text-sm text-inksoft">Cargando...</div>}
-          {!cargandoUsuarios && usuarios.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay usuarios registrados.</div>}
-          {usuarios
-            .filter((u) => {
-              const q = buscarUsuario.trim().toLowerCase()
-              if (!q) return true
-              return (u.email || '').toLowerCase().includes(q) || (u.nombre || '').toLowerCase().includes(q)
-            })
-            .map((u) => {
-              const productosDelUsuario = productos.filter((p) => p.vendedorId === u.uid)
-              const profesionalesDelUsuario = profesionales.filter((p) => p.solicitanteUid === u.uid)
-              const expandido = usuarioExpandidoId === u.uid
-              return (
-                <div key={u.uid} className="bg-panel border border-line rounded-lg p-3.5 mb-3">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-body text-sm font-medium text-ink truncate flex items-center gap-2">
-                        {u.email || u.nombre || u.uid}
-                        {u.pausado && (
-                          <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pausado</span>
-                        )}
-                      </div>
-                      <div className="font-body text-[11px] text-inksoft mt-0.5">
-                        Registrado: {u.creadoEl ? new Date(u.creadoEl).toLocaleDateString('es-BO') : '—'}
-                        {u.ultimoLogin && <> · Último login: {new Date(u.ultimoLogin).toLocaleDateString('es-BO')}</>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setUsuarioExpandidoId(expandido ? null : u.uid)}
-                        className="font-body text-[11px] text-teal font-semibold mt-1"
-                      >
-                        {productosDelUsuario.length} producto(s) · {profesionalesDelUsuario.length} servicio(s) {expandido ? '▲' : '▼'}
-                      </button>
-                    </div>
-                    <div className="flex gap-2 flex-wrap justify-end">
-                      <button
-                        type="button"
-                        onClick={() => pausarUsuario(u.uid, !u.pausado)}
-                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
-                      >
-                        {u.pausado ? 'Reactivar' : 'Pausar'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => eliminarUsuario(u.uid)}
-                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
 
-                  {expandido && (
-                    <div className="mt-3 pt-3 border-t border-line grid gap-2">
-                      {productosDelUsuario.length === 0 && profesionalesDelUsuario.length === 0 && (
-                        <div className="font-body text-xs text-inksoft">No tiene productos ni perfiles profesionales publicados.</div>
-                      )}
-                      {productosDelUsuario.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2 font-body text-xs text-ink">
-                          <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded">Producto</span>
-                          {p.nombre} · Bs {Number(p.precio || 0).toLocaleString('es-BO')} · {p.estado || 'activo'}{p.plan === 'premium' && ' · Premium'}
-                        </div>
-                      ))}
-                      {profesionalesDelUsuario.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2 font-body text-xs text-ink">
-                          <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded">Servicio</span>
-                          {p.nombre} · {p.especialidad || buscarRubro(p.rubro)?.label || 'Sin rubro'} · {p.estado}{p.plan === 'premium' && ' · Premium'}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          <input
+            value={busquedaUsuario}
+            onChange={(e) => setBusquedaUsuario(e.target.value)}
+            placeholder="Buscar por email..."
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-4"
+          />
+
+          {cargandoUsuarios && <div className="font-body text-sm text-inksoft">Cargando usuarios...</div>}
+
+          {!cargandoUsuarios && usuarios
+            .filter((u) => !busquedaUsuario.trim() || (u.email || '').toLowerCase().includes(busquedaUsuario.trim().toLowerCase()))
+            .map((u) => (
+            <div key={u.uid} className={`bg-panel border rounded-lg p-4 mb-3 ${u.pausado ? 'border-ochre' : 'border-line'}`}>
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <div className="font-body text-sm font-medium text-ink">
+                  {u.email || u.uid}
+                  {u.pausado && <span className="ml-2 font-body text-[10px] font-bold text-white bg-ochre px-1.5 py-0.5 rounded-full">PAUSADO</span>}
                 </div>
-              )
-            })}
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => pausarUsuarioAdmin(u.uid, !u.pausado)}
+                    disabled={accionandoUid === u.uid}
+                    className="px-2.5 py-1 rounded-md border border-line font-body text-[11px] text-ink disabled:opacity-50"
+                  >
+                    {u.pausado ? 'Reactivar' : 'Pausar'}
+                  </button>
+                  <button
+                    onClick={() => borrarUsuarioAdmin(u.uid, u.email)}
+                    disabled={accionandoUid === u.uid}
+                    className="px-2.5 py-1 rounded-md border border-line font-body text-[11px] text-maroon disabled:opacity-50"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+              <div className="font-body text-[11px] text-inksoft mb-2">
+                Se registró {u.creadoEn ? new Date(u.creadoEn).toLocaleDateString('es-BO') : '—'}
+                {u.ultimoLogin && <> · Último ingreso: {new Date(u.ultimoLogin).toLocaleDateString('es-BO')}</>}
+                {u.tienda && <> · Tienda: {u.tienda.nombreNegocio || 'sin nombre'} ({u.tienda.plan === 'premium' ? 'Premium' : 'Básico'})</>}
+              </div>
+
+              {(u.productos.length > 0 || u.servicios.length > 0) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {u.productos.map((p: any) => (
+                    <span key={p.id} className="font-body text-[10px] bg-panelalt rounded-full px-2 py-1 text-inksoft">
+                      🛍 {p.nombre} · {p.estado}
+                    </span>
+                  ))}
+                  {u.servicios.map((s: any) => (
+                    <span key={s.id} className="font-body text-[10px] bg-panelalt rounded-full px-2 py-1 text-inksoft">
+                      🧰 {s.nombre} · {s.estado}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {u.productos.length === 0 && u.servicios.length === 0 && (
+                <div className="font-body text-[11px] text-inksoft">Todavía no publicó nada.</div>
+              )}
+            </div>
+          ))}
+
+          {!cargandoUsuarios && usuarios.length === 0 && (
+            <div className="font-body text-sm text-inksoft">No hay usuarios registrados.</div>
+          )}
         </div>
       )}
 
@@ -1808,14 +1688,6 @@ export default function AdminPage() {
       {tab === 'metricas' && (
         <div>
           {cargandoMetricas && <div className="font-body text-sm text-inksoft">Cargando métricas...</div>}
-          {!cargandoMetricas && metricas?.error && (
-            <div className="font-body text-sm text-maroon bg-panelalt border border-line rounded-lg p-3">
-              No se pudieron cargar las métricas: {metricas.error}. Probá recargar la pestaña — si sigue igual, revisá los logs de la función /api/admin/metricas en Vercel.
-            </div>
-          )}
-          {!cargandoMetricas && !metricas && (
-            <div className="font-body text-sm text-inksoft">Todavía no se cargó nada — probá cambiar de pestaña y volver acá.</div>
-          )}
           {!cargandoMetricas && metricas && !metricas.error && (
             <div>
               {metricas.flujoCaja && (

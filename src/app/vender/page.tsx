@@ -27,7 +27,7 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
 }
 
 export default function VenderPage() {
-  const { usuario, cargando, emailVerificado, obtenerToken } = useAuth()
+  const { usuario, cargando, obtenerToken } = useAuth()
   const router = useRouter()
   const [misProductos, setMisProductos] = useState<any[]>([])
   const [misPedidos, setMisPedidos] = useState<any[]>([])
@@ -97,9 +97,8 @@ export default function VenderPage() {
   const [tiposVenta, setTiposVenta] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    if (cargando) return
-    if (!usuario || emailVerificado === false) router.push('/login')
-  }, [cargando, usuario, emailVerificado, router])
+    if (!cargando && !usuario) router.push('/login')
+  }, [cargando, usuario, router])
 
   useEffect(() => {
     if (usuario) {

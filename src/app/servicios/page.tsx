@@ -213,70 +213,51 @@ export default function ServiciosPage() {
           </button>
         </div>
 
-        <div className="flex gap-2 mb-2 flex-wrap items-center">
-          <button
-            type="button"
-            onClick={() => { setCategoriaSel('Todo'); setRubro('Todo') }}
-            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-              categoriaSel === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-            }`}
-          >
-            Todas las categorías
-          </button>
-          {categorias.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                setCategoriaSel(c.id)
-                setRubro('Todo')
+        <div className="flex gap-3 mb-2 flex-wrap items-center">
+          <select
+            value={categoriaSel}
+            onChange={(e) => {
+              const nuevaCategoria = e.target.value
+              setCategoriaSel(nuevaCategoria)
+              setRubro('Todo')
+              if (nuevaCategoria !== 'Todo') {
                 fetch('/api/analitica/categoria', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ tipo: 'servicio', valor: c.id }),
+                  body: JSON.stringify({ tipo: 'servicio', valor: nuevaCategoria }),
                 }).catch(() => {})
-              }}
-              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                categoriaSel === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
+              }
+            }}
+            className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[160px]"
+          >
+            <option value="Todo">Todas las categorías</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
 
-        {categoriaSel !== 'Todo' && (
-          <div className="flex gap-2 mb-2 flex-wrap items-center">
-            <button
-              type="button"
-              onClick={() => setRubro('Todo')}
-              className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
-                rubro === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-              }`}
-            >
-              Todos los rubros
-            </button>
-            {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => {
-                  setRubro(r.id)
+          {categoriaSel !== 'Todo' && (
+            <select
+              value={rubro}
+              onChange={(e) => {
+                setRubro(e.target.value)
+                if (e.target.value !== 'Todo') {
                   fetch('/api/analitica/categoria', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tipo: 'servicio', valor: r.id }),
+                    body: JSON.stringify({ tipo: 'servicio', valor: e.target.value }),
                   }).catch(() => {})
-                }}
-                className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
-                  rubro === r.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        )}
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel flex-1 min-w-[160px]"
+            >
+              <option value="Todo">Todos los rubros</option>
+              {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {(categoriaSel !== 'Todo' || rubro !== 'Todo') && (
           <div className="font-body text-xs text-inksoft mb-4">

@@ -62,14 +62,10 @@ export function generarHorasDeBloque(bloque: Pick<BloqueHorario, 'desde' | 'hast
 }
 
 // Todos los días de la semana en los que el profesional tiene AL MENOS
-// un bloque cargado (unión de todos los bloques). Tolera un horario
-// mal formado (sin `bloques`, o con algo que no sea array) para que un
-// dato viejo/corrupto en Firestore no rompa la página entera — en ese
-// caso simplemente no hay días con agenda.
+// un bloque cargado (unión de todos los bloques).
 export function diasConAgenda(horario: HorarioProfesional): number[] {
   const set = new Set<number>()
-  const bloques = Array.isArray(horario?.bloques) ? horario.bloques : []
-  for (const b of bloques) for (const d of b.dias) set.add(d)
+  for (const b of horario.bloques) for (const d of b.dias) set.add(d)
   return [...set].sort()
 }
 
@@ -79,8 +75,7 @@ export function diasConAgenda(horario: HorarioProfesional): number[] {
 // sin duplicados.
 export function horasDisponiblesDia(horario: HorarioProfesional, diaSemana: number): string[] {
   const set = new Set<string>()
-  const bloques = Array.isArray(horario?.bloques) ? horario.bloques : []
-  for (const b of bloques) {
+  for (const b of horario.bloques) {
     if (b.dias.includes(diaSemana)) {
       for (const h of generarHorasDeBloque(b)) set.add(h)
     }
