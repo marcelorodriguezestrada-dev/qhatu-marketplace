@@ -102,6 +102,7 @@ function CheckoutContent() {
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
   const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
+  const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
   // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
   // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
@@ -380,7 +381,18 @@ function CheckoutContent() {
                 </select>
               </label>
               <div className="mb-3">
-                <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
+                <button
+                  type="button"
+                  onClick={() => setMostrarMapaZonas((v) => !v)}
+                  className="font-body text-[12px] text-teal font-semibold underline"
+                >
+                  {mostrarMapaZonas ? 'Ocultar mapa de zonas' : 'Ver mapa de zonas y costos de envío'}
+                </button>
+                {mostrarMapaZonas && (
+                  <div className="mt-2">
+                    <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
+                  </div>
+                )}
               </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
