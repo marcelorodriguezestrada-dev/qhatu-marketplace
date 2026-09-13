@@ -92,15 +92,23 @@ export default function ProductoDetallePage() {
       })
   }, [id])
 
-  function agregarAlCarrito() {
+  function agregarItemsAlCarrito() {
     if (!usuario) {
       router.push('/login')
-      return
+      return false
     }
-    if (!producto) return
+    if (!producto) return false
     const minimo = producto.compraMinima && producto.compraMinima > 1 ? producto.compraMinima : cantidad
     for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto)
-    setAgregado(true)
+    return true
+  }
+
+  function agregarAlCarrito() {
+    if (agregarItemsAlCarrito()) setAgregado(true)
+  }
+
+  function comprarAhora() {
+    if (agregarItemsAlCarrito()) router.push('/checkout')
   }
 
   if (cargando) {
@@ -257,6 +265,12 @@ export default function ProductoDetallePage() {
               </div>
 
               <div className="flex flex-col gap-2.5 mb-4">
+                <button
+                  onClick={comprarAhora}
+                  className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold"
+                >
+                  Comprar
+                </button>
                 {tienda?.whatsapp && (
                   <a
                     href={`https://wa.me/${tienda.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
