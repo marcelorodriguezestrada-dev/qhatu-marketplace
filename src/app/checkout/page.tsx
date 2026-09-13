@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 
@@ -68,9 +68,21 @@ function repartirEnvio(subtotales: number[], costoEnvioTotal: number): number[] 
 }
 
 export default function CheckoutPage() {
-  const { items, vaciar } = useCarrito()
+  const { items: itemsCarrito, vaciarTienda } = useCarrito()
   const { usuario, cargando: authCargando, emailVerificado } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Qué tienda se está pagando en esta visita a /checkout — la manda
+  // el carrito como ?tienda=<vendedorId> (o "plataforma" para productos
+  // sin vendedor propio). Cada tienda del carrito se compra por
+  // separado, así que acá solo trabajamos con SUS productos — el resto
+  // del carrito queda intacto para pagarlo en otra visita.
+  const claveTienda = searchParams.get('tienda')
+  const vendedorIdTienda = claveTienda && claveTienda !== 'plataforma' ? claveTienda : null
+  const items = claveTienda
+    ? itemsCarrito.filter((i) => (i.vendedorId || 'plataforma') === claveTienda)
+    : itemsCarrito
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
@@ -288,7 +300,7 @@ export default function CheckoutPage() {
       setSubPedidos(actualizados)
       if (actualizados.every((s) => s.estadoActual === 'pagado')) {
         if (pollRef.current) clearInterval(pollRef.current)
-        vaciar()
+        vaciarTienda(vendedorIdTienda)
       }
     }, 4000)
     return () => {
