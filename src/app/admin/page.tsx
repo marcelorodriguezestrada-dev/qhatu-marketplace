@@ -7,6 +7,7 @@ import { useCategorias } from '@/lib/useCategorias'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
 import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
+import { labelTipoAnuncio } from '@/data/anuncios'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 
 function bs(n: number) {
@@ -61,7 +62,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'anuncios' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -231,6 +232,33 @@ export default function AdminPage() {
     } finally {
       setAccionandoUid(null)
     }
+  }
+
+  const [anuncios, setAnuncios] = useState<any[]>([])
+  const [cargandoAnuncios, setCargandoAnuncios] = useState(false)
+
+  function cargarAnuncios(pw?: string) {
+    setCargandoAnuncios(true)
+    fetch('/api/anuncios', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setAnuncios(data.anuncios || []))
+      .finally(() => setCargandoAnuncios(false))
+  }
+
+  function cambiarEstadoAnuncio(id: string, estado: string) {
+    fetch(`/api/anuncios/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ estado }),
+    }).then(() => cargarAnuncios())
+  }
+
+  function borrarAnuncio(id: string) {
+    if (!confirm('¿Borrar este anuncio definitivamente?')) return
+    fetch(`/api/anuncios/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': password },
+    }).then(() => cargarAnuncios())
   }
 
   function cargarMetricas(pw?: string) {
@@ -719,6 +747,17 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Usuarios
+        </button>
+        <button
+          onClick={() => { setTab('anuncios'); if (anuncios.length === 0) cargarAnuncios() }}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'anuncios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Anuncios
+          {anuncios.filter((a) => a.estado === 'pendiente_revision').length > 0 && (
+            <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {anuncios.filter((a) => a.estado === 'pendiente_revision').length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setTab('categorias')}
@@ -1459,6 +1498,60 @@ export default function AdminPage() {
 
           {!cargandoUsuarios && usuarios.length === 0 && (
             <div className="font-body text-sm text-inksoft">No hay usuarios registrados.</div>
+          )}
+        </div>
+      )}
+
+      {tab === 'anuncios' && (
+        <div>
+          <div className="font-body text-sm text-inksoft mb-4">
+            Un anuncio nuevo entra "Pendiente" y no aparece en /anuncios hasta que lo apruebes.
+          </div>
+
+          {cargandoAnuncios && <div className="font-body text-sm text-inksoft">Cargando anuncios...</div>}
+
+          {!cargandoAnuncios && [...anuncios]
+            .sort((a, b) => {
+              const orden: Record<string, number> = { pendiente_revision: 0, aprobado: 1, rechazado: 2 }
+              return (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3)
+            })
+            .map((a) => (
+            <div key={a.id} className={`bg-panel border rounded-lg p-4 mb-3 ${a.estado === 'pendiente_revision' ? 'border-ochre' : 'border-line'}`}>
+              <div className="flex items-center gap-3">
+                {a.imagenUrl && <img src={a.imagenUrl} alt={a.titulo} loading="lazy" className="w-12 h-12 rounded-lg object-cover border border-line shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-body text-[10px] font-semibold text-maroon uppercase">{labelTipoAnuncio(a.tipo)}</div>
+                  <div className="font-body text-sm font-medium text-ink">{a.titulo}</div>
+                  <div className="font-body text-xs text-inksoft">{a.autorEmail} · WhatsApp: {a.whatsapp}{a.precio ? ` · Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}</div>
+                </div>
+                <div className={`font-body text-[11px] font-semibold shrink-0 ${
+                  a.estado === 'aprobado' ? 'text-teal' : a.estado === 'rechazado' ? 'text-maroon' : 'text-ochre'
+                }`}>
+                  {a.estado === 'aprobado' ? 'Aprobado' : a.estado === 'rechazado' ? 'Rechazado' : 'Pendiente'}
+                </div>
+              </div>
+              <div className="font-body text-xs text-ink mt-2">{a.descripcion}</div>
+              <BadgeRiesgoIA moderacionIA={a.moderacionIA} />
+              <div className="flex gap-2 mt-3 flex-wrap">
+                {a.estado !== 'aprobado' && (
+                  <button onClick={() => cambiarEstadoAnuncio(a.id, 'aprobado')} className="px-3 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold">
+                    Aprobar
+                  </button>
+                )}
+                {a.estado !== 'rechazado' && (
+                  <button onClick={() => cambiarEstadoAnuncio(a.id, 'rechazado')} className="px-3 py-1.5 rounded-md border border-line font-body text-xs text-maroon">
+                    Rechazar
+                  </button>
+                )}
+                <button onClick={() => borrarAnuncio(a.id)} className="px-3 py-1.5 rounded-md border border-line font-body text-xs text-maroon">
+                  Borrar
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {!cargandoAnuncios && anuncios.length === 0 && (
+            <div className="font-body text-sm text-inksoft">Todavía no hay anuncios.</div>
           )}
         </div>
       )}
