@@ -40,3 +40,19 @@ export function diaSemanaDesdeClave(claveFecha: string) {
 }
 
 export const ORDEN_DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+// Fecha + hora legible en hora boliviana, para mostrarle al usuario
+// (ej: "5 sep 2026, 14:32"). A diferencia de diaBolivia/mesBolivia/
+// anioBolivia (que devuelven claves YYYY-MM-DD para agrupar reportes),
+// esta es para texto visible en pantalla, no para usar como id.
+export function fechaLegibleBolivia(fecha: Date | string) {
+  const d = aFechaBolivia(fecha)
+  const dia = d.getUTCDate()
+  const mes = MESES_CORTOS[d.getUTCMonth()]
+  const anio = d.getUTCFullYear()
+  const hora = String(d.getUTCHours()).padStart(2, '0')
+  const min = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${dia} ${mes} ${anio}, ${hora}:${min}`
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
   verificando_stock: { texto: 'Verificando stock', color: 'text-ochre' },
@@ -120,6 +121,9 @@ export default function MisPedidosPage() {
               <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
               <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
             </div>
+            {p.createdAt && (
+              <div className="font-body text-[11px] text-inksoft mb-1.5">{fechaLegibleBolivia(p.createdAt)}</div>
+            )}
             <div className="font-body text-xs text-inksoft mb-1">{(p.items || []).length} producto(s) · {bs(p.total || 0)}</div>
             <div className="font-body text-[11px] text-inksoft mb-3">
               Envío: {p.zonaEntrega || 'Sin zona'} · {p.direccion || 'Sin dirección'}

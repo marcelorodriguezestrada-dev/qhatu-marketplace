@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { calcularFranja } from '@/lib/reparto'
+import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -95,6 +96,9 @@ export default function SeguimientoPedidoPage() {
         <div>
           <div className="font-display text-xl font-bold text-ink">Pedido #{pedido.id?.slice(0, 6)}</div>
           <div className="font-body text-[13px] text-inksoft">{bs(pedido.total || 0)} · {(pedido.items || []).length} producto(s)</div>
+          {pedido.createdAt && (
+            <div className="font-body text-[11px] text-inksoft">{fechaLegibleBolivia(pedido.createdAt)}</div>
+          )}
         </div>
         <Link href="/mis-pedidos" className="font-body text-sm text-maroon underline">Mis pedidos</Link>
       </div>
