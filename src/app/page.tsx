@@ -12,11 +12,6 @@ import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
-import { labelTipoAnuncio } from '@/data/anuncios'
-
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
-}
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
@@ -27,7 +22,6 @@ export default function CatalogoPage() {
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
   const { usuario, logout } = useAuth()
-  const [anuncios, setAnuncios] = useState<any[]>([])
 
   useEffect(() => {
     fetch('/api/productos')
@@ -39,14 +33,6 @@ export default function CatalogoPage() {
         // Si falla la carga (por ejemplo, Firebase no configurado todavía
         // en desarrollo), nos quedamos con el catálogo semilla local.
       })
-
-    // Solo los 4 más nuevos, para que sea una tira chica — no queremos
-    // que compita con la vidriera de productos, solo darle una entrada
-    // a /anuncios desde la home (antes no tenía ninguna).
-    fetch('/api/anuncios')
-      .then((r) => r.json())
-      .then((data) => setAnuncios((data.anuncios || []).slice(0, 4)))
-      .catch(() => {})
   }, [])
 
   const filtrados = productos.filter((p) => {
@@ -118,6 +104,9 @@ export default function CatalogoPage() {
           <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
             <Link href="/servicios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
               Servicios
+            </Link>
+            <Link href="/anuncios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
+              Anuncios
             </Link>
             <Link href="/vender" className="border-none bg-white/10 text-white px-3 py-1.5 rounded-lg font-body text-[13px] shrink-0 whitespace-nowrap">
               Vender
@@ -224,37 +213,6 @@ export default function CatalogoPage() {
             </button>
           ))}
         </div>
-
-        {anuncios.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📢</span>
-                <div className="font-display text-base font-bold text-ink">Avisos de la comunidad</div>
-              </div>
-              <Link href="/anuncios" className="font-body text-xs text-maroon underline shrink-0">Ver todos</Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
-              {anuncios.map((a) => (
-                <Link
-                  key={a.id}
-                  href="/anuncios"
-                  className="w-48 shrink-0 bg-panel border border-line rounded-xl p-3.5"
-                >
-                  <div className="font-body text-[10px] font-semibold text-maroon uppercase tracking-wide mb-1">
-                    {labelTipoAnuncio(a.tipo)}
-                  </div>
-                  <div className="font-body text-sm font-semibold text-ink line-clamp-2">{a.titulo}</div>
-                  {a.precio ? (
-                    <div className="font-body text-sm font-bold text-ink mt-1">{bs(a.precio)}</div>
-                  ) : (
-                    <div className="font-body text-xs text-inksoft mt-1 line-clamp-2">{a.descripcion}</div>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {filtrados.map((p) => (
