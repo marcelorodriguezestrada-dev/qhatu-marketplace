@@ -68,7 +68,7 @@ export default function AnunciosPage() {
         )}
 
         {filtrados.map((a) => (
-          <div key={a.id} className="bg-panel border border-line rounded-xl p-4 mb-3 flex gap-3">
+          <Link key={a.id} href={`/anuncios/${a.id}`} className="bg-panel border border-line rounded-xl p-4 mb-3 flex gap-3">
             {a.imagenUrl && (
               <img src={a.imagenUrl} alt={a.titulo} className="w-16 h-16 rounded-lg object-cover border border-line shrink-0" />
             )}
@@ -83,12 +83,13 @@ export default function AnunciosPage() {
                 href={`https://wa.me/${(a.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Te escribo por tu anuncio "${a.titulo}" en Clasi Click.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 className="inline-block mt-2 px-3 py-1.5 rounded-md bg-teal text-white font-body text-xs font-semibold"
               >
                 💬 Contactar
               </a>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

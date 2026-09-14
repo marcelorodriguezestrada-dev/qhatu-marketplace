@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     // mostrando igual, en vez de que todo el tablero quede en blanco
     // por un solo problema puntual.
     const snapVacio = { docs: [] as any[] }
-    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap, vendedoresSnap] = await Promise.all([
+    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap, vendedoresSnap, anunciosSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
       db.collection('productos').get().catch((e) => { console.error('metricas: productos', e); return snapVacio }),
       db.collection('profesionales').get().catch((e) => { console.error('metricas: profesionales', e); return snapVacio }),
@@ -33,11 +33,25 @@ export async function GET(req: NextRequest) {
       db.collection('metricas_diarias').get().catch((e) => { console.error('metricas: metricas_diarias', e); return snapVacio }),
       db.collection('pagos_premium').get().catch((e) => { console.error('metricas: pagos_premium', e); return snapVacio }),
       db.collection('vendedores').get().catch((e) => { console.error('metricas: vendedores', e); return snapVacio }),
+      db.collection('anuncios').get().catch((e) => { console.error('metricas: anuncios', e); return snapVacio }),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
     const profesionales = profesionalesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
     const pedidos = pedidosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
+    const anuncios = anunciosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
+
+    const anunciosPorEstado = {
+      aprobado: anuncios.filter((a) => a.estado === 'aprobado').length,
+      pendiente_revision: anuncios.filter((a) => a.estado === 'pendiente_revision').length,
+      rechazado: anuncios.filter((a) => a.estado === 'rechazado').length,
+    }
+    const totalVistasAnuncios = anuncios.reduce((s, a) => s + (a.vistas || 0), 0)
+    const anunciosMasVistos = [...anuncios]
+      .filter((a) => (a.vistas || 0) > 0)
+      .sort((a, b) => (b.vistas || 0) - (a.vistas || 0))
+      .slice(0, 5)
+      .map((a) => ({ id: a.id, titulo: a.titulo, vistas: a.vistas || 0 }))
 
     const productosPorEstado = {
       activo: productos.filter((p) => !p.estado || p.estado === 'activo').length,
@@ -141,6 +155,7 @@ export async function GET(req: NextRequest) {
       pedidos: pedidos.map((p) => ({ createdAt: p.createdAt, total: p.total })),
       productos: productos.map((p) => ({ createdAt: p.createdAt })),
       profesionales: profesionales.map((p) => ({ createdAt: p.createdAt })),
+      anuncios: anuncios.map((a) => ({ createdAt: a.createdAt })),
     })
     const serieDiaria = ultimosDiasContinuos(serieDiariaCompleta, 90)
     const serieMensual = reagruparPor(serieDiariaCompleta, 'mes')
@@ -159,8 +174,10 @@ export async function GET(req: NextRequest) {
         totalClicsWhatsapp,
       },
       pedidos: { total: pedidos.length, porEstado: pedidosPorEstado, totalFacturado },
+      anuncios: { total: anuncios.length, porEstado: anunciosPorEstado, totalVistas: totalVistasAnuncios },
       flujoCaja,
       productosMasVistos,
+      anunciosMasVistos,
       profesionalesMasClicWhatsapp,
       categoriasMasBuscadas,
       serieDiaria,

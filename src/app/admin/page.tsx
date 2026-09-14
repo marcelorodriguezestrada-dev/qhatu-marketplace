@@ -35,6 +35,7 @@ const CAMPOS_METRICAS = {
   visitas: { label: 'Visitas al sitio', color: '#1a7f6e' },
   vistasProductos: { label: 'Vistas de productos', color: '#8a5a2f' },
   vistasProfesionales: { label: 'Vistas de profesionales', color: '#8a5a2f' },
+  vistasAnuncios: { label: 'Vistas de anuncios', color: '#8a5a2f' },
   clicsWhatsapp: { label: 'Clics a WhatsApp', color: '#25a244' },
   busquedasProductos: { label: 'Búsquedas de productos', color: '#b08900' },
   busquedasServicios: { label: 'Búsquedas de servicios', color: '#b08900' },
@@ -42,6 +43,7 @@ const CAMPOS_METRICAS = {
   facturado: { label: 'Facturado (Bs)', color: '#7a1f2b', esPlata: true },
   productosPublicados: { label: 'Productos publicados', color: '#3a5a8a' },
   profesionalesPublicados: { label: 'Profesionales publicados', color: '#3a5a8a' },
+  anunciosPublicados: { label: 'Anuncios publicados', color: '#3a5a8a' },
 } as const
 
 function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motivo: string } | null | undefined }) {
@@ -2273,6 +2275,34 @@ export default function AdminPage() {
                       <div key={p.id} className="flex items-center justify-between py-2 border-b border-line">
                         <span className="font-body text-sm text-ink">{i + 1}. {p.nombre}</span>
                         <span className="font-body text-xs text-inksoft">{p.vistas} vistas</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className="font-body text-sm font-semibold text-ink mb-3">Anuncios por estado</div>
+              <div className="flex flex-wrap gap-2 mb-8">
+                {Object.entries(metricas.anuncios?.porEstado || {}).map(([estado, cant]) => (
+                  <div key={estado} className="bg-panelalt border border-line rounded-lg px-3 py-2">
+                    <div className="font-body text-[11px] text-inksoft capitalize">{estado.replace('_', ' ')}</div>
+                    <div className="font-display text-lg font-bold text-ink">{cant as number}</div>
+                  </div>
+                ))}
+                <div className="bg-panel border border-line rounded-lg px-3 py-2">
+                  <div className="font-body text-[11px] text-inksoft">vistas totales</div>
+                  <div className="font-display text-lg font-bold text-ink">{metricas.anuncios?.totalVistas ?? 0}</div>
+                </div>
+              </div>
+
+              {metricas.anunciosMasVistos?.length > 0 && (
+                <>
+                  <div className="font-body text-sm font-semibold text-ink mb-3">Anuncios más vistos</div>
+                  <div className="mb-8">
+                    {metricas.anunciosMasVistos.map((a: any, i: number) => (
+                      <div key={a.id} className="flex items-center justify-between py-2 border-b border-line">
+                        <span className="font-body text-sm text-ink">{i + 1}. {a.titulo}</span>
+                        <span className="font-body text-xs text-inksoft">{a.vistas} vistas</span>
                       </div>
                     ))}
                   </div>

@@ -10,6 +10,7 @@ export type PuntoMetrica = {
   visitas: number
   vistasProductos: number
   vistasProfesionales: number
+  vistasAnuncios: number
   clicsWhatsapp: number
   busquedasProductos: number
   busquedasServicios: number
@@ -17,19 +18,20 @@ export type PuntoMetrica = {
   facturado: number
   productosPublicados: number
   profesionalesPublicados: number
+  anunciosPublicados: number
 }
 
 const CAMPOS_NUMERICOS = [
-  'visitas', 'vistasProductos', 'vistasProfesionales', 'clicsWhatsapp',
+  'visitas', 'vistasProductos', 'vistasProfesionales', 'vistasAnuncios', 'clicsWhatsapp',
   'busquedasProductos', 'busquedasServicios', 'pedidos', 'facturado',
-  'productosPublicados', 'profesionalesPublicados',
+  'productosPublicados', 'profesionalesPublicados', 'anunciosPublicados',
 ] as const
 
 function puntoVacio(clave: string): PuntoMetrica {
   return {
-    clave, visitas: 0, vistasProductos: 0, vistasProfesionales: 0, clicsWhatsapp: 0,
+    clave, visitas: 0, vistasProductos: 0, vistasProfesionales: 0, vistasAnuncios: 0, clicsWhatsapp: 0,
     busquedasProductos: 0, busquedasServicios: 0, pedidos: 0, facturado: 0,
-    productosPublicados: 0, profesionalesPublicados: 0,
+    productosPublicados: 0, profesionalesPublicados: 0, anunciosPublicados: 0,
   }
 }
 
@@ -45,6 +47,7 @@ export function construirSerieDiaria(params: {
   pedidos: { createdAt?: string; total?: number }[]
   productos: { createdAt?: string }[]
   profesionales: { createdAt?: string }[]
+  anuncios?: { createdAt?: string }[]
 }): PuntoMetrica[] {
   const mapa = new Map<string, PuntoMetrica>()
   const obtener = (clave: string) => {
@@ -57,6 +60,7 @@ export function construirSerieDiaria(params: {
     p.visitas = Number(doc.data?.visitas || 0)
     p.vistasProductos = Number(doc.data?.vistasProductos || 0)
     p.vistasProfesionales = Number(doc.data?.vistasProfesionales || 0)
+    p.vistasAnuncios = Number(doc.data?.vistasAnuncios || 0)
     p.clicsWhatsapp = Number(doc.data?.clicsWhatsapp || 0)
     p.busquedasProductos = Number(doc.data?.busquedasProductos || 0)
     p.busquedasServicios = Number(doc.data?.busquedasServicios || 0)
@@ -77,6 +81,11 @@ export function construirSerieDiaria(params: {
   for (const profesional of params.profesionales) {
     if (!profesional.createdAt) continue
     obtener(diaBolivia(profesional.createdAt)).profesionalesPublicados += 1
+  }
+
+  for (const anuncio of params.anuncios || []) {
+    if (!anuncio.createdAt) continue
+    obtener(diaBolivia(anuncio.createdAt)).anunciosPublicados += 1
   }
 
   return [...mapa.values()].sort((a, b) => a.clave.localeCompare(b.clave))

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { ejecutarMacheo } from '@/lib/macheoAnuncios'
+import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'No encontrado.' }, { status: 404 })
     }
     ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
+    sumarMetricaDiaria('vistasAnuncios').catch(() => {})
     return NextResponse.json({ id: doc.id, ...data })
   } catch (err) {
     console.error('GET /api/anuncios/[id]', err)
