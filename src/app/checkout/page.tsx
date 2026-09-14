@@ -1,14 +1,25 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
+import { calcularFranja } from '@/lib/reparto'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
+}
+
+// Ventana horaria aproximada de entrega, según a qué salida de la moto
+// (8:00 o 14:00, ver src/lib/reparto.ts) entra un pedido pagado ahora
+// mismo. Es una estimación para mostrarle al comprador, no un dato que
+// se guarda — el horario real de reparto lo arma /admin con la ruta del
+// día.
+function ventanaEntrega(): string {
+  return calcularFranja(new Date()) === '08:00' ? 'entre las 8:00 y las 12:00' : 'entre las 14:00 y las 18:00'
 }
 
 function linkWhatsappRetiroEfectivo(s: SubPedido): string {
@@ -596,8 +607,14 @@ function CheckoutContent() {
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">Todos los pagos confirmados</div>
-              <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">Tu pedido está en marcha</div>
+              {metodoEntrega === 'envio' ? (
+                <div className="font-body text-[13px] text-inksoft">
+                  Esperalo en la dirección que diste, {ventanaEntrega()}. Podés hacer el seguimiento acá abajo.
+                </div>
+              ) : (
+                <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
+              )}
             </div>
           ) : (
             <div className="font-body text-sm text-inksoft mb-4 text-center">
@@ -612,7 +629,15 @@ function CheckoutContent() {
                   {s.estadoActual === 'pagado' ? 'Pagado' : 'Esperando confirmación'}
                 </span>
               </div>
-              <div className="font-body text-xs text-inksoft">{bs(s.total)} · {s.items.length} producto(s)</div>
+              <div className="font-body text-xs text-inksoft mb-2">{bs(s.total)} · {s.items.length} producto(s)</div>
+              {s.estadoActual === 'pagado' && s.pedidoId && (
+                <Link
+                  href={`/mis-pedidos/${s.pedidoId}`}
+                  className="block text-center w-full py-2 rounded-lg border border-teal text-teal font-body text-xs font-semibold"
+                >
+                  Seguir mi pedido →
+                </Link>
+              )}
             </div>
           ))}
         </div>

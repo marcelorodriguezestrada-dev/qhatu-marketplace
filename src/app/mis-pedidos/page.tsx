@@ -124,6 +124,14 @@ export default function MisPedidosPage() {
             <div className="font-body text-[11px] text-inksoft mb-3">
               Envío: {p.zonaEntrega || 'Sin zona'} · {p.direccion || 'Sin dirección'}
             </div>
+            {['pagado', 'en_preparacion', 'en_entrega', 'entregado'].includes(p.estado) && (
+              <Link
+                href={`/mis-pedidos/${p.id}`}
+                className="block text-center w-full mb-3 py-2 rounded-lg border border-teal text-teal font-body text-xs font-semibold"
+              >
+                Ver seguimiento →
+              </Link>
+            )}
             {p.estado === 'verificando_stock' && esMiPedidoComoVendedor(p) && (
               <button
                 type="button"
