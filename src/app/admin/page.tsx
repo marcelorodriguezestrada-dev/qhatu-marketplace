@@ -9,6 +9,7 @@ import { labelPublicoProducto } from '@/data/publicoProducto'
 import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
+import { labelTipoAnuncio } from '@/data/anuncios'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -63,7 +64,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'usuarios' | 'reparto' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -71,6 +72,7 @@ export default function AdminPage() {
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
+  const [anuncios, setAnuncios] = useState<any[]>([])
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
   // uid del usuario cuya fila está desplegada mostrando el detalle de
   // sus productos y perfiles profesionales (null = ninguna abierta).
@@ -186,6 +188,7 @@ export default function AdminPage() {
         // vista pública filtrada en vez de la completa).
         cargarProfesionales(pw)
         cargarProductos(pw)
+        cargarAnuncios(pw)
       })
       .catch((e) => {
         setError(e.message)
@@ -212,6 +215,28 @@ export default function AdminPage() {
     fetch('/api/productos', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProductos(data.productos || []))
+  }
+
+  function cargarAnuncios(pw?: string) {
+    fetch('/api/anuncios', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setAnuncios(data.anuncios || []))
+  }
+
+  function cambiarEstadoAnuncio(id: string, estado: 'aprobado' | 'rechazado') {
+    fetch(`/api/anuncios/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ estado }),
+    }).then(() => cargarAnuncios())
+  }
+
+  function eliminarAnuncio(id: string) {
+    if (!confirm('¿Eliminar este anuncio? No se puede deshacer.')) return
+    fetch(`/api/anuncios/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': password },
+    }).then(() => cargarAnuncios())
   }
 
   function cargarUsuarios(pw?: string) {
@@ -738,6 +763,17 @@ export default function AdminPage() {
           {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
             <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {profesionales.filter((p) => p.estado === 'pendiente_revision').length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('anuncios')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'anuncios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Anuncios
+          {anuncios.filter((a) => a.estado === 'pendiente_revision').length > 0 && (
+            <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {anuncios.filter((a) => a.estado === 'pendiente_revision').length}
             </span>
           )}
         </button>
@@ -1482,6 +1518,68 @@ export default function AdminPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'anuncios' && (
+        <div>
+          <div className="font-body text-sm font-semibold text-ink mb-3">
+            Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
+          </div>
+          {anuncios.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay ningún anuncio publicado.</div>}
+          {anuncios
+            .slice()
+            .sort((a, b) => {
+              // Los pendientes de revisar primero — son los que hay que
+              // atender; aprobados/rechazados quedan abajo como
+              // historial.
+              const orden: Record<string, number> = { pendiente_revision: 0, aprobado: 1, rechazado: 2 }
+              return (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3) || (b.createdAt || '').localeCompare(a.createdAt || '')
+            })
+            .map((a) => (
+              <div key={a.id} className="bg-panel border border-line rounded-lg p-3.5 mb-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-body text-sm font-medium text-ink">{a.titulo}</span>
+                      <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                        {labelTipoAnuncio(a.tipo)}
+                      </span>
+                      {a.estado === 'pendiente_revision' && (
+                        <span className="inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pendiente</span>
+                      )}
+                      {a.estado === 'aprobado' && (
+                        <span className="inline-block bg-teal text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">Aprobado</span>
+                      )}
+                      {a.estado === 'rechazado' && (
+                        <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Rechazado</span>
+                      )}
+                    </div>
+                    <div className="font-body text-xs text-inksoft mt-1">{a.descripcion}</div>
+                    <div className="font-body text-[11px] text-inksoft mt-1.5">
+                      {a.autorEmail} · {a.whatsapp} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
+                    </div>
+                    {a.moderacionIA && (
+                      <div className={`font-body text-[11px] mt-1.5 ${a.moderacionIA.riesgo === 'alto' ? 'text-maroon' : a.moderacionIA.riesgo === 'medio' ? 'text-ochre' : 'text-inksoft'}`}>
+                        🤖 Riesgo {a.moderacionIA.riesgo}: {a.moderacionIA.motivo}
+                      </div>
+                    )}
+                  </div>
+                  {a.imagenUrl && (
+                    <img src={a.imagenUrl} alt={a.titulo} loading="lazy" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+                  )}
+                </div>
+                <div className="flex gap-2 flex-wrap mt-3">
+                  {a.estado !== 'aprobado' && (
+                    <button type="button" onClick={() => cambiarEstadoAnuncio(a.id, 'aprobado')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Aprobar</button>
+                  )}
+                  {a.estado !== 'rechazado' && (
+                    <button type="button" onClick={() => cambiarEstadoAnuncio(a.id, 'rechazado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Rechazar</button>
+                  )}
+                  <button type="button" onClick={() => eliminarAnuncio(a.id)} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Eliminar</button>
+                </div>
+              </div>
+            ))}
         </div>
       )}
 
