@@ -10,9 +10,9 @@ function bs(n: number) {
 }
 
 function colorPorPrecio(costo: number) {
-  if (costo <= 5) return '#1a7f6e' // teal — barato/cerca
-  if (costo <= 10) return '#c17f2b' // ocre — medio
-  return '#7A2E2E' // maroon — caro/lejos
+  if (costo <= 5) return '#2F8F6F' // verde — barato/cerca
+  if (costo <= 10) return '#D98E2B' // naranja — medio
+  return '#B5473F' // rojo — caro/lejos
 }
 
 // Arma un "territorio" por zona que cubre todo el mapa sin huecos
@@ -68,10 +68,10 @@ export default function MapaZonasPotosiCliente({ zonaSeleccionada }: { zonaSelec
               key={zona.nombre}
               positions={posiciones}
               pathOptions={{
-                color: esSeleccionada ? '#2B211D' : '#fff',
-                weight: esSeleccionada ? 2.5 : 1,
+                color: esSeleccionada ? '#2B211D' : 'rgba(255,255,255,0.85)',
+                weight: esSeleccionada ? 3 : 1.5,
                 fillColor: colorPorPrecio(zona.costoEnvio),
-                fillOpacity: esSeleccionada ? 0.75 : 0.55,
+                fillOpacity: esSeleccionada ? 0.8 : 0.62,
               }}
             >
               <Popup>
@@ -84,16 +84,16 @@ export default function MapaZonasPotosiCliente({ zonaSeleccionada }: { zonaSelec
         })}
 
         {ZONAS_ENVIO_POTOSI.map((z) => (
-          <CircleMarker key={z.nombre} center={[z.lat, z.lng]} radius={2} pathOptions={{ color: '#2B211D', fillColor: '#2B211D', fillOpacity: 1, weight: 0 }} />
+          <CircleMarker key={z.nombre} center={[z.lat, z.lng]} radius={3} pathOptions={{ color: '#fff', fillColor: '#2B211D', fillOpacity: 1, weight: 1.5 }} />
         ))}
       </MapContainer>
-      <div className="flex items-center gap-4 justify-center py-2 font-body text-[10px] text-inksoft bg-panel">
-        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#1a7f6e' }} />{bs(5)}</div>
-        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#c17f2b' }} />{bs(10)}</div>
-        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#7A2E2E' }} />{bs(15)}</div>
+      <div className="flex items-center gap-4 justify-center py-2.5 font-body text-[11px] text-inksoft bg-panel border-t border-line">
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full inline-block shadow-sm" style={{ background: '#2F8F6F' }} />{bs(5)}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full inline-block shadow-sm" style={{ background: '#D98E2B' }} />{bs(10)}</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full inline-block shadow-sm" style={{ background: '#B5473F' }} />{bs(15)}</div>
       </div>
-      <div className="font-body text-[9px] text-inksoft text-center pb-1.5 px-2 bg-panel">
-        Las áreas son una aproximación calculada por cercanía, no los límites barriales oficiales.
+      <div className="font-body text-[10px] text-inksoft text-center pb-2 px-3 bg-panel">
+        Las áreas son una aproximación por distancia real al centro, no los límites barriales oficiales.
       </div>
     </div>
   )
