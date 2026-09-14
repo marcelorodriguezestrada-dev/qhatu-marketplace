@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { titulo, descripcion, tipo, whatsapp, whatsappPais, precio, imagenUrl } = body
+    const { titulo, descripcion, tipo, whatsapp, whatsappPais, precio, imagenUrl, rubro } = body
 
     if (!titulo || !descripcion || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos (título, descripción y WhatsApp son obligatorios).' }, { status: 400 })
@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
       titulo,
       descripcion,
       tipo: tipo || 'otro',
+      // Solo tiene sentido en anuncios "busqueda" — es lo que permite
+      // el macheo automático 1 a 1 con profesionales de ese mismo
+      // rubro exacto. En cualquier otro tipo de anuncio queda null.
+      rubro: tipo === 'busqueda' && rubro ? rubro : null,
       whatsapp: whatsappCompleto,
       whatsappPais: paisId,
       precio: precio ? Number(precio) : null,

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
+import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
@@ -276,8 +277,14 @@ export default function MiPerfilPage() {
 
   return (
     <div className="max-w-[560px] mx-auto px-5 py-8">
-      <div className="font-display text-xl font-bold text-ink mb-1">Mi perfil de servicio</div>
-      <div className="font-body text-sm text-inksoft mb-6">{profesional.nombre}</div>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <div>
+          <div className="font-display text-xl font-bold text-ink">Mi perfil de servicio</div>
+          <div className="font-body text-sm text-inksoft">{profesional.nombre}</div>
+        </div>
+        <NotificacionesBell />
+      </div>
+      <div className="mb-5" />
 
       {error && (
         <div className="bg-maroon/10 border border-maroon rounded-lg p-3 mb-5 font-body text-xs text-maroon">{error}</div>

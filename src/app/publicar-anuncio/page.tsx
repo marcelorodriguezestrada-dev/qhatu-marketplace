@@ -5,13 +5,16 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { TIPOS_ANUNCIO } from '@/data/anuncios'
 import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
+import { useCategorias } from '@/lib/useCategorias'
 
 export default function PublicarAnuncioPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
+  const { rubrosFlat } = useCategorias()
 
   const [titulo, setTitulo] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [tipo, setTipo] = useState(TIPOS_ANUNCIO[0].id)
+  const [rubro, setRubro] = useState('')
   const [precio, setPrecio] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [whatsappPais, setWhatsappPais] = useState(PAIS_FALLBACK_ID)
@@ -48,7 +51,7 @@ export default function PublicarAnuncioPage() {
       const res = await fetch('/api/anuncios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl }),
+        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl, rubro: tipo === 'busqueda' ? rubro : undefined }),
       })
       const data = await res.json()
       if (data.error) {
@@ -110,6 +113,24 @@ export default function PublicarAnuncioPage() {
             <option key={t.id} value={t.id}>{t.label}</option>
           ))}
         </select>
+
+        {tipo === 'busqueda' && (
+          <div className="mb-3">
+            <select
+              value={rubro}
+              onChange={(e) => setRubro(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
+            >
+              <option value="">¿Qué tipo de profesional buscás? (opcional)</option>
+              {rubrosFlat.map((r) => (
+                <option key={r.id} value={r.id}>{r.categoriaLabel} · {r.label}</option>
+              ))}
+            </select>
+            <div className="font-body text-[11px] text-inksoft mt-1.5">
+              Si elegís uno, avisamos automáticamente a los profesionales de ese rubro apenas se apruebe tu anuncio.
+            </div>
+          </div>
+        )}
 
         <input
           value={titulo}

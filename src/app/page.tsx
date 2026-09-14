@@ -7,6 +7,7 @@ import { Producto } from '@/data/productos'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
 import { CartDrawer } from '@/components/CartDrawer'
+import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -112,6 +113,7 @@ export default function CatalogoPage() {
                 <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
                   Mis pedidos
                 </Link>
+                <NotificacionesBell variante="oscura" />
                 <button onClick={() => logout()} className="border-none bg-transparent text-white/60 font-body text-[12px] shrink-0 whitespace-nowrap">
                   {usuario.email?.split('@')[0]} · salir
                 </button>

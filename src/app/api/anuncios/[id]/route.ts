@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
+import { ejecutarMacheo } from '@/lib/macheoAnuncios'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +43,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
 
     await getDb().collection('anuncios').doc(params.id).update(cambios)
+
+    // El macheo con profesionales solo se dispara EXACTO en el momento
+    // en que se aprueba — nunca antes (no tiene sentido avisar de algo
+    // que todavía no se sabe si se va a publicar) y no se repite en
+    // ediciones posteriores que no cambien el estado.
+    //
+    // Ojo: lo esperamos con await a propósito, no lo lanzamos "en
+    // segundo plano" — en Vercel, una función serverless puede cortarse
+    // apenas se manda la respuesta, así que si no lo esperamos acá
+    // corremos el riesgo de que el macheo quede a mitad de camino
+    // (algunos profesionales notificados, otros no) sin aviso de error
+    // para nadie.
+    if (estado === 'aprobado') {
+      try {
+        await ejecutarMacheo(params.id)
+      } catch (err) {
+        console.error('Error en el macheo automático:', err)
+      }
+    }
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/anuncios/[id]', err)

@@ -98,19 +98,31 @@ export async function enviarRecordatorioTurno(destino: string, turno: DatosTurno
 // RESEND_API_KEY configurada, devolvemos null sin romper nada — el
 // endpoint que llama a esto ya sabe mostrarle al usuario un aviso en
 // vez de dejarlo esperando un mail que nunca va a llegar.
-export async function enviarCodigoVerificacion(destino: string, codigo: string) {
+// Aviso de "macheo": alguien publicó un anuncio de tipo "Busco" que
+// coincide con el rubro exacto de este profesional. Igual que con el
+// código de verificación, si Resend no está configurado devolvemos
+// null sin romper el flujo — el macheo y la notificación DENTRO de la
+// app quedan guardados igual, el mail es un canal extra, no el único.
+export async function enviarNotificacionMacheo(destino: string, datos: { profesionalNombre: string; anuncioTitulo: string; anuncioDescripcion: string; anuncioId: string; whatsappSolicitante: string }) {
   const resend = getResend()
   if (!resend) return null
+  const urlApp = process.env.NEXT_PUBLIC_APP_URL || 'https://clasiclick.vercel.app'
   return resend.emails.send({
     from: FROM,
     to: destino,
-    subject: `${codigo} — Tu código de verificación de Clasi Click`,
+    subject: `Alguien está buscando lo que ofrecés — "${datos.anuncioTitulo}"`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color:#2B211D;">
-        <h2 style="color:#7A2E2E;">Confirmá tu cuenta</h2>
-        <p>Usá este código para verificar tu email en Clasi Click:</p>
-        <p style="font-size:32px; font-weight:bold; letter-spacing:6px; text-align:center; margin:24px 0; color:#7A2E2E;">${codigo}</p>
-        <p style="font-size:13px; color:#6b5f57;">Vence en 15 minutos. Si no fuiste vos, podés ignorar este mail.</p>
+        <h2 style="color:#7A2E2E;">Tenés una coincidencia 🎯</h2>
+        <p>Hola ${datos.profesionalNombre}, alguien publicó un anuncio buscando justo tu rubro:</p>
+        <div style="background:#F1ECE0; border-radius:8px; padding:16px; margin:20px 0;">
+          <p style="margin:0 0 8px 0; font-weight:bold;">${datos.anuncioTitulo}</p>
+          <p style="margin:0; font-size:14px; color:#4a3f38;">${datos.anuncioDescripcion}</p>
+        </div>
+        <p style="font-size:13px; color:#6b5f57;">Podés contactar directo por WhatsApp: ${datos.whatsappSolicitante}</p>
+        <p style="margin-top:24px;">
+          <a href="${urlApp}/anuncios" style="background:#7A2E2E; color:white; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:14px;">Ver anuncios en Clasi Click</a>
+        </p>
         <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
       </div>
     `,
