@@ -10,6 +10,7 @@ import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 import { labelTipoAnuncio } from '@/data/anuncios'
+import { parsearAnunciosWhatsapp, AnuncioParseado } from '@/lib/parsearAnunciosWhatsapp'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -248,12 +249,64 @@ export default function AdminPage() {
     })
   }
 
+  function cambiarEstadoAnuncioConNota(id: string, estado: string, notaAdmin: string) {
+    fetch(`/api/anuncios/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ estado, notaAdmin }),
+    }).then(() => cargarAnuncios())
+  }
+
   function eliminarAnuncio(id: string) {
     if (!confirm('¿Eliminar este anuncio? No se puede deshacer.')) return
     fetch(`/api/anuncios/${id}`, {
       method: 'DELETE',
       headers: { 'x-admin-password': password },
     }).then(() => cargarAnuncios())
+  }
+
+  // Importación en lote de anuncios (pegar texto de un canal de WhatsApp)
+  const [textoImportarAnuncios, setTextoImportarAnuncios] = useState('')
+  const [parseadosAnuncios, setParseadosAnuncios] = useState<(AnuncioParseado & { incluir: boolean })[]>([])
+  const [importandoAnuncios, setImportandoAnuncios] = useState(false)
+  const [resultadoImportacion, setResultadoImportacion] = useState<{ creados: number; errores: string[] } | null>(null)
+
+  function parsearTextoAnuncios() {
+    const parseados = parsearAnunciosWhatsapp(textoImportarAnuncios)
+    setParseadosAnuncios(parseados.map((p) => ({ ...p, incluir: true })))
+    setResultadoImportacion(null)
+  }
+
+  function actualizarParseado(i: number, cambios: Partial<AnuncioParseado & { incluir: boolean }>) {
+    setParseadosAnuncios((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...cambios } : p)))
+  }
+
+  async function importarAnunciosSeleccionados() {
+    const seleccionados = parseadosAnuncios.filter((p) => p.incluir)
+    if (seleccionados.length === 0) return
+    setImportandoAnuncios(true)
+    try {
+      const res = await fetch('/api/admin/anuncios/importar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({
+          anuncios: seleccionados.map((p) => ({
+            titulo: p.titulo,
+            descripcion: p.descripcion,
+            telefono: p.telefono,
+            tipo: 'busqueda',
+            estado: p.incompleto ? 'info_solicitada' : 'aprobado',
+            notaAdmin: p.incompleto ? 'Importado desde WhatsApp con el texto cortado — falta pedirle al contacto la descripción completa.' : null,
+          })),
+        }),
+      })
+      const data = await res.json()
+      setResultadoImportacion({ creados: data.creados || 0, errores: data.errores || [] })
+      setParseadosAnuncios((prev) => prev.filter((p) => !p.incluir))
+      cargarAnuncios()
+    } finally {
+      setImportandoAnuncios(false)
+    }
   }
 
   function cargarUsuarios(pw?: string) {
@@ -1620,6 +1673,98 @@ export default function AdminPage() {
             </div>
           )}
 
+          <div className="font-body text-sm font-semibold text-ink mb-2">Importar en lote (desde WhatsApp)</div>
+          <div className="font-body text-[11px] text-inksoft mb-2">
+            Pegá el texto copiado de un canal/grupo de WhatsApp con varios avisos seguidos (título, teléfono y descripción cada uno). Se sube a nombre del cliente, sin que tenga cuenta acá — vos revisás cada uno antes de que se publique.
+          </div>
+          <textarea
+            value={textoImportarAnuncios}
+            onChange={(e) => setTextoImportarAnuncios(e.target.value)}
+            placeholder="Pegá acá el texto completo copiado de WhatsApp..."
+            rows={6}
+            className="w-full px-3 py-2.5 rounded-lg border border-line font-body text-xs mb-2"
+          />
+          <button
+            type="button"
+            onClick={parsearTextoAnuncios}
+            disabled={!textoImportarAnuncios.trim()}
+            className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+          >
+            Detectar avisos
+          </button>
+
+          {parseadosAnuncios.length > 0 && (
+            <div className="mt-4">
+              <div className="font-body text-xs text-inksoft mb-3">
+                Se detectaron <strong>{parseadosAnuncios.length}</strong> avisos. Los marcados <span className="text-ochre font-semibold">"texto cortado"</span> se importan pidiendo más datos en vez de publicarse directo — tenés el botón de WhatsApp al lado de cada uno para pedirle al contacto que te mande el texto completo.
+              </div>
+
+              <div className="flex flex-col gap-2 mb-3 max-h-[480px] overflow-y-auto pr-1">
+                {parseadosAnuncios.map((p, i) => (
+                  <div key={i} className={`border rounded-lg p-3 ${p.incompleto ? 'border-ochre bg-ochresoft' : 'border-line bg-panel'}`}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={p.incluir}
+                        onChange={(e) => actualizarParseado(i, { incluir: e.target.checked })}
+                        className="mt-1 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <input
+                          value={p.titulo}
+                          onChange={(e) => actualizarParseado(i, { titulo: e.target.value })}
+                          className="w-full font-body text-xs font-semibold text-ink bg-transparent border-none p-0 mb-1"
+                        />
+                        <div className="font-body text-[11px] text-inksoft mb-1">📞 {p.telefono} · {p.fecha}</div>
+                        {p.incompleto && (
+                          <div className="font-body text-[10px] font-bold text-ochre uppercase mb-1">⚠ Texto cortado — falta info</div>
+                        )}
+                      </div>
+                    </div>
+                    <textarea
+                      value={p.descripcion}
+                      onChange={(e) => actualizarParseado(i, { descripcion: e.target.value })}
+                      rows={2}
+                      className="w-full px-2 py-1.5 rounded-md border border-line font-body text-[11px] mb-2"
+                    />
+                    {p.incompleto && (
+                      <a
+                        href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Vimos tu aviso "${p.titulo}" pero el mensaje nos llegó cortado. ¿Nos podés mandar la descripción completa para publicarlo en Clasi Click?`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-2.5 py-1 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
+                      >
+                        💬 Pedirle el texto completo
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={importarAnunciosSeleccionados}
+                disabled={importandoAnuncios || parseadosAnuncios.filter((p) => p.incluir).length === 0}
+                className="px-3.5 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-50"
+              >
+                {importandoAnuncios
+                  ? 'Importando...'
+                  : `Importar ${parseadosAnuncios.filter((p) => p.incluir).length} seleccionados`}
+              </button>
+
+              {resultadoImportacion && (
+                <div className="mt-2 font-body text-xs text-teal">
+                  Se crearon {resultadoImportacion.creados} anuncios.
+                  {resultadoImportacion.errores.length > 0 && (
+                    <div className="text-maroon mt-1">{resultadoImportacion.errores.join(' · ')}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="border-t border-line my-6" />
+
           <div className="font-body text-sm font-semibold text-ink mb-3">
             Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
           </div>
@@ -1630,7 +1775,7 @@ export default function AdminPage() {
               // Los pendientes de revisar primero — son los que hay que
               // atender; aprobados/rechazados quedan abajo como
               // historial.
-              const orden: Record<string, number> = { pendiente_revision: 0, aprobado: 1, rechazado: 2 }
+              const orden: Record<string, number> = { pendiente_revision: 0, info_solicitada: 1, aprobado: 2, rechazado: 3 }
               return (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3) || (b.createdAt || '').localeCompare(a.createdAt || '')
             })
             .map((a) => (
@@ -1645,16 +1790,29 @@ export default function AdminPage() {
                       {a.estado === 'pendiente_revision' && (
                         <span className="inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pendiente</span>
                       )}
+                      {a.estado === 'info_solicitada' && (
+                        <span className="inline-block bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">⏳ Falta info</span>
+                      )}
                       {a.estado === 'aprobado' && (
                         <span className="inline-block bg-teal text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">Aprobado</span>
                       )}
                       {a.estado === 'rechazado' && (
                         <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Rechazado</span>
                       )}
+                      {a.creadoPorAdmin && (
+                        <span className="inline-block bg-panelalt text-inksoft text-[10px] font-semibold px-1.5 py-0.5 rounded" title="Lo subiste vos a nombre de un cliente">
+                          Importado
+                        </span>
+                      )}
                     </div>
                     <div className="font-body text-xs text-inksoft mt-1">{a.descripcion}</div>
+                    {a.notaAdmin && (
+                      <div className="font-body text-[11px] text-indigo-700 bg-indigo-50 rounded-md px-2.5 py-2 mt-1.5">
+                        📝 {a.notaAdmin}
+                      </div>
+                    )}
                     <div className="font-body text-[11px] text-inksoft mt-1.5">
-                      {a.autorEmail} · {a.whatsapp} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
+                      {a.autorEmail || (a.creadoPorAdmin ? 'Importado (sin cuenta)' : '')} · {a.whatsapp || a.telefonoOriginal || 'sin contacto'} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
                     </div>
                     {a.moderacionIA && (
                       <div className={`font-body text-[11px] mt-1.5 ${a.moderacionIA.riesgo === 'alto' ? 'text-maroon' : a.moderacionIA.riesgo === 'medio' ? 'text-ochre' : 'text-inksoft'}`}>
@@ -1669,6 +1827,17 @@ export default function AdminPage() {
                 <div className="flex gap-2 flex-wrap mt-3">
                   {a.estado !== 'aprobado' && (
                     <button type="button" onClick={() => cambiarEstadoAnuncio(a.id, 'aprobado')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Aprobar</button>
+                  )}
+                  {(a.whatsapp || a.telefonoOriginal) && a.estado !== 'aprobado' && (
+                    <a
+                      href={`https://wa.me/${(a.whatsapp || `591${a.telefonoOriginal}`).replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Vimos tu aviso "${a.titulo}" pero nos falta algún dato para publicarlo en Clasi Click. ¿Nos podés confirmar los detalles completos?`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => cambiarEstadoAnuncioConNota(a.id, 'info_solicitada', a.notaAdmin || 'Se le pidió más información por WhatsApp.')}
+                      className="px-2.5 py-1.5 rounded-md border border-indigo-200 font-body text-[11px] text-indigo-600"
+                    >
+                      💬 Pedir más datos
+                    </a>
                   )}
                   {a.estado !== 'rechazado' && (
                     <button type="button" onClick={() => cambiarEstadoAnuncio(a.id, 'rechazado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Rechazar</button>

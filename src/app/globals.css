@@ -14,11 +14,3 @@ body {
 html, body {
   overflow-x: hidden;
 }
-
-/* Usado por el segundo nivel del filtro de categorías (rubros): que
-   aparezca con una entrada suave en vez de "saltar" de golpe cuando
-   se elige una categoría. */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}

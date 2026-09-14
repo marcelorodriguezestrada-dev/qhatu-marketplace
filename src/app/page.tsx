@@ -18,7 +18,6 @@ export default function CatalogoPage() {
   const [productos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
   const [publico, setPublico] = useState('Todo')
   const [categoria, setCategoria] = useState('Todo')
-  const [rubroSel, setRubroSel] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
@@ -39,11 +38,10 @@ export default function CatalogoPage() {
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
     const matchCat = categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
-    const matchRubro = !rubroSel || p.rubro === rubroSel
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.vendedor.toLowerCase().includes(busqueda.toLowerCase())
-    return matchPublico && matchCat && matchRubro && matchBusqueda
+    return matchPublico && matchCat && matchBusqueda
   })
 
   // Solo entran acá los descuentos reales (precioOriginal cargado por
@@ -187,13 +185,11 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        <div className="flex gap-2 mb-2.5 flex-wrap">
+        <div className="flex gap-2 mb-5 flex-wrap">
           <button
-            onClick={() => { setCategoria('Todo'); setRubroSel('') }}
-            className={`px-4 py-2 rounded-xl border font-body text-sm font-semibold transition-all ${
-              categoria === 'Todo'
-                ? 'border-maroon bg-maroon text-white shadow-sm'
-                : 'border-line bg-panel text-inksoft hover:border-maroon/40 hover:text-ink'
+            onClick={() => setCategoria('Todo')}
+            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+              categoria === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
             }`}
           >
             Todo
@@ -202,60 +198,21 @@ export default function CatalogoPage() {
             <button
               key={c.id}
               onClick={() => {
-                const yaEstabaSeleccionada = categoria === c.id
-                setCategoria(yaEstabaSeleccionada ? 'Todo' : c.id)
-                setRubroSel('')
-                if (!yaEstabaSeleccionada) {
-                  fetch('/api/analitica/categoria', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tipo: 'producto', valor: c.label }),
-                  }).catch(() => {})
-                }
+                setCategoria(c.id)
+                fetch('/api/analitica/categoria', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tipo: 'producto', valor: c.label }),
+                }).catch(() => {})
               }}
-              className={`px-4 py-2 rounded-xl border font-body text-sm font-semibold transition-all ${
-                categoria === c.id
-                  ? 'border-maroon bg-maroon text-white shadow-sm'
-                  : 'border-line bg-panel text-inksoft hover:border-maroon/40 hover:text-ink'
+              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+                categoria === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
               {c.label}
             </button>
           ))}
         </div>
-
-        {/* Segundo nivel: solo aparece cuando hay una categoría puntual
-            elegida (no en "Todo"), y solo si esa categoría tiene rubros
-            cargados -- así el filtro se siente "vivo" en vez de mostrar
-            todo mezclado de entrada. */}
-        {categoria !== 'Todo' && (categoriasProductos.find((c) => c.id === categoria)?.rubros?.length ?? 0) > 0 && (
-          <div className="flex gap-1.5 mb-5 flex-wrap pl-1 border-l-2 border-line ml-1 py-0.5 animate-[fadeIn_0.15s_ease-in]">
-            <button
-              onClick={() => setRubroSel('')}
-              className={`px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors ml-2 ${
-                rubroSel === '' ? 'bg-panelalt text-ink font-semibold' : 'text-inksoft hover:text-ink'
-              }`}
-            >
-              Todos
-            </button>
-            {categoriasProductos
-              .find((c) => c.id === categoria)!
-              .rubros.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => setRubroSel(rubroSel === r.id ? '' : r.id)}
-                  className={`px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors ${
-                    rubroSel === r.id ? 'bg-panelalt text-ink font-semibold' : 'text-inksoft hover:text-ink'
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-          </div>
-        )}
-        {(categoria === 'Todo' || (categoriasProductos.find((c) => c.id === categoria)?.rubros?.length ?? 0) === 0) && (
-          <div className="mb-5" />
-        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {filtrados.map((p) => (

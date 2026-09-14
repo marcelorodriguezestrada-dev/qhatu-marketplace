@@ -36,13 +36,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const body = await req.json()
-    const { estado, titulo, descripcion, tipo, precio } = body
+    const { estado, titulo, descripcion, tipo, precio, notaAdmin } = body
     const cambios: Record<string, unknown> = {}
     if (estado !== undefined) cambios.estado = estado
     if (titulo !== undefined) cambios.titulo = titulo
     if (descripcion !== undefined) cambios.descripcion = descripcion
     if (tipo !== undefined) cambios.tipo = tipo
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
+    if (notaAdmin !== undefined) cambios.notaAdmin = notaAdmin
 
     await getDb().collection('anuncios').doc(params.id).update(cambios)
 
