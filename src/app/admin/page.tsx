@@ -73,6 +73,9 @@ export default function AdminPage() {
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [anuncios, setAnuncios] = useState<any[]>([])
+  const [macheos, setMacheos] = useState<any>(null)
+  const [cargandoMacheos, setCargandoMacheos] = useState(false)
+  const [anuncioExpandido, setAnuncioExpandido] = useState<string | null>(null)
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
   // uid del usuario cuya fila está desplegada mostrando el detalle de
   // sus productos y perfiles profesionales (null = ninguna abierta).
@@ -189,6 +192,7 @@ export default function AdminPage() {
         cargarProfesionales(pw)
         cargarProductos(pw)
         cargarAnuncios(pw)
+        cargarMacheos(pw)
       })
       .catch((e) => {
         setError(e.message)
@@ -223,12 +227,23 @@ export default function AdminPage() {
       .then((data) => setAnuncios(data.anuncios || []))
   }
 
+  function cargarMacheos(pw?: string) {
+    setCargandoMacheos(true)
+    fetch('/api/admin/macheos', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setMacheos(data))
+      .finally(() => setCargandoMacheos(false))
+  }
+
   function cambiarEstadoAnuncio(id: string, estado: 'aprobado' | 'rechazado') {
     fetch(`/api/anuncios/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ estado }),
-    }).then(() => cargarAnuncios())
+    }).then(() => {
+      cargarAnuncios()
+      cargarMacheos()
+    })
   }
 
   function eliminarAnuncio(id: string) {
@@ -1533,6 +1548,76 @@ export default function AdminPage() {
 
       {tab === 'anuncios' && (
         <div>
+          {macheos?.totales && (
+            <div className="mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+                <div className="bg-panel border border-line rounded-lg p-3">
+                  <div className="font-display text-lg font-bold text-ink">{macheos.totales.totalVistas}</div>
+                  <div className="font-body text-[11px] text-inksoft">Vistas totales</div>
+                </div>
+                <div className="bg-panel border border-line rounded-lg p-3">
+                  <div className="font-display text-lg font-bold text-ink">{macheos.totales.totalMatcheos}</div>
+                  <div className="font-body text-[11px] text-inksoft">Matcheos generados</div>
+                </div>
+                <div className="bg-panel border border-line rounded-lg p-3">
+                  <div className="font-display text-lg font-bold text-ink">{macheos.totales.totalEmailsEnviados}</div>
+                  <div className="font-body text-[11px] text-inksoft">Mails enviados</div>
+                </div>
+                <div className="bg-panel border border-line rounded-lg p-3">
+                  <div className="font-display text-lg font-bold text-ink truncate" title={macheos.totales.anuncioMasVisto?.anuncioTitulo}>
+                    {macheos.totales.anuncioMasVisto?.vistas ?? 0}
+                  </div>
+                  <div className="font-body text-[11px] text-inksoft truncate" title={macheos.totales.anuncioMasVisto?.anuncioTitulo}>
+                    Más visto: {macheos.totales.anuncioMasVisto?.anuncioTitulo || '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="font-body text-xs font-semibold text-inksoft mb-2">Ranking de anuncios por vistas y matcheos</div>
+              <div className="space-y-1.5 mb-1">
+                {macheos.porAnuncio.slice(0, 20).map((a: any, i: number) => (
+                  <div key={a.anuncioId} className="bg-panel border border-line rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setAnuncioExpandido(anuncioExpandido === a.anuncioId ? null : a.anuncioId)}
+                      className="w-full flex items-center gap-3 p-2.5 text-left"
+                    >
+                      <span className="font-body text-[11px] text-inksoft w-5 shrink-0">{i + 1}.</span>
+                      <span className="font-body text-xs text-ink flex-1 truncate">{a.anuncioTitulo}</span>
+                      <span className="font-body text-[11px] text-inksoft shrink-0">👁 {a.vistas}</span>
+                      {a.matcheos > 0 && (
+                        <span className="font-body text-[11px] text-teal shrink-0">
+                          🎯 {a.matcheos} · ✉️ {a.emailsEnviados}
+                        </span>
+                      )}
+                    </button>
+                    {anuncioExpandido === a.anuncioId && (
+                      <div className="border-t border-line px-3 py-2.5">
+                        {a.destinatarios.length === 0 ? (
+                          <div className="font-body text-[11px] text-inksoft">
+                            {a.tipo === 'busqueda' ? 'Todavía no matcheó con ningún profesional.' : 'Este tipo de anuncio no genera matcheos automáticos.'}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="font-body text-[11px] font-semibold text-inksoft mb-1">A quiénes se avisó:</div>
+                            {a.destinatarios.map((d: any, j: number) => (
+                              <div key={j} className="font-body text-[11px] text-inksoft flex items-center gap-2">
+                                <span className={d.emailEnviado ? 'text-teal' : 'text-maroon'}>{d.emailEnviado ? '✓' : '✕'}</span>
+                                <span className="text-ink">{d.profesionalNombre || 'Profesional'}</span>
+                                <span>{d.email || 'sin email cargado'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {cargandoMacheos && <div className="font-body text-[11px] text-inksoft">Actualizando...</div>}
+            </div>
+          )}
+
           <div className="font-body text-sm font-semibold text-ink mb-3">
             Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
           </div>

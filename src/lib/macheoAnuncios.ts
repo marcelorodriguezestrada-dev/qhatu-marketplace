@@ -43,29 +43,18 @@ export async function ejecutarMacheo(anuncioId: string): Promise<{ notificados: 
     const profesional = doc.data()
     const mensaje = `Alguien busca "${anuncio.titulo}" — coincide con tu rubro. Mirá el anuncio y contactalo por WhatsApp.`
 
-    try {
-      await db.collection('notificaciones').add({
-        // A quién le llega adentro de la app — el dueño de la cuenta
-        // del profesional, no el documento del profesional en sí.
-        uid: profesional.solicitanteUid || null,
-        tipo: 'macheo_anuncio',
-        anuncioId,
-        anuncioTitulo: anuncio.titulo,
-        profesionalId: doc.id,
-        mensaje,
-        leida: false,
-        createdAt: new Date().toISOString(),
-      })
-    } catch (err) {
-      console.error('ejecutarMacheo: no se pudo guardar la notificación', doc.id, err)
-    }
-
     // El mail es best-effort — probamos con el email cargado en el
     // perfil del profesional, y si no hay, con el de su cuenta de
     // Firebase Auth (puede que haya cargado el perfil con un mail
-    // distinto al de su login, por eso se intentan los dos).
+    // distinto al de su login, por eso se intentan los dos). Lo
+    // resolvemos ANTES de guardar la notificación para poder dejar
+    // registrado a quién se le avisó y si el mail salió bien o no —
+    // sin esto no había forma de armar estadísticas reales de a
+    // quiénes se avisó ni cuántos mails efectivamente se mandaron.
+    let destino: string | undefined
+    let emailEnviado = false
     try {
-      let destino = profesional.email as string | undefined
+      destino = profesional.email as string | undefined
       if (!destino && profesional.solicitanteUid) {
         const cuenta = await authAdmin.getUser(profesional.solicitanteUid).catch(() => null)
         destino = cuenta?.email || undefined
@@ -78,9 +67,32 @@ export async function ejecutarMacheo(anuncioId: string): Promise<{ notificados: 
           anuncioId,
           whatsappSolicitante: anuncio.whatsapp,
         })
+        emailEnviado = true
       }
     } catch (err) {
       console.error('ejecutarMacheo: no se pudo mandar el mail', doc.id, err)
+    }
+
+    try {
+      await db.collection('notificaciones').add({
+        // A quién le llega adentro de la app — el dueño de la cuenta
+        // del profesional, no el documento del profesional en sí.
+        uid: profesional.solicitanteUid || null,
+        tipo: 'macheo_anuncio',
+        anuncioId,
+        anuncioTitulo: anuncio.titulo,
+        profesionalId: doc.id,
+        profesionalNombre: profesional.nombre || null,
+        mensaje,
+        leida: false,
+        // Datos para estadísticas de admin (ver /api/admin/macheos):
+        // a quién se le intentó avisar por mail y si efectivamente salió.
+        emailDestino: destino || null,
+        emailEnviado,
+        createdAt: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('ejecutarMacheo: no se pudo guardar la notificación', doc.id, err)
     }
 
     notificados++
