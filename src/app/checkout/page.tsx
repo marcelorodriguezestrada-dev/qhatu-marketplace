@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
-import { ZONAS_ENVIO_POTOSI } from '@/data/zonasPotosi'
+import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { calcularFranja } from '@/lib/reparto'
 
@@ -113,6 +113,9 @@ function CheckoutContent() {
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
   const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
+  // Qué "Zona 1/2/3" está elegida en el primer selector — el segundo
+  // selector (el barrio) recién muestra las opciones de ese grupo.
+  const [grupoZonaSel, setGrupoZonaSel] = useState(grupoDeBarrio(ZONAS_ENVIO_POTOSI[0].nombre)?.id || ZONAS_AGRUPADAS[0].id)
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
   // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
@@ -150,6 +153,13 @@ function CheckoutContent() {
       (pos) => {
         setLat(pos.coords.latitude)
         setLng(pos.coords.longitude)
+        // Con la ubicación ya podemos adivinar el barrio más cercano y
+        // completar la zona y el barrio solos, en vez de dejar que la
+        // persona los busque a mano en la lista.
+        const cercano = barrioMasCercano(pos.coords.latitude, pos.coords.longitude)
+        setZonaEntrega(cercano.nombre)
+        const grupo = grupoDeBarrio(cercano.nombre)
+        if (grupo) setGrupoZonaSel(grupo.id)
         setBuscandoUbicacion(false)
       },
       () => {
@@ -379,12 +389,26 @@ function CheckoutContent() {
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
                 <select
+                  value={grupoZonaSel}
+                  onChange={(e) => {
+                    const grupo = ZONAS_AGRUPADAS.find((g) => g.id === e.target.value)
+                    setGrupoZonaSel(e.target.value)
+                    if (grupo) setZonaEntrega(grupo.barrios[0])
+                  }}
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm mb-2"
+                >
+                  {ZONAS_AGRUPADAS.map((g) => (
+                    <option key={g.id} value={g.id}>{g.label} · {bs(g.costoEnvio)}</option>
+                  ))}
+                </select>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Barrio</span>
+                <select
                   value={zonaEntrega}
                   onChange={(e) => setZonaEntrega(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 >
-                  {Object.keys(COSTOS_ENVIO).map((zona) => (
-                    <option key={zona} value={zona}>{zona} · {bs(COSTOS_ENVIO[zona])}</option>
+                  {(ZONAS_AGRUPADAS.find((g) => g.id === grupoZonaSel)?.barrios || []).map((barrio) => (
+                    <option key={barrio} value={barrio}>{barrio}</option>
                   ))}
                 </select>
               </label>

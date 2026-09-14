@@ -83,3 +83,43 @@ export const ZONAS_ENVIO_POTOSI: ZonaPotosi[] = COORDENADAS_ZONAS.map((z) => ({
 // de la ciudad trabaja). Se deriva de la misma lista de arriba para no
 // mantener los nombres en dos lugares distintos.
 export const ZONAS_POTOSI: string[] = ZONAS_ENVIO_POTOSI.map((z) => z.nombre)
+
+// Agrupado en "Zona 1 / Zona 2 / Zona 3" según el mismo costo de envío
+// por distancia de arriba (Bs 5 / 10 / 15) — así el selector del
+// checkout no es una lista larga de 22 barrios de un tirón: primero se
+// elige la zona (con su precio), y recién ahí aparecen los barrios de
+// esa zona.
+export type GrupoZonaPotosi = { id: string; label: string; costoEnvio: number; barrios: string[] }
+
+export const ZONAS_AGRUPADAS: GrupoZonaPotosi[] = (() => {
+  const costosOrdenados = [...new Set(ZONAS_ENVIO_POTOSI.map((z) => z.costoEnvio))].sort((a, b) => a - b)
+  return costosOrdenados.map((costo, i) => ({
+    id: `zona-${i + 1}`,
+    label: `Zona ${i + 1}`,
+    costoEnvio: costo,
+    barrios: ZONAS_ENVIO_POTOSI.filter((z) => z.costoEnvio === costo).map((z) => z.nombre),
+  }))
+})()
+
+// A qué grupo (Zona 1/2/3) pertenece un barrio puntual — para cuando
+// hay que arrancar el selector ya con algo elegido, o para reflejar la
+// zona detectada automáticamente por ubicación.
+export function grupoDeBarrio(nombreBarrio: string): GrupoZonaPotosi | undefined {
+  return ZONAS_AGRUPADAS.find((g) => g.barrios.includes(nombreBarrio))
+}
+
+// El barrio conocido más cercano a una coordenada — se usa cuando el
+// comprador comparte su ubicación en el checkout, para completarle la
+// zona y el barrio solo, sin que tenga que buscarlo a mano en la lista.
+export function barrioMasCercano(lat: number, lng: number): ZonaPotosi {
+  let mejor = ZONAS_ENVIO_POTOSI[0]
+  let mejorDistancia = Infinity
+  for (const z of ZONAS_ENVIO_POTOSI) {
+    const d = distanciaKm(lat, lng, z.lat, z.lng)
+    if (d < mejorDistancia) {
+      mejorDistancia = d
+      mejor = z
+    }
+  }
+  return mejor
+}
