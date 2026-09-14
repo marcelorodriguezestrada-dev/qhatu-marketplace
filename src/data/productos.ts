@@ -23,6 +23,11 @@ export type Producto = {
   icono: string
   imagenUrl?: string
   thumbUrl?: string
+  // Fotos extra de la galería del producto — beneficio Premium del
+  // VENDEDOR (no del producto en sí): si el vendedor tiene Premium
+  // vigente, cada uno de sus productos puede tener hasta
+  // MAX_FOTOS_ADICIONALES_PREMIUM fotos más, además de la principal.
+  fotosAdicionales?: string[]
   createdAt?: string
   vistas?: number
   plan?: 'basico' | 'premium'

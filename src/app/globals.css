@@ -5,3 +5,12 @@
 body {
   background: #F1ECE0;
 }
+
+/* Evita que la página entera pueda scrollear horizontalmente — sin
+   esto, cualquier elemento que se pase por unos pixeles del ancho de
+   pantalla (algo fácil que pase en celulares chicos) deja la página
+   "corrida" hacia la derecha, con el header y el carrito viéndose
+   desplazados/cortados hasta que el usuario scrollea de vuelta. */
+html, body {
+  overflow-x: hidden;
+}

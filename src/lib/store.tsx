@@ -11,6 +11,12 @@ type CarritoContextType = {
   cambiarCantidad: (id: number | string, delta: number) => void
   quitar: (id: number | string) => void
   vaciar: () => void
+  // Vacía solo los productos de UNA tienda — se usa después de pagarle
+  // a esa tienda en particular, dejando intactos los productos de
+  // otras tiendas que sigan pendientes en el carrito. `null` para el
+  // "cajón" de productos sin vendedorId asignado (vendidos directo por
+  // la plataforma).
+  vaciarTienda: (vendedorId: string | null) => void
   total: number
 }
 
@@ -61,10 +67,14 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     setItems([])
   }
 
+  function vaciarTienda(vendedorId: string | null) {
+    setItems((prev) => prev.filter((i) => (i.vendedorId || null) !== vendedorId))
+  }
+
   const total = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
   return (
-    <CarritoContext.Provider value={{ items, agregar, cambiarCantidad, quitar, vaciar, total }}>
+    <CarritoContext.Provider value={{ items, agregar, cambiarCantidad, quitar, vaciar, vaciarTienda, total }}>
       {children}
     </CarritoContext.Provider>
   )

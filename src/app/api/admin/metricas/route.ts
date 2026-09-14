@@ -19,14 +19,20 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
 
-    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap] = await Promise.all([
+    // Cada colección se consulta con su propio catch — si UNA falla
+    // (por el motivo que sea), el resto de las métricas se sigue
+    // mostrando igual, en vez de que todo el tablero quede en blanco
+    // por un solo problema puntual.
+    const snapVacio = { docs: [] as any[] }
+    const [usuariosTotal, productosSnap, profesionalesSnap, pedidosSnap, categoriasSnap, metricasDiariasSnap, pagosPremiumSnap, vendedoresSnap] = await Promise.all([
       contarUsuarios().catch(() => null), // null si Firebase Auth no está accesible por algún motivo
-      db.collection('productos').get(),
-      db.collection('profesionales').get(),
-      db.collection('pedidos').get(),
-      db.collection('analitica_categorias').get(),
-      db.collection('metricas_diarias').get(),
-      db.collection('pagos_premium').get(),
+      db.collection('productos').get().catch((e) => { console.error('metricas: productos', e); return snapVacio }),
+      db.collection('profesionales').get().catch((e) => { console.error('metricas: profesionales', e); return snapVacio }),
+      db.collection('pedidos').get().catch((e) => { console.error('metricas: pedidos', e); return snapVacio }),
+      db.collection('analitica_categorias').get().catch((e) => { console.error('metricas: analitica_categorias', e); return snapVacio }),
+      db.collection('metricas_diarias').get().catch((e) => { console.error('metricas: metricas_diarias', e); return snapVacio }),
+      db.collection('pagos_premium').get().catch((e) => { console.error('metricas: pagos_premium', e); return snapVacio }),
+      db.collection('vendedores').get().catch((e) => { console.error('metricas: vendedores', e); return snapVacio }),
     ])
 
     const productos = productosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
@@ -81,15 +87,28 @@ export async function GET(req: NextRequest) {
     )
     const premiumPagoPorConfirmar = profesionales.filter((p) => p.planEstadoPago === 'informado_pago')
 
+    // Mismo cálculo, pero para vendedores (tiendas de productos) — se
+    // suman al total porque, para el flujo de caja de la plataforma,
+    // da lo mismo si el que paga Bs 30/mes es un profesional o un
+    // vendedor: ambos pagan por el mismo beneficio Premium.
+    const vendedores = vendedoresSnap.docs.map((d) => d.data() as any)
+    const vendedoresPremiumVigentes = vendedores.filter((v) => esPremiumVigente(v))
+    const vendedoresVenciendoPronto = vendedoresPremiumVigentes.filter(
+      (v) => v.planVigenciaHasta && new Date(v.planVigenciaHasta) <= en7Dias
+    )
+    const vendedoresPagoPorConfirmar = vendedores.filter((v) => v.planEstadoPago === 'informado_pago')
+
     const flujoCaja = {
       pagosConfirmadosHistorico: pagosPremium.length,
       facturadoHistorico: pagosPremium.reduce((s, p) => s + (Number(p.monto) || 0), 0),
       pagosEsteMes: pagosPremiumEsteMes.length,
       facturadoEsteMes: pagosPremiumEsteMes.reduce((s, p) => s + (Number(p.monto) || 0), 0),
-      premiumVigentesAhora: premiumVigentes.length,
-      porConfirmar: premiumPagoPorConfirmar.length,
-      venciendoEn7Dias: premiumVenciendoPronto.length,
-      proyeccionProximos30Dias: premiumVigentes.length * PRECIO_PREMIUM_BS,
+      premiumVigentesAhora: premiumVigentes.length + vendedoresPremiumVigentes.length,
+      profesionalesPremiumVigentes: premiumVigentes.length,
+      vendedoresPremiumVigentes: vendedoresPremiumVigentes.length,
+      porConfirmar: premiumPagoPorConfirmar.length + vendedoresPagoPorConfirmar.length,
+      venciendoEn7Dias: premiumVenciendoPronto.length + vendedoresVenciendoPronto.length,
+      proyeccionProximos30Dias: (premiumVigentes.length + vendedoresPremiumVigentes.length) * PRECIO_PREMIUM_BS,
       precioPremiumBs: PRECIO_PREMIUM_BS,
     }
 

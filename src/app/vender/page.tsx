@@ -9,6 +9,12 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
+import { PRECIO_PREMIUM_BS } from '@/lib/planPremium'
+
+const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
+const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
+const BANK_ACCOUNT_NAME = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || ''
+const BANK_ACCOUNT_NUMBER = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || ''
 
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
@@ -27,7 +33,7 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
 }
 
 export default function VenderPage() {
-  const { usuario, cargando, obtenerToken } = useAuth()
+  const { usuario, cargando, emailVerificado, obtenerToken } = useAuth()
   const router = useRouter()
   const [misProductos, setMisProductos] = useState<any[]>([])
   const [misPedidos, setMisPedidos] = useState<any[]>([])
@@ -96,9 +102,25 @@ export default function VenderPage() {
   const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [tiposVenta, setTiposVenta] = useState<Record<string, boolean>>({})
 
+  // Membresía Premium de la tienda (paga, la confirma el admin) — a
+  // diferencia de todo lo de arriba, esto no lo puede tocar el vendedor
+  // directo, solo "avisar que ya pagó".
+  const [planVendedor, setPlanVendedor] = useState('basico')
+  const [planVigenciaVendedor, setPlanVigenciaVendedor] = useState<string | null>(null)
+  const [planEstadoPagoVendedor, setPlanEstadoPagoVendedor] = useState('ninguno')
+  const [premiumVendedorVigente, setPremiumVendedorVigente] = useState(false)
+  const [avisandoPago, setAvisandoPago] = useState(false)
+  const [pagandoPremium, setPagandoPremium] = useState(false)
+
+  // Galería de fotos extra por producto (Premium) — qué producto tiene
+  // abierto su editor de galería ahora mismo.
+  const [galeriaAbiertaId, setGaleriaAbiertaId] = useState<string | null>(null)
+  const [subiendoFotoGaleria, setSubiendoFotoGaleria] = useState(false)
+
   useEffect(() => {
-    if (!cargando && !usuario) router.push('/login')
-  }, [cargando, usuario, router])
+    if (cargando) return
+    if (!usuario || emailVerificado === false) router.push('/login')
+  }, [cargando, usuario, emailVerificado, router])
 
   useEffect(() => {
     if (usuario) {
@@ -130,6 +152,24 @@ export default function VenderPage() {
       setTiendaHorarios(data.horarios || '')
       setTiendaLogoUrl(data.logoUrl || '')
       setTiposVenta(data.tiposVenta || {})
+      setPlanVendedor(data.plan || 'basico')
+      setPlanVigenciaVendedor(data.planVigenciaHasta || null)
+      setPlanEstadoPagoVendedor(data.planEstadoPago || 'ninguno')
+      setPremiumVendedorVigente(!!data.premiumVigente)
+    }
+  }
+
+  async function avisarPagoPremium() {
+    setAvisandoPago(true)
+    try {
+      const token = await obtenerToken()
+      await fetch('/api/vendedores/informar-pago', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setPlanEstadoPagoVendedor('informado_pago')
+    } finally {
+      setAvisandoPago(false)
     }
   }
 
@@ -231,6 +271,52 @@ export default function VenderPage() {
     const data = await res.json()
     const propios = (data.productos || []).filter((p: any) => p.vendedorId === usuario?.uid)
     setMisProductos(propios)
+  }
+
+  // Galería de fotos extra por producto — solo tiene efecto real si la
+  // tienda tiene Premium vigente (el servidor lo vuelve a chequear
+  // igual, esto es solo para no ofrecer el botón si no va a andar).
+  async function subirFotoGaleria(productoId: string, file: File | null) {
+    if (!file) return
+    setSubiendoFotoGaleria(true)
+    try {
+      const comprimido = (await compressImage(file, 800, 0.7)) || file
+      const formData = new FormData()
+      formData.append('image', comprimido)
+      const token = await obtenerToken()
+      const subida = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const subidaData = await subida.json()
+      if (subidaData.error) throw new Error(subidaData.error)
+
+      const res = await fetch(`/api/productos/${productoId}/galeria`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url: subidaData.url }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setMisProductos((prev) => prev.map((p: any) => (p.id === productoId ? { ...p, fotosAdicionales: data.fotosAdicionales } : p)))
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo subir la foto.')
+    } finally {
+      setSubiendoFotoGaleria(false)
+    }
+  }
+
+  async function quitarFotoGaleria(productoId: string, url: string) {
+    const token = await obtenerToken()
+    const res = await fetch(`/api/productos/${productoId}/galeria`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ url }),
+    })
+    const data = await res.json()
+    if (data.error) return
+    setMisProductos((prev) => prev.map((p: any) => (p.id === productoId ? { ...p, fotosAdicionales: data.fotosAdicionales } : p)))
   }
 
   async function cargarMisPedidos() {
@@ -623,6 +709,93 @@ export default function VenderPage() {
           Estás editando el producto <strong>{editingId}</strong>. Hacé los cambios y presioná "Actualizar producto" o "Cancelar".
         </div>
       )}
+
+      {editingId && premiumVendedorVigente && (
+        <div className="mb-4 p-4 rounded-lg bg-panel border border-line">
+          <div className="font-body text-sm font-semibold text-ink mb-1">Galería extra de este producto</div>
+          <div className="font-body text-[11px] text-inksoft mb-3">
+            Hasta 4 fotos además de la principal — beneficio de tu membresía Premium.
+          </div>
+          <div className="flex gap-2 flex-wrap mb-2">
+            {(misProductos.find((p: any) => p.id === editingId)?.fotosAdicionales || []).map((url: string) => (
+              <div key={url} className="relative w-16 h-16">
+                <img src={url} alt="Foto extra" className="w-16 h-16 object-cover rounded-lg border border-line" />
+                <button
+                  onClick={() => quitarFotoGaleria(editingId, url)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] border-none"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          {(misProductos.find((p: any) => p.id === editingId)?.fotosAdicionales || []).length < 4 && (
+            <input
+              type="file"
+              accept="image/*"
+              disabled={subiendoFotoGaleria}
+              onChange={(e) => subirFotoGaleria(editingId, e.target.files?.[0] || null)}
+              className="font-body text-xs"
+            />
+          )}
+          {subiendoFotoGaleria && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
+        </div>
+      )}
+
+      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-body text-sm font-semibold text-ink">Membresía Premium de tu tienda</div>
+          {premiumVendedorVigente && (
+            <span className="font-body text-[10px] font-bold text-white bg-ochre px-2 py-0.5 rounded-full">PREMIUM</span>
+          )}
+        </div>
+        <p className="font-body text-[12px] text-inksoft mb-3">
+          Con Premium, cada uno de tus productos puede tener hasta 4 fotos extra en su galería (además de la principal).
+        </p>
+
+        {premiumVendedorVigente ? (
+          <div className="font-body text-xs text-teal">
+            Vigente hasta {planVigenciaVendedor ? new Date(planVigenciaVendedor).toLocaleDateString('es-BO') : '—'}.
+          </div>
+        ) : planEstadoPagoVendedor === 'informado_pago' ? (
+          <div className="font-body text-xs text-ochre bg-ochresoft rounded-md px-3 py-2">
+            Avisaste que ya pagaste — estamos confirmando tu pago, se activa solo en cuanto lo revisemos.
+          </div>
+        ) : pagandoPremium ? (
+          <div className="text-center pt-2">
+            {QR_PLATAFORMA ? (
+              <img src={QR_PLATAFORMA} alt="Código QR de pago" className="mx-auto w-44 rounded-lg border border-line mb-3" />
+            ) : (
+              <div className="text-left bg-panelalt border border-line rounded-lg p-3 font-body text-xs text-ink mb-3">
+                {BANK_ACCOUNT_NUMBER ? <div><strong>Cuenta / CBU:</strong> {BANK_ACCOUNT_NUMBER}</div> : null}
+                {BANK_NAME && <div><strong>Banco:</strong> {BANK_NAME}</div>}
+                {BANK_ACCOUNT_NAME && <div><strong>Titular:</strong> {BANK_ACCOUNT_NAME}</div>}
+              </div>
+            )}
+            <div className="font-display text-xl font-bold text-ink mb-3">Bs {PRECIO_PREMIUM_BS}</div>
+            <button
+              onClick={avisarPagoPremium}
+              disabled={avisandoPago}
+              className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+            >
+              {avisandoPago ? 'Avisando...' : 'Ya pagué'}
+            </button>
+            <button
+              onClick={() => setPagandoPremium(false)}
+              className="w-full mt-2 py-2 rounded-lg border border-line font-body text-xs text-inksoft"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setPagandoPremium(true)}
+            className="w-full py-2.5 rounded-lg border-none bg-ochre text-white font-body text-sm font-semibold"
+          >
+            Hacerme Premium — Bs {PRECIO_PREMIUM_BS}/mes
+          </button>
+        )}
+      </div>
 
       <div className="bg-panel border border-line rounded-xl p-5 mb-8">
         <div className="font-body text-sm font-semibold text-ink mb-1">Mi tienda</div>

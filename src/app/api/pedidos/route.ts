@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, franjaHoraria, costoEnvio, metodoEntrega, vendedorId } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -67,10 +67,24 @@ export async function POST(req: NextRequest) {
       vendedorId: vendedorId || null,
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
-      franjaHoraria: franjaHoraria || null,
+      // Ubicación opcional que comparte el comprador al pedir con
+      // envío — la usa /admin (pestaña Reparto) para armar la ruta de
+      // la moto por cercanía. Sin esto, el pedido igual se puede
+      // repartir, solo que a mano.
+      lat: typeof lat === 'number' ? lat : null,
+      lng: typeof lng === 'number' ? lng : null,
       costoEnvio: Number(costoEnvio || 0),
       metodoEntrega: metodoEntrega || 'delivery',
-      estado: 'pendiente_pago',
+      // 'qr' (default, pago por transferencia/QR) o 'efectivo' — solo
+      // tiene sentido con retiro en tienda. Le sirve al vendedor para
+      // saber si tiene que esperar una transferencia o cobrar en mano.
+      metodoPago: metodoPago || 'qr',
+      // Con envío arrancamos pidiéndole al vendedor que confirme que
+      // tiene stock antes de mostrarle el QR al comprador — así no
+      // depositan por algo que capaz ya no está disponible. Con retiro
+      // en tienda no hace falta este paso: el comprador ve el producto
+      // en mano antes de pagar.
+      estado: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })

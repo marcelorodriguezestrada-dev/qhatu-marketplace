@@ -1,35 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
-import { MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
+import { esPremiumVigente, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
 
 export const dynamic = 'force-dynamic'
 
-// Mismo criterio que la galería de profesionales: las fotos extra son
-// un beneficio Premium, y lo chequeamos del lado del servidor (no solo
-// en la UI) para que sea imposible saltárselo armando el pedido a mano.
-// A diferencia de los profesionales (que tienen vigencia y pago propio),
-// el plan de un producto es el mismo campo `plan` que ya se usa para
-// destacarlo en el listado — "premium" ahí es lo que habilita esto.
-async function verificarDueñoPremium(ref: FirebaseFirestore.DocumentReference, uid: string) {
-  const doc = await ref.get()
-  if (!doc.exists) return { error: 'No encontrado.', status: 404 as const }
+// A diferencia de la galería de profesionales (donde el Premium vive en
+// el mismo documento que se está editando), acá el Premium vive en
+// `vendedores/{uid}` — un vendedor con varios productos paga UNA sola
+// membresía y desbloquea la galería extra en TODOS sus productos.
+//
+// Ojo: esto reemplaza a una versión anterior de este archivo que
+// chequeaba `producto.plan === 'premium'` — ese campo es el que el
+// propio vendedor tilda gratis al publicar (solo afecta el orden en el
+// catálogo), no tiene ningún pago real detrás. Dejar que ESO desbloqueé
+// las fotos extra hubiera sido un beneficio "Premium" que cualquiera
+// activa gratis con un click. Ahora se chequea la membresía paga real.
+async function verificarDueñoPremium(productoRef: FirebaseFirestore.DocumentReference, uid: string) {
+  const doc = await productoRef.get()
+  if (!doc.exists) return { error: 'Producto no encontrado.', status: 404 as const }
   const data = doc.data()!
   if (data.vendedorId !== uid) return { error: 'Este producto no te pertenece.', status: 403 as const }
-  if (data.plan !== 'premium') {
-    return { error: 'Las fotos adicionales son un beneficio Premium para este producto.', status: 403 as const }
+
+  const vendedorDoc = await getDb().collection('vendedores').doc(uid).get()
+  if (!esPremiumVigente(vendedorDoc.data() || {})) {
+    return { error: 'La galería de fotos extra es un beneficio Premium de tu membresía de vendedor. Activala primero.', status: 403 as const }
   }
   return { data }
 }
 
-// POST { url: string } — agrega una foto a la galería del producto
-// (hasta el máximo).
+// POST { url: string } — agrega una foto a la galería del producto.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
 
   try {
-    const db = getDb()
-    const ref = db.collection('productos').doc(params.id)
+    const ref = getDb().collection('productos').doc(params.id)
     const chequeo = await verificarDueñoPremium(ref, usuario.uid)
     if ('error' in chequeo) return NextResponse.json({ error: chequeo.error }, { status: chequeo.status })
 
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const actuales: string[] = chequeo.data.fotosAdicionales || []
     if (actuales.length >= MAX_FOTOS_ADICIONALES_PREMIUM) {
-      return NextResponse.json({ error: `Máximo ${MAX_FOTOS_ADICIONALES_PREMIUM} fotos adicionales.` }, { status: 400 })
+      return NextResponse.json({ error: `Máximo ${MAX_FOTOS_ADICIONALES_PREMIUM} fotos adicionales por producto.` }, { status: 400 })
     }
 
     const nuevas = [...actuales, url]
@@ -50,14 +55,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-// DELETE { url: string } — saca una foto puntual de la galería.
+// DELETE { url: string } — saca una foto puntual.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
 
   try {
-    const db = getDb()
-    const ref = db.collection('productos').doc(params.id)
+    const ref = getDb().collection('productos').doc(params.id)
     const chequeo = await verificarDueñoPremium(ref, usuario.uid)
     if ('error' in chequeo) return NextResponse.json({ error: chequeo.error }, { status: chequeo.status })
 
