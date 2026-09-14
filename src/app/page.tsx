@@ -163,14 +163,16 @@ export default function CatalogoPage() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-3 flex-wrap">
+        <div className="flex gap-2 mb-3 flex-wrap items-center">
           <button
             onClick={() => setPublico('Todo')}
-            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+            aria-label="Ver todo"
+            title="Ver todo"
+            className={`w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 ${
               publico === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
             }`}
           >
-            Todos
+            🏠
           </button>
           {PUBLICOS_PRODUCTO.map((pub) => (
             <button
