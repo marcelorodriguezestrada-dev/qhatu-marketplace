@@ -883,6 +883,16 @@ export default function AdminPage() {
                     <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'entregado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]">Marcar entregado</button>
                   </div>
                 )}
+
+                <div className="mt-3 pt-3 border-t border-line text-right">
+                  <button
+                    type="button"
+                    onClick={() => eliminarPedido(p.id)}
+                    className="font-body text-[11px] text-maroon underline"
+                  >
+                    Eliminar pedido
+                  </button>
+                </div>
               </div>
             )
           })}
