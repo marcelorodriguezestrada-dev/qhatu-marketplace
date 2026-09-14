@@ -127,6 +127,11 @@ function CheckoutContent() {
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
   const [pasoActual, setPasoActual] = useState(0)
+  // Índices de subPedidos donde el usuario ya apretó "Continuar con la
+  // compra" después de que el vendedor confirmó stock. Hasta que no lo
+  // aprieta, aunque ya esté confirmado, mostramos el mensaje de
+  // "disponible" en vez de saltar directo al QR de pago.
+  const [pasosConfirmados, setPasosConfirmados] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -552,20 +557,44 @@ function CheckoutContent() {
               Pedido {pasoActual + 1} de {subPedidos.length}
             </div>
           )}
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-ochresoft flex items-center justify-center text-3xl animate-pulse">
+            🔍
+          </div>
           <div className="font-display text-lg font-bold text-ink mb-1.5">
             {subPedidos[pasoActual].vendedorNombre} está verificando el stock
           </div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            Le avisamos a {subPedidos.length > 1 ? 'este vendedor' : 'el vendedor'} y está confirmando que tiene disponible lo que pediste. Puede demorar unos minutos — no hace falta que hagas nada, en cuanto confirme se habilita acá mismo el QR para que deposites.
-          </div>
-          <div className="flex items-center justify-center gap-1.5 font-body text-xs text-inksoft">
-            <span className="w-1.5 h-1.5 rounded-full bg-ochre animate-pulse" />
-            Esperando confirmación...
+          <div className="font-body text-[13px] text-inksoft">
+            No hace falta que hagas nada — en cuanto confirme, seguimos acá mismo.
           </div>
         </div>
       )}
 
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && (
+      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && !pasosConfirmados.has(pasoActual) && (
+        <div className="bg-panel border border-line rounded-xl p-7 text-center">
+          {subPedidos.length > 1 && (
+            <div className="font-body text-[11px] text-inksoft mb-2">
+              Pedido {pasoActual + 1} de {subPedidos.length}
+            </div>
+          )}
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-tealsoft flex items-center justify-center text-3xl">
+            ✅
+          </div>
+          <div className="font-display text-lg font-bold text-ink mb-1.5">
+            El producto está disponible
+          </div>
+          <div className="font-body text-[13px] text-inksoft mb-5">
+            {subPedidos[pasoActual].vendedorNombre} confirmó que tiene stock. Podés continuar con la compra.
+          </div>
+          <button
+            onClick={() => setPasosConfirmados((prev) => new Set(prev).add(pasoActual))}
+            className="w-full py-3 rounded-lg bg-maroon text-white font-body text-sm font-semibold"
+          >
+            Continuar con la compra
+          </button>
+        </div>
+      )}
+
+      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && pasosConfirmados.has(pasoActual) && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
           {subPedidos.length > 1 && (
             <div className="font-body text-[11px] text-inksoft mb-2">
