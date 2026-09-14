@@ -90,7 +90,7 @@ export default function CheckoutPage() {
 }
 
 function CheckoutContent() {
-  const { items: itemsCarrito, vaciarTienda } = useCarrito()
+  const { items: itemsCarrito, cambiarCantidad, quitar, vaciarTienda } = useCarrito()
   const { usuario, cargando: authCargando, emailVerificado } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -376,9 +376,6 @@ function CheckoutContent() {
 
           {metodoEntrega === 'envio' ? (
             <>
-              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                Antes de mostrarte el QR, el vendedor confirma que tiene stock — puede demorar unos minutos. El depósito va a la cuenta de Clasi Click, no directo al vendedor.
-              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
                 <select
@@ -460,14 +457,40 @@ function CheckoutContent() {
           )}
 
           {/* Detalle de lo que se está comprando — antes solo se veía el
-              subtotal, sin poder revisar qué productos eran. */}
+              subtotal, sin poder revisar qué productos eran. Ahora
+              también se puede ajustar la cantidad o sacar un producto
+              sin tener que volver atrás a la tienda. */}
           <div className="mb-4">
             <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
             <div className="border-t border-line divide-y divide-line">
               {items.map((it) => (
-                <div key={it.id} className="flex items-center justify-between gap-2 py-2 font-body text-[13px] text-ink">
-                  <span className="flex-1">{it.cantidad} × {it.nombre}</span>
-                  <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
+                <div key={it.id} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
+                  <span className="flex-1 min-w-0">{it.nombre}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(it.id, -1)}
+                      className="w-6 h-6 border border-line rounded text-sm leading-none"
+                    >
+                      −
+                    </button>
+                    <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(it.id, 1)}
+                      className="w-6 h-6 border border-line rounded text-sm leading-none"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
+                  <button
+                    type="button"
+                    onClick={() => quitar(it.id)}
+                    className="shrink-0 font-body text-[11px] text-maroon underline"
+                  >
+                    quitar
+                  </button>
                 </div>
               ))}
             </div>
