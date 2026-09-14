@@ -67,7 +67,7 @@ export default function AdminPage() {
   const [autenticado, setAutenticado] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -76,6 +76,9 @@ export default function AdminPage() {
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [anuncios, setAnuncios] = useState<any[]>([])
+  const [banners, setBanners] = useState<any[]>([])
+  const [subiendoBanner, setSubiendoBanner] = useState(false)
+  const [bannerLinkNuevo, setBannerLinkNuevo] = useState('')
   const [macheos, setMacheos] = useState<any>(null)
   const [cargandoMacheos, setCargandoMacheos] = useState(false)
   const [anuncioExpandido, setAnuncioExpandido] = useState<string | null>(null)
@@ -195,6 +198,7 @@ export default function AdminPage() {
         cargarProfesionales(pw)
         cargarProductos(pw)
         cargarAnuncios(pw)
+        cargarBanners(pw)
         cargarMacheos(pw)
       })
       .catch((e) => {
@@ -228,6 +232,56 @@ export default function AdminPage() {
     fetch('/api/anuncios', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setAnuncios(data.anuncios || []))
+  }
+
+  function cargarBanners(pw?: string) {
+    fetch('/api/banners', { headers: { 'x-admin-password': pw ?? password } })
+      .then((r) => r.json())
+      .then((data) => setBanners(data.banners || []))
+  }
+
+  async function subirBanner(file: File | null) {
+    if (!file) return
+    setSubiendoBanner(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const resSubida = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+        body: formData,
+      })
+      const dataSubida = await resSubida.json()
+      if (dataSubida.error) throw new Error(dataSubida.error)
+
+      await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ imagenUrl: dataSubida.url, link: bannerLinkNuevo || null, orden: banners.length }),
+      })
+      setBannerLinkNuevo('')
+      cargarBanners()
+    } catch (e: any) {
+      alert('Error subiendo el banner: ' + e.message)
+    } finally {
+      setSubiendoBanner(false)
+    }
+  }
+
+  function toggleBanner(id: string, activo: boolean) {
+    fetch(`/api/banners/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ activo }),
+    }).then(() => cargarBanners())
+  }
+
+  function eliminarBanner(id: string) {
+    if (!confirm('¿Eliminar este banner?')) return
+    fetch(`/api/banners/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-password': password },
+    }).then(() => cargarBanners())
   }
 
   function cargarMacheos(pw?: string) {
@@ -852,6 +906,12 @@ export default function AdminPage() {
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'reparto' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Reparto
+        </button>
+        <button
+          onClick={() => setTab('banners')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'banners' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Banners
         </button>
         <button
           onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
@@ -1916,6 +1976,63 @@ export default function AdminPage() {
               </>
             )
           })()}
+        </div>
+      )}
+
+      {tab === 'banners' && (
+        <div>
+          <div className="font-body text-sm font-semibold text-ink mb-3">
+            Banners promocionales de la home
+          </div>
+          <div className="font-body text-xs text-inksoft mb-4">
+            Se muestran en la página de inicio cuando alguien está en "🏠" (sin filtrar por Mujer/Hombre/Niños). Recomendado: imágenes apaisadas, más anchas que altas.
+          </div>
+
+          <div className="bg-panel border border-line rounded-lg p-3.5 mb-5">
+            <div className="font-body text-xs font-semibold text-ink mb-2">Agregar banner nuevo</div>
+            <input
+              type="text"
+              value={bannerLinkNuevo}
+              onChange={(e) => setBannerLinkNuevo(e.target.value)}
+              placeholder="Link opcional a donde lleva (https://...)"
+              className="w-full px-3 py-2 rounded-md border border-line font-body text-xs mb-2"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirBanner(e.target.files?.[0] || null)}
+              disabled={subiendoBanner}
+              className="font-body text-xs"
+            />
+            {subiendoBanner && <div className="font-body text-xs text-inksoft mt-2">Subiendo...</div>}
+          </div>
+
+          {banners.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no cargaste ningún banner.</div>}
+          {banners.map((b) => (
+            <div key={b.id} className="bg-panel border border-line rounded-lg p-3 mb-2.5 flex items-center gap-3">
+              <img src={b.imagenUrl} alt="Banner" className="w-24 h-14 rounded object-cover shrink-0 border border-line" />
+              <div className="flex-1 min-w-0">
+                <div className="font-body text-xs text-ink truncate">{b.link || 'Sin link'}</div>
+                <div className="font-body text-[11px] text-inksoft">{b.activo !== false ? 'Activo' : 'Oculto'}</div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => toggleBanner(b.id, b.activo === false)}
+                  className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
+                >
+                  {b.activo !== false ? 'Ocultar' : 'Activar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => eliminarBanner(b.id)}
+                  className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

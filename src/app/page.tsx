@@ -8,6 +8,7 @@ import { PRODUCTOS_SEED } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
 import { CartDrawer } from '@/components/CartDrawer'
 import { NotificacionesBell } from '@/components/NotificacionesBell'
+import { BannerCarousel } from '@/components/BannerCarousel'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -165,7 +166,7 @@ export default function CatalogoPage() {
 
         <div className="flex gap-2 mb-3 flex-wrap items-center">
           <button
-            onClick={() => setPublico('Todo')}
+            onClick={() => { setPublico('Todo'); setCategoria('Todo') }}
             aria-label="Ver todo"
             title="Ver todo"
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 ${
@@ -187,34 +188,38 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        <div className="flex gap-2 mb-5 flex-wrap">
-          <button
-            onClick={() => setCategoria('Todo')}
-            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-              categoria === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-            }`}
-          >
-            Todo
-          </button>
-          {categoriasProductos.map((c) => (
+        {publico === 'Todo' ? (
+          <BannerCarousel />
+        ) : (
+          <div className="flex gap-2 mb-5 flex-wrap">
             <button
-              key={c.id}
-              onClick={() => {
-                setCategoria(c.id)
-                fetch('/api/analitica/categoria', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ tipo: 'producto', valor: c.label }),
-                }).catch(() => {})
-              }}
+              onClick={() => setCategoria('Todo')}
               className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                categoria === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                categoria === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
-              {c.label}
+              Todo
             </button>
-          ))}
-        </div>
+            {categoriasProductos.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setCategoria(c.id)
+                  fetch('/api/analitica/categoria', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo: 'producto', valor: c.label }),
+                  }).catch(() => {})
+                }}
+                className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+                  categoria === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {filtrados.map((p) => (
