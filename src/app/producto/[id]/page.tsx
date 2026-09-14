@@ -425,7 +425,11 @@ export default function ProductoDetallePage() {
                 </div>
                 <div className="p-3">
                   <div className="font-body text-xs text-ink mb-1 leading-snug">{r.nombre}</div>
-                  <div className="font-display text-sm font-bold text-ink">{bs(r.precio)}</div>
+                  {/* A propósito no se muestra el precio acá — misma
+                      lógica que en la grilla principal (ProductCard):
+                      genera curiosidad y hace falta entrar al producto
+                      para verlo. */}
+                  <div className="font-body text-[11px] font-semibold text-maroon">Ver precio</div>
                 </div>
               </Link>
             ))}
