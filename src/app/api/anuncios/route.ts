@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
-import { evaluarConIA } from '@/lib/moderacionIA'
+import { evaluarConIA, categorizarAnuncio } from '@/lib/moderacionIA'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
+import { construirArbolCategorias } from '@/lib/categoriasServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,15 +49,30 @@ export async function POST(req: NextRequest) {
 
     const moderacionIA = await evaluarConIA(`Anuncio clasificado.\nTítulo: ${titulo}\nDescripción: ${descripcion}`)
 
+    // Si la persona ya eligió un rubro a mano (hoy solo pasa en tipo
+    // "busqueda"), respetamos esa elección — la IA solo entra a
+    // categorizar cuando no hay nada elegido, para cualquier tipo de
+    // anuncio (no solo "busqueda"), así también se puede filtrar
+    // /anuncios por rubro y el macheo cubre más casos.
+    let rubroFinal = tipo === 'busqueda' && rubro ? rubro : null
+    if (!rubroFinal) {
+      try {
+        const { rubrosFlat } = await construirArbolCategorias()
+        rubroFinal = await categorizarAnuncio(`Título: ${titulo}\nDescripción: ${descripcion}`, rubrosFlat)
+      } catch (err) {
+        console.error('No se pudo categorizar el anuncio con IA:', err)
+      }
+    }
+
     const db = getDb()
     const ref = await db.collection('anuncios').add({
       titulo,
       descripcion,
       tipo: tipo || 'otro',
-      // Solo tiene sentido en anuncios "busqueda" — es lo que permite
-      // el macheo automático 1 a 1 con profesionales de ese mismo
-      // rubro exacto. En cualquier otro tipo de anuncio queda null.
-      rubro: tipo === 'busqueda' && rubro ? rubro : null,
+      // Puede venir de que la persona lo eligió a mano, o de que la IA
+      // lo categorizó sola con los rubros que ya existen (ver arriba) —
+      // en null si ninguno de los dos casos aplicó.
+      rubro: rubroFinal,
       whatsapp: whatsappCompleto,
       whatsappPais: paisId,
       precio: precio ? Number(precio) : null,
