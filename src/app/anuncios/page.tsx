@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth'
 import { TIPOS_ANUNCIO, labelTipoAnuncio } from '@/data/anuncios'
 import { useCategorias } from '@/lib/useCategorias'
 
@@ -10,6 +11,7 @@ function bs(n: number) {
 }
 
 export default function AnunciosPage() {
+  const { usuario } = useAuth()
   const { buscarRubro } = useCategorias()
   const [anuncios, setAnuncios] = useState<any[]>([])
   const [cargando, setCargando] = useState(true)
@@ -37,6 +39,14 @@ export default function AnunciosPage() {
         <div className="max-w-[960px] mx-auto flex items-center gap-2 flex-wrap">
           <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
           <span className="font-body text-sm text-white/70 hidden sm:inline sm:flex-1">Anuncios clasificados</span>
+          {usuario && (
+            <Link
+              href="/mis-anuncios"
+              className="border-none bg-transparent text-white/80 font-body text-xs sm:text-sm shrink-0 whitespace-nowrap"
+            >
+              Mis anuncios
+            </Link>
+          )}
           <Link
             href="/publicar-anuncio"
             className="ml-auto border-none bg-white/10 text-white px-3 py-2 rounded-lg font-body text-xs sm:text-sm shrink-0 whitespace-nowrap"
