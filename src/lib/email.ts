@@ -147,3 +147,59 @@ export async function enviarNotificacionMacheo(destino: string, datos: { profesi
     `,
   })
 }
+
+// Sugerencia de IA al PROFESIONAL — misma idea que enviarNotificacionMacheo
+// pero con el tono correcto: esto NO es un macheo exacto por rubro, es
+// una posibilidad que un admin revisó y decidió mandar a mano, así que
+// el mensaje dice "podría interesarte", nunca "coincide con tu rubro".
+export async function enviarSugerenciaIAProfesional(destino: string, datos: { profesionalNombre: string; anuncioTitulo: string; anuncioDescripcion: string; motivo: string; whatsappSolicitante: string }) {
+  const resend = getResend()
+  if (!resend) return null
+  return resend.emails.send({
+    from: FROM,
+    to: destino,
+    subject: `Podría interesarte — "${datos.anuncioTitulo}"`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color:#2B211D;">
+        <h2 style="color:#7A2E2E;">Una posible oportunidad para vos</h2>
+        <p>Hola ${datos.profesionalNombre}, alguien publicó este anuncio y nos pareció que podrías ayudarlo:</p>
+        <div style="background:#F1ECE0; border-radius:8px; padding:16px; margin:20px 0;">
+          <p style="margin:0 0 8px 0; font-weight:bold;">${datos.anuncioTitulo}</p>
+          <p style="margin:0; font-size:14px; color:#4a3f38;">${datos.anuncioDescripcion}</p>
+        </div>
+        <p style="font-size:13px; color:#6b5f57; font-style:italic;">${datos.motivo}</p>
+        <p style="font-size:13px; color:#6b5f57;">Podés contactar directo por WhatsApp: ${datos.whatsappSolicitante}</p>
+        <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
+      </div>
+    `,
+  })
+}
+
+// Sugerencia de IA al ANUNCIANTE — el lado que antes no se avisaba
+// nunca: el macheo automático por rubro solo le escribe al profesional,
+// nunca a quien publicó el "Busco X" avisándole que encontramos a
+// alguien. Esto cierra ese otro lado.
+export async function enviarSugerenciaIAAnunciante(destino: string, datos: { anuncioTitulo: string; profesionalNombre: string; profesionalRubroLabel: string; motivo: string; whatsappProfesional: string; profesionalId: string }) {
+  const resend = getResend()
+  if (!resend) return null
+  const urlApp = process.env.NEXT_PUBLIC_APP_URL || 'https://clasiclick.vercel.app'
+  return resend.emails.send({
+    from: FROM,
+    to: destino,
+    subject: `Encontramos a alguien para tu anuncio "${datos.anuncioTitulo}"`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color:#2B211D;">
+        <h2 style="color:#7A2E2E;">Tenemos a alguien para vos 🎯</h2>
+        <p>Publicaste "<strong>${datos.anuncioTitulo}</strong>" y creemos que <strong>${datos.profesionalNombre}</strong> (${datos.profesionalRubroLabel}) te puede ayudar:</p>
+        <p style="font-size:13px; color:#6b5f57; font-style:italic;">${datos.motivo}</p>
+        <p style="margin-top:20px;">
+          <a href="https://wa.me/${datos.whatsappProfesional.replace(/\D/g, '')}" style="background:#2F6E5C; color:white; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:14px;">Contactar por WhatsApp</a>
+        </p>
+        <p style="margin-top:20px; font-size:13px;">
+          <a href="${urlApp}/servicios/${datos.profesionalId}" style="color:#7A2E2E;">Ver su perfil completo</a>
+        </p>
+        <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
+      </div>
+    `,
+  })
+}

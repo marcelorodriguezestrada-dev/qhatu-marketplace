@@ -113,6 +113,96 @@ export async function categorizarAnuncio(contenido: string, rubros: { id: string
     return null
   }
 }
+export type SugerenciaMatcheoIA = { anuncioId: string; profesionalId: string; motivo: string }
+
+// El macheo automático (ejecutarMacheo, en macheoAnuncios.ts) solo cruza
+// por rubro EXACTO — si el anuncio no tiene rubro asignado, o su rubro
+// no tiene ningún profesional cargado todavía, ese "Busco X" se queda
+// sin nadie a quien avisarle aunque en la plataforma sí haya alguien
+// que razonablemente podría ayudar (ej: "se me tapó el desagüe" sin
+// rubro asignado, pero hay un plomero disponible).
+//
+// Esta función es la ayuda de admin para esos casos: le pasamos SOLO
+// los anuncios que el macheo exacto no resolvió, más la lista de
+// profesionales aprobados, y la IA sugiere pares razonables con un
+// motivo corto. Nunca se ejecuta sola ni manda nada — el admin decide,
+// anuncio por anuncio, si "Sugerir a ambas partes" (ver
+// /api/admin/macheos/sugerir).
+export async function sugerirMatcheosIA(
+  anuncios: { id: string; titulo: string; descripcion: string }[],
+  profesionales: { id: string; nombre: string; rubroLabel: string; descripcion: string }[]
+): Promise<SugerenciaMatcheoIA[]> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey || anuncios.length === 0 || profesionales.length === 0) return []
+
+  const listaProfesionales = profesionales
+    .map((p) => `${p.id} | ${p.rubroLabel} | ${p.nombre} | ${(p.descripcion || '').slice(0, 140)}`)
+    .join('\n')
+  const listaAnuncios = anuncios
+    .map((a) => `${a.id} | ${a.titulo} | ${(a.descripcion || '').slice(0, 200)}`)
+    .join('\n')
+
+  const systemPrompt =
+    'Sos un asistente que sugiere posibles coincidencias entre pedidos de gente y profesionales de Clasi Click, un marketplace boliviano. ' +
+    'Te paso una lista de ANUNCIOS ("busco X", con id, título y descripción) y una lista de PROFESIONALES disponibles (con id, rubro, nombre y descripción). ' +
+    'Estos anuncios NO matchearon por rubro exacto (no tienen rubro asignado, o nadie de ese rubro está cargado todavía), así que buscá coincidencias razonables ' +
+    'aunque el rubro no sea idéntico (ej: "se me tapó el desagüe" puede servirle un plomero aunque el anuncio no diga "plomero"). ' +
+    'NO inventes ids que no estén en las listas de abajo. Si un anuncio no tiene ningún profesional razonable, no lo incluyas — es mejor no sugerir nada que sugerir algo forzado. ' +
+    'Máximo 3 sugerencias por anuncio. ' +
+    'Respondé SOLO JSON válido, sin backticks, con esta forma exacta: ' +
+    '{"sugerencias": [{"anuncioId": "...", "profesionalId": "...", "motivo": "máximo 20 palabras"}]}'
+
+  const contenido = `ANUNCIOS:\n${listaAnuncios}\n\nPROFESIONALES:\n${listaProfesionales}`
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 1200,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: contenido },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('sugerirMatcheosIA: Groq respondió', res.status)
+      return []
+    }
+    const data = await res.json()
+    const texto = data.choices?.[0]?.message?.content
+    if (!texto) return []
+
+    const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+    const sugerencias = Array.isArray(parsed.sugerencias) ? parsed.sugerencias : []
+
+    // Chequeamos que cada id devuelto sea REALMENTE de las listas que
+    // mandamos — si la IA alucina un id, mejor descartar esa sugerencia
+    // que guardar/mostrar algo que apunta a nada.
+    const idsAnuncios = new Set(anuncios.map((a) => a.id))
+    const idsProfesionales = new Set(profesionales.map((p) => p.id))
+    return sugerencias
+      .filter(
+        (s: any) =>
+          typeof s?.anuncioId === 'string' &&
+          typeof s?.profesionalId === 'string' &&
+          idsAnuncios.has(s.anuncioId) &&
+          idsProfesionales.has(s.profesionalId)
+      )
+      .map((s: any) => ({
+        anuncioId: s.anuncioId,
+        profesionalId: s.profesionalId,
+        motivo: String(s.motivo || '').slice(0, 200),
+      }))
+  } catch (err) {
+    console.error('sugerirMatcheosIA', err)
+    return []
+  }
+}
+
 // acá si la IA detecta insultos, la reseña se bloquea directo (no llega
 // a publicarse ni pasa por una cola de revisión), porque un insulto en
 // una reseña pública no aporta nada que valga la pena revisar a mano.

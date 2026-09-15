@@ -81,6 +81,53 @@ export default function AdminPage() {
   const [bannerLinkNuevo, setBannerLinkNuevo] = useState('')
   const [macheos, setMacheos] = useState<any>(null)
   const [cargandoMacheos, setCargandoMacheos] = useState(false)
+
+  // Análisis con IA de los anuncios que el macheo exacto por rubro no
+  // resolvió, y envío puntual de la sugerencia a ambas partes.
+  const [sugerenciasIA, setSugerenciasIA] = useState<any[] | null>(null)
+  const [analizandoIA, setAnalizandoIA] = useState(false)
+  const [mensajeAnalisisIA, setMensajeAnalisisIA] = useState('')
+  const [enviandoSugerenciaId, setEnviandoSugerenciaId] = useState<string | null>(null)
+  const [sugerenciasEnviadas, setSugerenciasEnviadas] = useState<Set<string>>(new Set())
+
+  async function analizarMatcheosIA() {
+    setAnalizandoIA(true)
+    setMensajeAnalisisIA('')
+    try {
+      const res = await fetch('/api/admin/macheos/analizar-ia', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+      })
+      const data = await res.json()
+      if (data.error) {
+        setMensajeAnalisisIA(data.error)
+        setSugerenciasIA([])
+        return
+      }
+      setSugerenciasIA(data.sugerencias || [])
+      setMensajeAnalisisIA(data.mensaje || (data.sugerencias?.length ? '' : 'La IA no encontró ninguna coincidencia razonable por ahora.'))
+    } finally {
+      setAnalizandoIA(false)
+    }
+  }
+
+  async function sugerirAAmbasPartes(s: any) {
+    const clave = `${s.anuncioId}:${s.profesionalId}`
+    setEnviandoSugerenciaId(clave)
+    try {
+      const res = await fetch('/api/admin/macheos/sugerir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ anuncioId: s.anuncioId, profesionalId: s.profesionalId, motivo: s.motivo }),
+      })
+      const data = await res.json()
+      if (!data.error) {
+        setSugerenciasEnviadas((prev) => new Set(prev).add(clave))
+      }
+    } finally {
+      setEnviandoSugerenciaId(null)
+    }
+  }
   const [anuncioExpandido, setAnuncioExpandido] = useState<string | null>(null)
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
   // uid del usuario cuya fila está desplegada mostrando el detalle de
@@ -1981,8 +2028,56 @@ export default function AdminPage() {
             </div>
           )}
 
+          <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+            <div className="font-body text-sm font-semibold text-ink mb-1">Matcheos con IA</div>
+            <div className="font-body text-[11px] text-inksoft mb-3">
+              El matcheo automático de arriba solo cruza por rubro exacto. Este análisis mira los anuncios "Busco X" que se quedaron sin nadie (sin rubro, o rubro sin ningún profesional cargado) y sugiere, leyendo el texto, quién podría igual servir. No manda nada solo — cada sugerencia la aprobás vos, una por una.
+            </div>
+
+            <button
+              type="button"
+              onClick={analizarMatcheosIA}
+              disabled={analizandoIA}
+              className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+            >
+              {analizandoIA ? 'Analizando...' : '🤖 Analizar con IA posibles matcheos'}
+            </button>
+
+            {mensajeAnalisisIA && (
+              <div className="font-body text-xs text-inksoft mt-3">{mensajeAnalisisIA}</div>
+            )}
+
+            {sugerenciasIA && sugerenciasIA.length > 0 && (
+              <div className="flex flex-col gap-2.5 mt-4">
+                {sugerenciasIA.map((s) => {
+                  const clave = `${s.anuncioId}:${s.profesionalId}`
+                  const yaEnviada = sugerenciasEnviadas.has(clave)
+                  return (
+                    <div key={clave} className="border border-line rounded-lg p-3">
+                      <div className="font-body text-xs text-inksoft mb-1">
+                        <span className="font-semibold text-ink">{s.anuncioTitulo}</span> ↔ <span className="font-semibold text-ink">{s.profesionalNombre}</span>
+                        <span className="text-inksoft"> ({s.profesionalRubroLabel})</span>
+                      </div>
+                      <div className="font-body text-[11px] text-inksoft italic mb-2">💡 {s.motivo}</div>
+                      <button
+                        type="button"
+                        onClick={() => sugerirAAmbasPartes(s)}
+                        disabled={yaEnviada || enviandoSugerenciaId === clave}
+                        className={`px-3 py-1.5 rounded-md border-none font-body text-[11px] font-semibold disabled:opacity-50 ${
+                          yaEnviada ? 'bg-teal text-white' : 'bg-maroon text-white'
+                        }`}
+                      >
+                        {yaEnviada ? '✓ Sugerido a ambas partes' : enviandoSugerenciaId === clave ? 'Enviando...' : 'Sugerir a ambas partes'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="font-body text-sm font-semibold text-ink mb-2">Importar en lote (desde WhatsApp)</div>
-          <div className="font-body text-[11px] text-inksoft mb-2">
+            <div className="font-body text-[11px] text-inksoft mb-2">
             Pegá el texto copiado de un canal/grupo de WhatsApp con varios avisos seguidos (título, teléfono y descripción cada uno). Se sube a nombre del cliente, sin que tenga cuenta acá — vos revisás cada uno antes de que se publique.
           </div>
           <textarea
