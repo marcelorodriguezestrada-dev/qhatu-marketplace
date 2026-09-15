@@ -200,12 +200,70 @@ export default function AdminPage() {
         cargarAnuncios(pw)
         cargarBanners(pw)
         cargarMacheos(pw)
+        cargarConfigPagos()
       })
       .catch((e) => {
         setError(e.message)
         setAutenticado(false)
       })
       .finally(() => setCargando(false))
+  }
+
+  // QR de cobro para pedidos con envío (se paga acá, nunca directo al
+  // vendedor — ver la explicación en checkout/page.tsx).
+  const [qrPagoUrl, setQrPagoUrl] = useState('')
+  const [cbuPago, setCbuPago] = useState('')
+  const [bancoPago, setBancoPago] = useState('')
+  const [titularPago, setTitularPago] = useState('')
+  const [subiendoQrPago, setSubiendoQrPago] = useState(false)
+  const [guardandoConfigPago, setGuardandoConfigPago] = useState(false)
+  const [configPagoGuardada, setConfigPagoGuardada] = useState(false)
+
+  function cargarConfigPagos() {
+    fetch('/api/configuracion/pagos')
+      .then((r) => r.json())
+      .then((data) => {
+        setQrPagoUrl(data.qrImageUrl || '')
+        setCbuPago(data.cbu || '')
+        setBancoPago(data.banco || '')
+        setTitularPago(data.titular || '')
+      })
+  }
+
+  async function subirQrPago(file: File | null) {
+    if (!file) return
+    setSubiendoQrPago(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setQrPagoUrl(data.url)
+    } catch (e: any) {
+      setError('Error subiendo el QR: ' + e.message)
+    } finally {
+      setSubiendoQrPago(false)
+    }
+  }
+
+  async function guardarConfigPagos() {
+    setGuardandoConfigPago(true)
+    setConfigPagoGuardada(false)
+    try {
+      await fetch('/api/configuracion/pagos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ qrImageUrl: qrPagoUrl, cbu: cbuPago, banco: bancoPago, titular: titularPago }),
+      })
+      setConfigPagoGuardada(true)
+    } finally {
+      setGuardandoConfigPago(false)
+    }
   }
 
   function cargarProfesionales(pw?: string) {
@@ -863,6 +921,60 @@ export default function AdminPage() {
         <div className="bg-panel border border-line rounded-xl p-3.5">
           <div className="font-body text-[11px] text-inksoft">Premium</div>
           <div className="font-display text-2xl font-bold text-ink">{resumen.productosPremium}</div>
+        </div>
+      </div>
+
+      <div className="bg-panel border border-line rounded-xl p-4 mb-6">
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mi QR de cobro (pedidos con envío)</div>
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          Cuando un comprador elige "envío" en el checkout, siempre paga a ESTE QR (nunca directo al vendedor) — recién se le libera la plata al vendedor cuando confirmás la entrega. Con "retiro en tienda" sí se paga al QR propio del vendedor.
+        </div>
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="shrink-0">
+            {qrPagoUrl ? (
+              <img src={qrPagoUrl} alt="QR de cobro" className="w-28 h-28 object-cover rounded-lg border border-line" />
+            ) : (
+              <div className="w-28 h-28 rounded-lg border border-dashed border-line flex items-center justify-center font-body text-[10px] text-inksoft text-center px-2">
+                Sin QR cargado
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirQrPago(e.target.files?.[0] || null)}
+              disabled={subiendoQrPago}
+              className="font-body text-[10px] mt-1.5 w-28"
+            />
+            {subiendoQrPago && <div className="font-body text-[10px] text-maroon mt-1">Subiendo...</div>}
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <input
+              value={cbuPago}
+              onChange={(e) => setCbuPago(e.target.value)}
+              placeholder="Cuenta / CBU (opcional)"
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <input
+              value={bancoPago}
+              onChange={(e) => setBancoPago(e.target.value)}
+              placeholder="Banco (opcional)"
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <input
+              value={titularPago}
+              onChange={(e) => setTitularPago(e.target.value)}
+              placeholder="Titular de la cuenta (opcional)"
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <button
+              onClick={guardarConfigPagos}
+              disabled={guardandoConfigPago}
+              className="px-3.5 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-60"
+            >
+              {guardandoConfigPago ? 'Guardando...' : 'Guardar'}
+            </button>
+            {configPagoGuardada && <span className="font-body text-[11px] text-teal ml-2">Guardado ✓</span>}
+          </div>
         </div>
       </div>
 

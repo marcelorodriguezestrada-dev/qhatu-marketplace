@@ -107,6 +107,21 @@ function CheckoutContent() {
     : itemsCarrito
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
+  // QR/cuenta configurados por el admin desde /admin (ver
+  // /api/configuracion/pagos). Si todavía no cargó nada, se usan las
+  // variables de entorno de siempre como respaldo — así el checkout
+  // nunca se queda sin QR para mostrar.
+  const [qrPlataforma, setQrPlataforma] = useState(QR_PLATAFORMA)
+  const [cbuPlataforma, setCbuPlataforma] = useState(BANK_ACCOUNT_NUMBER)
+  useEffect(() => {
+    fetch('/api/configuracion/pagos')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.qrImageUrl) setQrPlataforma(data.qrImageUrl)
+        if (data.cbu) setCbuPlataforma(data.cbu)
+      })
+      .catch(() => {})
+  }, [])
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
   // Solo aplica cuando metodoEntrega es 'retiro' — con envío siempre es
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
@@ -199,8 +214,8 @@ function CheckoutContent() {
         const envioGrupo = enviosRepartidos[i]
         const totalGrupo = subtotal + envioGrupo
 
-        let qrImageUrl = QR_PLATAFORMA
-        let cbu = BANK_ACCOUNT_NUMBER
+        let qrImageUrl = qrPlataforma
+        let cbu = cbuPlataforma
         let cobroPropio = false
         let vendedorNombre = clave === 'plataforma' ? 'Clasi Click' : grupoItems[0]?.vendedor || 'Vendedor'
         let whatsappVendedor = ''
@@ -217,8 +232,8 @@ function CheckoutContent() {
             // confirmada la entrega — así protegemos al comprador si
             // el envío se complica.
             if (metodoEntrega === 'retiro' && data.configurado) {
-              qrImageUrl = data.qrImageUrl || QR_PLATAFORMA
-              cbu = data.cbu || BANK_ACCOUNT_NUMBER
+              qrImageUrl = data.qrImageUrl || qrPlataforma
+              cbu = data.cbu || cbuPlataforma
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
             } else if (data.nombreNegocio) {
