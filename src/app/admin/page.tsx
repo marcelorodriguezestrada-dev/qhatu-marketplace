@@ -383,6 +383,52 @@ export default function AdminPage() {
   const [importandoAnuncios, setImportandoAnuncios] = useState(false)
   const [resultadoImportacion, setResultadoImportacion] = useState<{ creados: number; errores: string[] } | null>(null)
 
+  // Importación en lote de profesionales/servicios — mismo mecanismo que
+  // arriba (mismo formato de texto, mismo parser), pero el resultado
+  // SIEMPRE queda pendiente de revisión: acá no hay atajo de "completo
+  // = se aprueba solo", porque un rubro y una zona reales no salen de
+  // un texto de WhatsApp.
+  const [textoImportarServicios, setTextoImportarServicios] = useState('')
+  const [parseadosServicios, setParseadosServicios] = useState<(AnuncioParseado & { incluir: boolean })[]>([])
+  const [importandoServicios, setImportandoServicios] = useState(false)
+  const [resultadoImportacionServicios, setResultadoImportacionServicios] = useState<{ creados: number; errores: string[] } | null>(null)
+
+  function parsearTextoServicios() {
+    const parseados = parsearAnunciosWhatsapp(textoImportarServicios)
+    setParseadosServicios(parseados.map((p) => ({ ...p, incluir: true })))
+    setResultadoImportacionServicios(null)
+  }
+
+  function actualizarParseadoServicio(i: number, cambios: Partial<AnuncioParseado & { incluir: boolean }>) {
+    setParseadosServicios((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...cambios } : p)))
+  }
+
+  async function importarServiciosSeleccionados() {
+    const seleccionados = parseadosServicios.filter((p) => p.incluir)
+    if (seleccionados.length === 0) return
+    setImportandoServicios(true)
+    try {
+      const res = await fetch('/api/admin/profesionales/importar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({
+          profesionales: seleccionados.map((p) => ({
+            nombre: p.titulo,
+            descripcion: p.descripcion,
+            telefono: p.telefono,
+            notaAdmin: p.incompleto ? 'Además, el texto quedó cortado — pedile al contacto la descripción completa.' : null,
+          })),
+        }),
+      })
+      const data = await res.json()
+      setResultadoImportacionServicios({ creados: data.creados || 0, errores: data.errores || [] })
+      setParseadosServicios((prev) => prev.filter((p) => !p.incluir))
+      cargarProfesionales()
+    } finally {
+      setImportandoServicios(false)
+    }
+  }
+
   function parsearTextoAnuncios() {
     const parseados = parsearAnunciosWhatsapp(textoImportarAnuncios)
     setParseadosAnuncios(parseados.map((p) => ({ ...p, incluir: true })))
@@ -1515,6 +1561,96 @@ export default function AdminPage() {
               {publicando ? (profesionalEditandoId ? 'Guardando...' : 'Publicando...') : (profesionalEditandoId ? 'Guardar cambios' : 'Publicar profesional')}
             </button>
           </form>
+
+          <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+            <div className="font-body text-sm font-semibold text-ink mb-2">Importar en lote (desde WhatsApp)</div>
+            <div className="font-body text-[11px] text-inksoft mb-2">
+              Pegá el texto de un canal/grupo de WhatsApp con varios avisos de oficios o servicios seguidos (título, teléfono y descripción cada uno) — mismo formato que en Anuncios. A diferencia de los anuncios, acá <strong>ningún</strong> importado se publica solo: todos entran a "Solicitudes pendientes" de abajo con rubro y zona sin definir, para que los revises uno por uno, les asignes el rubro/zona real, y uses "Pedir más info" si hace falta antes de aprobar.
+            </div>
+            <textarea
+              value={textoImportarServicios}
+              onChange={(e) => setTextoImportarServicios(e.target.value)}
+              placeholder="Pegá acá el texto completo copiado de WhatsApp..."
+              rows={6}
+              className="w-full px-3 py-2.5 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <button
+              type="button"
+              onClick={parsearTextoServicios}
+              disabled={!textoImportarServicios.trim()}
+              className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+            >
+              Detectar avisos
+            </button>
+
+            {parseadosServicios.length > 0 && (
+              <div className="mt-4">
+                <div className="font-body text-xs text-inksoft mb-3">
+                  Se detectaron <strong>{parseadosServicios.length}</strong> avisos. Los marcados <span className="text-ochre font-semibold">"texto cortado"</span> además quedan con una nota pidiendo el texto completo — pero insisto: TODOS quedan pendientes de revisión, completo o no.
+                </div>
+
+                <div className="flex flex-col gap-2 mb-3 max-h-[480px] overflow-y-auto pr-1">
+                  {parseadosServicios.map((p, i) => (
+                    <div key={i} className={`border rounded-lg p-3 ${p.incompleto ? 'border-ochre bg-ochresoft' : 'border-line bg-panel'}`}>
+                      <div className="flex items-start gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={p.incluir}
+                          onChange={(e) => actualizarParseadoServicio(i, { incluir: e.target.checked })}
+                          className="mt-1 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <input
+                            value={p.titulo}
+                            onChange={(e) => actualizarParseadoServicio(i, { titulo: e.target.value })}
+                            className="w-full font-body text-xs font-semibold text-ink bg-transparent border-none p-0 mb-1"
+                          />
+                          <div className="font-body text-[11px] text-inksoft mb-1">📞 {p.telefono} · {p.fecha}</div>
+                          {p.incompleto && (
+                            <div className="font-body text-[10px] font-bold text-ochre uppercase mb-1">⚠ Texto cortado — falta info</div>
+                          )}
+                        </div>
+                      </div>
+                      <textarea
+                        value={p.descripcion}
+                        onChange={(e) => actualizarParseadoServicio(i, { descripcion: e.target.value })}
+                        rows={2}
+                        className="w-full px-2 py-1.5 rounded-md border border-line font-body text-[11px] mb-2"
+                      />
+                      <a
+                        href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-2.5 py-1 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
+                      >
+                        💬 Invitar por WhatsApp
+                      </a>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={importarServiciosSeleccionados}
+                  disabled={importandoServicios || parseadosServicios.filter((p) => p.incluir).length === 0}
+                  className="px-3.5 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-50"
+                >
+                  {importandoServicios
+                    ? 'Importando...'
+                    : `Importar ${parseadosServicios.filter((p) => p.incluir).length} a revisión`}
+                </button>
+
+                {resultadoImportacionServicios && (
+                  <div className="mt-2 font-body text-xs text-teal">
+                    Se crearon {resultadoImportacionServicios.creados} profesionales, todos pendientes de revisión.
+                    {resultadoImportacionServicios.errores.length > 0 && (
+                      <div className="text-maroon mt-1">{resultadoImportacionServicios.errores.join(' · ')}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
             <div className="mb-8">
