@@ -127,6 +127,61 @@ function CheckoutContent() {
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
+
+  // Qué vendedores del carrito tienen su cobro (QR/CBU) configurado en
+  // /vender. Se consulta acá, al entrar al checkout, porque de esto
+  // depende si en "Retiro en tienda" se le puede ofrecer pagar por QR o
+  // solo coordinar por WhatsApp — antes esto solo se sabía DESPUÉS, al
+  // momento de crear el pedido, así que se le ofrecía "QR" a gente que
+  // después no tenía ningún QR al que pagarle.
+  const [vendedoresConQR, setVendedoresConQR] = useState<Record<string, boolean>>({})
+  const [consultandoVendedores, setConsultandoVendedores] = useState(true)
+
+  const vendedorIdsCarrito = Array.from(
+    new Set(items.map((i) => i.vendedorId).filter((v): v is string => !!v))
+  )
+  const claveVendedores = vendedorIdsCarrito.join(',')
+
+  useEffect(() => {
+    if (vendedorIdsCarrito.length === 0) {
+      setVendedoresConQR({})
+      setConsultandoVendedores(false)
+      return
+    }
+    let cancelado = false
+    setConsultandoVendedores(true)
+    Promise.all(
+      vendedorIdsCarrito.map((id) =>
+        fetch(`/api/vendedores/${id}`)
+          .then((r) => r.json())
+          .then((data) => [id, !!data.configurado] as const)
+          .catch(() => [id, false] as const)
+      )
+    )
+      .then((pares) => {
+        if (cancelado) return
+        setVendedoresConQR(Object.fromEntries(pares))
+      })
+      .finally(() => {
+        if (!cancelado) setConsultandoVendedores(false)
+      })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveVendedores])
+
+  // ¿Hay al menos un vendedor con QR propio? Si no, en retiro no tiene
+  // sentido mostrar la opción "QR": no hay a quién pagarle por ahí.
+  const algunVendedorConQR = vendedorIdsCarrito.some((id) => vendedoresConQR[id])
+
+  // Si ningún vendedor tiene QR, el pago en retiro se coordina sí o sí
+  // por WhatsApp — forzamos 'efectivo' para que el flujo posterior
+  // (que ya existía) mande al paso de WhatsApp en vez de a una pantalla
+  // de QR vacía.
+  useEffect(() => {
+    if (metodoEntrega === 'retiro' && !consultandoVendedores && !algunVendedorConQR) {
+      setMetodoPago('efectivo')
+    }
+  }, [metodoEntrega, consultandoVendedores, algunVendedorConQR])
   const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
   // Qué "Zona 1/2/3" está elegida en el primer selector — el segundo
   // selector (el barrio) recién muestra las opciones de ese grupo.
@@ -473,32 +528,47 @@ function CheckoutContent() {
             </>
           ) : (
             <>
-              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
-              </div>
-              <label className="block text-left mb-4">
-                <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('qr')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('efectivo')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    Efectivo
-                  </button>
+              {consultandoVendedores ? (
+                <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                  Verificando cómo podés pagarle a cada vendedor...
                 </div>
-              </label>
+              ) : algunVendedorConQR ? (
+                <>
+                  <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                    Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
+                  </div>
+                  <label className="block text-left mb-4">
+                    <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPago('qr')}
+                        className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                          metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                        }`}
+                      >
+                        QR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPago('efectivo')}
+                        className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                          metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                        }`}
+                      >
+                        Efectivo
+                      </button>
+                    </div>
+                  </label>
+                </>
+              ) : (
+                /* Ningún vendedor del carrito tiene QR cargado todavía:
+                   no hay a quién pagarle por ahí, así que se coordina
+                   todo por WhatsApp directo. */
+                <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                  Coordinás el pago y el retiro directo con cada vendedor por WhatsApp.
+                </div>
+              )}
             </>
           )}
 
