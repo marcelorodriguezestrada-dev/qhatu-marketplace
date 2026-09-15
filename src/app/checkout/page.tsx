@@ -255,6 +255,8 @@ function CheckoutContent() {
             total: totalGrupo,
             comprador: usuario?.email || null,
             vendedorId,
+            vendedorNombre,
+            vendedorWhatsapp: whatsappVendedor,
             zonaEntrega,
             direccion,
             lat: metodoEntrega === 'envio' ? lat : null,

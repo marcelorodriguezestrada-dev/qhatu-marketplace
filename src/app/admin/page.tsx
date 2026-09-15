@@ -1156,6 +1156,10 @@ export default function AdminPage() {
                     <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
                     <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
+                      🏪 {p.vendedorNombre || 'Clasi Click'}
+                      {p.createdAt && ` · ${new Date(p.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}`}
+                    </div>
+                    <div className="font-body text-[11px] text-inksoft mt-1">
                       {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
                     </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
@@ -1171,9 +1175,23 @@ export default function AdminPage() {
                 </div>
 
                 {p.estado === 'verificando_stock' && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'pendiente_pago')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Confirmar stock disponible</button>
-                    <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Sin stock / cancelar</button>
+                  <div className="mt-3">
+                    {p.vendedorWhatsapp && (
+                      <a
+                        href={`https://wa.me/${p.vendedorWhatsapp}?text=${encodeURIComponent(
+                          `Hola ${p.vendedorNombre}! Te escribo de Clasi Click — llegó un pedido nuevo (${p.items?.length || 0} producto(s), Bs ${p.total}). ¿Podés confirmarme si tenés stock disponible?`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mb-2 px-2.5 py-1.5 rounded-md border border-teal text-teal font-body text-[11px] font-semibold"
+                      >
+                        💬 Contactar al vendedor para verificar stock
+                      </a>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'pendiente_pago')} className="px-2.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Confirmar stock disponible</button>
+                      <button type="button" onClick={() => cambiarEstadoPedido(p.id, 'cancelado')} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] text-maroon">Sin stock / cancelar</button>
+                    </div>
                   </div>
                 )}
 

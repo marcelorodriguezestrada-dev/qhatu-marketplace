@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, lat, lng } = body
+    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
       total: Number(total),
       comprador: comprador || null,
       vendedorId: vendedorId || null,
+      // Guardamos nombre y WhatsApp del vendedor tal como estaban al
+      // momento de la compra — así /admin puede mostrar de qué tienda
+      // es cada pedido y contactarlo directo, sin tener que ir a
+      // buscarlo aparte a la colección de vendedores cada vez.
+      vendedorNombre: vendedorNombre || (vendedorId ? 'Vendedor' : 'Clasi Click'),
+      vendedorWhatsapp: vendedorWhatsapp || '',
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
       // Ubicación opcional que comparte el comprador al pedir con
