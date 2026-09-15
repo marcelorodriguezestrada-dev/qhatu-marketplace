@@ -33,15 +33,22 @@ export function GraficoBarras({
     <div className="flex items-end gap-[3px] h-36 overflow-x-auto pb-1">
       {datos.map((d) => (
         <div key={d.clave} className="flex flex-col items-center gap-1 shrink-0" style={{ width: datos.length > 40 ? 6 : 22 }}>
-          <div
-            title={`${formatoEtiqueta ? formatoEtiqueta(d.clave) : d.clave}: ${d.valor.toLocaleString('es-BO')}`}
-            className="w-full rounded-t"
-            style={{
-              height: `${Math.max(2, (d.valor / max) * 100)}%`,
-              backgroundColor: color,
-              opacity: d.valor === 0 ? 0.15 : 1,
-            }}
-          />
+          {/* Esta franja de abajo SÍ tiene una altura fija en píxeles
+              (h-28) — hace falta para que el "height: X%" de la barra
+              de acá abajo tenga contra qué calcularse. Sin esto, un
+              porcentaje de altura sobre un contenedor sin altura
+              definida no vale nada y la barra queda invisible. */}
+          <div className="w-full h-28 flex items-end">
+            <div
+              title={`${formatoEtiqueta ? formatoEtiqueta(d.clave) : d.clave}: ${d.valor.toLocaleString('es-BO')}`}
+              className="w-full rounded-t"
+              style={{
+                height: `${Math.max(2, (d.valor / max) * 100)}%`,
+                backgroundColor: color,
+                opacity: d.valor === 0 ? 0.15 : 1,
+              }}
+            />
+          </div>
           {datos.length <= 40 && (
             <div className="font-body text-[9px] text-inksoft whitespace-nowrap">
               {formatoEtiqueta ? formatoEtiqueta(d.clave) : d.clave}
