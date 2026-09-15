@@ -107,11 +107,85 @@ function CheckoutContent() {
     : itemsCarrito
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
+  // QR/cuenta configurados por el admin desde /admin (ver
+  // /api/configuracion/pagos). Si todavía no cargó nada, se usan las
+  // variables de entorno de siempre como respaldo — así el checkout
+  // nunca se queda sin QR para mostrar.
+  const [qrPlataforma, setQrPlataforma] = useState(QR_PLATAFORMA)
+  const [cbuPlataforma, setCbuPlataforma] = useState(BANK_ACCOUNT_NUMBER)
+  useEffect(() => {
+    fetch('/api/configuracion/pagos')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.qrImageUrl) setQrPlataforma(data.qrImageUrl)
+        if (data.cbu) setCbuPlataforma(data.cbu)
+      })
+      .catch(() => {})
+  }, [])
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
   // Solo aplica cuando metodoEntrega es 'retiro' — con envío siempre es
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
+
+  // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
+  // alcanza con que hayan subido la foto del QR — tienen que haber
+  // tildado "Pago con QR" en su tipo de ventas. Si subieron el QR pero
+  // no lo tildaron, es porque no quieren cobrar por ahí.
+  //
+  // Se consulta acá, al entrar al checkout, porque de esto depende si
+  // en "Retiro en tienda" se le puede ofrecer pagar por QR o solo
+  // coordinar por WhatsApp — antes esto solo se sabía DESPUÉS, al
+  // momento de crear el pedido.
+  const [vendedoresConQR, setVendedoresConQR] = useState<Record<string, boolean>>({})
+  const [consultandoVendedores, setConsultandoVendedores] = useState(true)
+
+  const vendedorIdsCarrito = Array.from(
+    new Set(items.map((i) => i.vendedorId).filter((v): v is string => !!v))
+  )
+  const claveVendedores = vendedorIdsCarrito.join(',')
+
+  useEffect(() => {
+    if (vendedorIdsCarrito.length === 0) {
+      setVendedoresConQR({})
+      setConsultandoVendedores(false)
+      return
+    }
+    let cancelado = false
+    setConsultandoVendedores(true)
+    Promise.all(
+      vendedorIdsCarrito.map((id) =>
+        fetch(`/api/vendedores/${id}`)
+          .then((r) => r.json())
+          .then((data) => [id, !!data.aceptaPagoQr] as const)
+          .catch(() => [id, false] as const)
+      )
+    )
+      .then((pares) => {
+        if (cancelado) return
+        setVendedoresConQR(Object.fromEntries(pares))
+      })
+      .finally(() => {
+        if (!cancelado) setConsultandoVendedores(false)
+      })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveVendedores])
+
+  // ¿Hay al menos un vendedor que habilitó cobrar por QR? Si no, en
+  // retiro no tiene sentido mostrar la opción: no hay a quién pagarle
+  // por ahí.
+  const algunVendedorConQR = vendedorIdsCarrito.some((id) => vendedoresConQR[id])
+
+  // Si ningún vendedor tiene QR, el pago en retiro se coordina sí o sí
+  // por WhatsApp — forzamos 'efectivo' para que el flujo posterior
+  // (que ya existía) mande al paso de WhatsApp en vez de a una pantalla
+  // de QR vacía.
+  useEffect(() => {
+    if (metodoEntrega === 'retiro' && !consultandoVendedores && !algunVendedorConQR) {
+      setMetodoPago('efectivo')
+    }
+  }, [metodoEntrega, consultandoVendedores, algunVendedorConQR])
   const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
   // Qué "Zona 1/2/3" está elegida en el primer selector — el segundo
   // selector (el barrio) recién muestra las opciones de ese grupo.
@@ -126,7 +200,6 @@ function CheckoutContent() {
   const [lng, setLng] = useState<number | null>(null)
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
-  const subPedidosRef = useRef<SubPedido[]>([])
   const [pasoActual, setPasoActual] = useState(0)
   // Índices de subPedidos donde el usuario ya apretó "Continuar con la
   // compra" después de que el vendedor confirmó stock. Hasta que no lo
@@ -200,8 +273,8 @@ function CheckoutContent() {
         const envioGrupo = enviosRepartidos[i]
         const totalGrupo = subtotal + envioGrupo
 
-        let qrImageUrl = QR_PLATAFORMA
-        let cbu = BANK_ACCOUNT_NUMBER
+        let qrImageUrl = qrPlataforma
+        let cbu = cbuPlataforma
         let cobroPropio = false
         let vendedorNombre = clave === 'plataforma' ? 'Clasi Click' : grupoItems[0]?.vendedor || 'Vendedor'
         let whatsappVendedor = ''
@@ -218,8 +291,8 @@ function CheckoutContent() {
             // confirmada la entrega — así protegemos al comprador si
             // el envío se complica.
             if (metodoEntrega === 'retiro' && data.configurado) {
-              qrImageUrl = data.qrImageUrl || QR_PLATAFORMA
-              cbu = data.cbu || BANK_ACCOUNT_NUMBER
+              qrImageUrl = data.qrImageUrl || qrPlataforma
+              cbu = data.cbu || cbuPlataforma
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
             } else if (data.nombreNegocio) {
@@ -241,6 +314,8 @@ function CheckoutContent() {
             total: totalGrupo,
             comprador: usuario?.email || null,
             vendedorId,
+            vendedorNombre,
+            vendedorWhatsapp: whatsappVendedor,
             zonaEntrega,
             direccion,
             lat: metodoEntrega === 'envio' ? lat : null,
@@ -274,20 +349,7 @@ function CheckoutContent() {
       setPasoActual(0)
       // Efectivo en retiro: no hay QR que mostrar — el pago se coordina
       // directo con el vendedor por WhatsApp cuando pasan a buscarlo.
-      // Retiro en efectivo: abrir WhatsApp directo sin pantalla intermedia
-      if (metodoEntrega === 'retiro' && metodoPago === 'efectivo') {
-        // Abrir WhatsApp para cada vendedor automáticamente
-        setTimeout(() => {
-          subPedidosRef.current?.forEach((s: any) => {
-            if (s.whatsapp) {
-              window.open(linkWhatsappRetiroEfectivo(s), '_blank')
-            }
-          })
-        }, 400)
-        setEtapa('resumen')
-      } else {
-        setEtapa('pagando')
-      }
+      setEtapa(metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'whatsapp' : 'pagando')
     } catch (e: any) {
       setError(e.message || 'No se pudieron crear los pedidos.')
       setEtapa('error')
@@ -382,24 +444,24 @@ function CheckoutContent() {
         <div className="bg-panel border border-line rounded-xl p-6">
           <div className="font-display text-lg font-bold text-ink mb-4">¿Cómo lo recibís?</div>
 
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button
               type="button"
               onClick={() => setMetodoEntrega('envio')}
-              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                metodoEntrega === 'envio' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
-              Envío
+              🛵 Envío
             </button>
             <button
               type="button"
               onClick={() => setMetodoEntrega('retiro')}
-              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                metodoEntrega === 'retiro' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
-              Retiro en tienda
+              🏬 Retiro en tienda
             </button>
           </div>
 
@@ -470,32 +532,47 @@ function CheckoutContent() {
             </>
           ) : (
             <>
-              <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
-              </div>
-              <label className="block text-left mb-4">
-                <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('qr')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMetodoPago('efectivo')}
-                    className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
-                      metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
-                    }`}
-                  >
-                    Efectivo
-                  </button>
+              {consultandoVendedores ? (
+                <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                  Verificando cómo podés pagarle a cada vendedor...
                 </div>
-              </label>
+              ) : algunVendedorConQR ? (
+                <>
+                  <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                    Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
+                  </div>
+                  <label className="block text-left mb-4">
+                    <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPago('qr')}
+                        className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                          metodoPago === 'qr' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                        }`}
+                      >
+                        QR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPago('efectivo')}
+                        className={`flex-1 py-2 rounded-lg border font-body text-[13px] font-semibold ${
+                          metodoPago === 'efectivo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+                        }`}
+                      >
+                        Efectivo
+                      </button>
+                    </div>
+                  </label>
+                </>
+              ) : (
+                /* Ningún vendedor del carrito tiene QR cargado todavía:
+                   no hay a quién pagarle por ahí, así que se coordina
+                   todo por WhatsApp directo. */
+                <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
+                  Coordinás el pago y el retiro directo con cada vendedor por WhatsApp.
+                </div>
+              )}
             </>
           )}
 
@@ -507,12 +584,19 @@ function CheckoutContent() {
             <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
             <div className="border-t border-line divide-y divide-line">
               {items.map((it) => (
-                <div key={it.id} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
-                  <span className="flex-1 min-w-0">{it.nombre}</span>
+                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
+                  <span className="flex-1 min-w-0">
+                    {it.nombre}
+                    {(it.tallaElegida || it.colorElegida) && (
+                      <span className="block text-[11px] text-inksoft">
+                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(it.id, -1)}
+                      onClick={() => cambiarCantidad(it, -1)}
                       className="w-6 h-6 border border-line rounded text-sm leading-none"
                     >
                       −
@@ -520,7 +604,7 @@ function CheckoutContent() {
                     <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(it.id, 1)}
+                      onClick={() => cambiarCantidad(it, 1)}
                       className="w-6 h-6 border border-line rounded text-sm leading-none"
                     >
                       +
@@ -529,7 +613,7 @@ function CheckoutContent() {
                   <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
                   <button
                     type="button"
-                    onClick={() => quitar(it.id)}
+                    onClick={() => quitar(it)}
                     className="shrink-0 font-body text-[11px] text-maroon underline"
                   >
                     quitar
