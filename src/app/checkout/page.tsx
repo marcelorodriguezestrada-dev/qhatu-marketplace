@@ -128,12 +128,15 @@ function CheckoutContent() {
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
 
-  // Qué vendedores del carrito tienen su cobro (QR/CBU) configurado en
-  // /vender. Se consulta acá, al entrar al checkout, porque de esto
-  // depende si en "Retiro en tienda" se le puede ofrecer pagar por QR o
-  // solo coordinar por WhatsApp — antes esto solo se sabía DESPUÉS, al
-  // momento de crear el pedido, así que se le ofrecía "QR" a gente que
-  // después no tenía ningún QR al que pagarle.
+  // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
+  // alcanza con que hayan subido la foto del QR — tienen que haber
+  // tildado "Pago con QR" en su tipo de ventas. Si subieron el QR pero
+  // no lo tildaron, es porque no quieren cobrar por ahí.
+  //
+  // Se consulta acá, al entrar al checkout, porque de esto depende si
+  // en "Retiro en tienda" se le puede ofrecer pagar por QR o solo
+  // coordinar por WhatsApp — antes esto solo se sabía DESPUÉS, al
+  // momento de crear el pedido.
   const [vendedoresConQR, setVendedoresConQR] = useState<Record<string, boolean>>({})
   const [consultandoVendedores, setConsultandoVendedores] = useState(true)
 
@@ -154,7 +157,7 @@ function CheckoutContent() {
       vendedorIdsCarrito.map((id) =>
         fetch(`/api/vendedores/${id}`)
           .then((r) => r.json())
-          .then((data) => [id, !!data.configurado] as const)
+          .then((data) => [id, !!data.aceptaPagoQr] as const)
           .catch(() => [id, false] as const)
       )
     )
@@ -169,8 +172,9 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveVendedores])
 
-  // ¿Hay al menos un vendedor con QR propio? Si no, en retiro no tiene
-  // sentido mostrar la opción "QR": no hay a quién pagarle por ahí.
+  // ¿Hay al menos un vendedor que habilitó cobrar por QR? Si no, en
+  // retiro no tiene sentido mostrar la opción: no hay a quién pagarle
+  // por ahí.
   const algunVendedorConQR = vendedorIdsCarrito.some((id) => vendedoresConQR[id])
 
   // Si ningún vendedor tiene QR, el pago en retiro se coordina sí o sí
