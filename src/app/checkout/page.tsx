@@ -28,7 +28,7 @@ function linkWhatsappRetiroEfectivo(s: SubPedido): string {
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
-type Etapa = 'entrega' | 'creando' | 'pagando' | 'whatsapp' | 'resumen' | 'error'
+type Etapa = 'entrega' | 'creando' | 'pagando' | 'resumen' | 'error'
 
 // Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
 // las coordenadas y ajustar los precios reales.
@@ -249,6 +249,16 @@ function CheckoutContent() {
   }
 
   async function confirmarEntregaYCrearPedidos() {
+    // Si es retiro + efectivo, reservamos la pestaña de WhatsApp ACÁ
+    // MISMO, todavía dentro del gesto de click del usuario — recién más
+    // abajo, después de crear el pedido (que tarda porque es un fetch),
+    // le asignamos la URL final. Si abriéramos la pestaña después de
+    // esos awaits, el navegador ya no lo reconoce como una acción
+    // directa del usuario y la mayoría de los navegadores bloquean el
+    // popup silenciosamente — así evitamos ese bloqueo.
+    const abrirWhatsappDirecto = metodoEntrega === 'retiro' && metodoPago === 'efectivo'
+    const ventanaWhatsapp = abrirWhatsappDirecto ? window.open('', '_blank') : null
+
     setEtapa('creando')
     setError('')
 
@@ -347,9 +357,25 @@ function CheckoutContent() {
 
       setSubPedidos(nuevos)
       setPasoActual(0)
-      // Efectivo en retiro: no hay QR que mostrar — el pago se coordina
-      // directo con el vendedor por WhatsApp cuando pasan a buscarlo.
-      setEtapa(metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'whatsapp' : 'pagando')
+
+      if (abrirWhatsappDirecto) {
+        // Como el checkout ahora es siempre de UNA tienda a la vez, acá
+        // solo hay un subPedido — le llevamos directo a WhatsApp con el
+        // detalle del pedido, sin ninguna pantalla intermedia de por
+        // medio.
+        const link = nuevos[0] ? linkWhatsappRetiroEfectivo(nuevos[0]) : null
+        if (link && ventanaWhatsapp) {
+          ventanaWhatsapp.location.href = link
+        } else if (link) {
+          // Si el navegador bloqueó igual la pestaña que reservamos
+          // (pasa en algunos navegadores de Android en modo muy
+          // restrictivo), abrimos de nuevo como respaldo.
+          window.open(link, '_blank')
+        }
+        setEtapa('resumen')
+      } else {
+        setEtapa('pagando')
+      }
     } catch (e: any) {
       setError(e.message || 'No se pudieron crear los pedidos.')
       setEtapa('error')
@@ -738,40 +764,6 @@ function CheckoutContent() {
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
           >
             Ya pagué
-          </button>
-        </div>
-      )}
-
-      {etapa === 'whatsapp' && (
-        <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          <div className="font-display text-lg font-bold text-ink mb-1.5">Coordiná el retiro y el pago</div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            Vas a pagar en efectivo cuando retirás. Escribile a {subPedidos.length > 1 ? 'cada vendedor' : 'el vendedor'} por WhatsApp para acordar día y horario.
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {subPedidos.map((s, i) =>
-              s.whatsapp ? (
-                <a
-                  key={i}
-                  href={linkWhatsappRetiroEfectivo(s)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
-                >
-                  💬 Continuar compra por WhatsApp{subPedidos.length > 1 ? ` — ${s.vendedorNombre}` : ''}
-                </a>
-              ) : (
-                <div key={i} className="font-body text-xs text-inksoft bg-panelalt border border-line rounded-lg p-3 text-left">
-                  {s.vendedorNombre} todavía no cargó un WhatsApp de contacto — vas a coordinar el retiro cuando te confirmen el pedido.
-                </div>
-              )
-            )}
-          </div>
-          <button
-            onClick={() => setEtapa('resumen')}
-            className="w-full py-3 rounded-lg border border-line bg-panel text-ink font-body text-sm font-semibold mt-4"
-          >
-            Ya avisé, continuar
           </button>
         </div>
       )}
