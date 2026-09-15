@@ -10,7 +10,7 @@ import { DIAS_SEMANA, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 import { labelTipoAnuncio } from '@/data/anuncios'
-import { parsearAnunciosWhatsapp, AnuncioParseado } from '@/lib/parsearAnunciosWhatsapp'
+import { parsearAnunciosWhatsapp, AnuncioParseado, mensajeInvitacionAnuncio } from '@/lib/parsearAnunciosWhatsapp'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -1787,16 +1787,14 @@ export default function AdminPage() {
                       rows={2}
                       className="w-full px-2 py-1.5 rounded-md border border-line font-body text-[11px] mb-2"
                     />
-                    {p.incompleto && (
-                      <a
-                        href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Vimos tu aviso "${p.titulo}" pero el mensaje nos llegó cortado. ¿Nos podés mandar la descripción completa para publicarlo en Clasi Click?`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block px-2.5 py-1 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
-                      >
-                        💬 Pedirle el texto completo
-                      </a>
-                    )}
+                    <a
+                      href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-2.5 py-1 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
+                    >
+                      💬 Invitar por WhatsApp
+                    </a>
                   </div>
                 ))}
               </div>
@@ -1890,13 +1888,13 @@ export default function AdminPage() {
                   )}
                   {(a.whatsapp || a.telefonoOriginal) && a.estado !== 'aprobado' && (
                     <a
-                      href={`https://wa.me/${(a.whatsapp || `591${a.telefonoOriginal}`).replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Vimos tu aviso "${a.titulo}" pero nos falta algún dato para publicarlo en Clasi Click. ¿Nos podés confirmar los detalles completos?`)}`}
+                      href={`https://wa.me/${(a.whatsapp || `591${a.telefonoOriginal}`).replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => cambiarEstadoAnuncioConNota(a.id, 'info_solicitada', a.notaAdmin || 'Se le pidió más información por WhatsApp.')}
                       className="px-2.5 py-1.5 rounded-md border border-indigo-200 font-body text-[11px] text-indigo-600"
                     >
-                      💬 Pedir más datos
+                      💬 Invitar por WhatsApp
                     </a>
                   )}
                   {a.estado !== 'rechazado' && (
