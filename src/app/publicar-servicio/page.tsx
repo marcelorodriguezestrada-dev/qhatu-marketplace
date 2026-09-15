@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ZONAS_POTOSI } from '@/data/zonasPotosi'
 import { useAuth } from '@/lib/auth'
-import { useCategorias } from '@/lib/useCategorias'
+import { useCategorias, agruparRubros } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
 
@@ -190,9 +190,19 @@ export default function PublicarServicioPage() {
           onChange={(e) => setRubro(e.target.value)}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
         >
-          {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
-            <option key={r.id} value={r.id}>{r.label}</option>
-          ))}
+          {agruparRubros(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((bloque) =>
+            bloque.grupoLabel ? (
+              <optgroup key={bloque.grupoId} label={bloque.grupoLabel}>
+                {bloque.rubros.map((r) => (
+                  <option key={r.id} value={r.id}>{r.label}</option>
+                ))}
+              </optgroup>
+            ) : (
+              bloque.rubros.map((r) => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))
+            )
+          )}
           <option value={RUBRO_ESCRIBIR_PROPIO}>Mi profesión no está en la lista (especificar)</option>
         </select>
         {rubro === RUBRO_ESCRIBIR_PROPIO && (

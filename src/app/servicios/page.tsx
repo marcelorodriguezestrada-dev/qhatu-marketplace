@@ -60,7 +60,22 @@ export default function ServiciosPage() {
   const { categorias, rubrosFlat, buscarRubro } = useCategorias()
   const [profesionales, setProfesionales] = useState<Profesional[]>([])
   const [categoriaSel, setCategoriaSel] = useState('Todo')
+  const [grupoSel, setGrupoSel] = useState('Todo')
   const [rubro, setRubro] = useState('Todo')
+
+  // Los links de las migas de pan del perfil de un profesional apuntan
+  // acá con ?categoria=...&grupo=...&rubro=... — antes esos parámetros
+  // se ignoraban por completo (el click no filtraba nada). Se leen una
+  // sola vez al montar; de ahí en más manda lo que el usuario toque.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const cat = params.get('categoria')
+    const grupo = params.get('grupo')
+    const rub = params.get('rubro')
+    if (cat) setCategoriaSel(cat)
+    if (grupo) setGrupoSel(grupo)
+    if (rub) setRubro(rub)
+  }, [])
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<'calificacion' | 'cercania'>('calificacion')
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
@@ -118,7 +133,22 @@ export default function ServiciosPage() {
   // Rubros que pertenecen a la categoría elegida — así el filtro "por
   // categoría" incluye a cualquier profesional cuyo rubro esté en esa
   // categoría, sea un rubro de la base o uno agregado después.
-  const rubroIdsDeCategoria = categorias.find((c) => c.id === categoriaSel)?.rubros.map((r) => r.id) || []
+  const rubrosDeCategoria = categorias.find((c) => c.id === categoriaSel)?.rubros || []
+  const rubroIdsDeCategoria = rubrosDeCategoria.map((r) => r.id)
+
+  // Grupos (nivel intermedio) presentes en esta categoría, sin repetir
+  // y en el orden en que vienen del servidor.
+  const gruposDeCategoria = rubrosDeCategoria.reduce<{ id: string; label: string }[]>((acc, r) => {
+    if (r.grupo && !acc.some((g) => g.id === r.grupo!.id)) acc.push({ id: r.grupo.id, label: r.grupo.label })
+    return acc
+  }, [])
+
+  // Rubros que se muestran como botones del tercer nivel: si hay un
+  // grupo elegido, solo los de ese grupo; si no, todos los de la categoría.
+  const rubrosVisibles = grupoSel === 'Todo'
+    ? rubrosDeCategoria
+    : rubrosDeCategoria.filter((r) => r.grupo?.id === grupoSel)
+  const rubroIdsDeGrupo = rubrosVisibles.map((r) => r.id)
 
   let filtrados = profesionales.filter((p) => {
     if (soloPotosi) {
@@ -137,6 +167,11 @@ export default function ServiciosPage() {
     let matchRubro = true
     if (rubro !== 'Todo') {
       matchRubro = p.rubro === rubro
+    } else if (grupoSel !== 'Todo') {
+      // Elegido un grupo pero no una especialidad puntual: entran todos
+      // los rubros de ese grupo (ej. "Médicos" trae clínicos,
+      // ginecólogos, neurocirujanos, etc.).
+      matchRubro = rubroIdsDeGrupo.includes(p.rubro)
     } else if (categoriaSel !== 'Todo') {
       matchRubro = rubroIdsDeCategoria.includes(p.rubro)
     }
@@ -216,7 +251,7 @@ export default function ServiciosPage() {
         <div className="flex gap-2 mb-2 flex-wrap items-center">
           <button
             type="button"
-            onClick={() => { setCategoriaSel('Todo'); setRubro('Todo') }}
+            onClick={() => { setCategoriaSel('Todo'); setGrupoSel('Todo'); setRubro('Todo') }}
             className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
               categoriaSel === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
             }`}
@@ -229,6 +264,7 @@ export default function ServiciosPage() {
               type="button"
               onClick={() => {
                 setCategoriaSel(c.id)
+                setGrupoSel('Todo')
                 setRubro('Todo')
                 fetch('/api/analitica/categoria', {
                   method: 'POST',
@@ -245,6 +281,38 @@ export default function ServiciosPage() {
           ))}
         </div>
 
+        {/* Nivel 2: grupos de la categoría elegida (ej. "Médicos",
+            "Salud mental"). Solo aparece si esa categoría tiene grupos
+            definidos — categorías simples como "Belleza" pasan directo
+            a la lista de rubros. */}
+        {categoriaSel !== 'Todo' && gruposDeCategoria.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap items-center">
+            <button
+              type="button"
+              onClick={() => { setGrupoSel('Todo'); setRubro('Todo') }}
+              className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+                grupoSel === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              }`}
+            >
+              Todo {categorias.find((c) => c.id === categoriaSel)?.label || ''}
+            </button>
+            {gruposDeCategoria.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => { setGrupoSel(g.id); setRubro('Todo') }}
+                className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+                  grupoSel === g.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Nivel 3: rubros/especialidades. Si hay un grupo elegido,
+            solo se muestran los de ese grupo. */}
         {categoriaSel !== 'Todo' && (
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             <button
@@ -254,9 +322,9 @@ export default function ServiciosPage() {
                 rubro === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
-              Todos los rubros
+              {grupoSel === 'Todo' ? 'Todos los rubros' : `Todo ${gruposDeCategoria.find((g) => g.id === grupoSel)?.label || ''}`}
             </button>
-            {(categorias.find((c) => c.id === categoriaSel)?.rubros || []).map((r) => (
+            {rubrosVisibles.map((r) => (
               <button
                 key={r.id}
                 type="button"
@@ -278,10 +346,48 @@ export default function ServiciosPage() {
           </div>
         )}
 
+        {/* Migas de pan: Categoría › Grupo › Rubro (ej. "Salud ›
+            Médicos › Ginecólogo/a"). Cada nivel es clickeable para
+            volver hacia atrás. */}
         {(categoriaSel !== 'Todo' || rubro !== 'Todo') && (
-          <div className="font-body text-xs text-inksoft mb-4">
-            {categorias.find((c) => c.id === categoriaSel)?.label || 'Todas las categorías'}
-            {rubro !== 'Todo' && <> <span className="text-line">›</span> {buscarRubro(rubro)?.label || rubro}</>}
+          <div className="font-body text-xs text-inksoft mb-4 flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => { setCategoriaSel('Todo'); setGrupoSel('Todo'); setRubro('Todo') }}
+              className="hover:text-maroon hover:underline"
+            >
+              Todos los servicios
+            </button>
+            {categoriaSel !== 'Todo' && (
+              <>
+                <span className="text-line">›</span>
+                <button
+                  type="button"
+                  onClick={() => { setGrupoSel('Todo'); setRubro('Todo') }}
+                  className={`hover:text-maroon hover:underline ${grupoSel === 'Todo' && rubro === 'Todo' ? 'text-ink font-semibold' : ''}`}
+                >
+                  {categorias.find((c) => c.id === categoriaSel)?.label}
+                </button>
+              </>
+            )}
+            {grupoSel !== 'Todo' && (
+              <>
+                <span className="text-line">›</span>
+                <button
+                  type="button"
+                  onClick={() => setRubro('Todo')}
+                  className={`hover:text-maroon hover:underline ${rubro === 'Todo' ? 'text-ink font-semibold' : ''}`}
+                >
+                  {gruposDeCategoria.find((g) => g.id === grupoSel)?.label}
+                </button>
+              </>
+            )}
+            {rubro !== 'Todo' && (
+              <>
+                <span className="text-line">›</span>
+                <span className="text-ink font-semibold">{buscarRubro(rubro)?.label || rubro}</span>
+              </>
+            )}
           </div>
         )}
 

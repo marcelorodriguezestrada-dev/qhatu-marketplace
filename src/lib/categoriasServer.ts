@@ -62,10 +62,30 @@ export async function construirArbolCategorias() {
   }
 
   const ordenBase = CATEGORIAS_BASE.map((c) => c.id)
+  // Orden de los grupos tal como están declarados en la base, para que
+  // "Médicos" aparezca antes que "Salud mental" si así está escrito, en
+  // vez de alfabéticamente.
+  const ordenGrupos = new Map<string, number>()
+  CATEGORIAS_BASE.forEach((c) => {
+    c.rubros.forEach((r) => {
+      if (r.grupo && !ordenGrupos.has(r.grupo.id)) ordenGrupos.set(r.grupo.id, ordenGrupos.size)
+    })
+  })
+
   const categorias = [...mapa.values()]
     .map((c) => ({
       ...c,
-      rubros: [...c.rubros].sort((a, b) => (a.id === 'otro' ? 1 : b.id === 'otro' ? -1 : a.label.localeCompare(b.label, 'es'))),
+      rubros: [...c.rubros].sort((a, b) => {
+        // Primero los rubros sueltos (sin grupo) quedan después de los
+        // agrupados, y dentro de cada grupo se ordena alfabéticamente —
+        // así el selector queda agrupado y prolijo.
+        const ga = a.grupo ? ordenGrupos.get(a.grupo.id) ?? 999 : 1000
+        const gb = b.grupo ? ordenGrupos.get(b.grupo.id) ?? 999 : 1000
+        if (ga !== gb) return ga - gb
+        if (a.id === 'otro') return 1
+        if (b.id === 'otro') return -1
+        return a.label.localeCompare(b.label, 'es')
+      }),
     }))
     .sort((a, b) => {
       const oa = ordenBase.indexOf(a.id)
@@ -79,7 +99,14 @@ export async function construirArbolCategorias() {
     })
 
   const rubrosFlat = categorias.flatMap((c) =>
-    c.rubros.map((r) => ({ id: r.id, label: r.label, categoriaId: c.id, categoriaLabel: c.label }))
+    c.rubros.map((r) => ({
+      id: r.id,
+      label: r.label,
+      categoriaId: c.id,
+      categoriaLabel: c.label,
+      grupoId: r.grupo?.id || null,
+      grupoLabel: r.grupo?.label || null,
+    }))
   )
 
   return { categorias, rubrosFlat }

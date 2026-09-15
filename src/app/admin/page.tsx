@@ -2547,7 +2547,10 @@ export default function AdminPage() {
                 )}
                 {cat.rubros.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-1.5">
-                    <span className="font-body text-sm text-ink">{r.label}</span>
+                    <span className="font-body text-sm text-ink">
+                      {r.grupo && <span className="text-inksoft">{r.grupo.label} › </span>}
+                      {r.label}
+                    </span>
                     <select
                       value={cat.id}
                       onChange={(e) => moverRubro(r.id, e.target.value)}

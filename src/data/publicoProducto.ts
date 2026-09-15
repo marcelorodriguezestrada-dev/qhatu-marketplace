@@ -6,11 +6,15 @@
 
 export type PublicoProducto = 'mujer' | 'hombre' | 'ninos' | 'unisex'
 
+// OJO: el id 'unisex' se mantiene a propósito aunque la etiqueta visible
+// diga "Otros" — hay productos ya guardados en Firestore con
+// publico:'unisex', y cambiar el id obligaría a migrarlos todos. Solo
+// cambió lo que ve el usuario.
 export const PUBLICOS_PRODUCTO: { id: PublicoProducto; label: string }[] = [
   { id: 'mujer', label: 'Mujer' },
   { id: 'hombre', label: 'Hombre' },
   { id: 'ninos', label: 'Niños' },
-  { id: 'unisex', label: 'Unisex' },
+  { id: 'unisex', label: 'Otros' },
 ]
 
 export const PUBLICO_PRODUCTO_FALLBACK: PublicoProducto = 'unisex'

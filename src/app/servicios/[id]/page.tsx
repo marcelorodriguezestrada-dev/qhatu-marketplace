@@ -159,6 +159,14 @@ export default function PerfilProfesionalPage() {
             <Link href={`/servicios?categoria=${rubroInfo.categoriaId}`} className="hover:underline">
               {rubroInfo.categoriaLabel}
             </Link>
+            {rubroInfo.grupoLabel && (
+              <>
+                <span className="text-line">›</span>
+                <Link href={`/servicios?categoria=${rubroInfo.categoriaId}&grupo=${rubroInfo.grupoId}`} className="hover:underline">
+                  {rubroInfo.grupoLabel}
+                </Link>
+              </>
+            )}
             <span className="text-line">›</span>
             <Link href={`/servicios?categoria=${rubroInfo.categoriaId}&rubro=${rubroInfo.id}`} className="hover:underline">
               {rubroInfo.label}
