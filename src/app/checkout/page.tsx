@@ -372,6 +372,12 @@ function CheckoutContent() {
           // restrictivo), abrimos de nuevo como respaldo.
           window.open(link, '_blank')
         }
+        // A partir de acá el resto se coordina por WhatsApp, no adentro
+        // de la app — no tiene sentido dejar el carrito de esta tienda
+        // esperando ni ponerse a consultar el estado del pedido cada
+        // pocos segundos, como si fuera a "pagarse solo" en algún
+        // momento.
+        vaciarTienda(vendedorIdTienda)
         setEtapa('resumen')
       } else {
         setEtapa('pagando')
@@ -428,6 +434,10 @@ function CheckoutContent() {
 
   useEffect(() => {
     if (etapa !== 'resumen') return
+    // Retiro + efectivo se coordina por WhatsApp, no acá adentro — no
+    // hay ningún "pagado" digital que esperar, así que no tiene sentido
+    // consultar el servidor cada 4 segundos para nada.
+    if (metodoEntrega === 'retiro' && metodoPago === 'efectivo') return
     pollRef.current = setInterval(async () => {
       const actualizados = await Promise.all(
         subPedidos.map(async (s) => {
@@ -768,7 +778,17 @@ function CheckoutContent() {
         </div>
       )}
 
-      {etapa === 'resumen' && (
+      {etapa === 'resumen' && metodoEntrega === 'retiro' && metodoPago === 'efectivo' && (
+        <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center">
+          <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
+          <div className="font-display text-lg font-bold text-ink mb-1.5">Pedido registrado</div>
+          <div className="font-body text-[13px] text-inksoft">
+            Coordiná el retiro y el pago directo por WhatsApp con el vendedor.
+          </div>
+        </div>
+      )}
+
+      {etapa === 'resumen' && !(metodoEntrega === 'retiro' && metodoPago === 'efectivo') && (
         <div>
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
