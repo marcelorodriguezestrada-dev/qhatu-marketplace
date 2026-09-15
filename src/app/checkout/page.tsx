@@ -383,24 +383,24 @@ function CheckoutContent() {
         <div className="bg-panel border border-line rounded-xl p-6">
           <div className="font-display text-lg font-bold text-ink mb-4">¿Cómo lo recibís?</div>
 
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button
               type="button"
               onClick={() => setMetodoEntrega('envio')}
-              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                metodoEntrega === 'envio' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
-              Envío
+              🛵 Envío
             </button>
             <button
               type="button"
               onClick={() => setMetodoEntrega('retiro')}
-              className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                metodoEntrega === 'retiro' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line text-inksoft'
+              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
-              Retiro en tienda
+              🏬 Retiro en tienda
             </button>
           </div>
 
