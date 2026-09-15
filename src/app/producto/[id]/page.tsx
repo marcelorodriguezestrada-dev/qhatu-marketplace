@@ -62,6 +62,9 @@ export default function ProductoDetallePage() {
   const [agregado, setAgregado] = useState(false)
   const [tab, setTab] = useState<'publicacion' | 'tienda'>('publicacion')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
+  const [tallaSel, setTallaSel] = useState('')
+  const [colorSel, setColorSel] = useState('')
+  const [errorSeleccion, setErrorSeleccion] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -70,6 +73,9 @@ export default function ProductoDetallePage() {
     setCantidad(1)
     setImagenRota(false)
     setTab('publicacion')
+    setTallaSel('')
+    setColorSel('')
+    setErrorSeleccion('')
 
     fetch(`/api/productos/${id}`)
       .then((r) => r.json())
@@ -98,8 +104,20 @@ export default function ProductoDetallePage() {
       return false
     }
     if (!producto) return false
+    // Si el producto tiene talles/colores cargados, no dejamos avanzar
+    // sin elegir uno — si no, no hay forma de saber qué le mandan al
+    // vendedor después.
+    if (producto.talles?.length > 0 && !tallaSel) {
+      setErrorSeleccion('Elegí una talla antes de continuar.')
+      return false
+    }
+    if (producto.colores?.length > 0 && !colorSel) {
+      setErrorSeleccion('Elegí un color antes de continuar.')
+      return false
+    }
+    setErrorSeleccion('')
     const minimo = producto.compraMinima && producto.compraMinima > 1 ? producto.compraMinima : cantidad
-    for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto)
+    for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto, { talla: tallaSel || undefined, color: colorSel || undefined })
     return true
   }
 
@@ -243,6 +261,50 @@ export default function ProductoDetallePage() {
 
               {producto.descripcionLarga && (
                 <div className="mb-6 font-body text-sm text-inksoft whitespace-pre-line">{producto.descripcionLarga}</div>
+              )}
+
+              {producto.talles?.length > 0 && (
+                <div className="mb-4">
+                  <span className="font-body text-sm text-inksoft block mb-1.5">Talla</span>
+                  <div className="flex flex-wrap gap-2">
+                    {producto.talles.map((t: string) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setTallaSel(t); setErrorSeleccion('') }}
+                        className={`px-3.5 py-1.5 rounded-full border font-body text-sm font-medium ${
+                          tallaSel === t ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {producto.colores?.length > 0 && (
+                <div className="mb-4">
+                  <span className="font-body text-sm text-inksoft block mb-1.5">Color</span>
+                  <div className="flex flex-wrap gap-2">
+                    {producto.colores.map((c: string) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => { setColorSel(c); setErrorSeleccion('') }}
+                        className={`px-3.5 py-1.5 rounded-full border font-body text-sm font-medium ${
+                          colorSel === c ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {errorSeleccion && (
+                <div className="font-body text-xs text-maroon mb-4">{errorSeleccion}</div>
               )}
 
               <div className="flex items-center gap-3 mb-5">

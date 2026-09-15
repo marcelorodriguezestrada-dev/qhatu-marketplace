@@ -74,7 +74,7 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
               <div className="font-body text-[12px] font-bold text-ink mb-2 truncate">{tienda.nombre}</div>
 
               {tienda.items.map((it) => (
-                <div key={it.id} className="flex gap-2.5 py-2">
+                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex gap-2.5 py-2">
                   <div className="w-11 h-11 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
                     {it.thumbUrl || it.imagenUrl ? (
                       <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -84,12 +84,17 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex-1">
                     <div className="font-body text-[13px] font-medium text-ink">{it.nombre}</div>
+                    {(it.tallaElegida || it.colorElegida) && (
+                      <div className="font-body text-[11px] text-inksoft">
+                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                     <div className="font-body text-xs text-inksoft mb-1.5">{bs(it.precio)}</div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => cambiarCantidad(it.id, -1)} className="w-5.5 h-5.5 border border-line rounded text-sm">−</button>
+                      <button onClick={() => cambiarCantidad(it, -1)} className="w-5.5 h-5.5 border border-line rounded text-sm">−</button>
                       <span className="font-body text-[13px]">{it.cantidad}</span>
-                      <button onClick={() => cambiarCantidad(it.id, 1)} className="w-5.5 h-5.5 border border-line rounded text-sm">+</button>
-                      <button onClick={() => quitar(it.id)} className="ml-auto text-[11px] text-maroon underline">quitar</button>
+                      <button onClick={() => cambiarCantidad(it, 1)} className="w-5.5 h-5.5 border border-line rounded text-sm">+</button>
+                      <button onClick={() => quitar(it)} className="ml-auto text-[11px] text-maroon underline">quitar</button>
                     </div>
                   </div>
                 </div>

@@ -40,6 +40,13 @@ export function ProductCard({ p }: { p: Producto }) {
       router.push('/login')
       return
     }
+    // Si tiene talles o colores para elegir, no lo agregamos a ciegas
+    // desde la grilla — lo mandamos a la ficha del producto, que es
+    // donde están los selectores.
+    if ((p.talles?.length ?? 0) > 0 || (p.colores?.length ?? 0) > 0) {
+      router.push(`/producto/${p.id}`)
+      return
+    }
     agregar(p)
   }
 

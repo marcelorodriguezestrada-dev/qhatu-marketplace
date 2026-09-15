@@ -508,12 +508,19 @@ function CheckoutContent() {
             <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
             <div className="border-t border-line divide-y divide-line">
               {items.map((it) => (
-                <div key={it.id} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
-                  <span className="flex-1 min-w-0">{it.nombre}</span>
+                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
+                  <span className="flex-1 min-w-0">
+                    {it.nombre}
+                    {(it.tallaElegida || it.colorElegida) && (
+                      <span className="block text-[11px] text-inksoft">
+                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(it.id, -1)}
+                      onClick={() => cambiarCantidad(it, -1)}
                       className="w-6 h-6 border border-line rounded text-sm leading-none"
                     >
                       −
@@ -521,7 +528,7 @@ function CheckoutContent() {
                     <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(it.id, 1)}
+                      onClick={() => cambiarCantidad(it, 1)}
                       className="w-6 h-6 border border-line rounded text-sm leading-none"
                     >
                       +
@@ -530,7 +537,7 @@ function CheckoutContent() {
                   <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
                   <button
                     type="button"
-                    onClick={() => quitar(it.id)}
+                    onClick={() => quitar(it)}
                     className="shrink-0 font-body text-[11px] text-maroon underline"
                   >
                     quitar

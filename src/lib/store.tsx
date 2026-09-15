@@ -3,13 +3,27 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Producto } from '@/data/productos'
 
-export type ItemCarrito = Producto & { cantidad: number }
+export type ItemCarrito = Producto & {
+  cantidad: number
+  // La talla/color que la persona eligió para ESTA línea del carrito —
+  // distinto de `talles`/`colores`, que son todas las opciones
+  // disponibles del producto. Opcionales: hay productos sin variantes.
+  tallaElegida?: string
+  colorElegida?: string
+}
+
+// Identifica una línea del carrito — dos unidades del mismo producto
+// con la MISMA talla y color son una sola línea (se suma la cantidad);
+// con talla o color distintos, son líneas separadas (no se mezclan).
+function claveLinea(i: { id: number | string; tallaElegida?: string; colorElegida?: string }): string {
+  return `${i.id}__${i.tallaElegida || ''}__${i.colorElegida || ''}`
+}
 
 type CarritoContextType = {
   items: ItemCarrito[]
-  agregar: (p: Producto) => void
-  cambiarCantidad: (id: number | string, delta: number) => void
-  quitar: (id: number | string) => void
+  agregar: (p: Producto, opciones?: { talla?: string; color?: string }) => void
+  cambiarCantidad: (item: ItemCarrito, delta: number) => void
+  quitar: (item: ItemCarrito) => void
   vaciar: () => void
   // Vacía solo los productos de UNA tienda — se usa después de pagarle
   // a esa tienda en particular, dejando intactos los productos de
@@ -45,22 +59,26 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     if (cargado) localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
   }, [items, cargado])
 
-  function agregar(p: Producto) {
+  function agregar(p: Producto, opciones?: { talla?: string; color?: string }) {
+    const nuevo: ItemCarrito = { ...p, cantidad: 1, tallaElegida: opciones?.talla, colorElegida: opciones?.color }
+    const clave = claveLinea(nuevo)
     setItems((prev) => {
-      const existe = prev.find((i) => i.id === p.id)
-      if (existe) return prev.map((i) => (i.id === p.id ? { ...i, cantidad: i.cantidad + 1 } : i))
-      return [...prev, { ...p, cantidad: 1 }]
+      const existe = prev.find((i) => claveLinea(i) === clave)
+      if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: i.cantidad + 1 } : i))
+      return [...prev, nuevo]
     })
   }
 
-  function cambiarCantidad(id: number | string, delta: number) {
+  function cambiarCantidad(item: ItemCarrito, delta: number) {
+    const clave = claveLinea(item)
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, cantidad: Math.max(1, i.cantidad + delta) } : i))
+      prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: Math.max(1, i.cantidad + delta) } : i))
     )
   }
 
-  function quitar(id: number | string) {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+  function quitar(item: ItemCarrito) {
+    const clave = claveLinea(item)
+    setItems((prev) => prev.filter((i) => claveLinea(i) !== clave))
   }
 
   function vaciar() {
