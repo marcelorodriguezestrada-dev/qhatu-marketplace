@@ -69,6 +69,13 @@ export default function MiPerfilPage() {
   const [cargandoTurnos, setCargandoTurnos] = useState(false)
   const [mandandoRecordatorioId, setMandandoRecordatorioId] = useState<string | null>(null)
 
+  // --- Oportunidades: anuncios "Busco X" que coinciden con mi rubro ---
+  // Mismo criterio que ya usa el macheo automático por mail/notificación
+  // (mismo id de rubro) — esto es la versión "lista siempre visible en
+  // mi perfil" de lo mismo, con un botón directo para contactar.
+  const [oportunidades, setOportunidades] = useState<any[]>([])
+  const [cargandoOportunidades, setCargandoOportunidades] = useState(false)
+
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
   }, [authCargando, usuario, router])
@@ -87,6 +94,25 @@ export default function MiPerfilPage() {
     cargarTurnos()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profesional?.id, profesional?.plan, profesional?.planVigenciaHasta])
+
+  useEffect(() => {
+    if (!profesional?.rubro) return
+    setCargandoOportunidades(true)
+    fetch('/api/anuncios')
+      .then((r) => r.json())
+      .then((data) => {
+        const anuncios = (data.anuncios || []) as any[]
+        setOportunidades(
+          anuncios.filter((a) => a.tipo === 'busqueda' && a.rubro === profesional.rubro)
+        )
+      })
+      .finally(() => setCargandoOportunidades(false))
+  }, [profesional?.rubro])
+
+  function linkWhatsappOportunidad(a: any) {
+    const texto = `Hola! Vi que buscabas "${a.titulo}" en Clasi Click — te puedo ayudar con eso.`
+    return `https://wa.me/${(a.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
+  }
 
   async function cargarTurnos() {
     if (!profesional) return
@@ -296,6 +322,38 @@ export default function MiPerfilPage() {
           <div className="font-body text-xs text-inksoft">{estadoInfo.detalle}</div>
           {profesional.estado === 'info_solicitada' && profesional.notaAdmin && (
             <div className="mt-2 font-body text-xs text-ink bg-panelalt rounded-md px-2.5 py-2">📝 {profesional.notaAdmin}</div>
+          )}
+        </div>
+      )}
+
+      {/* Oportunidades: gente que publicó "Busco X" con el mismo rubro
+          que este profesional — mismo criterio que el macheo automático
+          por mail, mostrado acá como lista con botón de contacto directo. */}
+      {(cargandoOportunidades || oportunidades.length > 0) && (
+        <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+          <div className="font-body text-sm font-semibold text-ink mb-1">Oportunidades para vos</div>
+          <div className="font-body text-xs text-inksoft mb-3">
+            Gente que publicó un anuncio buscando justo tu rubro. Contactalos antes de que lo haga otro.
+          </div>
+          {cargandoOportunidades ? (
+            <div className="font-body text-xs text-inksoft">Buscando...</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {oportunidades.map((a) => (
+                <div key={a.id} className="bg-panelalt rounded-lg p-3">
+                  <div className="font-body text-sm font-semibold text-ink mb-0.5">{a.titulo}</div>
+                  <div className="font-body text-xs text-inksoft mb-2 line-clamp-2">{a.descripcion}</div>
+                  <a
+                    href={linkWhatsappOportunidad(a)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-3 py-1.5 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
+                  >
+                    💬 Contactar
+                  </a>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
