@@ -606,7 +606,7 @@ function CheckoutContent() {
           </div>
           <div className="font-body text-[13px] text-inksoft mb-5">
             {metodoEntrega === 'envio'
-              ? 'Con envío, el depósito va directo a la cuenta de Clasi Click — se lo liberamos al vendedor recién cuando se confirma que te llegó el pedido.'
+              ? 'Pagá'
               : subPedidos[pasoActual].cobroPropio
                 ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
                 : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
