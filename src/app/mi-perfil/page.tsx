@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
 import { NotificacionesBell } from '@/components/NotificacionesBell'
-import { Compartir } from '@/components/Compartir'
 import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
@@ -621,15 +620,6 @@ export default function MiPerfilPage() {
             Con Premium activás una agenda propia: cargás tus días y horarios, y la gente reserva turno directo desde tu perfil.
           </div>
         )}
-      </div>
-
-      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
-        <div className="font-body text-sm font-semibold text-ink mb-2">📣 Promocioná tu perfil</div>
-        <Compartir
-          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/servicios/${profesional.id}`}
-          titulo={profesional.nombre}
-          imagenUrl={profesional.imagenUrl}
-        />
       </div>
 
       <Link href={`/servicios/${profesional.id}`} className="block text-center font-body text-xs text-inksoft underline">

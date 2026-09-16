@@ -123,6 +123,40 @@ const SECCIONES: Seccion[] = [
 export default function AyudaPage() {
   const [abierta, setAbierta] = useState<string | null>(null)
 
+
+  const [formNombre, setFormNombre] = useState('')
+  const [formCelular, setFormCelular] = useState('')
+  const [formEmail, setFormEmail] = useState('')
+  const [formTienda, setFormTienda] = useState('')
+  const [formMensaje, setFormMensaje] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [enviado, setEnviado] = useState(false)
+  const [errorForm, setErrorForm] = useState('')
+
+  async function enviarSolicitud() {
+    if (!formCelular.trim() && !formEmail.trim()) {
+      setErrorForm('Necesitamos al menos tu celular o email para contactarte.')
+      return
+    }
+    setEnviando(true); setErrorForm('')
+    try {
+      const res = await fetch('/api/solicitud-ayuda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: formNombre, celular: formCelular,
+          email: formEmail, tienda: formTienda, mensaje: formMensaje
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setEnviado(true)
+    } catch (e: any) {
+      setErrorForm(e.message || 'Error al enviar. Intentá de nuevo.')
+    } finally { setEnviando(false) }
+  }
+
+
   return (
     <div className="max-w-[720px] mx-auto px-5 py-10">
       <Link href="/" className="font-body text-sm text-inksoft hover:underline">← Volver a Clasi Click</Link>
@@ -179,6 +213,113 @@ export default function AyudaPage() {
         <div className="font-body text-sm text-ink mb-1">¿No encontraste lo que buscabas?</div>
         <div className="font-body text-xs text-inksoft">Escribinos directo por WhatsApp y te ayudamos.</div>
       </div>
+
+
+        {/* ── Formulario de contacto ── */}
+        <div className="mt-12 bg-panel border border-line rounded-2xl p-6 max-w-lg mx-auto">
+          <div className="text-center mb-6">
+            <p className="text-3xl mb-2">📞</p>
+            <h2 className="font-display text-xl font-bold text-ink mb-1">¿Necesitás ayuda para subir tu negocio?</h2>
+            <p className="font-body text-sm text-inksoft">
+              Dejanos tus datos y te contactamos para ayudarte a publicar tu tienda, tus productos o tu servicio. Sin costo.
+            </p>
+          </div>
+
+          {enviado ? (
+            <div className="text-center py-8">
+              <p className="text-4xl mb-3">✅</p>
+              <p className="font-display font-bold text-ink text-lg mb-1">¡Recibimos tu mensaje!</p>
+              <p className="font-body text-sm text-inksoft">
+                Nos vamos a comunicar con vos a la brevedad para ayudarte a publicar.
+              </p>
+              <button onClick={() => { setEnviado(false); setFormNombre(''); setFormCelular(''); setFormEmail(''); setFormTienda(''); setFormMensaje('') }}
+                className="mt-4 font-body text-sm text-maroon underline">
+                Enviar otra consulta
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="font-body text-xs text-inksoft mb-1 block font-semibold">Tu nombre</label>
+                <input
+                  className="w-full border border-line rounded-xl px-3.5 py-2.5 font-body text-sm text-ink bg-panelalt"
+                  placeholder="¿Cómo te llamás?"
+                  value={formNombre}
+                  onChange={e => setFormNombre(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-body text-xs text-inksoft mb-1 block font-semibold">
+                    Celular <span className="text-maroon">*</span>
+                  </label>
+                  <input
+                    className="w-full border border-line rounded-xl px-3.5 py-2.5 font-body text-sm text-ink bg-panelalt"
+                    placeholder="Ej: 75263557"
+                    type="tel"
+                    value={formCelular}
+                    onChange={e => setFormCelular(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="font-body text-xs text-inksoft mb-1 block font-semibold">
+                    Email <span className="text-inksoft font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    className="w-full border border-line rounded-xl px-3.5 py-2.5 font-body text-sm text-ink bg-panelalt"
+                    placeholder="tu@email.com"
+                    type="email"
+                    value={formEmail}
+                    onChange={e => setFormEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-body text-xs text-inksoft mb-1 block font-semibold">
+                  Nombre de tu tienda o negocio <span className="text-inksoft font-normal">(opcional)</span>
+                </label>
+                <input
+                  className="w-full border border-line rounded-xl px-3.5 py-2.5 font-body text-sm text-ink bg-panelalt"
+                  placeholder="Ej: Ropa Mary, Ferretería Don Carlos..."
+                  value={formTienda}
+                  onChange={e => setFormTienda(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="font-body text-xs text-inksoft mb-1 block font-semibold">
+                  ¿En qué necesitás ayuda?
+                </label>
+                <textarea
+                  rows={3}
+                  className="w-full border border-line rounded-xl px-3.5 py-2.5 font-body text-sm text-ink bg-panelalt resize-none"
+                  placeholder="Ej: Quiero subir mi tienda de ropa, tengo muchos productos y no sé cómo empezar..."
+                  value={formMensaje}
+                  onChange={e => setFormMensaje(e.target.value)}
+                />
+              </div>
+
+              {errorForm && (
+                <p className="font-body text-sm text-maroon bg-maroonsoft rounded-lg px-3 py-2">{errorForm}</p>
+              )}
+
+              <button
+                onClick={enviarSolicitud}
+                disabled={enviando}
+                className="w-full py-3 rounded-xl bg-maroon text-white font-body font-semibold text-sm disabled:opacity-40 transition-opacity"
+              >
+                {enviando ? '⟳ Enviando...' : '📲 Quiero que me ayuden a publicar'}
+              </button>
+
+              <p className="font-body text-xs text-inksoft text-center">
+                * Al menos celular o email es obligatorio para poder contactarte.
+              </p>
+            </div>
+          )}
+        </div>
+
     </div>
   )
 }

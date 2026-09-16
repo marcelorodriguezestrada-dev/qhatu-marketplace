@@ -996,6 +996,31 @@ export default function AdminPage() {
     )
   }
 
+
+  const [solicitudes, setSolicitudes] = useState<any[]>([])
+  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
+
+  async function cargarSolicitudes() {
+    setCargandoSolicitudes(true)
+    try {
+      const res = await fetch('/api/solicitud-ayuda', {
+        headers: { 'x-admin-password': password }
+      })
+      const data = await res.json()
+      setSolicitudes(data.solicitudes || [])
+    } finally { setCargandoSolicitudes(false) }
+  }
+
+  async function marcarSolicitud(id: string, estado: string) {
+    await fetch('/api/solicitud-ayuda', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ id, estado }),
+    })
+    setSolicitudes(prev => prev.map(s => s.id === id ? { ...s, estado } : s))
+  }
+
+
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="grid grid-cols-2 gap-3 mb-6">
