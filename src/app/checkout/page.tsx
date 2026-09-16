@@ -123,6 +123,11 @@ function CheckoutContent() {
       .catch(() => {})
   }, [])
   const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
+  // Recién se muestran los campos de dirección/pago DESPUÉS de que el
+  // comprador toca uno de los dos botones a propósito — antes, con
+  // "envío" precargado por default, esos campos aparecían de entrada
+  // sin que nadie eligiera nada, lo cual mareaba más de lo necesario.
+  const [metodoElegido, setMetodoElegido] = useState(false)
   // Solo aplica cuando metodoEntrega es 'retiro' — con envío siempre es
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
   // sin verse las caras).
@@ -492,27 +497,90 @@ function CheckoutContent() {
         <div className="bg-panel border border-line rounded-xl p-6">
           <div className="font-display text-lg font-bold text-ink mb-4">¿Cómo lo recibís?</div>
 
+          {/* Detalle de lo que se está comprando, con foto de cada
+              producto — va primero para que el comprador vea qué está
+              llevando antes de meterse a elegir método de entrega. */}
+          <div className="mb-5">
+            <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
+            <div className="border-t border-line divide-y divide-line">
+              {items.map((it) => (
+                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center gap-3 py-2.5 font-body text-[13px] text-ink">
+                  {(it.thumbUrl || it.imagenUrl) ? (
+                    <img
+                      src={it.thumbUrl || it.imagenUrl}
+                      alt={it.nombre}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-12 h-12 rounded-lg object-cover border border-line shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg border border-line bg-panelalt shrink-0" />
+                  )}
+                  <span className="flex-1 min-w-0">
+                    {it.nombre}
+                    {(it.tallaElegida || it.colorElegida) && (
+                      <span className="block text-[11px] text-inksoft">
+                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(it, -1)}
+                      className="w-6 h-6 border border-line rounded text-sm leading-none"
+                    >
+                      −
+                    </button>
+                    <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(it, 1)}
+                      className="w-6 h-6 border border-line rounded text-sm leading-none"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
+                  <button
+                    type="button"
+                    onClick={() => quitar(it)}
+                    className="shrink-0 font-body text-[11px] text-maroon underline"
+                  >
+                    quitar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button
               type="button"
-              onClick={() => setMetodoEntrega('envio')}
+              onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true) }}
               className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                metodoElegido && metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
               🛵 Envío
             </button>
             <button
               type="button"
-              onClick={() => setMetodoEntrega('retiro')}
+              onClick={() => { setMetodoEntrega('retiro'); setMetodoElegido(true) }}
               className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                metodoElegido && metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
               🏬 Retiro en tienda
             </button>
           </div>
 
+          {!metodoElegido && (
+            <div className="font-body text-[12px] text-inksoft mb-2">Elegí una opción para seguir.</div>
+          )}
+
+          {metodoElegido && (
+          <>
           <label className="block text-left mb-4">
             <span className="font-body text-[11px] text-inksoft block mb-1">Tu nombre</span>
             <input
@@ -634,53 +702,6 @@ function CheckoutContent() {
             </>
           )}
 
-          {/* Detalle de lo que se está comprando — antes solo se veía el
-              subtotal, sin poder revisar qué productos eran. Ahora
-              también se puede ajustar la cantidad o sacar un producto
-              sin tener que volver atrás a la tienda. */}
-          <div className="mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
-            <div className="border-t border-line divide-y divide-line">
-              {items.map((it) => (
-                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center justify-between gap-2 py-2.5 font-body text-[13px] text-ink">
-                  <span className="flex-1 min-w-0">
-                    {it.nombre}
-                    {(it.tallaElegida || it.colorElegida) && (
-                      <span className="block text-[11px] text-inksoft">
-                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidad(it, -1)}
-                      className="w-6 h-6 border border-line rounded text-sm leading-none"
-                    >
-                      −
-                    </button>
-                    <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidad(it, 1)}
-                      className="w-6 h-6 border border-line rounded text-sm leading-none"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
-                  <button
-                    type="button"
-                    onClick={() => quitar(it)}
-                    className="shrink-0 font-body text-[11px] text-maroon underline"
-                  >
-                    quitar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(subtotalCarrito)}</div>
           <div className="font-body text-[12px] text-inksoft mb-3">Envío: {bs(costoEnvio)}</div>
           <div className="font-display text-xl font-bold text-ink mb-4">{bs(subtotalCarrito + costoEnvio)}</div>
@@ -691,6 +712,8 @@ function CheckoutContent() {
           >
             {metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
           </button>
+          </>
+          )}
         </div>
       )}
 
