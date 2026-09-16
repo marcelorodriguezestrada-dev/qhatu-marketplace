@@ -65,6 +65,8 @@ function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motiv
 export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [autenticado, setAutenticado] = useState(false)
+  const [solicitudes, setSolicitudes] = useState<any[]>([])
+  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
@@ -996,9 +998,6 @@ export default function AdminPage() {
     )
   }
 
-
-  const [solicitudes, setSolicitudes] = useState<any[]>([])
-  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
 
   async function cargarSolicitudes() {
     setCargandoSolicitudes(true)
