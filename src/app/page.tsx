@@ -109,6 +109,9 @@ export default function CatalogoPage() {
             <Link href="/anuncios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
               Anuncios
             </Link>
+            <Link href="/ayuda" className="border-none bg-transparent text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">
+              Ayuda
+            </Link>
             <Link href="/vender" className="border-none bg-white/10 text-white px-3 py-1.5 rounded-lg font-body text-[13px] shrink-0 whitespace-nowrap">
               Vender
             </Link>
