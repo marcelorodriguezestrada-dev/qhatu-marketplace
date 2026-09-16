@@ -57,7 +57,7 @@ type SubPedido = {
   declarado: boolean
   estadoActual: string
 }
-// ok 
+
 // Reparte el costo de envío proporcional al subtotal de cada vendedor,
 // asegurando que la suma dé exacto (el "sobrante" de redondear para
 // abajo se lo llevan los grupos con la parte decimal más alta).
