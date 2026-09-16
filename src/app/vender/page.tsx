@@ -11,6 +11,7 @@ import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
 import { PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 import { buscarMercados } from '@/data/mercadosPotosi'
+import { Compartir } from '@/components/Compartir'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -37,6 +38,9 @@ export default function VenderPage() {
   const { usuario, cargando, emailVerificado, obtenerToken } = useAuth()
   const router = useRouter()
   const [misProductos, setMisProductos] = useState<any[]>([])
+  // Marketing: qué panel de "compartir" está abierto — 'tienda' para el
+  // de la tienda completa, o el id del producto puntual.
+  const [compartiendoId, setCompartiendoId] = useState<string | null>(null)
   const [misPedidos, setMisPedidos] = useState<any[]>([])
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
   const [nombre, setNombre] = useState('')
@@ -1295,12 +1299,32 @@ export default function VenderPage() {
         })}
       </div>
 
-      <div className="font-body text-sm font-semibold text-ink mb-3">Mis productos ({misProductos.length})</div>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="font-body text-sm font-semibold text-ink">Mis productos ({misProductos.length})</div>
+        {usuario && (
+          <button
+            type="button"
+            onClick={() => setCompartiendoId(compartiendoId === 'tienda' ? null : 'tienda')}
+            className="font-body text-xs text-maroon underline shrink-0"
+          >
+            📣 Compartir mi tienda
+          </button>
+        )}
+      </div>
+      {compartiendoId === 'tienda' && usuario && (
+        <div className="mb-4">
+          <Compartir
+            url={`${typeof window !== 'undefined' ? window.location.origin : ''}/tienda/${usuario.uid}`}
+            titulo="mi tienda"
+          />
+        </div>
+      )}
       {misProductos.length === 0 && (
         <div className="font-body text-sm text-inksoft">Todavía no publicaste ningún producto.</div>
       )}
       {misProductos.map((p) => (
-        <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
+        <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
             {(p.thumbUrl || p.imagenUrl) ? (
               <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -1321,6 +1345,13 @@ export default function VenderPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCompartiendoId(compartiendoId === p.id ? null : p.id)}
+              className="font-body text-xs text-maroon underline shrink-0"
+            >
+              📣 Compartir
+            </button>
             <button
               onClick={() => {
                 // Prefill form for editing
@@ -1356,6 +1387,16 @@ export default function VenderPage() {
               Borrar
             </button>
           </div>
+          </div>
+          {compartiendoId === p.id && (
+            <div className="mt-3">
+              <Compartir
+                url={`${typeof window !== 'undefined' ? window.location.origin : ''}/producto/${p.id}`}
+                titulo={p.nombre}
+                imagenUrl={p.imagenUrl}
+              />
+            </div>
+          )}
         </div>
       ))}
     </div>
