@@ -22,9 +22,9 @@ function ventanaEntrega(): string {
   return calcularFranja(new Date()) === '08:00' ? 'entre las 8:00 y las 12:00' : 'entre las 14:00 y las 18:00'
 }
 
-function linkWhatsappRetiroEfectivo(s: SubPedido): string {
+function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
   const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
-  const texto = `Hola! Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
+  const texto = `Hola! Soy ${nombreComprador}. Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
@@ -192,6 +192,12 @@ function CheckoutContent() {
   const [grupoZonaSel, setGrupoZonaSel] = useState(grupoDeBarrio(ZONAS_ENVIO_POTOSI[0].nombre)?.id || ZONAS_AGRUPADAS[0].id)
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
+  // El nombre lo pedimos acá porque hoy ninguna cuenta lo tiene
+  // garantizado — el registro solo pide email, contraseña y celular
+  // (ver /login), así que sin esto el vendedor y el admin solo verían
+  // un email en cada pedido, nunca un nombre real de a quién le están
+  // vendiendo.
+  const [nombreComprador, setNombreComprador] = useState('')
   // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
   // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
   // comprador no la comparte, igual puede pedir con envío; su parada
@@ -249,6 +255,11 @@ function CheckoutContent() {
   }
 
   async function confirmarEntregaYCrearPedidos() {
+    if (!nombreComprador.trim()) {
+      setError('Escribí tu nombre y apellido antes de continuar.')
+      return
+    }
+
     // Si es retiro + efectivo, reservamos la pestaña de WhatsApp ACÁ
     // MISMO, todavía dentro del gesto de click del usuario — recién más
     // abajo, después de crear el pedido (que tarda porque es un fetch),
@@ -323,6 +334,7 @@ function CheckoutContent() {
             items: grupoItems,
             total: totalGrupo,
             comprador: usuario?.email || null,
+            nombreComprador,
             vendedorId,
             vendedorNombre,
             vendedorWhatsapp: whatsappVendedor,
@@ -363,7 +375,7 @@ function CheckoutContent() {
         // solo hay un subPedido — le llevamos directo a WhatsApp con el
         // detalle del pedido, sin ninguna pantalla intermedia de por
         // medio.
-        const link = nuevos[0] ? linkWhatsappRetiroEfectivo(nuevos[0]) : null
+        const link = nuevos[0] ? linkWhatsappRetiroEfectivo(nuevos[0], nombreComprador) : null
         if (link && ventanaWhatsapp) {
           ventanaWhatsapp.location.href = link
         } else if (link) {
@@ -500,6 +512,16 @@ function CheckoutContent() {
               🏬 Retiro en tienda
             </button>
           </div>
+
+          <label className="block text-left mb-4">
+            <span className="font-body text-[11px] text-inksoft block mb-1">Tu nombre</span>
+            <input
+              value={nombreComprador}
+              onChange={(e) => setNombreComprador(e.target.value)}
+              placeholder="Nombre y apellido"
+              className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+            />
+          </label>
 
           {metodoEntrega === 'envio' ? (
             <>

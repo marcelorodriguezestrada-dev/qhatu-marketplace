@@ -1178,7 +1178,10 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
-                    <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
+                    <div className="font-body text-xs font-semibold text-ink mt-0.5">
+                      👤 {p.nombreComprador || 'Sin nombre cargado'}
+                    </div>
+                    <div className="font-body text-[11px] text-inksoft">{p.comprador || 'Sin email'}</div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
                       🏪 {p.vendedorNombre || 'Clasi Click'}
                       {p.createdAt && ` · ${new Date(p.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}`}
@@ -1196,6 +1199,28 @@ export default function AdminPage() {
                       Confirmar pago
                     </button>
                   )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-line flex flex-col gap-2">
+                  {(p.items || []).map((it: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-md bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
+                        {(it.thumbUrl || it.imagenUrl) ? (
+                          <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="font-body text-[8px] text-inksoft">IMG</span>
+                        )}
+                      </div>
+                      <div className="font-body text-xs text-ink flex-1 min-w-0 truncate">
+                        {it.cantidad} × {it.nombre}
+                        {(it.tallaElegida || it.colorElegida) && (
+                          <span className="text-inksoft"> ({[it.tallaElegida, it.colorElegida].filter(Boolean).join(' · ')})</span>
+                        )}
+                      </div>
+                      <div className="font-body text-xs text-inksoft shrink-0">{bs(it.precio * it.cantidad)}</div>
+                    </div>
+                  ))}
+                  <div className="font-body text-xs font-semibold text-ink text-right">Total: {bs(p.total)}</div>
                 </div>
 
                 {p.estado === 'verificando_stock' && (

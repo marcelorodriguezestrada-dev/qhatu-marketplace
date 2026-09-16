@@ -1278,10 +1278,29 @@ export default function VenderPage() {
                 <div className="font-body text-xs text-inksoft">Pedido #{p.id.slice(0, 6)}</div>
                 <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
               </div>
-              <div className="font-body text-sm font-medium text-ink">{itemsVendidos.length} producto(s) · {bs(p.total)}</div>
-              <div className="font-body text-[11px] text-inksoft mt-1 mb-2">
-                Comprador: {p.comprador || 'Sin email'}
+              <div className="font-body text-xs font-semibold text-ink">👤 {p.nombreComprador || 'Sin nombre cargado'}</div>
+              <div className="font-body text-[11px] text-inksoft mb-2">{p.comprador || 'Sin email'}</div>
+
+              <div className="flex flex-col gap-2 mb-2">
+                {itemsVendidos.map((it: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-md bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
+                      {(it.thumbUrl || it.imagenUrl) ? (
+                        <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-body text-[8px] text-inksoft">IMG</span>
+                      )}
+                    </div>
+                    <div className="font-body text-xs text-ink flex-1 min-w-0 truncate">
+                      {it.cantidad} × {it.nombre}
+                      {(it.tallaElegida || it.colorElegida) && (
+                        <span className="text-inksoft"> ({[it.tallaElegida, it.colorElegida].filter(Boolean).join(' · ')})</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
+              <div className="font-body text-sm font-semibold text-ink mb-2">Total: {bs(p.total)}</div>
               {accion && (
                 <button
                   onClick={() => avanzarEstadoPedido(p.id, accion.estado)}

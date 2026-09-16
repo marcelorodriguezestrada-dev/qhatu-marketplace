@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
+    const { items, total, comprador, nombreComprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -64,6 +64,12 @@ export async function POST(req: NextRequest) {
       items,
       total: Number(total),
       comprador: comprador || null,
+      // Nombre y apellido que la persona escribió en el checkout — a
+      // diferencia de `comprador` (el email de la cuenta), esto es lo
+      // que el vendedor y el admin ven como "a nombre de quién" es el
+      // pedido, porque el registro de cuenta no pide nombre (ver
+      // /login: solo pide email, contraseña y celular).
+      nombreComprador: nombreComprador || null,
       vendedorId: vendedorId || null,
       // Guardamos nombre y WhatsApp del vendedor tal como estaban al
       // momento de la compra — así /admin puede mostrar de qué tienda
