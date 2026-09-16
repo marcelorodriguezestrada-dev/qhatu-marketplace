@@ -554,6 +554,14 @@ function CheckoutContent() {
             </div>
           </div>
 
+          <div className="bg-panelalt rounded-lg px-3.5 py-3 mb-5">
+            <div className="font-body text-[12px] text-inksoft mb-0.5">Subtotal: {bs(subtotalCarrito)}</div>
+            {costoEnvio > 0 && (
+              <div className="font-body text-[12px] text-inksoft mb-1">Envío: {bs(costoEnvio)}</div>
+            )}
+            <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
+          </div>
+
           <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button
               type="button"
@@ -594,45 +602,17 @@ function CheckoutContent() {
           {metodoEntrega === 'envio' ? (
             <>
               <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Zona</span>
-                <select
-                  value={grupoZonaSel}
-                  onChange={(e) => {
-                    const grupo = ZONAS_AGRUPADAS.find((g) => g.id === e.target.value)
-                    setGrupoZonaSel(e.target.value)
-                    if (grupo) setZonaEntrega(grupo.barrios[0])
-                  }}
-                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm mb-2"
-                >
-                  {ZONAS_AGRUPADAS.map((g) => (
-                    <option key={g.id} value={g.id}>{g.label} · {bs(g.costoEnvio)}</option>
-                  ))}
-                </select>
                 <span className="font-body text-[11px] text-inksoft block mb-1">Barrio</span>
                 <select
                   value={zonaEntrega}
                   onChange={(e) => setZonaEntrega(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 >
-                  {(ZONAS_AGRUPADAS.find((g) => g.id === grupoZonaSel)?.barrios || []).map((barrio) => (
-                    <option key={barrio} value={barrio}>{barrio}</option>
+                  {ZONAS_ENVIO_POTOSI.map((z) => (
+                    <option key={z.nombre} value={z.nombre}>{z.nombre} · {bs(z.costoEnvio)}</option>
                   ))}
                 </select>
               </label>
-              <div className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => setMostrarMapaZonas((v) => !v)}
-                  className="font-body text-[12px] text-teal font-semibold underline"
-                >
-                  {mostrarMapaZonas ? 'Ocultar mapa de zonas' : 'Ver mapa de zonas y costos de envío'}
-                </button>
-                {mostrarMapaZonas && (
-                  <div className="mt-2">
-                    <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
-                  </div>
-                )}
-              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
                 <input
@@ -642,19 +622,6 @@ function CheckoutContent() {
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>
-              <div className="mb-4">
-                <button
-                  type="button"
-                  onClick={usarMiUbicacion}
-                  disabled={buscandoUbicacion}
-                  className="font-body text-[12px] text-teal font-semibold underline disabled:opacity-60"
-                >
-                  {buscandoUbicacion ? 'Buscando ubicación...' : lat != null ? '📍 Ubicación guardada ✓ (volver a compartir)' : '📍 Compartir mi ubicación'}
-                </button>
-                <div className="font-body text-[11px] text-inksoft mt-1">
-                  Ayuda a que la moto arme la ruta más corta para llegar antes.
-                </div>
-              </div>
             </>
           ) : (
             <>
@@ -694,17 +661,13 @@ function CheckoutContent() {
               ) : (
                 /* Ningún vendedor del carrito tiene QR cargado todavía:
                    no hay a quién pagarle por ahí, así que se coordina
-                   todo por WhatsApp directo. */
-                <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                  Coordinás el pago y el retiro directo con cada vendedor por WhatsApp.
-                </div>
+                   todo por WhatsApp directo (sin mensaje explicativo
+                   acá — se explica solo en el paso siguiente). */
+                null
               )}
             </>
           )}
 
-          <div className="font-body text-[12px] text-inksoft mb-1">Subtotal: {bs(subtotalCarrito)}</div>
-          <div className="font-body text-[12px] text-inksoft mb-3">Envío: {bs(costoEnvio)}</div>
-          <div className="font-display text-xl font-bold text-ink mb-4">{bs(subtotalCarrito + costoEnvio)}</div>
           <button
             onClick={confirmarEntregaYCrearPedidos}
             disabled={authCargando}
