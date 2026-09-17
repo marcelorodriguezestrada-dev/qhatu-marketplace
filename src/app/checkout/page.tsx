@@ -735,6 +735,9 @@ function CheckoutContent() {
           <div className="font-display text-lg font-bold text-ink mb-1.5">
             El producto está disponible
           </div>
+          <div className="font-body text-[13px] text-ink mb-3">
+            Por favor realizá el pago a <strong>{subPedidos[pasoActual].vendedorNombre}</strong> y cuando termines presioná "Ya pagué".
+          </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
               {subPedidos[pasoActual].cobroPropio
@@ -800,7 +803,7 @@ function CheckoutContent() {
               <div className="flex items-center justify-between mb-1">
                 <span className="font-body text-sm font-medium text-ink">{s.vendedorNombre}</span>
                 <span className={`font-body text-[11px] font-semibold ${s.estadoActual === 'pagado' ? 'text-teal' : 'text-ochre'}`}>
-                  {s.estadoActual === 'pagado' ? 'Pagado' : 'Esperando confirmación'}
+                  {s.estadoActual === 'pagado' ? 'Pagado' : 'Esperando confirmación · es un instante'}
                 </span>
               </div>
               <div className="font-body text-xs text-inksoft mb-2">{bs(s.total)} · {s.items.length} producto(s)</div>
