@@ -794,11 +794,7 @@ function CheckoutContent() {
                 <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
               )}
             </div>
-          ) : (
-            <div className="font-body text-sm text-inksoft mb-4 text-center">
-              Avisamos a cada vendedor. Esto se actualiza solo a medida que van confirmando.
-            </div>
-          )}
+          ) : null}
           {subPedidos.map((s, i) => (
             <div key={i} className="bg-panel border border-line rounded-lg p-4 mb-3">
               <div className="flex items-center justify-between mb-1">
