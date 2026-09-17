@@ -2320,6 +2320,17 @@ export default function AdminPage() {
 
       {tab === 'reparto' && (
         <div>
+          <button
+            type="button"
+            onClick={() => {
+              const link = `${window.location.origin}/reparto-hoy?clave=${encodeURIComponent(password)}`
+              navigator.clipboard.writeText(link)
+              alert('Link copiado — pasáselo al repartidor por WhatsApp. No hace falta que inicie sesión.')
+            }}
+            className="mb-4 px-3.5 py-2 rounded-md border border-line font-body text-xs font-semibold"
+          >
+            🔗 Copiar link para el repartidor
+          </button>
           {(() => {
             // Solo entran acá los pedidos con envío YA pagados (con
             // stock ya confirmado, porque sin eso ni siquiera llegan a
