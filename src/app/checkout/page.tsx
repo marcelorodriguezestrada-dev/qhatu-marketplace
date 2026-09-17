@@ -736,7 +736,7 @@ function CheckoutContent() {
             El producto está disponible
           </div>
           <div className="font-body text-[13px] text-ink mb-3">
-            Por favor realizá el pago a <strong>{subPedidos[pasoActual].vendedorNombre}</strong> y cuando termines presioná "Ya pagué".
+            Por favor realizá el pago y cuando termines presioná "Ya pagué".
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
@@ -800,8 +800,7 @@ function CheckoutContent() {
           ) : null}
           {subPedidos.map((s, i) => (
             <div key={i} className="bg-panel border border-line rounded-lg p-4 mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-body text-sm font-medium text-ink">{s.vendedorNombre}</span>
+              <div className="flex items-center justify-end mb-1">
                 <span className={`font-body text-[11px] font-semibold ${s.estadoActual === 'pagado' ? 'text-teal' : 'text-ochre'}`}>
                   {s.estadoActual === 'pagado' ? 'Pagado' : 'Esperando confirmación · es un instante'}
                 </span>
