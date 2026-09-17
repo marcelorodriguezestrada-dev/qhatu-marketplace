@@ -379,7 +379,16 @@ function CheckoutContent() {
           cobroPropio,
           pedidoId: dataPedido.id,
           declarado: false,
-          estadoActual: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
+          // Antes acá se ponía 'verificando_stock' y el comprador se
+          // quedaba esperando a que el vendedor confirme. Ahora el
+          // comprador sigue directo como si el producto ya estuviera
+          // disponible — el pedido en la base SIGUE guardándose con
+          // estado 'verificando_stock' (eso no cambió, ver
+          // /api/pedidos), así que el vendedor y el admin lo siguen
+          // viendo para confirmar el stock desde /mis-pedidos o
+          // /admin. Si no había stock, se soluciona por WhatsApp
+          // después, no bloqueando el pago acá.
+          estadoActual: 'pendiente_pago',
         })
       }
 
@@ -433,32 +442,11 @@ function CheckoutContent() {
     })
   }
 
-  // Mientras el paso actual está "verificando_stock" (solo pasa con
-  // envío), consultamos cada pocos segundos si el vendedor ya lo
-  // confirmó desde /mis-pedidos o vos desde /admin. En cuanto cambia,
-  // esta misma pantalla pasa sola a mostrar el QR — el comprador no
-  // tiene que hacer nada ni refrescar.
-  useEffect(() => {
-    if (etapa !== 'pagando') return
-    const sub = subPedidos[pasoActual]
-    if (!sub || sub.estadoActual !== 'verificando_stock' || !sub.pedidoId) return
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/pedidos/${sub.pedidoId}`)
-        const data = await res.json()
-        if (data.estado && data.estado !== 'verificando_stock') {
-          setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, estadoActual: data.estado } : s)))
-        }
-      } catch {
-        // si falla una consulta, probamos de nuevo en el siguiente ciclo
-      }
-    }, 4000)
-    return () => clearInterval(interval)
-    // Solo nos importa si ESTE paso sigue en verificación — no hace
-    // falta re-crear el intervalo por cambios en otros subpedidos.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, pasoActual, subPedidos[pasoActual]?.estadoActual, subPedidos[pasoActual]?.pedidoId])
+  // Antes acá había un polling que consultaba cada 4 segundos si el
+  // vendedor ya había confirmado el stock, para sacar al comprador de
+  // la pantalla de espera. Ya no hace falta: el comprador nunca entra
+  // a ese estado del lado del cliente (ver más arriba), así que no
+  // hay nada que esperar ni que consultar acá.
 
   useEffect(() => {
     if (etapa !== 'resumen') return
@@ -506,13 +494,11 @@ function CheckoutContent() {
 
       {etapa === 'entrega' && (
         <div className="bg-panel border border-line rounded-xl p-6">
-          <div className="font-display text-lg font-bold text-ink mb-4">¿Cómo lo recibís?</div>
-
           {/* Detalle de lo que se está comprando, con foto de cada
               producto — va primero para que el comprador vea qué está
               llevando antes de meterse a elegir método de entrega. */}
           <div className="mb-5">
-            <span className="font-body text-[11px] text-inksoft block mb-1.5">Tu pedido</span>
+            <div className="font-display text-lg font-bold text-ink mb-3">Tu pedido</div>
             <div className="border-t border-line divide-y divide-line">
               {items.map((it) => (
                 <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center gap-3 py-2.5 font-body text-[13px] text-ink">
@@ -572,6 +558,8 @@ function CheckoutContent() {
             )}
             <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
           </div>
+
+          <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo querés recibir tu pedido?</div>
 
           <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button
@@ -729,51 +717,12 @@ function CheckoutContent() {
         </div>
       )}
 
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual === 'verificando_stock' && (
-        <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          {subPedidos.length > 1 && (
-            <div className="font-body text-[11px] text-inksoft mb-2">
-              Pedido {pasoActual + 1} de {subPedidos.length}
-            </div>
-          )}
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-ochresoft flex items-center justify-center text-3xl animate-pulse">
-            🔍
-          </div>
-          <div className="font-display text-lg font-bold text-ink mb-1.5">
-            {subPedidos[pasoActual].vendedorNombre} está verificando el stock
-          </div>
-          <div className="font-body text-[13px] text-inksoft">
-            No hace falta que hagas nada — en cuanto confirme, seguimos acá mismo.
-          </div>
-        </div>
-      )}
+      {/* Ya no existe la pantalla de "verificando stock" del lado del
+          comprador, ni la de "el producto está disponible, confirmá
+          para seguir" (ver la nota en confirmarEntregaYCrearPedidos)
+          — se pasa directo al paso de pago de acá abajo. */}
 
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && !pasosConfirmados.has(pasoActual) && (
-        <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          {subPedidos.length > 1 && (
-            <div className="font-body text-[11px] text-inksoft mb-2">
-              Pedido {pasoActual + 1} de {subPedidos.length}
-            </div>
-          )}
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-tealsoft flex items-center justify-center text-3xl">
-            ✅
-          </div>
-          <div className="font-display text-lg font-bold text-ink mb-1.5">
-            El producto está disponible
-          </div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            {subPedidos[pasoActual].vendedorNombre} confirmó que tiene stock. Podés continuar con la compra.
-          </div>
-          <button
-            onClick={() => setPasosConfirmados((prev) => new Set(prev).add(pasoActual))}
-            className="w-full py-3 rounded-lg bg-maroon text-white font-body text-sm font-semibold"
-          >
-            Continuar con la compra
-          </button>
-        </div>
-      )}
-
-      {etapa === 'pagando' && subPedidos[pasoActual] && subPedidos[pasoActual].estadoActual !== 'verificando_stock' && pasosConfirmados.has(pasoActual) && (
+      {etapa === 'pagando' && subPedidos[pasoActual] && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
           {subPedidos.length > 1 && (
             <div className="font-body text-[11px] text-inksoft mb-2">
