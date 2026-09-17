@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { calcularFranja } from '@/lib/reparto'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 
 function bs(n: number) {
@@ -28,9 +27,13 @@ const ESTADOS_PREVIOS: Record<string, string> = {
   informado_pago: 'Avisaste que ya pagaste — estamos confirmándolo.',
 }
 
-function ventanaEntrega(pagadoAt?: string): string {
-  const fecha = pagadoAt ? new Date(pagadoAt) : new Date()
-  return calcularFranja(fecha) === '08:00' ? 'entre las 8:00 y las 12:00' : 'entre las 14:00 y las 18:00'
+// Igual que en el checkout: la entrega es al día siguiente del pago,
+// horario todavía sin confirmar — no una franja horaria del mismo día.
+function fechaEntregaTexto(pagadoAt?: string): string {
+  const base = pagadoAt ? new Date(pagadoAt) : new Date()
+  const manana = new Date(base)
+  manana.setDate(manana.getDate() + 1)
+  return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
 }
 
 export default function SeguimientoPedidoPage() {
@@ -122,7 +125,7 @@ export default function SeguimientoPedidoPage() {
           {esEnvio && pedido.estado !== 'entregado' && (
             <div className="bg-tealsoft border border-teal rounded-xl p-4 mb-5 text-center">
               <div className="font-body text-[13px] text-ink">
-                Esperalo en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>, {ventanaEntrega(pedido.pagadoAt)}.
+                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt)}, horario a confirmar. Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
               </div>
             </div>
           )}

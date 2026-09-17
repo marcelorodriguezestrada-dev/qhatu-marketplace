@@ -7,7 +7,6 @@ import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
-import { calcularFranja } from '@/lib/reparto'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -18,8 +17,14 @@ function bs(n: number) {
 // mismo. Es una estimación para mostrarle al comprador, no un dato que
 // se guarda — el horario real de reparto lo arma /admin con la ruta del
 // día.
-function ventanaEntrega(): string {
-  return calcularFranja(new Date()) === '08:00' ? 'entre las 8:00 y las 12:00' : 'entre las 14:00 y las 18:00'
+// Ya no calculamos una franja horaria de "hoy" — ahora la entrega es al
+// día siguiente del pago, con horario todavía sin confirmar (lo
+// coordina la moto directamente). Muestra la fecha de mañana en
+// español, ej: "mañana, jueves 18 de septiembre".
+function fechaEntregaTexto(): string {
+  const manana = new Date()
+  manana.setDate(manana.getDate() + 1)
+  return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
 }
 
 function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
@@ -788,10 +793,10 @@ function CheckoutContent() {
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">Tu pedido está en marcha</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">¡Felicidades, tu compra fue un éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
-                  Esperalo en la dirección que diste, {ventanaEntrega()}. Podés hacer el seguimiento acá abajo.
+                  Estarás recibiendo el pedido {fechaEntregaTexto()}, horario a confirmar.
                 </div>
               ) : (
                 <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
