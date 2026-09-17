@@ -729,21 +729,24 @@ function CheckoutContent() {
               Pago {pasoActual + 1} de {subPedidos.length}
             </div>
           )}
-          <div className="font-display text-lg font-bold text-ink mb-1.5">
-            Pagale a {subPedidos[pasoActual].vendedorNombre}
+          <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-tealsoft flex items-center justify-center text-2xl">
+            ✅
           </div>
-          <div className="font-body text-[13px] text-inksoft mb-5">
-            {metodoEntrega === 'envio'
-              ? 'Pagá'
-              : subPedidos[pasoActual].cobroPropio
+          <div className="font-display text-lg font-bold text-ink mb-1.5">
+            El producto está disponible
+          </div>
+          {metodoEntrega !== 'envio' && (
+            <div className="font-body text-[13px] text-inksoft mb-5">
+              {subPedidos[pasoActual].cobroPropio
                 ? 'Este vendedor cobra directo — el pago va a su cuenta, no a Clasi Click'
                 : 'Este vendedor todavía no configuró su cobro — usá el QR general por ahora'}
-          </div>
+            </div>
+          )}
 
           {subPedidos[pasoActual].qrImageUrl ? (
-            <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line" />
+            <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line mt-2" />
           ) : (
-            <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink">
+            <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink mt-2">
               {subPedidos[pasoActual].cbu ? (
                 <div><strong>Cuenta / CBU:</strong> {subPedidos[pasoActual].cbu}</div>
               ) : (
@@ -756,12 +759,7 @@ function CheckoutContent() {
             </div>
           )}
 
-          <div className="font-display text-2xl font-bold text-ink mt-4 mb-1">{bs(subPedidos[pasoActual].total)}</div>
-          {subPedidos[pasoActual].pedidoId && (
-            <div className="font-body text-xs text-inksoft mb-5">
-              Incluí la referencia <strong>#{subPedidos[pasoActual].pedidoId!.slice(0, 6)}</strong> en el pago si tu banco lo permite
-            </div>
-          )}
+          <div className="font-display text-2xl font-bold text-ink mt-4 mb-5">{bs(subPedidos[pasoActual].total)}</div>
 
           <button
             onClick={declararPagoActual}
