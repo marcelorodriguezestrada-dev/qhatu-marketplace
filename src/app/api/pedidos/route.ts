@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, nombreComprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
+    const { items, total, comprador, nombreComprador, zonaEntrega, direccion, entreCalles, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -79,6 +79,10 @@ export async function POST(req: NextRequest) {
       vendedorWhatsapp: vendedorWhatsapp || '',
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
+      // Referencia opcional ("entre calle X y calle Y") — ayuda a
+      // ubicar la dirección cuando el barrio no tiene numeración clara,
+      // sin ser obligatoria.
+      entreCalles: entreCalles || null,
       // Ubicación opcional que comparte el comprador al pedir con
       // envío — la usa /admin (pestaña Reparto) para armar la ruta de
       // la moto por cercanía. Sin esto, el pedido igual se puede

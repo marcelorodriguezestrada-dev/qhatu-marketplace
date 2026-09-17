@@ -191,12 +191,18 @@ function CheckoutContent() {
       setMetodoPago('efectivo')
     }
   }, [metodoEntrega, consultandoVendedores, algunVendedorConQR])
-  const [zonaEntrega, setZonaEntrega] = useState(ZONAS_ENVIO_POTOSI[0].nombre)
+  // Arranca vacío a propósito — hasta que el comprador no elige un
+  // barrio, no mostramos ningún costo de envío (ver el resumen de
+  // arriba de "¿Cómo lo recibís?"). Antes traía el primer barrio de la
+  // lista precargado, así que el envío ya aparecía sin que nadie
+  // hubiera elegido nada.
+  const [zonaEntrega, setZonaEntrega] = useState('')
   // Qué "Zona 1/2/3" está elegida en el primer selector — el segundo
   // selector (el barrio) recién muestra las opciones de ese grupo.
   const [grupoZonaSel, setGrupoZonaSel] = useState(grupoDeBarrio(ZONAS_ENVIO_POTOSI[0].nombre)?.id || ZONAS_AGRUPADAS[0].id)
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
+  const [entreCalles, setEntreCalles] = useState('')
   // El nombre lo pedimos acá porque hoy ninguna cuenta lo tiene
   // garantizado — el registro solo pide email, contraseña y celular
   // (ver /login), así que sin esto el vendedor y el admin solo verían
@@ -262,6 +268,10 @@ function CheckoutContent() {
   async function confirmarEntregaYCrearPedidos() {
     if (!nombreComprador.trim()) {
       setError('Escribí tu nombre y apellido antes de continuar.')
+      return
+    }
+    if (metodoEntrega === 'envio' && !zonaEntrega) {
+      setError('Elegí tu barrio antes de continuar.')
       return
     }
 
@@ -345,6 +355,7 @@ function CheckoutContent() {
             vendedorWhatsapp: whatsappVendedor,
             zonaEntrega,
             direccion,
+            entreCalles: entreCalles || null,
             lat: metodoEntrega === 'envio' ? lat : null,
             lng: metodoEntrega === 'envio' ? lng : null,
             costoEnvio: envioGrupo,
@@ -556,7 +567,7 @@ function CheckoutContent() {
 
           <div className="bg-panelalt rounded-lg px-3.5 py-3 mb-5">
             <div className="font-body text-[12px] text-inksoft mb-0.5">Subtotal: {bs(subtotalCarrito)}</div>
-            {costoEnvio > 0 && (
+            {metodoEntrega === 'envio' && zonaEntrega && (
               <div className="font-body text-[12px] text-inksoft mb-1">Envío: {bs(costoEnvio)}</div>
             )}
             <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
@@ -608,17 +619,43 @@ function CheckoutContent() {
                   onChange={(e) => setZonaEntrega(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 >
+                  <option value="">Elegí tu barrio</option>
                   {ZONAS_ENVIO_POTOSI.map((z) => (
-                    <option key={z.nombre} value={z.nombre}>{z.nombre} · {bs(z.costoEnvio)}</option>
+                    <option key={z.nombre} value={z.nombre}>{z.nombre}</option>
                   ))}
                 </select>
               </label>
+
+              <div className="mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMostrarMapaZonas((v) => !v)}
+                  className="font-body text-[12px] text-teal font-semibold underline"
+                >
+                  {mostrarMapaZonas ? 'Ocultar mapa de zonas' : 'Ver mapa de zonas y costos de envío'}
+                </button>
+                {mostrarMapaZonas && (
+                  <div className="mt-2">
+                    <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
+                  </div>
+                )}
+              </div>
+
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
                 <input
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
                   placeholder="Calle, número, barrio"
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                />
+              </label>
+              <label className="block text-left mb-3">
+                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles (opcional)</span>
+                <input
+                  value={entreCalles}
+                  onChange={(e) => setEntreCalles(e.target.value)}
+                  placeholder="Ej: entre Bolívar y Junín"
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>

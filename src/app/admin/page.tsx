@@ -1188,6 +1188,7 @@ export default function AdminPage() {
                     </div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
                       {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
+                      {p.entreCalles && ` (${p.entreCalles})`}
                     </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
                   </div>
@@ -2359,7 +2360,10 @@ export default function AdminPage() {
                       {i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-body text-[13px] font-medium text-ink">{p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}</div>
+                      <div className="font-body text-[13px] font-medium text-ink">
+                        {p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}
+                        {p.entreCalles && ` (${p.entreCalles})`}
+                      </div>
                       <div className="font-body text-[11px] text-inksoft">
                         {p.comprador || 'Sin email'} · {bs(p.total)}
                         {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
