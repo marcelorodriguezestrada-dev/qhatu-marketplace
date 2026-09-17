@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Seccion = {
   id: string
@@ -122,6 +122,14 @@ const SECCIONES: Seccion[] = [
 
 export default function AyudaPage() {
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [whatsappClasiClick, setWhatsappClasiClick] = useState('')
+
+  useEffect(() => {
+    fetch('/api/configuracion/contacto')
+      .then((r) => r.json())
+      .then((data) => setWhatsappClasiClick(data.whatsapp || ''))
+      .catch(() => {})
+  }, [])
 
 
   const [formNombre, setFormNombre] = useState('')
@@ -209,10 +217,20 @@ export default function AyudaPage() {
         </div>
       ))}
 
-      <div className="bg-panelalt border border-line rounded-xl p-5 text-center mt-10">
-        <div className="font-body text-sm text-ink mb-1">¿No encontraste lo que buscabas?</div>
-        <div className="font-body text-xs text-inksoft">Escribinos directo por WhatsApp y te ayudamos.</div>
-      </div>
+      {whatsappClasiClick && (
+        <div className="bg-panelalt border border-line rounded-xl p-5 text-center mt-10">
+          <div className="font-body text-sm text-ink mb-1">¿No encontraste lo que buscabas?</div>
+          <div className="font-body text-xs text-inksoft mb-3">Escribinos directo por WhatsApp y te ayudamos.</div>
+          <a
+            href={`https://wa.me/${whatsappClasiClick}?text=${encodeURIComponent('Hola! Tengo una consulta sobre Clasi Click.')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-5 py-2.5 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold"
+          >
+            💬 Escribir por WhatsApp
+          </a>
+        </div>
+      )}
 
 
         {/* ── Formulario de contacto ── */}

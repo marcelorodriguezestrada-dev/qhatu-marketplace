@@ -250,6 +250,7 @@ export default function AdminPage() {
         cargarBanners(pw)
         cargarMacheos(pw)
         cargarConfigPagos()
+        cargarConfigContacto()
       })
       .catch((e) => {
         setError(e.message)
@@ -267,6 +268,33 @@ export default function AdminPage() {
   const [subiendoQrPago, setSubiendoQrPago] = useState(false)
   const [guardandoConfigPago, setGuardandoConfigPago] = useState(false)
   const [configPagoGuardada, setConfigPagoGuardada] = useState(false)
+
+  // WhatsApp propio de Clasi Click (no el de un vendedor puntual) —
+  // se usa en /ayuda para el botón de contacto general.
+  const [whatsappClasiClick, setWhatsappClasiClick] = useState('')
+  const [guardandoWhatsappCC, setGuardandoWhatsappCC] = useState(false)
+  const [whatsappCCGuardado, setWhatsappCCGuardado] = useState(false)
+
+  function cargarConfigContacto() {
+    fetch('/api/configuracion/contacto')
+      .then((r) => r.json())
+      .then((data) => setWhatsappClasiClick(data.whatsapp || ''))
+  }
+
+  async function guardarWhatsappClasiClick() {
+    setGuardandoWhatsappCC(true)
+    setWhatsappCCGuardado(false)
+    try {
+      await fetch('/api/configuracion/contacto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ whatsapp: whatsappClasiClick }),
+      })
+      setWhatsappCCGuardado(true)
+    } finally {
+      setGuardandoWhatsappCC(false)
+    }
+  }
 
   function cargarConfigPagos() {
     fetch('/api/configuracion/pagos')
@@ -1092,6 +1120,29 @@ export default function AdminPage() {
             </button>
             {configPagoGuardada && <span className="font-body text-[11px] text-teal ml-2">Guardado ✓</span>}
           </div>
+        </div>
+      </div>
+
+      <div className="bg-panel border border-line rounded-xl p-4 mb-6">
+        <div className="font-body text-sm font-semibold text-ink mb-1">WhatsApp de Clasi Click</div>
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          El número de contacto general de la plataforma — no el de un vendedor o profesional puntual. Se usa en /ayuda para el botón "Escribinos por WhatsApp".
+        </div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <input
+            value={whatsappClasiClick}
+            onChange={(e) => setWhatsappClasiClick(e.target.value)}
+            placeholder="Ej: 59171234567"
+            className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-line font-body text-xs"
+          />
+          <button
+            onClick={guardarWhatsappClasiClick}
+            disabled={guardandoWhatsappCC}
+            className="px-3.5 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-60"
+          >
+            {guardandoWhatsappCC ? 'Guardando...' : 'Guardar'}
+          </button>
+          {whatsappCCGuardado && <span className="font-body text-[11px] text-teal">Guardado ✓</span>}
         </div>
       </div>
 
