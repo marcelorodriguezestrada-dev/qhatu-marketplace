@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { ProductIcon } from '@/components/ProductIcon'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -41,7 +42,7 @@ function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): stri
 function linkComprobanteWhatsapp(s: SubPedido, nombreComprador: string): string | null {
   if (!s.whatsappCobro) return null
   const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
-  const texto = `Hola! Soy ${nombreComprador}. Te mando el comprobante de mi pago del pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''}:\n${detalle}\nTotal: ${bs(s.total)}\n👇 Ahí va el screenshot`
+  const texto = `Hola! Soy ${nombreComprador}. Te mando el comprobante de mi pago del pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''}:\n${detalle}\nTotal: ${bs(s.total)}`
   return `https://wa.me/${s.whatsappCobro.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
@@ -859,9 +860,16 @@ function CheckoutContent() {
             <div className="font-body text-[11px] text-inksoft mb-1.5">Estás pagando</div>
             <div className="divide-y divide-line">
               {subPedidos[pasoActual].items.map((it, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 py-1.5 font-body text-[13px] text-ink">
-                  <span className="flex-1 min-w-0">{it.cantidad} × {it.nombre}</span>
-                  <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
+                <div key={i} className="flex items-center gap-2.5 py-1.5">
+                  <div className="w-9 h-9 rounded-md bg-panel border border-line overflow-hidden shrink-0 flex items-center justify-center">
+                    {it.thumbUrl || it.imagenUrl ? (
+                      <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    ) : (
+                      <ProductIcon kind={it.icono} size={16} />
+                    )}
+                  </div>
+                  <span className="flex-1 min-w-0 font-body text-[13px] text-ink">{it.cantidad} × {it.nombre}</span>
+                  <span className="shrink-0 font-body text-[13px] text-ink">{bs(it.precio * it.cantidad)}</span>
                 </div>
               ))}
             </div>
