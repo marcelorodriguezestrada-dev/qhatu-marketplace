@@ -536,51 +536,55 @@ function CheckoutContent() {
             <div className="font-display text-lg font-bold text-ink mb-3">Tu pedido</div>
             <div className="border-t border-line divide-y divide-line">
               {items.map((it) => (
-                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center gap-3 py-2.5 font-body text-[13px] text-ink">
-                  {(it.thumbUrl || it.imagenUrl) ? (
-                    <img
-                      src={it.thumbUrl || it.imagenUrl}
-                      alt={it.nombre}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-12 h-12 rounded-lg object-cover border border-line shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg border border-line bg-panelalt shrink-0" />
-                  )}
-                  <span className="flex-1 min-w-0">
-                    {it.nombre}
-                    {(it.tallaElegida || it.colorElegida) && (
-                      <span className="block text-[11px] text-inksoft">
-                        {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
-                      </span>
+                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="py-3 font-body text-[13px] text-ink">
+                  <div className="flex items-center gap-3 mb-2">
+                    {(it.thumbUrl || it.imagenUrl) ? (
+                      <img
+                        src={it.thumbUrl || it.imagenUrl}
+                        alt={it.nombre}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-12 h-12 rounded-lg object-cover border border-line shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg border border-line bg-panelalt shrink-0" />
                     )}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="flex-1 min-w-0 leading-snug">
+                      {it.nombre}
+                      {(it.tallaElegida || it.colorElegida) && (
+                        <span className="block text-[11px] text-inksoft">
+                          {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pl-[60px]">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => cambiarCantidad(it, -1)}
+                        className="w-6 h-6 border border-line rounded text-sm leading-none"
+                      >
+                        −
+                      </button>
+                      <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
+                      <button
+                        type="button"
+                        onClick={() => cambiarCantidad(it, 1)}
+                        className="w-6 h-6 border border-line rounded text-sm leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
                     <button
                       type="button"
-                      onClick={() => cambiarCantidad(it, -1)}
-                      className="w-6 h-6 border border-line rounded text-sm leading-none"
+                      onClick={() => quitar(it)}
+                      className="shrink-0 font-body text-[11px] text-maroon underline"
                     >
-                      −
-                    </button>
-                    <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidad(it, 1)}
-                      className="w-6 h-6 border border-line rounded text-sm leading-none"
-                    >
-                      +
+                      quitar
                     </button>
                   </div>
-                  <span className="shrink-0 w-16 text-right">{bs(it.precio * it.cantidad)}</span>
-                  <button
-                    type="button"
-                    onClick={() => quitar(it)}
-                    className="shrink-0 font-body text-[11px] text-maroon underline"
-                  >
-                    quitar
-                  </button>
                 </div>
               ))}
             </div>
@@ -594,7 +598,7 @@ function CheckoutContent() {
             <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
           </div>
 
-          <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo querés recibir tu pedido?</div>
+          <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo quieres recibir tu pedido?</div>
 
           <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
             <button

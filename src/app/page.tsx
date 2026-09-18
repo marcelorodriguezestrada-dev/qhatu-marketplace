@@ -147,7 +147,7 @@ export default function CatalogoPage() {
           >
             <div className="text-2xl mb-1">🧑‍🔧</div>
             <div className="font-display text-sm sm:text-base font-bold text-white">Servicios</div>
-            <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales cerca tuyo</div>
+            <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales</div>
           </Link>
         </div>
 
