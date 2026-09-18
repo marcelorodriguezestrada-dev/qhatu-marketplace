@@ -741,7 +741,7 @@ function CheckoutContent() {
             El producto está disponible
           </div>
           <div className="font-body text-[13px] text-ink mb-3">
-            Por favor realizá el pago y cuando termines presioná "Ya pagué".
+            Escaneá el QR, realizá el pago y enviá el comprobante por WhatsApp al vendedor.
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
@@ -769,11 +769,32 @@ function CheckoutContent() {
 
           <div className="font-display text-2xl font-bold text-ink mt-4 mb-5">{bs(subPedidos[pasoActual].total)}</div>
 
+          {/* Botón principal: ir a WhatsApp a mandar el comprobante */}
+          <a
+            href={(() => {
+              const s = subPedidos[pasoActual]
+              const numero = (s.whatsapp || s.vendedorWhatsapp || '').replace(/\D/g, '')
+              const items = s.items?.map((it: any) => `• ${it.nombre} x${it.cantidad} — ${bs(it.precio * it.cantidad)}`).join('\n') || ''
+              const texto = `Hola! Acabo de realizar el pago de mi pedido en Clasi Click 🛍️\n\n*Pedido #${s.pedidoId || ''}*\n${items}\n\n*Total pagado: ${bs(s.total)}*\n\nTe mando el comprobante a continuación 👇`
+              return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`
+            })()}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full py-3 rounded-lg border-none bg-[#25D366] text-white font-body text-sm font-semibold flex items-center justify-center gap-2 mb-3 no-underline"
+            onClick={() => {
+              // Después de abrir WhatsApp, esperar 3 segundos y declarar el pago
+              setTimeout(() => declararPagoActual(), 3000)
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.523 5.847L.057 23.882a.5.5 0 0 0 .613.613l6.101-1.459A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.524-5.168-1.432l-.361-.216-3.747.896.911-3.659-.236-.374A9.937 9.937 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            Enviar comprobante por WhatsApp
+          </a>
+
           <button
             onClick={declararPagoActual}
-            className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+            className="w-full py-2.5 rounded-lg border border-line bg-transparent text-inksoft font-body text-sm"
           >
-            Ya pagué
+            Ya envié el comprobante, continuar
           </button>
         </div>
       )}
