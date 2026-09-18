@@ -851,11 +851,24 @@ function CheckoutContent() {
           <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-tealsoft flex items-center justify-center text-2xl">
             ✅
           </div>
-          <div className="font-display text-lg font-bold text-ink mb-1.5">
-            El producto está disponible
+
+          {/* Resumen de lo que se está pagando, antes del QR -- para
+              que quede clara la compra justo en el momento de pagar,
+              no solo más arriba en el paso de entrega. */}
+          <div className="text-left bg-panelalt border border-line rounded-lg p-3.5 mb-4">
+            <div className="font-body text-[11px] text-inksoft mb-1.5">Estás pagando</div>
+            <div className="divide-y divide-line">
+              {subPedidos[pasoActual].items.map((it, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 py-1.5 font-body text-[13px] text-ink">
+                  <span className="flex-1 min-w-0">{it.cantidad} × {it.nombre}</span>
+                  <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="font-body text-[13px] text-ink mb-3">
-            Por favor realizá el pago y cuando termines presioná "Enviar comprobante". Se te va a abrir WhatsApp para que mandes el screenshot.
+
+          <div className="font-body text-[13px] text-ink font-medium mb-3">
+            Pagá con el QR
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
