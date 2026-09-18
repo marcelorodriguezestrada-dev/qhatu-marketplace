@@ -7,6 +7,7 @@ import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
+import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -222,6 +223,38 @@ function CheckoutContent() {
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
+  // Resultado de chequear la dirección contra OpenStreetMap: null =
+  // todavía no se chequeó, true = la encontró, false = no la encontró
+  // (esto NO bloquea seguir — ver el comentario largo en
+  // /api/validar-direccion sobre por qué es solo un aviso).
+  const [direccionVerificada, setDireccionVerificada] = useState<boolean | null>(null)
+  const [verificandoDireccion, setVerificandoDireccion] = useState(false)
+
+  function verificarDireccion() {
+    if (!direccion.trim()) {
+      setDireccionVerificada(null)
+      return
+    }
+    setVerificandoDireccion(true)
+    fetch('/api/validar-direccion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ direccion }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setDireccionVerificada(!!data.encontrada)
+        // Si la persona no compartió su ubicación en vivo (más precisa),
+        // usamos el punto que encontró Nominatim como mejor que nada —
+        // ayuda a la moto igual, aunque sea aproximado a la calle.
+        if (data.encontrada && lat == null && lng == null) {
+          setLat(data.lat)
+          setLng(data.lng)
+        }
+      })
+      .catch(() => setDireccionVerificada(null))
+      .finally(() => setVerificandoDireccion(false))
+  }
   // El nombre lo pedimos acá porque hoy ninguna cuenta lo tiene
   // garantizado — el registro solo pide email, contraseña y celular
   // (ver /login), así que sin esto el vendedor y el admin solo verían
@@ -292,6 +325,11 @@ function CheckoutContent() {
     }
     if (!whatsappComprador.trim()) {
       setError('Escribí tu WhatsApp antes de continuar — lo necesitamos para el comprobante y para avisarte del pedido.')
+      return
+    }
+    const validacionWhatsapp = validarWhatsappBoliviano(whatsappComprador)
+    if (!validacionWhatsapp.valido) {
+      setError(validacionWhatsapp.motivo || 'Revisá tu número de WhatsApp.')
       return
     }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
@@ -689,15 +727,32 @@ function CheckoutContent() {
                 )}
               </div>
 
-              <label className="block text-left mb-3">
+              <label className="block text-left mb-1">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Dirección *</span>
                 <input
                   value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
+                  onChange={(e) => {
+                    setDireccion(e.target.value)
+                    setDireccionVerificada(null)
+                  }}
+                  onBlur={verificarDireccion}
                   placeholder="Calle, número, barrio"
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>
+              <div className="mb-3 min-h-[16px]">
+                {verificandoDireccion && (
+                  <span className="font-body text-[11px] text-inksoft">Verificando dirección...</span>
+                )}
+                {!verificandoDireccion && direccionVerificada === true && (
+                  <span className="font-body text-[11px] text-teal">✓ Encontramos esta dirección en el mapa.</span>
+                )}
+                {!verificandoDireccion && direccionVerificada === false && (
+                  <span className="font-body text-[11px] text-ochre">
+                    ⚠ No pudimos confirmar esta dirección en el mapa — revisá que esté bien escrita. Igual podés continuar, la moto va a confirmar el punto exacto.
+                  </span>
+                )}
+              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles (opcional)</span>
                 <input
@@ -751,6 +806,10 @@ function CheckoutContent() {
                 null
               )}
             </>
+          )}
+
+          {error && (
+            <div className="font-body text-xs text-maroon mb-3">{error}</div>
           )}
 
           <button

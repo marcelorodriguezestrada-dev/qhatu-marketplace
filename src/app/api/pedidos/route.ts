@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       // pedido, porque el registro de cuenta no pide nombre (ver
       // /login: solo pide email, contraseña y celular).
       nombreComprador: nombreComprador || null,
-      whatsappComprador: whatsappComprador || null,
+      whatsappComprador: whatsappComprador ? numeroLocalABolivia(whatsappComprador) : null,
       vendedorId: vendedorId || null,
       // Guardamos nombre y WhatsApp del vendedor tal como estaban al
       // momento de la compra — así /admin puede mostrar de qué tienda
