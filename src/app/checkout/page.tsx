@@ -849,10 +849,13 @@ function CheckoutContent() {
             </div>
           )}
           <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-tealsoft flex items-center justify-center text-2xl">
-            💳
+            ✅
           </div>
           <div className="font-display text-lg font-bold text-ink mb-1.5">
-            Pagá a este QR
+            El producto está disponible
+          </div>
+          <div className="font-body text-[13px] text-ink mb-3">
+            Por favor realizá el pago y cuando termines presioná "Enviar comprobante". Se te va a abrir WhatsApp para que mandes el screenshot.
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
@@ -878,11 +881,16 @@ function CheckoutContent() {
             </div>
           )}
 
-          <div className="font-display text-2xl font-bold text-ink mt-4 mb-5">{bs(subPedidos[pasoActual].total)}</div>
+          <div className="font-display text-2xl font-bold text-ink mt-4 mb-4">{bs(subPedidos[pasoActual].total)}</div>
+
+          <div className="font-body text-[13px] text-ink font-medium mb-2">
+            👇 Para continuar, mandá el comprobante a este WhatsApp
+          </div>
 
           <button
             onClick={declararPagoActual}
-            className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+            className="w-full py-3 rounded-lg border-none text-white font-body text-sm font-semibold"
+            style={{ backgroundColor: '#25D366' }}
           >
             📤 Enviar comprobante por WhatsApp
           </button>
