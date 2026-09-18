@@ -11,7 +11,7 @@ import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
-
+//
 // Ventana horaria aproximada de entrega, según a qué salida de la moto
 // (8:00 o 14:00, ver src/lib/reparto.ts) entra un pedido pagado ahora
 // mismo. Es una estimación para mostrarle al comprador, no un dato que
