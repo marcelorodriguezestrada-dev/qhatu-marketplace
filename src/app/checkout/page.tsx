@@ -849,13 +849,10 @@ function CheckoutContent() {
             </div>
           )}
           <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-tealsoft flex items-center justify-center text-2xl">
-            ✅
+            💳
           </div>
           <div className="font-display text-lg font-bold text-ink mb-1.5">
-            El producto está disponible
-          </div>
-          <div className="font-body text-[13px] text-ink mb-3">
-            Por favor realizá el pago y cuando termines presioná "Enviar comprobante". Se te va a abrir WhatsApp para que mandes el screenshot.
+            Pagá a este QR
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
