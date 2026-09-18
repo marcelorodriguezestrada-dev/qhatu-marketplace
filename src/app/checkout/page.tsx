@@ -11,7 +11,7 @@ import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
-//
+
 // Ventana horaria aproximada de entrega, según a qué salida de la moto
 // (8:00 o 14:00, ver src/lib/reparto.ts) entra un pedido pagado ahora
 // mismo. Es una estimación para mostrarle al comprador, no un dato que
@@ -33,6 +33,17 @@ function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): stri
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
+// Link para mandar el comprobante de pago por WhatsApp — a quien haya
+// recibido la plata (ver whatsappCobro: la plataforma en envío, o el
+// vendedor si cobra directo en retiro). El comprador manda el
+// screenshot del pago a continuación de este mensaje.
+function linkComprobanteWhatsapp(s: SubPedido, nombreComprador: string): string | null {
+  if (!s.whatsappCobro) return null
+  const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
+  const texto = `Hola! Soy ${nombreComprador}. Te mando el comprobante de mi pago del pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''}:\n${detalle}\nTotal: ${bs(s.total)}\n👇 Ahí va el screenshot`
+  return `https://wa.me/${s.whatsappCobro.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
+}
+
 type Etapa = 'entrega' | 'creando' | 'pagando' | 'resumen' | 'error'
 
 // Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
@@ -51,6 +62,7 @@ type SubPedido = {
   vendedorId: string | null
   vendedorNombre: string
   whatsapp: string
+  whatsappCobro: string
   items: ItemCarrito[]
   subtotal: number
   costoEnvio: number
@@ -118,12 +130,14 @@ function CheckoutContent() {
   // nunca se queda sin QR para mostrar.
   const [qrPlataforma, setQrPlataforma] = useState(QR_PLATAFORMA)
   const [cbuPlataforma, setCbuPlataforma] = useState(BANK_ACCOUNT_NUMBER)
+  const [whatsappPlataforma, setWhatsappPlataforma] = useState('')
   useEffect(() => {
     fetch('/api/configuracion/pagos')
       .then((r) => r.json())
       .then((data) => {
         if (data.qrImageUrl) setQrPlataforma(data.qrImageUrl)
         if (data.cbu) setCbuPlataforma(data.cbu)
+        if (data.whatsapp) setWhatsappPlataforma(data.whatsapp)
       })
       .catch(() => {})
   }, [])
@@ -214,6 +228,7 @@ function CheckoutContent() {
   // un email en cada pedido, nunca un nombre real de a quién le están
   // vendiendo.
   const [nombreComprador, setNombreComprador] = useState('')
+  const [whatsappComprador, setWhatsappComprador] = useState('')
   // Ubicación GPS opcional — con esto el reparto puede armar la ruta de
   // la moto por cercanía en vez de ir a ciegas por la zona nomás. Si el
   // comprador no la comparte, igual puede pedir con envío; su parada
@@ -346,6 +361,11 @@ function CheckoutContent() {
         }
 
         const metodoPagoGrupo = metodoEntrega === 'retiro' ? metodoPago : 'qr'
+        // A quién le tiene que llegar el comprobante por WhatsApp: si
+        // el vendedor cobra directo (retiro + tiene su QR configurado),
+        // a él; si no, a la plataforma (siempre en envío, y en retiro
+        // cuando el vendedor todavía no configuró su cobro).
+        const whatsappCobro = cobroPropio ? whatsappVendedor : whatsappPlataforma
 
         const resPedido = await fetch('/api/pedidos', {
           method: 'POST',
@@ -355,6 +375,7 @@ function CheckoutContent() {
             total: totalGrupo,
             comprador: usuario?.email || null,
             nombreComprador,
+            whatsappComprador,
             vendedorId,
             vendedorNombre,
             vendedorWhatsapp: whatsappVendedor,
@@ -375,6 +396,7 @@ function CheckoutContent() {
           vendedorId,
           vendedorNombre,
           whatsapp: whatsappVendedor,
+          whatsappCobro,
           items: grupoItems,
           subtotal,
           costoEnvio: envioGrupo,
@@ -433,6 +455,14 @@ function CheckoutContent() {
   function declararPagoActual() {
     const sub = subPedidos[pasoActual]
     if (!sub.pedidoId) return
+
+    // El window.open va PRIMERO y sin esperar nada async — los
+    // navegadores bloquean los popups que se abren después de un
+    // await/then, así que si lo dejamos para después del fetch, en
+    // varios celulares ni se abre.
+    const link = linkComprobanteWhatsapp(sub, nombreComprador)
+    if (link) window.open(link, '_blank')
+
     fetch(`/api/pedidos/${sub.pedidoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -603,6 +633,19 @@ function CheckoutContent() {
             />
           </label>
 
+          <label className="block text-left mb-4">
+            <span className="font-body text-[11px] text-inksoft block mb-1">Tu WhatsApp</span>
+            <input
+              value={whatsappComprador}
+              onChange={(e) => setWhatsappComprador(e.target.value)}
+              placeholder="Ej: 71234567"
+              className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+            />
+            <span className="font-body text-[11px] text-inksoft block mt-1">
+              Para mandar el comprobante de pago y avisarte cuando esté confirmado.
+            </span>
+          </label>
+
           {metodoEntrega === 'envio' ? (
             <>
               <label className="block text-left mb-3">
@@ -741,7 +784,7 @@ function CheckoutContent() {
             El producto está disponible
           </div>
           <div className="font-body text-[13px] text-ink mb-3">
-            Escaneá el QR, realizá el pago y enviá el comprobante por WhatsApp al vendedor.
+            Por favor realizá el pago y cuando termines presioná "Enviar comprobante". Se te va a abrir WhatsApp para que mandes el screenshot.
           </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
@@ -769,32 +812,11 @@ function CheckoutContent() {
 
           <div className="font-display text-2xl font-bold text-ink mt-4 mb-5">{bs(subPedidos[pasoActual].total)}</div>
 
-          {/* Botón principal: ir a WhatsApp a mandar el comprobante */}
-          <a
-            href={(() => {
-              const s = subPedidos[pasoActual]
-              const numero = (s.whatsapp || s.vendedorWhatsapp || '').replace(/\D/g, '')
-              const items = s.items?.map((it: any) => `• ${it.nombre} x${it.cantidad} — ${bs(it.precio * it.cantidad)}`).join('\n') || ''
-              const texto = `Hola! Acabo de realizar el pago de mi pedido en Clasi Click 🛍️\n\n*Pedido #${s.pedidoId || ''}*\n${items}\n\n*Total pagado: ${bs(s.total)}*\n\nTe mando el comprobante a continuación 👇`
-              return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`
-            })()}
-            target="_blank"
-            rel="noreferrer"
-            className="w-full py-3 rounded-lg border-none bg-[#25D366] text-white font-body text-sm font-semibold flex items-center justify-center gap-2 mb-3 no-underline"
-            onClick={() => {
-              // Después de abrir WhatsApp, esperar 3 segundos y declarar el pago
-              setTimeout(() => declararPagoActual(), 3000)
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.523 5.847L.057 23.882a.5.5 0 0 0 .613.613l6.101-1.459A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.891 0-3.659-.524-5.168-1.432l-.361-.216-3.747.896.911-3.659-.236-.374A9.937 9.937 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-            Enviar comprobante por WhatsApp
-          </a>
-
           <button
             onClick={declararPagoActual}
-            className="w-full py-2.5 rounded-lg border border-line bg-transparent text-inksoft font-body text-sm"
+            className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
           >
-            Ya envié el comprobante, continuar
+            📤 Enviar comprobante por WhatsApp
           </button>
         </div>
       )}

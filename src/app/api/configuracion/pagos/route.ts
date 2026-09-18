@@ -10,17 +10,18 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const doc = await getDb().collection('configuracion').doc('pagos').get()
-    if (!doc.exists) return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '' })
+    if (!doc.exists) return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '', whatsapp: '' })
     const data = doc.data()!
     return NextResponse.json({
       qrImageUrl: data.qrImageUrl || '',
       cbu: data.cbu || '',
       banco: data.banco || '',
       titular: data.titular || '',
+      whatsapp: data.whatsapp || '',
     })
   } catch (err) {
     console.error('GET /api/configuracion/pagos', err)
-    return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '' })
+    return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '', whatsapp: '' })
   }
 }
 
@@ -36,13 +37,14 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, banco, titular } = body
+    const { qrImageUrl, cbu, banco, titular, whatsapp } = body
     await getDb().collection('configuracion').doc('pagos').set(
       {
         qrImageUrl: qrImageUrl || '',
         cbu: cbu || '',
         banco: banco || '',
         titular: titular || '',
+        whatsapp: whatsapp || '',
         actualizadoEn: new Date().toISOString(),
       },
       { merge: true }

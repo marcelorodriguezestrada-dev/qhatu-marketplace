@@ -250,7 +250,6 @@ export default function AdminPage() {
         cargarBanners(pw)
         cargarMacheos(pw)
         cargarConfigPagos()
-        cargarConfigContacto()
       })
       .catch((e) => {
         setError(e.message)
@@ -265,36 +264,10 @@ export default function AdminPage() {
   const [cbuPago, setCbuPago] = useState('')
   const [bancoPago, setBancoPago] = useState('')
   const [titularPago, setTitularPago] = useState('')
+  const [whatsappPago, setWhatsappPago] = useState('')
   const [subiendoQrPago, setSubiendoQrPago] = useState(false)
   const [guardandoConfigPago, setGuardandoConfigPago] = useState(false)
   const [configPagoGuardada, setConfigPagoGuardada] = useState(false)
-
-  // WhatsApp propio de Clasi Click (no el de un vendedor puntual) —
-  // se usa en /ayuda para el botón de contacto general.
-  const [whatsappClasiClick, setWhatsappClasiClick] = useState('')
-  const [guardandoWhatsappCC, setGuardandoWhatsappCC] = useState(false)
-  const [whatsappCCGuardado, setWhatsappCCGuardado] = useState(false)
-
-  function cargarConfigContacto() {
-    fetch('/api/configuracion/contacto')
-      .then((r) => r.json())
-      .then((data) => setWhatsappClasiClick(data.whatsapp || ''))
-  }
-
-  async function guardarWhatsappClasiClick() {
-    setGuardandoWhatsappCC(true)
-    setWhatsappCCGuardado(false)
-    try {
-      await fetch('/api/configuracion/contacto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ whatsapp: whatsappClasiClick }),
-      })
-      setWhatsappCCGuardado(true)
-    } finally {
-      setGuardandoWhatsappCC(false)
-    }
-  }
 
   function cargarConfigPagos() {
     fetch('/api/configuracion/pagos')
@@ -304,6 +277,7 @@ export default function AdminPage() {
         setCbuPago(data.cbu || '')
         setBancoPago(data.banco || '')
         setTitularPago(data.titular || '')
+        setWhatsappPago(data.whatsapp || '')
       })
   }
 
@@ -335,7 +309,7 @@ export default function AdminPage() {
       await fetch('/api/configuracion/pagos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ qrImageUrl: qrPagoUrl, cbu: cbuPago, banco: bancoPago, titular: titularPago }),
+        body: JSON.stringify({ qrImageUrl: qrPagoUrl, cbu: cbuPago, banco: bancoPago, titular: titularPago, whatsapp: whatsappPago }),
       })
       setConfigPagoGuardada(true)
     } finally {
@@ -1111,6 +1085,15 @@ export default function AdminPage() {
               placeholder="Titular de la cuenta (opcional)"
               className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
             />
+            <input
+              value={whatsappPago}
+              onChange={(e) => setWhatsappPago(e.target.value)}
+              placeholder="Tu WhatsApp para recibir comprobantes (ej: 59171234567)"
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <div className="font-body text-[10px] text-inksoft mb-2 -mt-1">
+              A este número te va a llegar el comprobante de los pedidos con envío (esos siempre se pagan a tu cuenta, nunca directo al vendedor).
+            </div>
             <button
               onClick={guardarConfigPagos}
               disabled={guardandoConfigPago}
@@ -1120,29 +1103,6 @@ export default function AdminPage() {
             </button>
             {configPagoGuardada && <span className="font-body text-[11px] text-teal ml-2">Guardado ✓</span>}
           </div>
-        </div>
-      </div>
-
-      <div className="bg-panel border border-line rounded-xl p-4 mb-6">
-        <div className="font-body text-sm font-semibold text-ink mb-1">WhatsApp de Clasi Click</div>
-        <div className="font-body text-[11px] text-inksoft mb-3">
-          El número de contacto general de la plataforma — no el de un vendedor o profesional puntual. Se usa en /ayuda para el botón "Escribinos por WhatsApp".
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <input
-            value={whatsappClasiClick}
-            onChange={(e) => setWhatsappClasiClick(e.target.value)}
-            placeholder="Ej: 59171234567"
-            className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-line font-body text-xs"
-          />
-          <button
-            onClick={guardarWhatsappClasiClick}
-            disabled={guardandoWhatsappCC}
-            className="px-3.5 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-60"
-          >
-            {guardandoWhatsappCC ? 'Guardando...' : 'Guardar'}
-          </button>
-          {whatsappCCGuardado && <span className="font-body text-[11px] text-teal">Guardado ✓</span>}
         </div>
       </div>
 
@@ -1250,6 +1210,16 @@ export default function AdminPage() {
                     >
                       Confirmar pago
                     </button>
+                  )}
+                  {p.estado === 'pagado' && p.whatsappComprador && (
+                    <a
+                      href={`https://wa.me/${p.whatsappComprador.replace(/\D/g, '')}?text=${encodeURIComponent(`¡Felicitaciones ${p.nombreComprador || ''}! 🎉 Tu pedido #${p.id.slice(0, 6)} quedó confirmado. En cuanto esté listo te avisamos por acá.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-md border border-teal text-teal font-body text-xs font-semibold shrink-0"
+                    >
+                      🎉 Mandar felicitaciones
+                    </a>
                   )}
                 </div>
 
