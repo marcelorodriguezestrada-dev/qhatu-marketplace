@@ -290,8 +290,16 @@ function CheckoutContent() {
       setError('Escribí tu nombre y apellido antes de continuar.')
       return
     }
+    if (!whatsappComprador.trim()) {
+      setError('Escribí tu WhatsApp antes de continuar — lo necesitamos para el comprobante y para avisarte del pedido.')
+      return
+    }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
       setError('Elegí tu barrio antes de continuar.')
+      return
+    }
+    if (metodoEntrega === 'envio' && !direccion.trim()) {
+      setError('Escribí tu dirección antes de continuar.')
       return
     }
 
@@ -628,7 +636,7 @@ function CheckoutContent() {
           {metodoElegido && (
           <>
           <label className="block text-left mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Tu nombre</span>
+            <span className="font-body text-[11px] text-inksoft block mb-1">Tu nombre *</span>
             <input
               value={nombreComprador}
               onChange={(e) => setNombreComprador(e.target.value)}
@@ -638,7 +646,7 @@ function CheckoutContent() {
           </label>
 
           <label className="block text-left mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Tu WhatsApp</span>
+            <span className="font-body text-[11px] text-inksoft block mb-1">Tu WhatsApp *</span>
             <input
               value={whatsappComprador}
               onChange={(e) => setWhatsappComprador(e.target.value)}
@@ -682,7 +690,7 @@ function CheckoutContent() {
               </div>
 
               <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección</span>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección *</span>
                 <input
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
