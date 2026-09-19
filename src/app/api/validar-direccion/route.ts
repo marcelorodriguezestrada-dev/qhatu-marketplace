@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 // Valida una dirección contra Nominatim (el geocodificador gratis de
 // OpenStreetMap) — no hace falta API key, a cambio de dos reglas de su
-// política de uso que hay que respetar si o si:
+// política de uso que hay que respetar sí o sí:
 // 1. Mandar un User-Agent que identifique la app (no el default de fetch).
 // 2. Como máximo 1 pedido por segundo PARA TODO EL SITIO, no por usuario
 //    — Nominatim es un servicio compartido y gratuito, se corta el acceso
@@ -12,19 +12,33 @@ export const dynamic = 'force-dynamic'
 //    día de mañana esto se llena de tráfico, hay que pasarse a un
 //    proveedor pago (Google Geocoding, Mapbox) con su propio límite.
 //
-// OJO con lo que esto SÍ y NO garantiza: que Nominatim encuentre una
-// coincidencia dice que esa calle/zona existe en el mapa de OpenStreetMap
-// — no confirma que el número de puerta exista, ni mucho menos que la
-// persona viva ahí. Y que NO la encuentre no significa que la dirección
-// sea falsa: OpenStreetMap en Potosí puede tener calles nuevas o barrios
-// informales sin mapear todavía. Por eso en el checkout esto se usa como
-// aviso, no como bloqueo — ver el comentario en checkout/page.tsx.
+// Este endpoint devuelve tres resultados posibles, a propósito
+// distintos entre sí porque el checkout los trata distinto (ver el
+// comentario largo en checkout/page.tsx sobre por qué es bloqueante):
+// - encontrada: true  → hay una calle/zona que matchea en OpenStreetMap.
+// - encontrada: false → se pudo consultar bien, y NO matchea nada
+//   razonable (dirección demasiado corta/vacía de contenido, o
+//   Nominatim no encontró nada parecido). Esto bloquea el checkout.
+// - encontrada: null  → no se pudo ni consultar (Nominatim caído,
+//   sin red, etc.). Esto NO bloquea — no es culpa de la persona que
+//   compra que el servicio gratuito esté caído, y frenarle la compra
+//   por un corte de un tercero sería peor negocio que dejarla pasar.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const direccion = (body.direccion || '').trim()
     if (!direccion) {
       return NextResponse.json({ error: 'Falta la dirección.' }, { status: 400 })
+    }
+
+    // Filtro rápido antes de gastar el pedido a Nominatim: una
+    // dirección real en Potosí siempre tiene alguna letra (nombre de
+    // calle/zona), no solo números — esto es lo que dejaba pasar cosas
+    // como "33" o "1" (Nominatim a veces matchea un número suelto con
+    // cualquier cosa, un código postal, un kilómetro de ruta, etc.).
+    const tieneLetras = /[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(direccion)
+    if (direccion.length < 5 || !tieneLetras) {
+      return NextResponse.json({ encontrada: false, motivo: 'Escribí la calle y el número, no alcanza con un número solo.' })
     }
 
     const consulta = `${direccion}, Potosí, Bolivia`
@@ -38,12 +52,12 @@ export async function POST(req: NextRequest) {
       },
     })
     if (!res.ok) {
-      return NextResponse.json({ encontrada: false, motivo: 'servicio_no_disponible' })
+      return NextResponse.json({ encontrada: null, motivo: 'servicio_no_disponible' })
     }
 
     const resultados = await res.json()
     if (!Array.isArray(resultados) || resultados.length === 0) {
-      return NextResponse.json({ encontrada: false })
+      return NextResponse.json({ encontrada: false, motivo: 'No encontramos esa dirección — revisá que esté bien escrita.' })
     }
 
     const match = resultados[0]
@@ -55,8 +69,9 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     console.error('POST /api/validar-direccion', err)
-    // Si Nominatim falla o está lento, no queremos que eso le tranque
-    // la compra a nadie — el checkout lo trata igual que "no encontrada".
-    return NextResponse.json({ encontrada: false, motivo: 'error' })
+    // Nominatim falló de verdad (timeout, red, etc.) — distinto de "no
+    // la encontramos": acá no sabemos si es válida o no, así que no
+    // bloqueamos (ver el comentario de arriba sobre encontrada: null).
+    return NextResponse.json({ encontrada: null, motivo: 'error' })
   }
 }

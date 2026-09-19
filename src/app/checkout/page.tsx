@@ -227,37 +227,49 @@ function CheckoutContent() {
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
-  // Resultado de chequear la dirección contra OpenStreetMap: null =
-  // todavía no se chequeó, true = la encontró, false = no la encontró
-  // (esto NO bloquea seguir — ver el comentario largo en
-  // /api/validar-direccion sobre por qué es solo un aviso).
-  const [direccionVerificada, setDireccionVerificada] = useState<boolean | null>(null)
+  // Resultado de chequear la dirección contra OpenStreetMap:
+  // - null    = todavía no se chequeó
+  // - true    = la encontró → deja seguir
+  // - false   = la consulta funcionó pero NO la encontró → esto SÍ
+  //             bloquea, a pedido explícito (antes era solo un aviso,
+  //             pero dejaba pasar cualquier cosa igual)
+  // - 'error' = no se pudo ni consultar (Nominatim caído/sin red) → NO
+  //             bloquea, porque no es culpa del comprador que un
+  //             servicio gratis de terceros esté caído en ese momento
+  const [direccionVerificada, setDireccionVerificada] = useState<boolean | 'error' | null>(null)
   const [verificandoDireccion, setVerificandoDireccion] = useState(false)
+  const [motivoDireccion, setMotivoDireccion] = useState('')
 
-  function verificarDireccion() {
+  async function verificarDireccion(): Promise<boolean | 'error' | null> {
     if (!direccion.trim()) {
       setDireccionVerificada(null)
-      return
+      return null
     }
     setVerificandoDireccion(true)
-    fetch('/api/validar-direccion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ direccion }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setDireccionVerificada(!!data.encontrada)
-        // Si la persona no compartió su ubicación en vivo (más precisa),
-        // usamos el punto que encontró Nominatim como mejor que nada —
-        // ayuda a la moto igual, aunque sea aproximado a la calle.
-        if (data.encontrada && lat == null && lng == null) {
-          setLat(data.lat)
-          setLng(data.lng)
-        }
+    try {
+      const res = await fetch('/api/validar-direccion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direccion }),
       })
-      .catch(() => setDireccionVerificada(null))
-      .finally(() => setVerificandoDireccion(false))
+      const data = await res.json()
+      const resultado: boolean | 'error' | null = data.encontrada === null ? 'error' : !!data.encontrada
+      setDireccionVerificada(resultado)
+      setMotivoDireccion(data.motivo || '')
+      // Si la persona no compartió su ubicación en vivo (más precisa),
+      // usamos el punto que encontró Nominatim como mejor que nada —
+      // ayuda a la moto igual, aunque sea aproximado a la calle.
+      if (data.encontrada && lat == null && lng == null) {
+        setLat(data.lat)
+        setLng(data.lng)
+      }
+      return resultado
+    } catch {
+      setDireccionVerificada('error')
+      return 'error'
+    } finally {
+      setVerificandoDireccion(false)
+    }
   }
   // El nombre lo pedimos acá porque hoy ninguna cuenta lo tiene
   // garantizado — el registro solo pide email, contraseña y celular
@@ -345,6 +357,21 @@ function CheckoutContent() {
     if (metodoEntrega === 'envio' && !direccion.trim()) {
       setError('Escribí tu dirección antes de continuar.')
       return
+    }
+    if (metodoEntrega === 'envio') {
+      // Si todavía no se chequeó (por ejemplo, escribió y tocó
+      // "Continuar" sin salir del campo de dirección), la chequeamos
+      // recién acá — no dejamos pasar una dirección sin verificar.
+      let resultado = direccionVerificada
+      if (resultado === null) {
+        resultado = await verificarDireccion()
+      }
+      if (resultado === false) {
+        setError(motivoDireccion || 'No encontramos esa dirección — revisala antes de continuar.')
+        return
+      }
+      // resultado === true, o 'error' (el servicio de verificación
+      // falló) — en los dos casos se deja continuar.
     }
 
     // Si es retiro + efectivo, reservamos la pestaña de WhatsApp ACÁ
@@ -764,6 +791,7 @@ function CheckoutContent() {
                   onChange={(e) => {
                     setDireccion(e.target.value)
                     setDireccionVerificada(null)
+                    setMotivoDireccion('')
                   }}
                   onBlur={verificarDireccion}
                   placeholder="Calle, número, barrio"
@@ -778,8 +806,13 @@ function CheckoutContent() {
                   <span className="font-body text-[11px] text-teal">✓ Encontramos esta dirección en el mapa.</span>
                 )}
                 {!verificandoDireccion && direccionVerificada === false && (
+                  <span className="font-body text-[11px] text-maroon">
+                    ⚠ {motivoDireccion || 'No encontramos esa dirección — revisá que esté bien escrita.'}
+                  </span>
+                )}
+                {!verificandoDireccion && direccionVerificada === 'error' && (
                   <span className="font-body text-[11px] text-ochre">
-                    ⚠ No pudimos confirmar esta dirección en el mapa — revisá que esté bien escrita. Igual podés continuar, la moto va a confirmar el punto exacto.
+                    No pudimos verificarla ahora (problema de conexión) — podés continuar igual.
                   </span>
                 )}
               </div>
