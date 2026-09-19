@@ -109,6 +109,9 @@ export default function CatalogoPage() {
             <Link href="/anuncios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
               Anuncios
             </Link>
+            <Link href="/ayuda" className="border-none bg-transparent text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">
+              Ayuda
+            </Link>
             <Link href="/vender" className="border-none bg-white/10 text-white px-3 py-1.5 rounded-lg font-body text-[13px] shrink-0 whitespace-nowrap">
               Vender
             </Link>
@@ -144,7 +147,7 @@ export default function CatalogoPage() {
           >
             <div className="text-2xl mb-1">🧑‍🔧</div>
             <div className="font-display text-sm sm:text-base font-bold text-white">Servicios</div>
-            <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales cerca tuyo</div>
+            <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales</div>
           </Link>
         </div>
 

@@ -65,6 +65,8 @@ function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motiv
 export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [autenticado, setAutenticado] = useState(false)
+  const [solicitudes, setSolicitudes] = useState<any[]>([])
+  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
@@ -72,6 +74,7 @@ export default function AdminPage() {
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
   const [pedidos, setPedidos] = useState<any[]>([])
+  const [subiendoFotoEntregaId, setSubiendoFotoEntregaId] = useState<string | null>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -262,6 +265,7 @@ export default function AdminPage() {
   const [cbuPago, setCbuPago] = useState('')
   const [bancoPago, setBancoPago] = useState('')
   const [titularPago, setTitularPago] = useState('')
+  const [whatsappPago, setWhatsappPago] = useState('')
   const [subiendoQrPago, setSubiendoQrPago] = useState(false)
   const [guardandoConfigPago, setGuardandoConfigPago] = useState(false)
   const [configPagoGuardada, setConfigPagoGuardada] = useState(false)
@@ -274,6 +278,7 @@ export default function AdminPage() {
         setCbuPago(data.cbu || '')
         setBancoPago(data.banco || '')
         setTitularPago(data.titular || '')
+        setWhatsappPago(data.whatsapp || '')
       })
   }
 
@@ -305,7 +310,7 @@ export default function AdminPage() {
       await fetch('/api/configuracion/pagos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ qrImageUrl: qrPagoUrl, cbu: cbuPago, banco: bancoPago, titular: titularPago }),
+        body: JSON.stringify({ qrImageUrl: qrPagoUrl, cbu: cbuPago, banco: bancoPago, titular: titularPago, whatsapp: whatsappPago }),
       })
       setConfigPagoGuardada(true)
     } finally {
@@ -552,6 +557,36 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ estado }),
     }).then(() => entrar(password))
+  }
+
+  // La moto saca una foto del producto entregado (en la puerta, o en
+  // manos de quien lo recibió) al marcar el pedido como entregado — es
+  // más simple que pedir una firma física, y ya alcanza como
+  // comprobante de que el reparto se hizo bien.
+  async function marcarEntregadoConFoto(id: string, file: File) {
+    setSubiendoFotoEntregaId(id)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const resSubida = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+        body: formData,
+      })
+      const dataSubida = await resSubida.json()
+      if (dataSubida.error) throw new Error(dataSubida.error)
+
+      await fetch(`/api/pedidos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ estado: 'entregado', fotoEntregaUrl: dataSubida.url }),
+      })
+      entrar(password)
+    } catch (e: any) {
+      alert('No se pudo subir la foto: ' + e.message)
+    } finally {
+      setSubiendoFotoEntregaId(null)
+    }
   }
 
   function confirmarPago(id: string) {
@@ -996,6 +1031,28 @@ export default function AdminPage() {
     )
   }
 
+
+  async function cargarSolicitudes() {
+    setCargandoSolicitudes(true)
+    try {
+      const res = await fetch('/api/solicitud-ayuda', {
+        headers: { 'x-admin-password': password }
+      })
+      const data = await res.json()
+      setSolicitudes(data.solicitudes || [])
+    } finally { setCargandoSolicitudes(false) }
+  }
+
+  async function marcarSolicitud(id: string, estado: string) {
+    await fetch('/api/solicitud-ayuda', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ id, estado }),
+    })
+    setSolicitudes(prev => prev.map(s => s.id === id ? { ...s, estado } : s))
+  }
+
+
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1059,6 +1116,15 @@ export default function AdminPage() {
               placeholder="Titular de la cuenta (opcional)"
               className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
             />
+            <input
+              value={whatsappPago}
+              onChange={(e) => setWhatsappPago(e.target.value)}
+              placeholder="Tu WhatsApp para recibir comprobantes (ej: 59171234567)"
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-xs mb-2"
+            />
+            <div className="font-body text-[10px] text-inksoft mb-2 -mt-1">
+              A este número te va a llegar el comprobante de los pedidos con envío (esos siempre se pagan a tu cuenta, nunca directo al vendedor).
+            </div>
             <button
               onClick={guardarConfigPagos}
               disabled={guardandoConfigPago}
@@ -1154,13 +1220,17 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="font-body text-sm font-medium text-ink">Pedido #{p.id.slice(0, 6)}</div>
-                    <div className="font-body text-xs text-inksoft">{p.items?.length || 0} producto(s) · {bs(p.total)}</div>
+                    <div className="font-body text-xs font-semibold text-ink mt-0.5">
+                      👤 {p.nombreComprador || 'Sin nombre cargado'}
+                    </div>
+                    <div className="font-body text-[11px] text-inksoft">{p.comprador || 'Sin email'}</div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
                       🏪 {p.vendedorNombre || 'Clasi Click'}
                       {p.createdAt && ` · ${new Date(p.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}`}
                     </div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
                       {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
+                      {p.entreCalles && ` (${p.entreCalles})`}
                     </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
                   </div>
@@ -1172,6 +1242,38 @@ export default function AdminPage() {
                       Confirmar pago
                     </button>
                   )}
+                  {p.estado === 'pagado' && p.whatsappComprador && (
+                    <a
+                      href={`https://wa.me/${p.whatsappComprador.replace(/\D/g, '')}?text=${encodeURIComponent(`¡Felicitaciones ${p.nombreComprador || ''}! 🎉 Tu pedido #${p.id.slice(0, 6)} quedó confirmado. En cuanto esté listo te avisamos por acá.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-md border border-teal text-teal font-body text-xs font-semibold shrink-0"
+                    >
+                      🎉 Mandar felicitaciones
+                    </a>
+                  )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-line flex flex-col gap-2">
+                  {(p.items || []).map((it: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-md bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
+                        {(it.thumbUrl || it.imagenUrl) ? (
+                          <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="font-body text-[8px] text-inksoft">IMG</span>
+                        )}
+                      </div>
+                      <div className="font-body text-xs text-ink flex-1 min-w-0 truncate">
+                        {it.cantidad} × {it.nombre}
+                        {(it.tallaElegida || it.colorElegida) && (
+                          <span className="text-inksoft"> ({[it.tallaElegida, it.colorElegida].filter(Boolean).join(' · ')})</span>
+                        )}
+                      </div>
+                      <div className="font-body text-xs text-inksoft shrink-0">{bs(it.precio * it.cantidad)}</div>
+                    </div>
+                  ))}
+                  <div className="font-body text-xs font-semibold text-ink text-right">Total: {bs(p.total)}</div>
                 </div>
 
                 {p.estado === 'verificando_stock' && (
@@ -2270,6 +2372,17 @@ export default function AdminPage() {
 
       {tab === 'reparto' && (
         <div>
+          <button
+            type="button"
+            onClick={() => {
+              const link = `${window.location.origin}/reparto-hoy?clave=${encodeURIComponent(password)}`
+              navigator.clipboard.writeText(link)
+              alert('Link copiado — pasáselo al repartidor por WhatsApp. No hace falta que inicie sesión.')
+            }}
+            className="mb-4 px-3.5 py-2 rounded-md border border-line font-body text-xs font-semibold"
+          >
+            🔗 Copiar link para el repartidor
+          </button>
           {(() => {
             // Solo entran acá los pedidos con envío YA pagados (con
             // stock ya confirmado, porque sin eso ni siquiera llegan a
@@ -2310,19 +2423,38 @@ export default function AdminPage() {
                       {i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-body text-[13px] font-medium text-ink">{p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}</div>
+                      <div className="font-body text-[13px] font-medium text-ink">
+                        {p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}
+                        {p.entreCalles && ` (${p.entreCalles})`}
+                      </div>
                       <div className="font-body text-[11px] text-inksoft">
                         {p.comprador || 'Sin email'} · {bs(p.total)}
                         {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
-                      className="shrink-0 px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold"
-                    >
-                      Entregado
-                    </button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <label className="px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold cursor-pointer">
+                        {subiendoFotoEntregaId === p.id ? 'Subiendo...' : '📷 Entregado'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={subiendoFotoEntregaId === p.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) marcarEntregadoConFoto(p.id, file)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
+                        className="font-body text-[9px] text-inksoft underline"
+                      >
+                        marcar sin foto
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
