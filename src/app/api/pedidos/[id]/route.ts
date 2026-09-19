@@ -110,12 +110,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    const payload: Record<string, string> = { estado, updatedAt: new Date().toISOString() }
+    const payload: Record<string, unknown> = { estado, updatedAt: new Date().toISOString() }
     if (estado === 'pendiente_pago') payload.stockConfirmadoAt = new Date().toISOString()
     if (estado === 'pagado') payload.pagadoAt = new Date().toISOString()
     if (estado === 'en_preparacion') payload.enPreparacionAt = new Date().toISOString()
     if (estado === 'en_entrega') payload.enEntregaAt = new Date().toISOString()
-    if (estado === 'entregado') payload.entregadoAt = new Date().toISOString()
+    if (estado === 'entregado') {
+      payload.entregadoAt = new Date().toISOString()
+      // Foto de comprobante de entrega -- el producto en la puerta o en
+      // manos de quien lo recibe, que saca la moto al entregar. Es
+      // opcional: si por algún motivo no se pudo sacar, igual se puede
+      // marcar como entregado.
+      if (typeof body.fotoEntregaUrl === 'string' && body.fotoEntregaUrl) payload.fotoEntregaUrl = body.fotoEntregaUrl
+    }
     if (estado === 'cancelado') payload.canceladoAt = new Date().toISOString()
 
     await ref.update(payload)

@@ -74,6 +74,7 @@ export default function AdminPage() {
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
   const [pedidos, setPedidos] = useState<any[]>([])
+  const [subiendoFotoEntregaId, setSubiendoFotoEntregaId] = useState<string | null>(null)
   const [productos, setProductos] = useState<any[]>([])
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -556,6 +557,36 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ estado }),
     }).then(() => entrar(password))
+  }
+
+  // La moto saca una foto del producto entregado (en la puerta, o en
+  // manos de quien lo recibió) al marcar el pedido como entregado — es
+  // más simple que pedir una firma física, y ya alcanza como
+  // comprobante de que el reparto se hizo bien.
+  async function marcarEntregadoConFoto(id: string, file: File) {
+    setSubiendoFotoEntregaId(id)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const resSubida = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+        body: formData,
+      })
+      const dataSubida = await resSubida.json()
+      if (dataSubida.error) throw new Error(dataSubida.error)
+
+      await fetch(`/api/pedidos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ estado: 'entregado', fotoEntregaUrl: dataSubida.url }),
+      })
+      entrar(password)
+    } catch (e: any) {
+      alert('No se pudo subir la foto: ' + e.message)
+    } finally {
+      setSubiendoFotoEntregaId(null)
+    }
   }
 
   function confirmarPago(id: string) {
@@ -2401,13 +2432,29 @@ export default function AdminPage() {
                         {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
-                      className="shrink-0 px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold"
-                    >
-                      Entregado
-                    </button>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <label className="px-2 py-1 rounded-md border border-line font-body text-[10px] font-semibold cursor-pointer">
+                        {subiendoFotoEntregaId === p.id ? 'Subiendo...' : '📷 Entregado'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={subiendoFotoEntregaId === p.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) marcarEntregadoConFoto(p.id, file)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => cambiarEstadoPedido(p.id, 'entregado')}
+                        className="font-body text-[9px] text-inksoft underline"
+                      >
+                        marcar sin foto
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

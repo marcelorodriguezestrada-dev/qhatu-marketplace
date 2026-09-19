@@ -157,6 +157,18 @@ export default function SeguimientoPedidoPage() {
         </>
       )}
 
+      {pedido.estado === 'entregado' && pedido.fotoEntregaUrl && (
+        <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+          <div className="font-body text-sm font-semibold text-ink mb-2.5">Así quedó entregado</div>
+          <img
+            src={pedido.fotoEntregaUrl}
+            alt="Foto de la entrega"
+            loading="lazy"
+            className="w-full max-h-72 object-cover rounded-lg border border-line"
+          />
+        </div>
+      )}
+
       <div className="bg-panel border border-line rounded-xl p-4">
         <div className="font-body text-sm font-semibold text-ink mb-3">Detalle del pedido</div>
         <div className="space-y-2">
