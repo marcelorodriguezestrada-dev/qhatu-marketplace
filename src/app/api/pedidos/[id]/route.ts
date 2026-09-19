@@ -72,7 +72,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (estado === 'informado_pago') {
-      await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      const cambios: Record<string, unknown> = { estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      // Opcional: la URL de la captura del comprobante, si el comprador
+      // la subió desde el checkout — así el vendedor/admin la puede ver
+      // sin depender de que se la manden aparte por WhatsApp.
+      if (typeof body.comprobanteUrl === 'string' && body.comprobanteUrl) cambios.comprobanteUrl = body.comprobanteUrl
+      await ref.update(cambios)
       return NextResponse.json({ ok: true })
     }
 

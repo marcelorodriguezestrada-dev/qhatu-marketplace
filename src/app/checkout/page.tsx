@@ -37,12 +37,15 @@ function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): stri
 
 // Link para mandar el comprobante de pago por WhatsApp — a quien haya
 // recibido la plata (ver whatsappCobro: la plataforma en envío, o el
-// vendedor si cobra directo en retiro). El comprador manda el
-// screenshot del pago a continuación de este mensaje.
-function linkComprobanteWhatsapp(s: SubPedido, nombreComprador: string): string | null {
+// vendedor si cobra directo en retiro). Si el comprador subió la
+// captura desde el checkout, el mensaje ya lleva el link a esa imagen
+// — si no la subió, el mensaje sigue funcionando igual, solo que sin
+// ese link (la persona puede mandarla aparte, como antes).
+function linkComprobanteWhatsapp(s: SubPedido, nombreComprador: string, comprobanteUrl?: string): string | null {
   if (!s.whatsappCobro) return null
   const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
-  const texto = `Hola! Soy ${nombreComprador}. Te mando el comprobante de mi pago del pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''}:\n${detalle}\nTotal: ${bs(s.total)}`
+  const lineaComprobante = comprobanteUrl ? `\n📎 Comprobante: ${comprobanteUrl}` : ''
+  const texto = `Hola! Soy ${nombreComprador}. Te mando el comprobante de mi pago del pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''}:\n${detalle}\nTotal: ${bs(s.total)}${lineaComprobante}`
   return `https://wa.me/${s.whatsappCobro.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
@@ -110,7 +113,7 @@ export default function CheckoutPage() {
 
 function CheckoutContent() {
   const { items: itemsCarrito, cambiarCantidad, quitar, vaciarTienda } = useCarrito()
-  const { usuario, cargando: authCargando, emailVerificado } = useAuth()
+  const { usuario, cargando: authCargando, emailVerificado, obtenerToken } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -278,6 +281,8 @@ function CheckoutContent() {
   // "disponible" en vez de saltar directo al QR de pago.
   const [pasosConfirmados, setPasosConfirmados] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
+  const [comprobanteUrl, setComprobanteUrl] = useState('')
+  const [subiendoComprobante, setSubiendoComprobante] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Concretar una compra requiere estar logueado Y con el email
@@ -507,21 +512,45 @@ function CheckoutContent() {
     // navegadores bloquean los popups que se abren después de un
     // await/then, así que si lo dejamos para después del fetch, en
     // varios celulares ni se abre.
-    const link = linkComprobanteWhatsapp(sub, nombreComprador)
+    const link = linkComprobanteWhatsapp(sub, nombreComprador, comprobanteUrl || undefined)
     if (link) window.open(link, '_blank')
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'informado_pago' }),
+      body: JSON.stringify({ estado: 'informado_pago', comprobanteUrl: comprobanteUrl || undefined }),
     }).then(() => {
       setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, declarado: true, estadoActual: 'informado_pago' } : s)))
+      setComprobanteUrl('')
       if (pasoActual < subPedidos.length - 1) {
         setPasoActual(pasoActual + 1)
       } else {
         setEtapa('resumen')
       }
     })
+  }
+
+  async function subirComprobante(file: File | null) {
+    if (!file) return
+    setSubiendoComprobante(true)
+    setError('')
+    try {
+      const token = await obtenerToken()
+      const form = new FormData()
+      form.append('image', file)
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: form,
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setComprobanteUrl(data.url)
+    } catch (e: any) {
+      setError(e.message || 'No se pudo subir la imagen.')
+    } finally {
+      setSubiendoComprobante(false)
+    }
   }
 
   // Antes acá había un polling que consultaba cada 4 segundos si el
@@ -873,6 +902,10 @@ function CheckoutContent() {
                 </div>
               ))}
             </div>
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-line font-body text-sm font-bold text-ink">
+              <span>Total</span>
+              <span>{bs(subPedidos[pasoActual].total)}</span>
+            </div>
           </div>
 
           <div className="font-body text-[13px] text-ink font-medium mb-3">
@@ -904,9 +937,39 @@ function CheckoutContent() {
 
           <div className="font-display text-2xl font-bold text-ink mt-4 mb-4">{bs(subPedidos[pasoActual].total)}</div>
 
-          <div className="font-body text-[13px] text-ink font-medium mb-2">
-            👇 Para continuar, mandá el comprobante a este WhatsApp
+          <div className="text-left mb-4">
+            <div className="font-body text-[13px] text-ink font-medium mb-2">
+              📎 Subí una foto del comprobante (opcional)
+            </div>
+            {comprobanteUrl ? (
+              <div className="flex items-center gap-2.5">
+                <img src={comprobanteUrl} alt="Comprobante" className="w-14 h-14 rounded-lg object-cover border border-line" />
+                <div className="flex-1">
+                  <div className="font-body text-xs text-teal">✓ Listo, se va a mandar junto con el mensaje</div>
+                  <button type="button" onClick={() => setComprobanteUrl('')} className="font-body text-[11px] text-inksoft underline">
+                    Sacar y subir otra
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={subiendoComprobante}
+                  onChange={(e) => subirComprobante(e.target.files?.[0] || null)}
+                  className="font-body text-xs text-inksoft"
+                />
+                {subiendoComprobante && <div className="font-body text-xs text-inksoft mt-1.5">Subiendo...</div>}
+              </>
+            )}
           </div>
+
+          <div className="font-body text-[13px] text-ink font-medium mb-2">
+            👇 {comprobanteUrl ? 'Confirmá por WhatsApp' : 'Para continuar, mandá el comprobante a este WhatsApp'}
+          </div>
+
+          {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
 
           <button
             onClick={declararPagoActual}
