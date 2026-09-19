@@ -1009,7 +1009,7 @@ function CheckoutContent() {
             className="w-full py-3 rounded-lg border-none text-white font-body text-sm font-semibold"
             style={{ backgroundColor: '#25D366' }}
           >
-            📤 Enviar comprobante por WhatsApp
+            📤 WhatsApp
           </button>
         </div>
       )}
