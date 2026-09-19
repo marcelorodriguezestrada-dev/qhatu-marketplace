@@ -7,29 +7,20 @@ export const dynamic = 'force-dynamic'
 // GET público — devuelve el perfil de tienda completo de un vendedor:
 // datos de cobro (para el checkout) y datos de la tienda (para la
 // pestaña "Info. Tienda" de cada producto: dirección, mapa, horarios,
-// tipos de venta).
-//
-// Dos campos parecidos pero que significan cosas distintas:
-//  - `configurado`: el vendedor YA cargó datos de cobro propios (QR o
-//    CBU). Lo usa el checkout para saber si le paga a él directo o cae
-//    al QR general de la plataforma.
-//  - `aceptaPagoQr`: además de tenerlos cargados, el vendedor tildó
-//    explícitamente "Pago con QR" en su tipo de ventas. Tener la foto
-//    del QR subida no alcanza — si no lo tildó, no quiere cobrar por
-//    ahí, y no hay que ofrecerle esa opción al comprador.
+// tipos de venta). "configurado" indica específicamente si YA cargó su
+// cobro propio (QR o CBU) — eso es lo que usa el checkout para decidir
+// si le paga a él directo o cae al QR general de la plataforma.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getDb()
     const doc = await db.collection('vendedores').doc(params.id).get()
     if (!doc.exists) {
-      return NextResponse.json({ configurado: false, aceptaPagoQr: false, existe: false })
+      return NextResponse.json({ configurado: false, existe: false })
     }
     const data = doc.data() as any
-    const tieneDatosCobro = !!(data.qrImageUrl || data.cbu)
     return NextResponse.json({
       existe: true,
-      configurado: tieneDatosCobro,
-      aceptaPagoQr: tieneDatosCobro && !!data.tiposVenta?.pagoQr,
+      configurado: !!(data.qrImageUrl || data.cbu),
       qrImageUrl: data.qrImageUrl || '',
       cbu: data.cbu || '',
       nombreNegocio: data.nombreNegocio || '',
@@ -49,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     })
   } catch (err) {
     console.error('GET /api/vendedores/[id]', err)
-    return NextResponse.json({ configurado: false, aceptaPagoQr: false, existe: false })
+    return NextResponse.json({ configurado: false, existe: false })
   }
 }
 

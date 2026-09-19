@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { calcularFranja } from '@/lib/reparto'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 
 function bs(n: number) {
@@ -27,13 +28,9 @@ const ESTADOS_PREVIOS: Record<string, string> = {
   informado_pago: 'Avisaste que ya pagaste — estamos confirmándolo.',
 }
 
-// Igual que en el checkout: la entrega es al día siguiente del pago,
-// horario todavía sin confirmar — no una franja horaria del mismo día.
-function fechaEntregaTexto(pagadoAt?: string): string {
-  const base = pagadoAt ? new Date(pagadoAt) : new Date()
-  const manana = new Date(base)
-  manana.setDate(manana.getDate() + 1)
-  return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
+function ventanaEntrega(pagadoAt?: string): string {
+  const fecha = pagadoAt ? new Date(pagadoAt) : new Date()
+  return calcularFranja(fecha) === '08:00' ? 'entre las 8:00 y las 12:00' : 'entre las 14:00 y las 18:00'
 }
 
 export default function SeguimientoPedidoPage() {
@@ -125,7 +122,7 @@ export default function SeguimientoPedidoPage() {
           {esEnvio && pedido.estado !== 'entregado' && (
             <div className="bg-tealsoft border border-teal rounded-xl p-4 mb-5 text-center">
               <div className="font-body text-[13px] text-ink">
-                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt)}, horario a confirmar. Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
+                Esperalo en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>, {ventanaEntrega(pedido.pagadoAt)}.
               </div>
             </div>
           )}
@@ -157,18 +154,6 @@ export default function SeguimientoPedidoPage() {
         </>
       )}
 
-      {pedido.estado === 'entregado' && pedido.fotoEntregaUrl && (
-        <div className="bg-panel border border-line rounded-xl p-4 mb-5">
-          <div className="font-body text-sm font-semibold text-ink mb-2.5">Así quedó entregado</div>
-          <img
-            src={pedido.fotoEntregaUrl}
-            alt="Foto de la entrega"
-            loading="lazy"
-            className="w-full max-h-72 object-cover rounded-lg border border-line"
-          />
-        </div>
-      )}
-
       <div className="bg-panel border border-line rounded-xl p-4">
         <div className="font-body text-sm font-semibold text-ink mb-3">Detalle del pedido</div>
         <div className="space-y-2">
@@ -189,7 +174,7 @@ export default function SeguimientoPedidoPage() {
           ))}
         </div>
         <div className="font-body text-[11px] text-inksoft mt-3 pt-3 border-t border-line">
-          {esEnvio ? `Envío: ${pedido.zonaEntrega || 'Sin zona'} · ${pedido.direccion || 'Sin dirección'}${pedido.entreCalles ? ` (${pedido.entreCalles})` : ''}` : 'Retiro en tienda'}
+          {esEnvio ? `Envío: ${pedido.zonaEntrega || 'Sin zona'} · ${pedido.direccion || 'Sin dirección'}` : 'Retiro en tienda'}
         </div>
       </div>
     </div>

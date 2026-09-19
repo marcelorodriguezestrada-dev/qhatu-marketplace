@@ -10,7 +10,6 @@ import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } fr
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
 import { PRECIO_PREMIUM_BS } from '@/lib/planPremium'
-import { buscarMercados } from '@/data/mercadosPotosi'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -98,7 +97,6 @@ export default function VenderPage() {
   const [tiendaLat, setTiendaLat] = useState<number | null>(null)
   const [tiendaLng, setTiendaLng] = useState<number | null>(null)
   const [buscandoUbicacionTienda, setBuscandoUbicacionTienda] = useState(false)
-  const [mercadosSugeridos, setMercadosSugeridos] = useState<ReturnType<typeof buscarMercados>>([])
   const [tiendaHorarios, setTiendaHorarios] = useState('')
   const [tiendaLogoUrl, setTiendaLogoUrl] = useState('')
   const [subiendoLogo, setSubiendoLogo] = useState(false)
@@ -850,38 +848,12 @@ export default function VenderPage() {
           {subiendoLogo && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
         </div>
 
-        <div className="relative mb-2">
-          <input
-            value={tiendaDireccion}
-            onChange={(e) => {
-              const v = e.target.value
-              setTiendaDireccion(v)
-              setMercadosSugeridos(buscarMercados(v))
-            }}
-            onBlur={() => setTimeout(() => setMercadosSugeridos([]), 150)}
-            placeholder="Dirección de tu local (ej: Calle Bolívar 123, o el mercado donde tenés tu puesto)"
-            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
-          />
-          {mercadosSugeridos.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-panel border border-line rounded-lg shadow-lg z-10 overflow-hidden">
-              {mercadosSugeridos.map((m) => (
-                <button
-                  key={m.nombre}
-                  type="button"
-                  onClick={() => {
-                    setTiendaDireccion(m.nombre)
-                    setTiendaLat(m.lat)
-                    setTiendaLng(m.lng)
-                    setMercadosSugeridos([])
-                  }}
-                  className="w-full text-left px-3.5 py-2.5 font-body text-sm text-ink hover:bg-panelalt border-b border-line last:border-b-0"
-                >
-                  📍 {m.nombre} <span className="text-inksoft text-xs">— ubicación exacta confirmada</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <input
+          value={tiendaDireccion}
+          onChange={(e) => setTiendaDireccion(e.target.value)}
+          placeholder="Dirección de tu local (ej: Calle Bolívar 123, Potosí)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-2"
+        />
         <button
           type="button"
           onClick={usarMiUbicacionTienda}
@@ -1278,29 +1250,10 @@ export default function VenderPage() {
                 <div className="font-body text-xs text-inksoft">Pedido #{p.id.slice(0, 6)}</div>
                 <div className={`font-body text-[11px] font-semibold ${estado.color}`}>{estado.texto}</div>
               </div>
-              <div className="font-body text-xs font-semibold text-ink">👤 {p.nombreComprador || 'Sin nombre cargado'}</div>
-              <div className="font-body text-[11px] text-inksoft mb-2">{p.comprador || 'Sin email'}</div>
-
-              <div className="flex flex-col gap-2 mb-2">
-                {itemsVendidos.map((it: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-md bg-panelalt flex items-center justify-center overflow-hidden shrink-0">
-                      {(it.thumbUrl || it.imagenUrl) ? (
-                        <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="font-body text-[8px] text-inksoft">IMG</span>
-                      )}
-                    </div>
-                    <div className="font-body text-xs text-ink flex-1 min-w-0 truncate">
-                      {it.cantidad} × {it.nombre}
-                      {(it.tallaElegida || it.colorElegida) && (
-                        <span className="text-inksoft"> ({[it.tallaElegida, it.colorElegida].filter(Boolean).join(' · ')})</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="font-body text-sm font-medium text-ink">{itemsVendidos.length} producto(s) · {bs(p.total)}</div>
+              <div className="font-body text-[11px] text-inksoft mt-1 mb-2">
+                Comprador: {p.comprador || 'Sin email'}
               </div>
-              <div className="font-body text-sm font-semibold text-ink mb-2">Total: {bs(p.total)}</div>
               {accion && (
                 <button
                   onClick={() => avanzarEstadoPedido(p.id, accion.estado)}

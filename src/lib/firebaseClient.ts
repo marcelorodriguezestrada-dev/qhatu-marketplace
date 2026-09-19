@@ -1,7 +1,7 @@
 'use client'
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
-import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth'
+import { getAuth, Auth } from 'firebase/auth'
 
 // Config pública del proyecto de Firebase — a diferencia de las
 // credenciales de firebaseAdmin.ts (que son secretas y solo corren en el
@@ -29,15 +29,6 @@ let auth: Auth | null = null
 if (typeof window !== 'undefined') {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
   auth = getAuth(app)
-  // Lo dejamos explícito en vez de confiar en el default del SDK — así
-  // la sesión queda guardada en el navegador (no solo en memoria) y
-  // sobrevive cerrar la pestaña, reiniciar el celular, etc. Si igual
-  // seguís viendo que pide loguearse seguido, probablemente NO sea esto
-  // (esto ya era el comportamiento por default) — el motivo real está
-  // en otro lado, revisar la lógica que redirige a /login.
-  setPersistence(auth, browserLocalPersistence).catch((err) => {
-    console.error('No se pudo fijar la persistencia de sesión de Firebase:', err)
-  })
 }
 
 export { auth }

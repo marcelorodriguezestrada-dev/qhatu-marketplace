@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
-import { expandirTalles } from '@/data/productos'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -268,7 +267,7 @@ export default function ProductoDetallePage() {
                 <div className="mb-4">
                   <span className="font-body text-sm text-inksoft block mb-1.5">Talla</span>
                   <div className="flex flex-wrap gap-2">
-                    {expandirTalles(producto.talles).map((t: string) => (
+                    {producto.talles.map((t: string) => (
                       <button
                         key={t}
                         type="button"

@@ -73,18 +73,3 @@ Además, nuestra página cuenta con un sistema inteligente que realiza un matche
 Puedes ver la sección de anuncios e ingresar aquí: https://clasiclick.ezeti.pro/anuncios
 ¿Te parece bien que publiquemos este anuncio o prefieres enviarme fotos e información nueva para subirlo hoy mismo? 🙌`
 }
-
-// Mismo espíritu que la de arriba, pero para alguien que ofrece un
-// SERVICIO profesional (no un anuncio de compra/venta) — le pedimos
-// específicamente los datos que hacen falta para publicarlo en el
-// directorio (rubro, zona, descripción de qué hace), porque a
-// diferencia de un anuncio, un profesional publicado es una garantía
-// pública que Clasi Click le da a los usuarios — no se sube nada sin
-// esa info confirmada por vos.
-export function mensajeInvitacionProfesional(): string {
-  return `¡Hola! 👋 Vi tu publicación en Cambalache ofreciendo tus servicios y me pareció muy buena tu propuesta. 👏
-Te escribo porque desde Clasi Click —un emprendimiento 100% potosino creado para impulsar a nuestra gente y a los negocios locales— queremos sumarte a nuestro directorio de profesionales, totalmente gratis. 🚀
-Para publicarte necesito confirmar algunos datos: ¿en qué rubro trabajás exactamente, en qué zona de la ciudad atendés, y podrías contarme un poco más de tu experiencia o servicio?
-Nuestra plataforma conecta automáticamente a quien busca tu tipo de servicio con vos apenas publican un aviso — así que en cuanto confirmes estos datos te subo al directorio.
-¿Me confirmás esta info para publicarte hoy mismo? 🙌`
-}
