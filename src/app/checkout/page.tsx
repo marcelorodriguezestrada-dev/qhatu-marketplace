@@ -1029,7 +1029,7 @@ function CheckoutContent() {
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">¡Felicidades, tu compra fue un éxito!</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">Su compra se ha éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
                   Estarás recibiendo el pedido {fechaEntregaTexto()}, horario a confirmar.
