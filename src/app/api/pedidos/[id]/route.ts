@@ -35,23 +35,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
-    const { estado, pagoVendedorMedio, franjaHoraria } = body
+    const { estado, pagoVendedorMedio } = body
 
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
-
-    // El comprador elige en qué franja del día prefiere recibir el
-    // envío, ya con el pedido pagado y confirmado — es solo una
-    // preferencia suya sobre SU pedido (igual que "informado_pago" o
-    // el comprobante), así que no pedimos login para guardarla: alcanza
-    // con conocer el id del pedido.
-    if (franjaHoraria) {
-      if (!['8-13', '13-19'].includes(franjaHoraria)) {
-        return NextResponse.json({ error: 'Franja horaria inválida.' }, { status: 400 })
-      }
-      await ref.update({ franjaHoraria, updatedAt: new Date().toISOString() })
-      return NextResponse.json({ ok: true })
-    }
 
     // Acción aparte: nosotros (la plataforma) le pagamos al vendedor lo
     // que le corresponde por un pedido con envío (esa plata había
@@ -85,12 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (estado === 'informado_pago') {
-      const cambios: Record<string, unknown> = { estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-      // Opcional: la URL de la captura del comprobante, si el comprador
-      // la subió desde el checkout — así el vendedor/admin la puede ver
-      // sin depender de que se la manden aparte por WhatsApp.
-      if (typeof body.comprobanteUrl === 'string' && body.comprobanteUrl) cambios.comprobanteUrl = body.comprobanteUrl
-      await ref.update(cambios)
+      await ref.update({ estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       return NextResponse.json({ ok: true })
     }
 
@@ -110,19 +92,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    const payload: Record<string, unknown> = { estado, updatedAt: new Date().toISOString() }
+    const payload: Record<string, string> = { estado, updatedAt: new Date().toISOString() }
     if (estado === 'pendiente_pago') payload.stockConfirmadoAt = new Date().toISOString()
     if (estado === 'pagado') payload.pagadoAt = new Date().toISOString()
     if (estado === 'en_preparacion') payload.enPreparacionAt = new Date().toISOString()
     if (estado === 'en_entrega') payload.enEntregaAt = new Date().toISOString()
-    if (estado === 'entregado') {
-      payload.entregadoAt = new Date().toISOString()
-      // Foto de comprobante de entrega -- el producto en la puerta o en
-      // manos de quien lo recibe, que saca la moto al entregar. Es
-      // opcional: si por algún motivo no se pudo sacar, igual se puede
-      // marcar como entregado.
-      if (typeof body.fotoEntregaUrl === 'string' && body.fotoEntregaUrl) payload.fotoEntregaUrl = body.fotoEntregaUrl
-    }
+    if (estado === 'entregado') payload.entregadoAt = new Date().toISOString()
     if (estado === 'cancelado') payload.canceladoAt = new Date().toISOString()
 
     await ref.update(payload)

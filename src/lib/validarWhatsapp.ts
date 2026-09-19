@@ -17,7 +17,7 @@ export function validarWhatsappBoliviano(numero: string): { valido: boolean; mot
     return { valido: false, motivo: 'El número tiene que tener 8 dígitos (sin el +591, ese lo agregamos solos).' }
   }
   if (!/^[67]/.test(local)) {
-    return { valido: false, motivo: 'Teléfono inválido.' }
+    return { valido: false, motivo: 'Los celulares en Bolivia empiezan con 6 o 7.' }
   }
   if (/^(\d)\1{7}$/.test(local)) {
     return { valido: false, motivo: 'Ese número no parece real — revisalo.' }

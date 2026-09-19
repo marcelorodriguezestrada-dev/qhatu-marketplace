@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
@@ -297,10 +296,6 @@ export default function LoginPage() {
       >
         {modo === 'registro' || modo === 'recuperar' ? '¿Ya tenés cuenta? Iniciá sesión' : '¿No tenés cuenta? Registrate'}
       </button>
-
-      <Link href="/ayuda" className="block w-full text-center font-body text-[11px] text-inksoft underline mt-4">
-        Centro de ayuda
-      </Link>
     </div>
   )
 }

@@ -39,33 +39,6 @@ export type Producto = {
   tiendaLogoUrl?: string
 }
 
-// El vendedor puede cargar los talles como un rango corto ("34-38") en
-// vez de escribir cada número — acá lo "desarmamos" en talles sueltos
-// para que el comprador elija uno específico, no el rango entero como
-// si fuera una sola opción. Funciona con números ("34-38" → 34..38);
-// cualquier otra cosa (S/M/L, "Único", un talle suelto) se deja tal
-// cual está, porque no hay un rango numérico que expandir.
-export function expandirTalles(talles: string[]): string[] {
-  const resultado: string[] = []
-  for (const t of talles) {
-    const match = t.trim().match(/^(\d+)\s*-\s*(\d+)$/)
-    if (match) {
-      const desde = parseInt(match[1], 10)
-      const hasta = parseInt(match[2], 10)
-      // Si el rango viniera al revés (38-34) o fuera absurdamente
-      // largo, mejor dejarlo tal cual que generar cientos de botones.
-      if (desde <= hasta && hasta - desde <= 40) {
-        for (let n = desde; n <= hasta; n++) resultado.push(String(n))
-        continue
-      }
-    }
-    resultado.push(t.trim())
-  }
-  // Sin duplicados, por si el vendedor puso "34-38, 36" y 36 ya estaba
-  // adentro del rango.
-  return [...new Set(resultado)]
-}
-
 // Catálogo semilla. En producción esto vive en Firestore (colección
 // "productos") y cada vendedor lo carga desde un panel propio — esto es
 // el punto de partida para no arrancar con la tienda vacía.

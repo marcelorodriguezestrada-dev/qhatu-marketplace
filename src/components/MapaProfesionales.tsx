@@ -45,20 +45,17 @@ export function MapaProfesionales({
 
       // Centro por defecto: Potosí, Bolivia (lanzamiento inicial en Potosí)
       const centroInicial = centro || { lat: -19.5886, lng: -65.7531 }
-      const mapa = L.map(contenedorRef.current).setView([centroInicial.lat, centroInicial.lng], 13)
+      const mapa = L.map(contenedorRef.current).setView([centroInicial.lat, centroInicial.lng], centro ? 13 : 10)
       mapaRef.current = mapa
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap',
       }).addTo(mapa)
 
-      const puntos: [number, number][] = []
-
       if (centro) {
         L.circleMarker([centro.lat, centro.lng], { radius: 8, color: '#2F6E5C', fillColor: '#2F6E5C', fillOpacity: 0.6 })
           .addTo(mapa)
           .bindPopup('Vos estás acá')
-        puntos.push([centro.lat, centro.lng])
       }
 
       profesionales
@@ -68,18 +65,7 @@ export function MapaProfesionales({
           L.marker([p.lat as number, p.lng as number])
             .addTo(mapa)
             .bindPopup(`<strong>${p.nombre}</strong><br/>${rubroLabel}<br/><a href="/servicios/${p.id}">Ver perfil</a>`)
-          puntos.push([p.lat as number, p.lng as number])
         })
-
-      // En vez de un zoom fijo "a ojo" (que se ve lejano si los
-      // profesionales están agrupados en una zona chica, o corta
-      // puntos si están más desperdigados), encuadramos el mapa para
-      // que entren todos los puntos, lo más cerca posible.
-      if (puntos.length > 1) {
-        mapa.fitBounds(L.latLngBounds(puntos), { padding: [32, 32], maxZoom: 15 })
-      } else if (puntos.length === 1) {
-        mapa.setView(puntos[0], 15)
-      }
     }
 
     iniciarMapa()

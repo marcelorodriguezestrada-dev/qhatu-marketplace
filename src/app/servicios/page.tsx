@@ -248,52 +248,51 @@ export default function ServiciosPage() {
           </button>
         </div>
 
-        {/* Un solo nivel de botones a la vez — categoría, o grupo, o
-            especialidad — nunca los tres juntos. Las migas de pan de
-            abajo ("Todos los servicios › Salud › Médicos") son la
-            forma de volver a un nivel anterior; acá arriba solo se ve
-            el paso siguiente, para no enterrar la pantalla en botones. */}
-        {categoriaSel === 'Todo' && (
-          <div className="flex gap-2 mb-2 flex-wrap items-center">
+        <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <button
+            type="button"
+            onClick={() => { setCategoriaSel('Todo'); setGrupoSel('Todo'); setRubro('Todo') }}
+            className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+              categoriaSel === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+            }`}
+          >
+            Todas las categorías
+          </button>
+          {categorias.map((c) => (
             <button
+              key={c.id}
               type="button"
-              onClick={() => { setCategoriaSel('Todo'); setGrupoSel('Todo'); setRubro('Todo') }}
-              className="px-4 py-1.5 rounded-full border font-body text-sm font-medium border-maroon bg-maroonsoft text-maroon"
+              onClick={() => {
+                setCategoriaSel(c.id)
+                setGrupoSel('Todo')
+                setRubro('Todo')
+                fetch('/api/analitica/categoria', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tipo: 'servicio', valor: c.id }),
+                }).catch(() => {})
+              }}
+              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
+                categoriaSel === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              }`}
             >
-              Todas las categorías
+              {c.label}
             </button>
-            {categorias.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setCategoriaSel(c.id)
-                  setGrupoSel('Todo')
-                  setRubro('Todo')
-                  fetch('/api/analitica/categoria', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tipo: 'servicio', valor: c.id }),
-                  }).catch(() => {})
-                }}
-                className="px-4 py-1.5 rounded-full border font-body text-sm font-medium border-line bg-panel text-inksoft"
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
 
-        {/* Grupos de la categoría elegida (ej. "Médicos", "Salud
-            mental") — solo mientras no se haya elegido un grupo
-            todavía, y solo si esa categoría tiene grupos definidos
-            (categorías simples como "Belleza" pasan directo a rubros). */}
-        {categoriaSel !== 'Todo' && grupoSel === 'Todo' && gruposDeCategoria.length > 0 && (
+        {/* Nivel 2: grupos de la categoría elegida (ej. "Médicos",
+            "Salud mental"). Solo aparece si esa categoría tiene grupos
+            definidos — categorías simples como "Belleza" pasan directo
+            a la lista de rubros. */}
+        {categoriaSel !== 'Todo' && gruposDeCategoria.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             <button
               type="button"
               onClick={() => { setGrupoSel('Todo'); setRubro('Todo') }}
-              className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-maroon bg-maroonsoft text-maroon"
+              className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+                grupoSel === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              }`}
             >
               Todo {categorias.find((c) => c.id === categoriaSel)?.label || ''}
             </button>
@@ -302,7 +301,9 @@ export default function ServiciosPage() {
                 key={g.id}
                 type="button"
                 onClick={() => { setGrupoSel(g.id); setRubro('Todo') }}
-                className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-line bg-panel text-inksoft"
+                className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+                  grupoSel === g.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                }`}
               >
                 {g.label}
               </button>
@@ -310,12 +311,9 @@ export default function ServiciosPage() {
           </div>
         )}
 
-        {/* Especialidades/rubros — recién cuando ya se pasó el nivel de
-            grupo (o la categoría no tiene grupos, así que se salta
-            directo acá). Esta fila SÍ se queda visible aunque ya
-            hayas elegido una, para poder cambiar entre especialidades
-            del mismo grupo sin tener que volver para atrás. */}
-        {categoriaSel !== 'Todo' && (grupoSel !== 'Todo' || gruposDeCategoria.length === 0) && (
+        {/* Nivel 3: rubros/especialidades. Si hay un grupo elegido,
+            solo se muestran los de ese grupo. */}
+        {categoriaSel !== 'Todo' && (
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             <button
               type="button"
