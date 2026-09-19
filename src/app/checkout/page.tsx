@@ -295,6 +295,8 @@ function CheckoutContent() {
   const [error, setError] = useState('')
   const [comprobanteUrl, setComprobanteUrl] = useState('')
   const [subiendoComprobante, setSubiendoComprobante] = useState(false)
+  const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
+  const [guardandoFranja, setGuardandoFranja] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Concretar una compra requiere estar logueado Y con el email
@@ -577,6 +579,30 @@ function CheckoutContent() {
       setError(e.message || 'No se pudo subir la imagen.')
     } finally {
       setSubiendoComprobante(false)
+    }
+  }
+
+  // Se llama desde la pantalla de éxito, una vez que ya está todo
+  // pagado — guarda la preferencia en TODOS los subPedidos pagados de
+  // esta compra (son todos del mismo checkout, tiene sentido que
+  // compartan el horario de entrega).
+  async function elegirFranja(franja: '8-13' | '13-19') {
+    setGuardandoFranja(true)
+    setFranjaHoraria(franja)
+    try {
+      await Promise.all(
+        subPedidos
+          .filter((s) => s.estadoActual === 'pagado' && s.pedidoId)
+          .map((s) =>
+            fetch(`/api/pedidos/${s.pedidoId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ franjaHoraria: franja }),
+            })
+          )
+      )
+    } finally {
+      setGuardandoFranja(false)
     }
   }
 
@@ -1039,6 +1065,41 @@ function CheckoutContent() {
               )}
             </div>
           ) : null}
+
+          {/* Franja horaria de entrega — solo para envío, una vez
+              confirmado el pago. Es una preferencia, no una garantía
+              exacta (el reparto todavía depende de la moto/vendedor),
+              por eso el texto dice "de" y no "a las". */}
+          {metodoEntrega === 'envio' && subPedidos.every((s) => s.estadoActual === 'pagado') && (
+            <div className="bg-panel border border-line rounded-xl p-4 mb-3">
+              <div className="font-body text-sm font-medium text-ink mb-2.5">¿En qué horario preferís recibirlo?</div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => elegirFranja('8-13')}
+                  disabled={guardandoFranja}
+                  className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
+                    franjaHoraria === '8-13' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                  }`}
+                >
+                  8 a 13
+                </button>
+                <button
+                  type="button"
+                  onClick={() => elegirFranja('13-19')}
+                  disabled={guardandoFranja}
+                  className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
+                    franjaHoraria === '13-19' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                  }`}
+                >
+                  13 a 19
+                </button>
+              </div>
+              {franjaHoraria && !guardandoFranja && (
+                <div className="font-body text-[11px] text-teal mt-2">✓ Guardado, se lo avisamos al repartidor.</div>
+              )}
+            </div>
+          )}
           {subPedidos.map((s, i) => (
             <div key={i} className="bg-panel border border-line rounded-lg p-4 mb-3">
               <div className="flex items-center justify-end mb-1">

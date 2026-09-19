@@ -35,10 +35,23 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
-    const { estado, pagoVendedorMedio } = body
+    const { estado, pagoVendedorMedio, franjaHoraria } = body
 
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
+
+    // El comprador elige en qué franja del día prefiere recibir el
+    // envío, ya con el pedido pagado y confirmado — es solo una
+    // preferencia suya sobre SU pedido (igual que "informado_pago" o
+    // el comprobante), así que no pedimos login para guardarla: alcanza
+    // con conocer el id del pedido.
+    if (franjaHoraria) {
+      if (!['8-13', '13-19'].includes(franjaHoraria)) {
+        return NextResponse.json({ error: 'Franja horaria inválida.' }, { status: 400 })
+      }
+      await ref.update({ franjaHoraria, updatedAt: new Date().toISOString() })
+      return NextResponse.json({ ok: true })
+    }
 
     // Acción aparte: nosotros (la plataforma) le pagamos al vendedor lo
     // que le corresponde por un pedido con envío (esa plata había
