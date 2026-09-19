@@ -961,7 +961,17 @@ function CheckoutContent() {
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between pt-2 mt-1 border-t border-line font-body text-sm font-bold text-ink">
+            <div className="flex items-center justify-between pt-2 mt-1 border-t border-line font-body text-[13px] text-inksoft">
+              <span>Subtotal</span>
+              <span>{bs(subPedidos[pasoActual].subtotal)}</span>
+            </div>
+            {subPedidos[pasoActual].costoEnvio > 0 && (
+              <div className="flex items-center justify-between font-body text-[13px] text-inksoft">
+                <span>Envío</span>
+                <span>{bs(subPedidos[pasoActual].costoEnvio)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-1 font-body text-sm font-bold text-ink">
               <span>Total</span>
               <span>{bs(subPedidos[pasoActual].total)}</span>
             </div>
@@ -979,7 +989,18 @@ function CheckoutContent() {
           )}
 
           {subPedidos[pasoActual].qrImageUrl ? (
-            <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line mt-2" />
+            <>
+              <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line mt-2" />
+              <a
+                href={subPedidos[pasoActual].qrImageUrl}
+                download="qr-pago.jpg"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-2 font-body text-[12px] text-teal underline"
+              >
+                ⬇ Descargar QR
+              </a>
+            </>
           ) : (
             <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink mt-2">
               {subPedidos[pasoActual].cbu ? (
