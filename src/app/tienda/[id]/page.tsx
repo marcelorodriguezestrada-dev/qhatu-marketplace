@@ -3,8 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { Producto } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
+
+const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
+  ssr: false,
+  loading: () => <div className="h-[300px] rounded-xl border border-line bg-panelalt" />,
+})
 
 interface PerfilTienda {
   existe: boolean
@@ -18,6 +24,8 @@ interface PerfilTienda {
   rating: number | null
   logoUrl: string
   followers: number
+  lat?: number | null
+  lng?: number | null
 }
 
 export default function TiendaPage() {
@@ -119,6 +127,15 @@ export default function TiendaPage() {
               {perfil.tipoVentas && (
                 <div className="font-body text-sm text-inksoft">🛍️ {perfil.tipoVentas}</div>
               )}
+            </div>
+          )}
+
+          {perfil.lat != null && perfil.lng != null && (
+            <div className="mt-4 pt-4 border-t border-line">
+              <MapaProfesionales
+                profesionales={[{ id: vendedorId, nombre: nombre, rubro: perfil.tipoVentas || '', lat: perfil.lat, lng: perfil.lng }]}
+                centro={{ lat: perfil.lat, lng: perfil.lng }}
+              />
             </div>
           )}
         </div>

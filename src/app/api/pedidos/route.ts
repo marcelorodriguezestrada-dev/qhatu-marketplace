@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, zonaEntrega, direccion, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
+    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -64,6 +65,13 @@ export async function POST(req: NextRequest) {
       items,
       total: Number(total),
       comprador: comprador || null,
+      // Nombre y apellido que la persona escribió en el checkout — a
+      // diferencia de `comprador` (el email de la cuenta), esto es lo
+      // que el vendedor y el admin ven como "a nombre de quién" es el
+      // pedido, porque el registro de cuenta no pide nombre (ver
+      // /login: solo pide email, contraseña y celular).
+      nombreComprador: nombreComprador || null,
+      whatsappComprador: whatsappComprador ? numeroLocalABolivia(whatsappComprador) : null,
       vendedorId: vendedorId || null,
       // Guardamos nombre y WhatsApp del vendedor tal como estaban al
       // momento de la compra — así /admin puede mostrar de qué tienda
@@ -73,6 +81,10 @@ export async function POST(req: NextRequest) {
       vendedorWhatsapp: vendedorWhatsapp || '',
       zonaEntrega: zonaEntrega || 'No especificado',
       direccion: direccion || null,
+      // Referencia opcional ("entre calle X y calle Y") — ayuda a
+      // ubicar la dirección cuando el barrio no tiene numeración clara,
+      // sin ser obligatoria.
+      entreCalles: entreCalles || null,
       // Ubicación opcional que comparte el comprador al pedir con
       // envío — la usa /admin (pestaña Reparto) para armar la ruta de
       // la moto por cercanía. Sin esto, el pedido igual se puede
