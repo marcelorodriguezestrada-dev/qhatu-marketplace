@@ -1265,8 +1265,7 @@ function CheckoutContent() {
               </div>
 
               <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
-                No cierres esta pantalla — se actualiza sola. Si preferís cerrarla, podés seguir tu pedido desde{' '}
-                <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
+                No podés salir de esta pantalla ni hacer otra compra hasta que se confirme el pago — se actualiza sola.
               </div>
             </>
           )}
