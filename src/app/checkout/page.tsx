@@ -1245,7 +1245,7 @@ function CheckoutContent() {
             disabled={!comprobanteUrl || subiendoComprobante}
             className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40 mb-2"
           >
-            ✓ Ya pagué, confirmar
+            ✓ Continuar
           </button>
 
           <button
