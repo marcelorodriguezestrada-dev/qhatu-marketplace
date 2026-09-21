@@ -473,6 +473,10 @@ function CheckoutContent() {
       // resultado === true, o 'error' (el servicio de verificación
       // falló) — en los dos casos se deja continuar.
     }
+    if (metodoEntrega === 'envio' && !entreCalles.trim()) {
+      setError('Escribí entre qué calles queda tu dirección antes de continuar — ayuda mucho a que la moto no se pierda.')
+      return
+    }
 
     // Si es retiro + efectivo, reservamos la pestaña de WhatsApp ACÁ
     // MISMO, todavía dentro del gesto de click del usuario — recién más
@@ -1015,7 +1019,7 @@ function CheckoutContent() {
                 )}
               </div>
               <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles (opcional)</span>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles *</span>
                 <input
                   value={entreCalles}
                   onChange={(e) => setEntreCalles(e.target.value)}
@@ -1168,7 +1172,7 @@ function CheckoutContent() {
                 download="qr-pago.jpg"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-2 font-body text-[12px] text-teal underline"
+                className="flex items-center justify-center gap-2 mt-3 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold"
               >
                 ⬇ Descargar QR
               </a>
