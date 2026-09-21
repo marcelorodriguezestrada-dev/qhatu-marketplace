@@ -308,6 +308,70 @@ function CheckoutContent() {
     subPedidosRef.current = subPedidos
   }, [subPedidos])
 
+  // ── La pantalla "Esperando la confirmación del pago" tiene que
+  // sobrevivir a que el comprador salga de /checkout ─────────────────
+  // Todo el estado del checkout (etapa, subPedidos, etc.) vive solo en
+  // memoria de esta página: si la persona navega a otra ruta (por
+  // ejemplo entra a /admin en la misma pestaña) el componente se
+  // desmonta, y al volver arranca de cero en la etapa 'entrega' — el
+  // mensaje de espera "desaparece" aunque el pedido siga en
+  // 'informado_pago'. Por eso, mientras se espera, guardamos lo mínimo
+  // en localStorage y lo restauramos al volver. El polling de más abajo
+  // arranca solo en cuanto la etapa vuelve a ser 'esperando', así que si
+  // el admin ya validó el pago mientras tanto, pasa directo al resumen.
+  const claveEspera = `clasiclick_checkout_espera_${claveTienda || 'todas'}`
+  const [restaurando, setRestaurando] = useState(true)
+
+  useEffect(() => {
+    if (authCargando) return
+    try {
+      const guardado = localStorage.getItem(claveEspera)
+      if (guardado && usuario) {
+        const d = JSON.parse(guardado)
+        const vigente = typeof d?.guardadoAt === 'number' && Date.now() - d.guardadoAt < 48 * 60 * 60 * 1000
+        if (vigente && d.uid === usuario.uid && Array.isArray(d.subPedidos) && d.subPedidos.length > 0) {
+          setSubPedidos(d.subPedidos)
+          setMetodoEntrega(d.metodoEntrega === 'retiro' ? 'retiro' : 'envio')
+          setMetodoPago(d.metodoPago === 'efectivo' ? 'efectivo' : 'qr')
+          setMetodoElegido(true)
+          setEtapa('esperando')
+        } else {
+          // Vencido, o de otra cuenta que usó este mismo navegador.
+          localStorage.removeItem(claveEspera)
+        }
+      }
+    } catch {
+      // JSON corrupto o localStorage bloqueado: se arranca normal.
+    }
+    setRestaurando(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authCargando])
+
+  useEffect(() => {
+    if (restaurando) return
+    try {
+      const cancelada = subPedidos.some((s) => s.estadoActual === 'cancelado')
+      if (etapa === 'esperando' && usuario && !cancelada) {
+        localStorage.setItem(
+          claveEspera,
+          JSON.stringify({ uid: usuario.uid, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
+        )
+      } else if (etapa === 'resumen' || (etapa === 'esperando' && cancelada)) {
+        // Ya se confirmó (o se canceló): no hay nada más que esperar.
+        localStorage.removeItem(claveEspera)
+      }
+    } catch {
+      // Sin localStorage la pantalla sigue funcionando, solo que no sobrevive a salir.
+    }
+  }, [restaurando, etapa, subPedidos, usuario, metodoEntrega, metodoPago, claveEspera])
+
+  function salirDeEspera() {
+    try {
+      localStorage.removeItem(claveEspera)
+    } catch {}
+    router.push('/')
+  }
+
   // Concretar una compra requiere estar logueado Y con el email
   // verificado (regla de toda la plataforma) — si alguien llega hasta
   // acá sin cuenta, o con una cuenta todavía sin verificar, lo mandamos
@@ -672,7 +736,7 @@ function CheckoutContent() {
       const actuales = subPedidosRef.current
       const actualizados = await Promise.all(
         actuales.map(async (s) => {
-          if (!s.pedidoId || s.estadoActual === 'pagado') return s
+          if (!s.pedidoId || s.estadoActual === 'pagado' || s.estadoActual === 'cancelado') return s
           try {
             const res = await fetch(`/api/pedidos/${s.pedidoId}`)
             const data = await res.json()
@@ -690,8 +754,14 @@ function CheckoutContent() {
 
       if (actualizados.every((s) => s.estadoActual === 'pagado')) {
         if (pollRef.current) clearInterval(pollRef.current)
-        vaciarTienda(vendedorIdTienda)
+        // Solo sacamos del carrito lo que se pagó en ESTA compra (no toda
+        // la tienda): si el comprador volvió días después con productos
+        // nuevos en el carrito, esos no se tocan.
+        for (const s of actualizados) for (const it of s.items) quitar(it)
         setEtapa('resumen')
+      } else if (actualizados.some((s) => s.estadoActual === 'cancelado')) {
+        // Cancelado desde /admin: no tiene sentido seguir consultando.
+        if (pollRef.current) clearInterval(pollRef.current)
       }
     }
 
@@ -703,6 +773,13 @@ function CheckoutContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa])
+
+  // Hasta no saber si hay una espera guardada, no mostramos ni el
+  // formulario ni "carrito vacío" (se vería un parpadeo antes de
+  // restaurar la pantalla de espera).
+  if (restaurando) return null
+
+  const pedidoCancelado = subPedidos.some((s) => s.estadoActual === 'cancelado')
 
   // Ojo: 'esperando' tiene que estar contemplado acá. Si no, en cuanto
   // el carrito queda vacío (o el usuario recarga), el comprador sale
@@ -1156,25 +1233,53 @@ function CheckoutContent() {
 
       {etapa === 'esperando' && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          <div className="w-11 h-11 rounded-full bg-ochre text-white flex items-center justify-center mx-auto mb-3.5 text-xl animate-pulse">
-            ⏳
+          <div
+            className={`w-11 h-11 rounded-full text-white flex items-center justify-center mx-auto mb-3.5 text-xl ${
+              pedidoCancelado ? 'bg-maroon' : 'bg-ochre animate-pulse'
+            }`}
+          >
+            {pedidoCancelado ? '✕' : '⏳'}
           </div>
-          <div className="font-display text-lg font-bold text-ink mb-1.5">Esperando la confirmación del pago</div>
-          <div className="font-body text-[13px] text-inksoft mb-4">
-            Ya recibimos tu comprobante. En cuanto {subPedidos.length > 1 ? 'los vendedores lo revisen' : 'el vendedor lo revise'} se
-            confirma tu pedido y vas a poder elegir el horario de entrega.
+          <div className="font-display text-lg font-bold text-ink mb-1.5">
+            {pedidoCancelado ? 'Pedido cancelado' : 'Esperando la confirmación del pago'}
           </div>
 
-          <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
-            No cierres esta pantalla — se actualiza sola. Si preferís cerrarla, podés seguir tu pedido desde{' '}
-            <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
-          </div>
+          {pedidoCancelado ? (
+            <>
+              <div className="font-body text-[13px] text-inksoft mb-4">
+                El vendedor canceló este pedido. Si ya pagaste, comunicate con él por WhatsApp para coordinar.
+              </div>
+              <button
+                type="button"
+                onClick={salirDeEspera}
+                className="w-full py-2.5 rounded-lg border border-line bg-transparent font-body text-xs font-semibold text-inksoft mb-4"
+              >
+                Volver a la tienda
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="font-body text-[13px] text-inksoft mb-4">
+                Ya recibimos tu comprobante. En cuanto {subPedidos.length > 1 ? 'los vendedores lo revisen' : 'el vendedor lo revise'} se
+                confirma tu pedido y vas a poder elegir el horario de entrega.
+              </div>
+
+              <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
+                No cierres esta pantalla — se actualiza sola. Si preferís cerrarla, podés seguir tu pedido desde{' '}
+                <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
+              </div>
+            </>
+          )}
 
           {subPedidos.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-2 py-2 border-t border-line">
               <span className="font-body text-xs text-ink truncate">{s.vendedorNombre}</span>
-              <span className={`font-body text-[11px] font-semibold shrink-0 ${s.estadoActual === 'pagado' ? 'text-teal' : 'text-ochre'}`}>
-                {s.estadoActual === 'pagado' ? '✓ Confirmado' : 'Revisando...'}
+              <span
+                className={`font-body text-[11px] font-semibold shrink-0 ${
+                  s.estadoActual === 'pagado' ? 'text-teal' : s.estadoActual === 'cancelado' ? 'text-maroon' : 'text-ochre'
+                }`}
+              >
+                {s.estadoActual === 'pagado' ? '✓ Confirmado' : s.estadoActual === 'cancelado' ? '✕ Cancelado' : 'Revisando...'}
               </span>
             </div>
           ))}
