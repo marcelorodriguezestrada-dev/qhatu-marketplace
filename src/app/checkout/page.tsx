@@ -1286,12 +1286,12 @@ function CheckoutContent() {
           ) : (
             <>
               <div className="font-body text-[13px] text-inksoft mb-4">
-                Ya recibimos tu comprobante. En cuanto {subPedidos.length > 1 ? 'los vendedores lo revisen' : 'el vendedor lo revise'} se
-                confirma tu pedido y vas a poder elegir el horario de entrega.
+                Ya recibimos tu comprobante. En cuanto Clasi Click revise se
+                confirmara tu pedido y vas a poder elegir el horario de entrega.
               </div>
 
               <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
-                No cierres esta pantalla — se actualiza sola. Si preferís cerrarla, podés seguir tu pedido desde{' '}
+                No cierres esta pantalla — se actualiza sola. Si prefieres cerrarla, puedés seguir tu pedido desde{' '}
                 <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
               </div>
             </>
