@@ -22,7 +22,7 @@ export type ZonaPotosi = {
 
 const CENTRO_POTOSI = { lat: -19.5893, lng: -65.7535 } // Plaza 10 de Noviembre
 
-function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+export function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLng = ((lng2 - lng1) * Math.PI) / 180
