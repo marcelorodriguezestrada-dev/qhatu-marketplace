@@ -1144,7 +1144,7 @@ function CheckoutContent() {
               </div>
             )}
             <div className="flex items-center justify-between pt-1 font-body text-sm font-bold text-ink">
-              <span>Total</span>
+              <span>Total a Pagar</span>
               <span>{bs(subPedidos[pasoActual].total)}</span>
             </div>
           </div>
