@@ -301,6 +301,13 @@ function CheckoutContent() {
   const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
   const [guardandoFranja, setGuardandoFranja] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // uid de la persona que CREÓ el pedido. Firebase Auth sincroniza la
+  // sesión entre pestañas del mismo navegador: si en otra pestaña se
+  // entra con otra cuenta (por ejemplo la de admin), acá `usuario`
+  // pasa a ser esa otra cuenta. El pedido sigue siendo del comprador
+  // original, así que guardamos su uid aparte y lo usamos en vez de
+  // `usuario.uid` para todo lo que tenga que ver con la espera.
+  const uidCompradorRef = useRef<string | null>(null)
   // Espejo de subPedidos siempre actualizado, para que el intervalo del
   // polling no trabaje con una copia vieja capturada en el closure.
   const subPedidosRef = useRef<SubPedido[]>([])
@@ -330,6 +337,7 @@ function CheckoutContent() {
         const d = JSON.parse(guardado)
         const vigente = typeof d?.guardadoAt === 'number' && Date.now() - d.guardadoAt < 48 * 60 * 60 * 1000
         if (vigente && d.uid === usuario.uid && Array.isArray(d.subPedidos) && d.subPedidos.length > 0) {
+          uidCompradorRef.current = d.uid
           setSubPedidos(d.subPedidos)
           setMetodoEntrega(d.metodoEntrega === 'retiro' ? 'retiro' : 'envio')
           setMetodoPago(d.metodoPago === 'efectivo' ? 'efectivo' : 'qr')
@@ -351,10 +359,15 @@ function CheckoutContent() {
     if (restaurando) return
     try {
       const cancelada = subPedidos.some((s) => s.estadoActual === 'cancelado')
-      if (etapa === 'esperando' && usuario && !cancelada) {
+      // Siempre el uid del comprador original, aunque `usuario` haya
+      // cambiado por un login en otra pestaña (si no, al volver el
+      // guardado quedaría a nombre del admin y se descartaría).
+      const uidGuardar = uidCompradorRef.current ?? usuario?.uid ?? null
+      if (etapa === 'esperando' && uidGuardar && !cancelada) {
+        uidCompradorRef.current = uidGuardar
         localStorage.setItem(
           claveEspera,
-          JSON.stringify({ uid: usuario.uid, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
+          JSON.stringify({ uid: uidGuardar, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
         )
       } else if (etapa === 'resumen' || (etapa === 'esperando' && cancelada)) {
         // Ya se confirmó (o se canceló): no hay nada más que esperar.
@@ -376,10 +389,22 @@ function CheckoutContent() {
   // verificado (regla de toda la plataforma) — si alguien llega hasta
   // acá sin cuenta, o con una cuenta todavía sin verificar, lo mandamos
   // a /login antes de dejarlo seguir.
+  //
+  // OJO: este chequeo es solo para ENTRAR al checkout. Una vez que el
+  // pedido ya se creó (pagando / esperando / resumen) no se vuelve a
+  // mirar la sesión: si en otra pestaña se cierra sesión o se entra con
+  // otra cuenta (ej. admin), Firebase lo sincroniza acá, `usuario`
+  // cambia, y antes esto mandaba a /login — que a su vez rebotaba a la
+  // home al ver una cuenta ya logueada. La pantalla de espera no
+  // necesita la sesión: el polling a /api/pedidos/[id] es público.
+  const pedidoYaCreado =
+    etapa === 'pagando' || etapa === 'esperando' || etapa === 'resumen' || subPedidos.some((s) => !!s.pedidoId)
+
   useEffect(() => {
     if (authCargando) return
+    if (pedidoYaCreado) return
     if (!usuario || emailVerificado === false) router.push('/login')
-  }, [authCargando, usuario, emailVerificado, router])
+  }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
   const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
@@ -447,6 +472,10 @@ function CheckoutContent() {
       }
       // resultado === true, o 'error' (el servicio de verificación
       // falló) — en los dos casos se deja continuar.
+    }
+    if (metodoEntrega === 'envio' && !entreCalles.trim()) {
+      setError('Escribí entre qué calles queda tu dirección antes de continuar — ayuda mucho a que la moto no se pierda.')
+      return
     }
 
     // Si es retiro + efectivo, reservamos la pestaña de WhatsApp ACÁ
@@ -573,6 +602,7 @@ function CheckoutContent() {
         })
       }
 
+      uidCompradorRef.current = usuario?.uid ?? null
       setSubPedidos(nuevos)
       setPasoActual(0)
 
@@ -989,7 +1019,7 @@ function CheckoutContent() {
                 )}
               </div>
               <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles (opcional)</span>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles *</span>
                 <input
                   value={entreCalles}
                   onChange={(e) => setEntreCalles(e.target.value)}
@@ -1118,7 +1148,7 @@ function CheckoutContent() {
               </div>
             )}
             <div className="flex items-center justify-between pt-1 font-body text-sm font-bold text-ink">
-              <span>Total</span>
+              <span>Total a Pagar</span>
               <span>{bs(subPedidos[pasoActual].total)}</span>
             </div>
           </div>
@@ -1142,7 +1172,7 @@ function CheckoutContent() {
                 download="qr-pago.jpg"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-2 font-body text-[12px] text-teal underline"
+                className="flex items-center justify-center gap-2 mt-3 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold"
               >
                 ⬇ Descargar QR
               </a>
@@ -1219,7 +1249,7 @@ function CheckoutContent() {
             disabled={!comprobanteUrl || subiendoComprobante}
             className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40 mb-2"
           >
-            ✓ Ya pagué, confirmar
+            ✓ Continuar
           </button>
 
           <button
@@ -1260,8 +1290,8 @@ function CheckoutContent() {
           ) : (
             <>
               <div className="font-body text-[13px] text-inksoft mb-4">
-                Ya recibimos tu comprobante. En cuanto {subPedidos.length > 1 ? 'los vendedores lo revisen' : 'el vendedor lo revise'} se
-                confirma tu pedido y vas a poder elegir el horario de entrega.
+                Ya recibimos tu comprobante. En cuanto Clasi Click revise se
+                confirmara tu pedido y vas a poder elegir el horario de entrega.
               </div>
 
               <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
@@ -1272,7 +1302,7 @@ function CheckoutContent() {
 
           {subPedidos.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-2 py-2 border-t border-line">
-              <span className="font-body text-xs text-ink truncate">{s.vendedorNombre}</span>
+              <span className="font-body text-xs text-ink truncate"> </span>
               <span
                 className={`font-body text-[11px] font-semibold shrink-0 ${
                   s.estadoActual === 'pagado' ? 'text-teal' : s.estadoActual === 'cancelado' ? 'text-maroon' : 'text-ochre'
