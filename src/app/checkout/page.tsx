@@ -301,6 +301,13 @@ function CheckoutContent() {
   const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
   const [guardandoFranja, setGuardandoFranja] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // uid de la persona que CREÓ el pedido. Firebase Auth sincroniza la
+  // sesión entre pestañas del mismo navegador: si en otra pestaña se
+  // entra con otra cuenta (por ejemplo la de admin), acá `usuario`
+  // pasa a ser esa otra cuenta. El pedido sigue siendo del comprador
+  // original, así que guardamos su uid aparte y lo usamos en vez de
+  // `usuario.uid` para todo lo que tenga que ver con la espera.
+  const uidCompradorRef = useRef<string | null>(null)
   // Espejo de subPedidos siempre actualizado, para que el intervalo del
   // polling no trabaje con una copia vieja capturada en el closure.
   const subPedidosRef = useRef<SubPedido[]>([])
@@ -330,6 +337,7 @@ function CheckoutContent() {
         const d = JSON.parse(guardado)
         const vigente = typeof d?.guardadoAt === 'number' && Date.now() - d.guardadoAt < 48 * 60 * 60 * 1000
         if (vigente && d.uid === usuario.uid && Array.isArray(d.subPedidos) && d.subPedidos.length > 0) {
+          uidCompradorRef.current = d.uid
           setSubPedidos(d.subPedidos)
           setMetodoEntrega(d.metodoEntrega === 'retiro' ? 'retiro' : 'envio')
           setMetodoPago(d.metodoPago === 'efectivo' ? 'efectivo' : 'qr')
@@ -351,10 +359,15 @@ function CheckoutContent() {
     if (restaurando) return
     try {
       const cancelada = subPedidos.some((s) => s.estadoActual === 'cancelado')
-      if (etapa === 'esperando' && usuario && !cancelada) {
+      // Siempre el uid del comprador original, aunque `usuario` haya
+      // cambiado por un login en otra pestaña (si no, al volver el
+      // guardado quedaría a nombre del admin y se descartaría).
+      const uidGuardar = uidCompradorRef.current ?? usuario?.uid ?? null
+      if (etapa === 'esperando' && uidGuardar && !cancelada) {
+        uidCompradorRef.current = uidGuardar
         localStorage.setItem(
           claveEspera,
-          JSON.stringify({ uid: usuario.uid, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
+          JSON.stringify({ uid: uidGuardar, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
         )
       } else if (etapa === 'resumen' || (etapa === 'esperando' && cancelada)) {
         // Ya se confirmó (o se canceló): no hay nada más que esperar.
@@ -376,10 +389,22 @@ function CheckoutContent() {
   // verificado (regla de toda la plataforma) — si alguien llega hasta
   // acá sin cuenta, o con una cuenta todavía sin verificar, lo mandamos
   // a /login antes de dejarlo seguir.
+  //
+  // OJO: este chequeo es solo para ENTRAR al checkout. Una vez que el
+  // pedido ya se creó (pagando / esperando / resumen) no se vuelve a
+  // mirar la sesión: si en otra pestaña se cierra sesión o se entra con
+  // otra cuenta (ej. admin), Firebase lo sincroniza acá, `usuario`
+  // cambia, y antes esto mandaba a /login — que a su vez rebotaba a la
+  // home al ver una cuenta ya logueada. La pantalla de espera no
+  // necesita la sesión: el polling a /api/pedidos/[id] es público.
+  const pedidoYaCreado =
+    etapa === 'pagando' || etapa === 'esperando' || etapa === 'resumen' || subPedidos.some((s) => !!s.pedidoId)
+
   useEffect(() => {
     if (authCargando) return
+    if (pedidoYaCreado) return
     if (!usuario || emailVerificado === false) router.push('/login')
-  }, [authCargando, usuario, emailVerificado, router])
+  }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
   const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
@@ -573,6 +598,7 @@ function CheckoutContent() {
         })
       }
 
+      uidCompradorRef.current = usuario?.uid ?? null
       setSubPedidos(nuevos)
       setPasoActual(0)
 
