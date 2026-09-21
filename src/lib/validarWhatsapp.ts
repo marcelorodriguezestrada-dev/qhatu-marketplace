@@ -14,7 +14,7 @@ export function validarWhatsappBoliviano(numero: string): { valido: boolean; mot
   const local = limpio.startsWith('591') && limpio.length > 8 ? limpio.slice(3) : limpio
 
   if (local.length !== 8) {
-    return { valido: false, motivo: 'El número tiene que tener 8 dígitos.' }
+    return { valido: false, motivo: 'El número de telefono tiene que tener 8 dígitos.' }
   }
   if (!/^[67]/.test(local)) {
     return { valido: false, motivo: 'Teléfono inválido.' }
