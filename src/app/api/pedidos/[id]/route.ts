@@ -90,6 +90,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // la subió desde el checkout — así el vendedor/admin la puede ver
       // sin depender de que se la manden aparte por WhatsApp.
       if (typeof body.comprobanteUrl === 'string' && body.comprobanteUrl) cambios.comprobanteUrl = body.comprobanteUrl
+      // Resultado del OCR del comprobante — es informativo, para que el
+      // vendedor vea si el monto leído coincide sin compararlo a ojo.
+      // No decide nada por sí solo: la confirmación sigue siendo manual.
+      if (typeof body.ocrMonto === 'number') cambios.ocrMonto = body.ocrMonto
+      if (typeof body.ocrCoincide === 'boolean') cambios.ocrCoincide = body.ocrCoincide
       await ref.update(cambios)
       return NextResponse.json({ ok: true })
     }

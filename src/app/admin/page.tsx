@@ -1254,6 +1254,37 @@ export default function AdminPage() {
                   )}
                 </div>
 
+                {p.comprobanteUrl && (
+                  <div className="mt-3 pt-3 border-t border-line">
+                    <div className="font-body text-[11px] text-inksoft mb-1.5">Comprobante enviado por el comprador</div>
+                    <div className="flex items-start gap-2.5">
+                      <a href={p.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                        <img src={p.comprobanteUrl} alt="Comprobante" className="w-16 h-16 rounded-lg object-cover border border-line" />
+                      </a>
+                      <div className="flex-1 min-w-0">
+                        {p.ocrCoincide === true && (
+                          <div className="font-body text-[11px] text-teal mb-0.5">
+                            ✓ Lectura automática: {bs(p.ocrMonto)} — coincide con el total
+                          </div>
+                        )}
+                        {p.ocrCoincide === false && (
+                          <div className="font-body text-[11px] text-maroon mb-0.5">
+                            ⚠ Lectura automática: {bs(p.ocrMonto)} — no coincide con {bs(p.total)}. Revisá la imagen.
+                          </div>
+                        )}
+                        {p.ocrCoincide == null && (
+                          <div className="font-body text-[11px] text-inksoft mb-0.5">
+                            No se pudo leer el monto automáticamente — revisá la imagen a mano.
+                          </div>
+                        )}
+                        <a href={p.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] text-maroon underline">
+                          Ver comprobante en grande
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-3 pt-3 border-t border-line flex flex-col gap-2">
                   {(p.items || []).map((it: any, i: number) => (
                     <div key={i} className="flex items-center gap-2.5">

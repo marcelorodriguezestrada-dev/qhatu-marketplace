@@ -7,6 +7,7 @@ import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
+import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 
@@ -294,6 +295,8 @@ function CheckoutContent() {
   const [pasosConfirmados, setPasosConfirmados] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
   const [comprobanteUrl, setComprobanteUrl] = useState('')
+  const [resultadoOCR, setResultadoOCR] = useState<ResultadoOCR | null>(null)
+  const [leyendoOCR, setLeyendoOCR] = useState(false)
   const [subiendoComprobante, setSubiendoComprobante] = useState(false)
   const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
   const [guardandoFranja, setGuardandoFranja] = useState(false)
@@ -533,24 +536,33 @@ function CheckoutContent() {
     }
   }
 
+  // Confirma el pago DENTRO de la app. Exige comprobante subido — sin
+  // eso no se puede avanzar (antes era opcional y el paso real pasaba
+  // por WhatsApp; ahora WhatsApp es un extra).
   function declararPagoActual() {
     const sub = subPedidos[pasoActual]
     if (!sub.pedidoId) return
-
-    // El window.open va PRIMERO y sin esperar nada async — los
-    // navegadores bloquean los popups que se abren después de un
-    // await/then, así que si lo dejamos para después del fetch, en
-    // varios celulares ni se abre.
-    const link = linkComprobanteWhatsapp(sub, nombreComprador, comprobanteUrl || undefined)
-    if (link) window.open(link, '_blank')
+    if (!comprobanteUrl) {
+      setError('Subí la foto del comprobante para confirmar el pago.')
+      return
+    }
+    setError('')
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'informado_pago', comprobanteUrl: comprobanteUrl || undefined }),
+      body: JSON.stringify({
+        estado: 'informado_pago',
+        comprobanteUrl,
+        // Guardamos lo que leyó el OCR para que el vendedor lo vea al
+        // confirmar — le ahorra tener que comparar el monto a ojo.
+        ocrMonto: resultadoOCR?.montoDetectado ?? null,
+        ocrCoincide: resultadoOCR?.coincide ?? null,
+      }),
     }).then(() => {
       setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, declarado: true, estadoActual: 'informado_pago' } : s)))
       setComprobanteUrl('')
+      setResultadoOCR(null)
       if (pasoActual < subPedidos.length - 1) {
         setPasoActual(pasoActual + 1)
       } else {
@@ -559,10 +571,30 @@ function CheckoutContent() {
     })
   }
 
+  // Opcional: además de confirmar en la app, mandarle el comprobante al
+  // vendedor por WhatsApp. No cambia el estado del pedido.
+  function avisarPorWhatsapp() {
+    const sub = subPedidos[pasoActual]
+    const link = linkComprobanteWhatsapp(sub, nombreComprador, comprobanteUrl || undefined)
+    if (link) window.open(link, '_blank')
+  }
+
   async function subirComprobante(file: File | null) {
     if (!file) return
     setSubiendoComprobante(true)
     setError('')
+    setResultadoOCR(null)
+
+    // El OCR arranca en paralelo y NUNCA bloquea la subida: si tarda o
+    // falla (conexión lenta, foto borrosa), el comprobante igual queda
+    // subido y el comprador puede seguir. Es una ayuda, no un filtro.
+    const montoEsperado = subPedidos[pasoActual]?.total ?? 0
+    setLeyendoOCR(true)
+    leerComprobante(file, montoEsperado)
+      .then((r) => setResultadoOCR(r))
+      .catch((e) => console.error('OCR falló, se ignora:', e))
+      .finally(() => setLeyendoOCR(false))
+
     try {
       const token = await obtenerToken()
       const form = new FormData()
@@ -1019,17 +1051,38 @@ function CheckoutContent() {
 
           <div className="text-left mb-4">
             <div className="font-body text-[13px] text-ink font-medium mb-2">
-              📎 Subí una foto del comprobante (opcional)
+              📎 Subí la foto del comprobante
             </div>
             {comprobanteUrl ? (
-              <div className="flex items-center gap-2.5">
-                <img src={comprobanteUrl} alt="Comprobante" className="w-14 h-14 rounded-lg object-cover border border-line" />
-                <div className="flex-1">
-                  <div className="font-body text-xs text-teal">✓ Listo, se va a mandar junto con el mensaje</div>
-                  <button type="button" onClick={() => setComprobanteUrl('')} className="font-body text-[11px] text-inksoft underline">
-                    Sacar y subir otra
-                  </button>
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <img src={comprobanteUrl} alt="Comprobante" className="w-14 h-14 rounded-lg object-cover border border-line" />
+                  <div className="flex-1">
+                    <div className="font-body text-xs text-teal">✓ Comprobante subido</div>
+                    <button
+                      type="button"
+                      onClick={() => { setComprobanteUrl(''); setResultadoOCR(null) }}
+                      className="font-body text-[11px] text-inksoft underline"
+                    >
+                      Sacar y subir otra
+                    </button>
+                  </div>
                 </div>
+
+                {leyendoOCR && (
+                  <div className="font-body text-[11px] text-inksoft">Leyendo el comprobante...</div>
+                )}
+                {!leyendoOCR && resultadoOCR?.coincide === true && (
+                  <div className="font-body text-[11px] text-teal bg-tealsoft border border-teal rounded-lg px-2.5 py-2">
+                    ✓ Leímos {bs(resultadoOCR.montoDetectado!)} en el comprobante — coincide con el total
+                    {resultadoOCR.fechaDetectada && ` · ${resultadoOCR.fechaDetectada}`}
+                  </div>
+                )}
+                {!leyendoOCR && resultadoOCR?.coincide === false && (
+                  <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
+                    ⚠ Leímos {bs(resultadoOCR.montoDetectado!)} y el total es {bs(subPedidos[pasoActual].total)}. Revisá que sea el comprobante correcto — igual podés continuar y el vendedor lo verifica.
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -1045,18 +1098,21 @@ function CheckoutContent() {
             )}
           </div>
 
-          <div className="font-body text-[13px] text-ink font-medium mb-2">
-            👇 {comprobanteUrl ? 'Confirmá por WhatsApp' : 'Para continuar, mandá el comprobante a este WhatsApp'}
-          </div>
-
           {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
 
           <button
             onClick={declararPagoActual}
-            className="w-full py-3 rounded-lg border-none text-white font-body text-sm font-semibold"
-            style={{ backgroundColor: '#25D366' }}
+            disabled={!comprobanteUrl || subiendoComprobante}
+            className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40 mb-2"
           >
-            📤 WhatsApp
+            ✓ Ya pagué, confirmar
+          </button>
+
+          <button
+            onClick={avisarPorWhatsapp}
+            className="w-full py-2.5 rounded-lg bg-transparent border border-line font-body text-xs font-semibold text-inksoft"
+          >
+            📤 También avisar por WhatsApp (opcional)
           </button>
         </div>
       )}
