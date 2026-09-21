@@ -50,7 +50,7 @@ function linkComprobanteWhatsapp(s: SubPedido, nombreComprador: string, comproba
   return `https://wa.me/${s.whatsappCobro.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
-type Etapa = 'entrega' | 'creando' | 'pagando' | 'resumen' | 'error'
+type Etapa = 'entrega' | 'creando' | 'pagando' | 'esperando' | 'resumen' | 'error'
 
 // Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
 // las coordenadas y ajustar los precios reales.
@@ -301,6 +301,12 @@ function CheckoutContent() {
   const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
   const [guardandoFranja, setGuardandoFranja] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Espejo de subPedidos siempre actualizado, para que el intervalo del
+  // polling no trabaje con una copia vieja capturada en el closure.
+  const subPedidosRef = useRef<SubPedido[]>([])
+  useEffect(() => {
+    subPedidosRef.current = subPedidos
+  }, [subPedidos])
 
   // Concretar una compra requiere estar logueado Y con el email
   // verificado (regla de toda la plataforma) — si alguien llega hasta
@@ -566,7 +572,10 @@ function CheckoutContent() {
       if (pasoActual < subPedidos.length - 1) {
         setPasoActual(pasoActual + 1)
       } else {
-        setEtapa('resumen')
+        // No vamos directo al resumen: primero hay que esperar a que el
+        // vendedor confirme el pago. Recién ahí tiene sentido elegir
+        // horario de entrega.
+        setEtapa('esperando')
       }
     })
   }
@@ -645,33 +654,61 @@ function CheckoutContent() {
   // hay nada que esperar ni que consultar acá.
 
   useEffect(() => {
-    if (etapa !== 'resumen') return
+    // Corre tanto en la pantalla de espera como en el resumen: es lo que
+    // detecta que el vendedor confirmó el pago.
+    if (etapa !== 'esperando' && etapa !== 'resumen') return
     // Retiro + efectivo se coordina por WhatsApp, no acá adentro — no
     // hay ningún "pagado" digital que esperar, así que no tiene sentido
     // consultar el servidor cada 4 segundos para nada.
     if (metodoEntrega === 'retiro' && metodoPago === 'efectivo') return
-    pollRef.current = setInterval(async () => {
+
+    let cancelado = false
+
+    async function consultar() {
+      // Leemos el estado más fresco con el updater de React en vez de
+      // la variable capturada por el closure — si no, cada tick del
+      // intervalo trabaja con la lista congelada del primer render y
+      // pisa lo que ya se había actualizado.
+      const actuales = subPedidosRef.current
       const actualizados = await Promise.all(
-        subPedidos.map(async (s) => {
+        actuales.map(async (s) => {
           if (!s.pedidoId || s.estadoActual === 'pagado') return s
-          const res = await fetch(`/api/pedidos/${s.pedidoId}`)
-          const data = await res.json()
-          return { ...s, estadoActual: data.estado || s.estadoActual }
+          try {
+            const res = await fetch(`/api/pedidos/${s.pedidoId}`)
+            const data = await res.json()
+            return { ...s, estadoActual: data.estado || s.estadoActual }
+          } catch {
+            // Un fallo de red puntual no tiene que sacar al comprador de
+            // la pantalla ni "resetear" nada: dejamos el estado como
+            // está y reintentamos en el próximo tick.
+            return s
+          }
         })
       )
+      if (cancelado) return
       setSubPedidos(actualizados)
+
       if (actualizados.every((s) => s.estadoActual === 'pagado')) {
         if (pollRef.current) clearInterval(pollRef.current)
         vaciarTienda(vendedorIdTienda)
+        setEtapa('resumen')
       }
-    }, 4000)
+    }
+
+    consultar()
+    pollRef.current = setInterval(consultar, 4000)
     return () => {
+      cancelado = true
       if (pollRef.current) clearInterval(pollRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa])
 
-  if (items.length === 0 && etapa !== 'resumen') {
+  // Ojo: 'esperando' tiene que estar contemplado acá. Si no, en cuanto
+  // el carrito queda vacío (o el usuario recarga), el comprador sale
+  // disparado a "Tu carrito está vacío" justo mientras espera que le
+  // confirmen el pago — que es exactamente cuando NO hay que sacarlo.
+  if (items.length === 0 && etapa !== 'resumen' && etapa !== 'esperando') {
     return (
       <div className="max-w-[420px] mx-auto px-5 py-16 text-center">
         <p className="font-body text-sm text-inksoft mb-4">Tu carrito está vacío.</p>
@@ -1114,6 +1151,33 @@ function CheckoutContent() {
           >
             📤 También avisar por WhatsApp (opcional)
           </button>
+        </div>
+      )}
+
+      {etapa === 'esperando' && (
+        <div className="bg-panel border border-line rounded-xl p-7 text-center">
+          <div className="w-11 h-11 rounded-full bg-ochre text-white flex items-center justify-center mx-auto mb-3.5 text-xl animate-pulse">
+            ⏳
+          </div>
+          <div className="font-display text-lg font-bold text-ink mb-1.5">Esperando la confirmación del pago</div>
+          <div className="font-body text-[13px] text-inksoft mb-4">
+            Ya recibimos tu comprobante. En cuanto {subPedidos.length > 1 ? 'los vendedores lo revisen' : 'el vendedor lo revise'} se
+            confirma tu pedido y vas a poder elegir el horario de entrega.
+          </div>
+
+          <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
+            No cierres esta pantalla — se actualiza sola. Si preferís cerrarla, podés seguir tu pedido desde{' '}
+            <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
+          </div>
+
+          {subPedidos.map((s, i) => (
+            <div key={i} className="flex items-center justify-between gap-2 py-2 border-t border-line">
+              <span className="font-body text-xs text-ink truncate">{s.vendedorNombre}</span>
+              <span className={`font-body text-[11px] font-semibold shrink-0 ${s.estadoActual === 'pagado' ? 'text-teal' : 'text-ochre'}`}>
+                {s.estadoActual === 'pagado' ? '✓ Confirmado' : 'Revisando...'}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
