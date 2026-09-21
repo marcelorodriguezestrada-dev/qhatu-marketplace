@@ -1299,7 +1299,7 @@ function CheckoutContent() {
 
           {subPedidos.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-2 py-2 border-t border-line">
-              <span className="font-body text-xs text-ink truncate">{s.vendedorNombre}</span>
+              <span className="font-body text-xs text-ink truncate"> </span>
               <span
                 className={`font-body text-[11px] font-semibold shrink-0 ${
                   s.estadoActual === 'pagado' ? 'text-teal' : s.estadoActual === 'cancelado' ? 'text-maroon' : 'text-ochre'
