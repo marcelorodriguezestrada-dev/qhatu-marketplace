@@ -1033,19 +1033,31 @@ function CheckoutContent() {
                 </select>
               </label>
 
-              <label className="flex items-start gap-2.5 mb-3 bg-ochresoft border border-ochre rounded-lg px-3 py-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={envioExpress}
-                  onChange={(e) => setEnvioExpress(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span className="font-body text-[13px] text-ink">
-                  <strong>🚀 Envío express — +{bs(COSTO_ENVIO_EXPRESS_EXTRA)} sobre el envío normal</strong>
-                  <br />
-                  Tu pedido llega hoy mismo, en vez de al día siguiente.
+              <button
+                type="button"
+                onClick={() => setEnvioExpress((v) => !v)}
+                className="w-full flex items-center justify-between gap-3 mb-3 bg-panel border border-line rounded-lg px-3.5 py-3"
+              >
+                <div className="flex items-center gap-2.5 text-left">
+                  <span className="text-lg">⚡</span>
+                  <div>
+                    <div className="font-body text-sm font-semibold text-ink flex items-center gap-1.5">
+                      Envío express
+                      <span className="font-body text-[10px] font-semibold text-teal bg-tealsoft px-1.5 py-0.5 rounded-full">
+                        +{bs(COSTO_ENVIO_EXPRESS_EXTRA)}
+                      </span>
+                    </div>
+                    <div className="font-body text-[11px] text-inksoft">Recibirá su pedido hoy mismo.</div>
+                  </div>
+                </div>
+                <span className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${envioExpress ? 'bg-ink' : 'bg-line'}`}>
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      envioExpress ? 'translate-x-5' : ''
+                    }`}
+                  />
                 </span>
-              </label>
+              </button>
 
               <div className="mb-3">
                 <button
