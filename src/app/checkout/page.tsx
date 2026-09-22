@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
-import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano } from '@/data/zonasPotosi'
+import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano, distanciaKm } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -241,6 +241,14 @@ function CheckoutContent() {
   const [verificandoDireccion, setVerificandoDireccion] = useState(false)
   const [motivoDireccion, setMotivoDireccion] = useState('')
 
+  // Qué tan lejos del centro del barrio elegido puede caer la dirección
+  // geocodificada y todavía darla por buena. Los barrios no tienen un
+  // radio real (son polígonos, no círculos), así que este número es
+  // generoso a propósito: alcanza para cubrir un barrio típico sin
+  // rechazar direcciones válidas que caen cerca del borde, pero corta
+  // cuando la dirección escrita claramente corresponde a otro barrio.
+  const RADIO_BARRIO_KM = 1.5
+
   async function verificarDireccion(): Promise<boolean | 'error' | null> {
     if (!direccion.trim()) {
       setDireccionVerificada(null)
@@ -254,9 +262,27 @@ function CheckoutContent() {
         body: JSON.stringify({ direccion }),
       })
       const data = await res.json()
-      const resultado: boolean | 'error' | null = data.encontrada === null ? 'error' : !!data.encontrada
+      let resultado: boolean | 'error' | null = data.encontrada === null ? 'error' : !!data.encontrada
+      let motivo = data.motivo || ''
+      // Si la dirección sí se encontró en el mapa, todavía falta
+      // chequear que quede cerca del barrio que el comprador eligió
+      // arriba — Nominatim puede devolver una calle real que queda en
+      // otro barrio de la ciudad, y hasta ahora eso pasaba sin avisar.
+      if (resultado === true && zonaEntrega) {
+        const barrioElegido = ZONAS_ENVIO_POTOSI.find((z) => z.nombre === zonaEntrega)
+        if (barrioElegido) {
+          const distancia = distanciaKm(data.lat, data.lng, barrioElegido.lat, barrioElegido.lng)
+          if (distancia > RADIO_BARRIO_KM) {
+            const cercano = barrioMasCercano(data.lat, data.lng)
+            if (cercano.nombre !== zonaEntrega) {
+              resultado = false
+              motivo = `Esa dirección parece quedar en ${cercano.nombre}, no en ${zonaEntrega}. Revisá el barrio o la dirección.`
+            }
+          }
+        }
+      }
       setDireccionVerificada(resultado)
-      setMotivoDireccion(data.motivo || '')
+      setMotivoDireccion(motivo)
       // Si la persona no compartió su ubicación en vivo (más precisa),
       // usamos el punto que encontró Nominatim como mejor que nada —
       // ayuda a la moto igual, aunque sea aproximado a la calle.
@@ -961,7 +987,15 @@ function CheckoutContent() {
                 <span className="font-body text-[11px] text-inksoft block mb-1">Barrio</span>
                 <select
                   value={zonaEntrega}
-                  onChange={(e) => setZonaEntrega(e.target.value)}
+                  onChange={(e) => {
+                    setZonaEntrega(e.target.value)
+                    // Si ya había una dirección validada contra el barrio
+                    // anterior, ese resultado queda viejo apenas cambia el
+                    // barrio — se vuelve a chequear recién al salir del
+                    // campo de dirección (o al tocar "Continuar").
+                    setDireccionVerificada(null)
+                    setMotivoDireccion('')
+                  }}
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 >
                   <option value="">Elegí tu barrio</option>
