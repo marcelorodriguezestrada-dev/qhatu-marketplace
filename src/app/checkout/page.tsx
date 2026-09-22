@@ -1324,27 +1324,45 @@ function CheckoutContent() {
         </div>
       )}
 
-      {/* Solo se muestra acá el caso cancelado: mientras el pago sigue
-          esperando validación, es PagoPendienteGate (montado en
-          layout.tsx) el que tapa toda la app con ese mensaje — antes
-          este bloque duplicaba esa misma pantalla por debajo, un
-          instante antes de que el gate terminara de montarse. */}
-      {etapa === 'esperando' && pedidoCancelado && (
+      {etapa === 'esperando' && (
         <div className="bg-panel border border-line rounded-xl p-7 text-center">
-          <div className="w-11 h-11 rounded-full text-white flex items-center justify-center mx-auto mb-3.5 text-xl bg-maroon">
-            ✕
-          </div>
-          <div className="font-display text-lg font-bold text-ink mb-1.5">Pedido cancelado</div>
-          <div className="font-body text-[13px] text-inksoft mb-4">
-            El vendedor canceló este pedido. Si ya pagaste, comunicate con él por WhatsApp para coordinar.
-          </div>
-          <button
-            type="button"
-            onClick={salirDeEspera}
-            className="w-full py-2.5 rounded-lg border border-line bg-transparent font-body text-xs font-semibold text-inksoft mb-4"
+          <div
+            className={`w-11 h-11 rounded-full text-white flex items-center justify-center mx-auto mb-3.5 text-xl ${
+              pedidoCancelado ? 'bg-maroon' : 'bg-ochre animate-pulse'
+            }`}
           >
-            Volver a la tienda
-          </button>
+            {pedidoCancelado ? '✕' : '⏳'}
+          </div>
+          <div className="font-display text-lg font-bold text-ink mb-1.5">
+            {pedidoCancelado ? 'Pedido cancelado' : 'Esperando la confirmación del pago'}
+          </div>
+
+          {pedidoCancelado ? (
+            <>
+              <div className="font-body text-[13px] text-inksoft mb-4">
+                El vendedor canceló este pedido. Si ya pagaste, comunicate con él por WhatsApp para coordinar.
+              </div>
+              <button
+                type="button"
+                onClick={salirDeEspera}
+                className="w-full py-2.5 rounded-lg border border-line bg-transparent font-body text-xs font-semibold text-inksoft mb-4"
+              >
+                Volver a la tienda
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="font-body text-[13px] text-inksoft mb-4">
+                Ya recibimos tu comprobante. En cuanto Clasi Click revise se
+                confirmara tu pedido y vas a poder elegir el horario de entrega.
+              </div>
+
+              <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
+                No cierres esta pantalla — se actualiza sola. Si prefieres cerrarla, puedés seguir tu pedido desde{' '}
+                <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
+              </div>
+            </>
+          )}
 
           {subPedidos.map((s, i) => (
             <div key={i} className="flex items-center justify-between gap-2 py-2 border-t border-line">
