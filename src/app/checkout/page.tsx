@@ -38,11 +38,17 @@ function fechaEntregaTexto(fechaElegida?: string): string {
 
 function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
   // wa.me no permite adjuntar una imagen de verdad — solo texto
-  // precargado. Lo más parecido es mandar el link directo a la foto:
-  // WhatsApp arma una vista previa sola al pegar un link que termina
-  // en imagen, así el vendedor la ve sin tener que buscarla.
+  // precargado. Mandamos el link "visor" de ImgBB (imagenViewerUrl,
+  // con metadatos Open Graph) en vez del link directo al archivo — es
+  // el que WhatsApp sabe convertir en una vista previa con miniatura.
+  // Si el producto es viejo y no tiene ese campo (se subió antes de
+  // este cambio), caemos al link directo como respaldo — abre igual,
+  // solo que sin la miniatura automática.
   const detalle = s.items
-    .map((it) => `${it.nombre}, precio ${bs(it.precio)}${it.imagenUrl ? ` — foto: ${it.imagenUrl}` : ''}`)
+    .map((it) => {
+      const foto = it.imagenViewerUrl || it.imagenUrl
+      return `${it.nombre}, precio ${bs(it.precio)}${foto ? ` — foto: ${foto}` : ''}`
+    })
     .join('\n')
   const texto = `Hola! Soy ${nombreComprador}. Quiero consultar sobre el producto:\n${detalle}`
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`

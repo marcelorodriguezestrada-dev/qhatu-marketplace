@@ -54,6 +54,7 @@ export default function VenderPage() {
   const [materiales, setMateriales] = useState('')
   const [compraMinima, setCompraMinima] = useState('1')
   const [imagenUrl, setImagenUrl] = useState('')
+  const [imagenViewerUrl, setImagenViewerUrl] = useState('')
   const [thumbUrl, setThumbUrl] = useState('')
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [subiendoImagen, setSubiendoImagen] = useState(false)
@@ -409,10 +410,11 @@ export default function VenderPage() {
         try { URL.revokeObjectURL(localPreviewUrl) } catch (e) {}
         setLocalPreviewUrl(null)
       }
-      // data.url = media, data.thumbUrl = thumbnail (si está disponible)
+      // data.url = media, data.thumbUrl = thumbnail (si está disponible),
+      // data.urlViewer = página de ImgBB con vista previa (para WhatsApp)
       setImagenUrl(data.url)
+      setImagenViewerUrl(data.urlViewer || '')
       setThumbUrl(data.thumbUrl || '')
-      // Podríamos guardar data.thumbUrl en el producto si expandimos el modelo
     } catch (e) {
       // @ts-ignore
       setError('Error subiendo la imagen: ' + (e?.message || e))
@@ -458,6 +460,7 @@ export default function VenderPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setImagenUrl(data.url)
+      setImagenViewerUrl(data.urlViewer || '')
       setThumbUrl(data.thumbUrl || '')
       // reemplazamos lastFile con el nuevo file
       setLastFile(file)
@@ -614,6 +617,7 @@ export default function VenderPage() {
             precio: Number(precio),
             icono,
             imagenUrl,
+            imagenViewerUrl,
               thumbUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             descripcionCorta,
@@ -641,6 +645,7 @@ export default function VenderPage() {
             precio: Number(precio),
             icono,
             imagenUrl,
+            imagenViewerUrl,
               thumbUrl,
             precioOriginal: precioOriginal ? Number(precioOriginal) : null,
             plan,
@@ -662,6 +667,7 @@ export default function VenderPage() {
       setPrecio('')
       setPrecioOriginal('')
       setImagenUrl('')
+      setImagenViewerUrl('')
       setIcono(ICONOS[0])
       setPlan('basico')
       setDescripcionCorta('')
@@ -1246,6 +1252,7 @@ export default function VenderPage() {
                 setPrecioOriginal('')
                 setIcono(ICONOS[0])
                 setImagenUrl('')
+                setImagenViewerUrl('')
                 setPlan('basico')
               }}
               className="px-4 py-2.5 rounded-lg border border-line font-body text-sm"
@@ -1355,6 +1362,7 @@ export default function VenderPage() {
                 setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
                 setIcono(p.icono || ICONOS[0])
                 setImagenUrl(p.imagenUrl || '')
+                setImagenViewerUrl(p.imagenViewerUrl || '')
                 setDescripcionCorta(p.descripcionCorta || '')
                 setDescripcionLarga(p.descripcionLarga || '')
                 setTallesTexto((p.talles || []).join(', '))

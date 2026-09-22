@@ -44,23 +44,28 @@ export async function POST(req: NextRequest) {
       })
       const data = await imgbbRes.json()
       if (!data.success) throw new Error(data.error?.message || 'ImgBB rechazó la imagen.')
-      return data.data.url as string
+      // `url` es el link directo al archivo (lo que usa <img src>).
+      // `url_viewer` es la página de ImgBB con metadatos Open Graph —
+      // WhatsApp (y redes en general) arman la vista previa leyendo esa
+      // página, no el archivo directo, así que la guardamos aparte para
+      // los mensajes de WhatsApp (ver /checkout).
+      return { url: data.data.url as string, urlViewer: (data.data.url_viewer as string) || null }
     }
 
     // Subir la imagen principal
-    const url = await uploadToImgbb(file)
+    const principal = await uploadToImgbb(file)
     // Si recibimos thumb, subirlo también (no es obligatorio)
     let thumbUrl: string | null = null
     if (thumb) {
       try {
-        thumbUrl = await uploadToImgbb(thumb)
+        thumbUrl = (await uploadToImgbb(thumb)).url
       } catch (err) {
         console.warn('Thumb upload failed', err)
         thumbUrl = null
       }
     }
 
-    return NextResponse.json({ url, thumbUrl })
+    return NextResponse.json({ url: principal.url, urlViewer: principal.urlViewer, thumbUrl })
   } catch (err: any) {
     console.error('POST /api/upload-image', err)
     return NextResponse.json({ error: err.message || 'Error desconocido subiendo la imagen.' }, { status: 500 })

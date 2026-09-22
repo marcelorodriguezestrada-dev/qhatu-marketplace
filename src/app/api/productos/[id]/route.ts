@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, rubro, publico, precio, icono, imagenUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
@@ -78,6 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (precio !== undefined) cambios.precio = precio
     if (icono !== undefined) cambios.icono = icono
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
+    if (imagenViewerUrl !== undefined) cambios.imagenViewerUrl = imagenViewerUrl
     if (thumbUrl !== undefined) cambios.thumbUrl = thumbUrl
     if (precioOriginal !== undefined) cambios.precioOriginal = precioOriginal
     if (descripcionCorta !== undefined) cambios.descripcionCorta = descripcionCorta
