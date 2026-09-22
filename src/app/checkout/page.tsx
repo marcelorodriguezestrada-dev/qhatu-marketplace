@@ -1419,13 +1419,13 @@ function CheckoutContent() {
               <div className="font-body text-sm font-medium text-ink mb-2.5">
                 {envioExpress ? '¿En qué horario de hoy prefiere recibirlo?' : '¿En qué horario prefiere recibirlo?'}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2.5">
                 <button
                   type="button"
                   onClick={() => elegirFranja('8-13')}
                   disabled={guardandoFranja}
-                  className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                    franjaHoraria === '8-13' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                    franjaHoraria === '8-13' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
                   }`}
                 >
                   8 a 13
@@ -1434,8 +1434,8 @@ function CheckoutContent() {
                   type="button"
                   onClick={() => elegirFranja('13-19')}
                   disabled={guardandoFranja}
-                  className={`flex-1 py-2.5 rounded-lg border font-body text-sm font-semibold ${
-                    franjaHoraria === '13-19' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                    franjaHoraria === '13-19' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
                   }`}
                 >
                   13 a 19
