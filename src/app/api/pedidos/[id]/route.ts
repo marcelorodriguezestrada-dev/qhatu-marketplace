@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
-    const { estado, pagoVendedorMedio, franjaHoraria } = body
+    const { estado, pagoVendedorMedio, franjaHoraria, fechaEntrega } = body
 
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
@@ -49,7 +49,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!['8-13', '13-19'].includes(franjaHoraria)) {
         return NextResponse.json({ error: 'Franja horaria inválida.' }, { status: 400 })
       }
-      await ref.update({ franjaHoraria, updatedAt: new Date().toISOString() })
+      // fechaEntrega: si el comprador no puede recibirlo mañana (el
+      // día por default), eligió otro día de la semana desde
+      // /checkout — yyyy-mm-dd. `null` es explícito: vuelve a la
+      // fecha por default si la persona cambió de opinión.
+      if (fechaEntrega !== undefined && fechaEntrega !== null && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEntrega)) {
+        return NextResponse.json({ error: 'Fecha de entrega inválida.' }, { status: 400 })
+      }
+      await ref.update({ franjaHoraria, fechaEntrega: fechaEntrega || null, updatedAt: new Date().toISOString() })
       return NextResponse.json({ ok: true })
     }
 

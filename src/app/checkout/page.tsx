@@ -30,6 +30,23 @@ function fechaEntregaTexto(): string {
   return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
 }
 
+// Opciones de día para quien no puede recibir el pedido mañana —
+// arranca en pasado mañana (mañana ya está cubierto por las dos
+// franjas de siempre) y ofrece una semana completa de ahí en más.
+// `iso` es lo que se manda a guardar (yyyy-mm-dd); `label` es lo que
+// ve el comprador, ej: "vie 26 sep".
+function proximosDias(cantidad: number): { iso: string; label: string }[] {
+  const dias: { iso: string; label: string }[] = []
+  for (let i = 2; i < 2 + cantidad; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const label = d.toLocaleDateString('es-BO', { weekday: 'short', day: 'numeric', month: 'short' })
+    dias.push({ iso, label })
+  }
+  return dias
+}
+
 function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
   const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
   const texto = `Hola! Soy ${nombreComprador}. Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
@@ -316,6 +333,13 @@ function CheckoutContent() {
   const [subiendoComprobante, setSubiendoComprobante] = useState(false)
   const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
   const [guardandoFranja, setGuardandoFranja] = useState(false)
+  // Si el comprador no puede recibirlo mañana (el día por default),
+  // puede elegir otro día de la semana en vez de las dos franjas
+  // normales. fechaElegida queda vacío mientras se usa el día por
+  // default — recién se manda al backend cuando la persona elige uno
+  // explícito acá.
+  const [otroDia, setOtroDia] = useState(false)
+  const [fechaElegida, setFechaElegida] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // uid de la persona que CREÓ el pedido. Firebase Auth sincroniza la
   // sesión entre pestañas del mismo navegador: si en otra pestaña se
@@ -773,7 +797,7 @@ function CheckoutContent() {
   // pagado — guarda la preferencia en TODOS los subPedidos pagados de
   // esta compra (son todos del mismo checkout, tiene sentido que
   // compartan el horario de entrega).
-  async function elegirFranja(franja: '8-13' | '13-19') {
+  async function elegirFranja(franja: '8-13' | '13-19', fecha?: string) {
     setGuardandoFranja(true)
     setFranjaHoraria(franja)
     try {
@@ -784,7 +808,7 @@ function CheckoutContent() {
             fetch(`/api/pedidos/${s.pedidoId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ franjaHoraria: franja }),
+              body: JSON.stringify({ franjaHoraria: franja, fechaEntrega: fecha || null }),
             })
           )
       )
@@ -1416,33 +1440,113 @@ function CheckoutContent() {
               por eso el texto dice "de" y no "a las". */}
           {metodoEntrega === 'envio' && subPedidos.every((s) => s.estadoActual === 'pagado') && (
             <div className="bg-panel border border-line rounded-xl p-4 mb-3">
-              <div className="font-body text-sm font-medium text-ink mb-2.5">
-                {envioExpress ? '¿En qué horario de hoy prefiere recibirlo?' : '¿En qué horario prefiere recibirlo?'}
-              </div>
-              <div className="flex flex-col gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => elegirFranja('8-13')}
-                  disabled={guardandoFranja}
-                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                    franjaHoraria === '8-13' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-                  }`}
-                >
-                  8 a 13
-                </button>
-                <button
-                  type="button"
-                  onClick={() => elegirFranja('13-19')}
-                  disabled={guardandoFranja}
-                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                    franjaHoraria === '13-19' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-                  }`}
-                >
-                  13 a 19
-                </button>
-              </div>
-              {franjaHoraria && !guardandoFranja && (
-                <div className="font-body text-[11px] text-teal mt-2">✓ Guardado.</div>
+              {!otroDia ? (
+                <>
+                  <div className="font-body text-sm font-medium text-ink mb-2.5">
+                    {envioExpress ? '¿En qué horario de hoy prefiere recibirlo?' : '¿En qué horario prefiere recibirlo?'}
+                  </div>
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => elegirFranja('8-13')}
+                      disabled={guardandoFranja}
+                      className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                        franjaHoraria === '8-13' && !fechaElegida ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                      }`}
+                    >
+                      8 a 13
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => elegirFranja('13-19')}
+                      disabled={guardandoFranja}
+                      className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                        franjaHoraria === '13-19' && !fechaElegida ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                      }`}
+                    >
+                      13 a 19
+                    </button>
+                  </div>
+                  {franjaHoraria && !fechaElegida && !guardandoFranja && (
+                    <div className="font-body text-[11px] text-teal mt-2">✓ Guardado.</div>
+                  )}
+                  {!envioExpress && (
+                    <button
+                      type="button"
+                      onClick={() => setOtroDia(true)}
+                      className="w-full text-center font-body text-[12px] text-maroon underline mt-3"
+                    >
+                      No puedo ese día, quiero escoger otro
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="font-body text-sm font-medium text-ink mb-2.5">
+                    Seleccioná el día que querés recibir tu pedido
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {proximosDias(7).map((d) => (
+                      <button
+                        key={d.iso}
+                        type="button"
+                        onClick={() => setFechaElegida(d.iso)}
+                        className={`py-2.5 rounded-full border font-body text-[13px] font-semibold capitalize ${
+                          fechaElegida === d.iso ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {fechaElegida && (
+                    <>
+                      <div className="font-body text-sm font-medium text-ink mb-2.5">¿En qué horario preferís recibirlo?</div>
+                      <div className="flex flex-col gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => elegirFranja('8-13', fechaElegida)}
+                          disabled={guardandoFranja}
+                          className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                            franjaHoraria === '8-13' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                          }`}
+                        >
+                          8 a 13
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => elegirFranja('13-19', fechaElegida)}
+                          disabled={guardandoFranja}
+                          className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                            franjaHoraria === '13-19' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                          }`}
+                        >
+                          13 a 19
+                        </button>
+                      </div>
+                      {franjaHoraria && !guardandoFranja && (
+                        <div className="font-body text-[11px] text-teal mt-2">✓ Guardado.</div>
+                      )}
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtroDia(false)
+                      setFechaElegida('')
+                      // El resaltado de "mañana" refleja lo que está
+                      // guardado de verdad — si acá había elegido otro
+                      // día, ya no vale mostrar ese botón marcado hasta
+                      // que confirme de nuevo.
+                      if (fechaElegida) setFranjaHoraria('')
+                    }}
+                    className="w-full text-center font-body text-[12px] text-inksoft underline mt-3"
+                  >
+                    Volver a las opciones de mañana
+                  </button>
+                </>
               )}
             </div>
           )}
