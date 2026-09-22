@@ -1442,7 +1442,7 @@ function CheckoutContent() {
                 </button>
               </div>
               {franjaHoraria && !guardandoFranja && (
-                <div className="font-body text-[11px] text-teal mt-2">✓ Guardado, se lo avisamos al repartidor.</div>
+                <div className="font-body text-[11px] text-teal mt-2">✓ Guardado.</div>
               )}
             </div>
           )}
