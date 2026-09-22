@@ -37,8 +37,8 @@ function fechaEntregaTexto(fechaElegida?: string): string {
 }
 
 function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
-  const detalle = s.items.map((it) => `- ${it.cantidad} × ${it.nombre}`).join('\n')
-  const texto = `Hola! Soy ${nombreComprador}. Quiero coordinar el retiro de mi pedido${s.pedidoId ? ` #${s.pedidoId.slice(0, 6)}` : ''} para pagarlo en efectivo al retirarlo:\n${detalle}\nTotal: ${bs(s.total)}\n¿Cuándo puedo pasar a buscarlo?`
+  const detalle = s.items.map((it) => `${it.nombre} con foto de precio ${bs(it.precio)}`).join(', ')
+  const texto = `Hola! Soy ${nombreComprador}. Quiero consultar sobre el producto ${detalle}.`
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
