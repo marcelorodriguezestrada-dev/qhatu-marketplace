@@ -787,7 +787,11 @@ function CheckoutContent() {
       if (data.error) throw new Error(data.error)
       setComprobanteUrl(data.url)
     } catch (e: any) {
-      setError(e.message || 'No se pudo subir la imagen.')
+      // Mensaje fijo en vez del error crudo del servidor — cubre tanto
+      // una falla técnica (red, ImgBB caído) como haber subido un
+      // archivo que no es una imagen válida del comprobante.
+      console.error('Error subiendo el comprobante:', e)
+      setError('Error al enviar el comprobante, vuelva a intentarlo.')
     } finally {
       setSubiendoComprobante(false)
     }
@@ -1240,7 +1244,7 @@ function CheckoutContent() {
           </div>
 
           <div className="font-body text-base font-bold text-ink bg-ochresoft border border-ochre rounded-lg px-4 py-3 mb-4 text-center">
-            Descargá el QR para el pago y, una vez realizado, volvé a esta página y subí el comprobante.
+            Descargué el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
           </div>
 
           <div className="font-body text-[13px] text-ink font-medium mb-3">
