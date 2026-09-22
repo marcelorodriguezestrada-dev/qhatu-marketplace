@@ -23,6 +23,13 @@ export type Producto = {
   icono: string
   imagenUrl?: string
   thumbUrl?: string
+  // Página "visor" de ImgBB para la foto principal (ibb.co/xxxx, con
+  // metadatos Open Graph) — a diferencia de `imagenUrl` (el link
+  // directo al archivo, usado para mostrarla en la app con <img>),
+  // esta es la que hay que mandar en un mensaje de WhatsApp para que
+  // arme la vista previa con miniatura (ver linkWhatsappRetiroEfectivo
+  // en /checkout). Vacío en productos subidos antes de este campo.
+  imagenViewerUrl?: string
   // Fotos extra de la galería del producto — beneficio Premium del
   // VENDEDOR (no del producto en sí): si el vendedor tiene Premium
   // vigente, cada uno de sus productos puede tener hasta
