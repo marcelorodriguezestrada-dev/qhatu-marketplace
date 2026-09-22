@@ -389,6 +389,40 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCargando])
 
+  // Precarga los datos que este comprador ya cargó en una compra
+  // anterior (nombre, WhatsApp, barrio, dirección, entre calles) —
+  // para no hacerlo escribir todo de nuevo cada vez. Recién se
+  // consulta cuando ya sabemos que NO hay una espera para restaurar
+  // (si no, pisaría los datos de un pedido en curso), y solo completa
+  // los campos que sigan vacíos, por si la persona ya empezó a
+  // escribir algo distinto.
+  useEffect(() => {
+    if (restaurando || etapa !== 'entrega' || !usuario) return
+    let cancelado = false
+    ;(async () => {
+      try {
+        const token = await obtenerToken()
+        if (!token) return
+        const res = await fetch('/api/usuarios/datos-envio', { headers: { Authorization: `Bearer ${token}` } })
+        const data = await res.json()
+        const d = data.datosEnvio
+        if (!d || cancelado) return
+        setNombreComprador((prev) => prev || d.nombreComprador || '')
+        setWhatsappComprador((prev) => prev || d.whatsappComprador || '')
+        setZonaEntrega((prev) => prev || d.zonaEntrega || '')
+        setDireccion((prev) => prev || d.direccion || '')
+        setEntreCalles((prev) => prev || d.entreCalles || '')
+      } catch {
+        // Sin datos guardados (o falló la consulta): el comprador
+        // arranca con el formulario vacío, como siempre.
+      }
+    })()
+    return () => {
+      cancelado = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurando, usuario])
+
   useEffect(() => {
     if (restaurando) return
     try {
@@ -640,6 +674,20 @@ function CheckoutContent() {
       uidCompradorRef.current = usuario?.uid ?? null
       setSubPedidos(nuevos)
       setPasoActual(0)
+
+      // Guardamos estos datos para la próxima compra — no bloquea nada
+      // si falla (la compra ya se hizo), por eso no se espera ni se
+      // muestra ningún error acá.
+      obtenerToken()
+        .then((token) => {
+          if (!token) return
+          fetch('/api/usuarios/datos-envio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles }),
+          }).catch(() => {})
+        })
+        .catch(() => {})
 
       if (abrirWhatsappDirecto) {
         // Como el checkout ahora es siempre de UNA tienda a la vez, acá
