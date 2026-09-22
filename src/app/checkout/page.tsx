@@ -1397,12 +1397,12 @@ function CheckoutContent() {
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">Su compra se ha éxito!</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">Su compra se ha realizado con éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
                   {envioExpress
                     ? 'El producto te llegará hoy, horario a confirmar.'
-                    : `Estarás recibiendo el pedido ${fechaEntregaTexto()}, horario a confirmar.`}
+                    : `Estará recibiendo el pedido ${fechaEntregaTexto()}, en el rango horario que seleccione:`}
                 </div>
               ) : (
                 <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
@@ -1417,7 +1417,7 @@ function CheckoutContent() {
           {metodoEntrega === 'envio' && subPedidos.every((s) => s.estadoActual === 'pagado') && (
             <div className="bg-panel border border-line rounded-xl p-4 mb-3">
               <div className="font-body text-sm font-medium text-ink mb-2.5">
-                {envioExpress ? '¿En qué horario de hoy preferís recibirlo?' : '¿En qué horario preferís recibirlo?'}
+                {envioExpress ? '¿En qué horario de hoy prefiere recibirlo?' : '¿En qué horario prefiere recibirlo?'}
               </div>
               <div className="flex gap-2">
                 <button
