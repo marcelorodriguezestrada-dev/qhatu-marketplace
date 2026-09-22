@@ -1317,8 +1317,7 @@ function CheckoutContent() {
                 )}
                 {!leyendoOCR && resultadoOCR?.coincide === true && (
                   <div className="font-body text-[11px] text-teal bg-tealsoft border border-teal rounded-lg px-2.5 py-2">
-                    ✓ Leímos {bs(resultadoOCR.montoDetectado!)} en el comprobante — coincide con el total
-                    {resultadoOCR.fechaDetectada && ` · ${resultadoOCR.fechaDetectada}`}
+                    ✓ Comprobante verificado
                   </div>
                 )}
                 {!leyendoOCR && resultadoOCR?.coincide === false && (
