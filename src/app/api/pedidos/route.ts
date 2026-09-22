@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng } = body
+    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, envioExpress } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -92,6 +92,12 @@ export async function POST(req: NextRequest) {
       lat: typeof lat === 'number' ? lat : null,
       lng: typeof lng === 'number' ? lng : null,
       costoEnvio: Number(costoEnvio || 0),
+      // Envío express: entrega el mismo día en vez del día siguiente, a
+      // cambio de un costo fijo en vez del costo por barrio (ver
+      // COSTO_ENVIO_EXPRESS en /checkout). Se lo mostramos a /admin y al
+      // vendedor para que sepan que este pedido en particular es
+      // urgente, no para el reparto de mañana.
+      envioExpress: !!envioExpress,
       metodoEntrega: metodoEntrega || 'delivery',
       // 'qr' (default, pago por transferencia/QR) o 'efectivo' — solo
       // tiene sentido con retiro en tienda. Le sirve al vendedor para

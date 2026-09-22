@@ -55,6 +55,7 @@ type Etapa = 'entrega' | 'creando' | 'pagando' | 'esperando' | 'resumen' | 'erro
 // Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
 // las coordenadas y ajustar los precios reales.
 const COSTOS_ENVIO: Record<string, number> = Object.fromEntries(ZONAS_ENVIO_POTOSI.map((z) => [z.nombre, z.costoEnvio]))
+const COSTO_ENVIO_EXPRESS = 15
 
 // QR/cuenta de la plataforma — se usa como respaldo para los items sin
 // vendedor identificado (datos de ejemplo) o para vendedores que
@@ -157,6 +158,12 @@ function CheckoutContent() {
   // QR (no tiene sentido pagar en efectivo algo que te llevan a domicilio
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
+
+  // Envío express: en vez del costo por zona, un valor fijo — a cambio
+  // de que la moto lo entregue el mismo día en vez de al día siguiente
+  // (ver COSTO_ENVIO_EXPRESS más abajo). Solo aplica con envío, nunca
+  // con retiro en tienda.
+  const [envioExpress, setEnvioExpress] = useState(false)
 
   // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
   // alcanza con que hayan subido la foto del QR — tienen que haber
@@ -367,6 +374,7 @@ function CheckoutContent() {
           setSubPedidos(d.subPedidos)
           setMetodoEntrega(d.metodoEntrega === 'retiro' ? 'retiro' : 'envio')
           setMetodoPago(d.metodoPago === 'efectivo' ? 'efectivo' : 'qr')
+          setEnvioExpress(!!d.envioExpress)
           setMetodoElegido(true)
           setEtapa('esperando')
         } else {
@@ -393,7 +401,7 @@ function CheckoutContent() {
         uidCompradorRef.current = uidGuardar
         localStorage.setItem(
           claveEspera,
-          JSON.stringify({ uid: uidGuardar, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago })
+          JSON.stringify({ uid: uidGuardar, guardadoAt: Date.now(), subPedidos, metodoEntrega, metodoPago, envioExpress })
         )
       } else if (etapa === 'resumen' || (etapa === 'esperando' && cancelada)) {
         // Ya se confirmó (o se canceló): no hay nada más que esperar.
@@ -402,7 +410,7 @@ function CheckoutContent() {
     } catch {
       // Sin localStorage la pantalla sigue funcionando, solo que no sobrevive a salir.
     }
-  }, [restaurando, etapa, subPedidos, usuario, metodoEntrega, metodoPago, claveEspera])
+  }, [restaurando, etapa, subPedidos, usuario, metodoEntrega, metodoPago, envioExpress, claveEspera])
 
   function salirDeEspera() {
     try {
@@ -432,7 +440,7 @@ function CheckoutContent() {
     if (!usuario || emailVerificado === false) router.push('/login')
   }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
-  const costoEnvio = metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0)
+  const costoEnvio = metodoEntrega === 'retiro' ? 0 : envioExpress ? COSTO_ENVIO_EXPRESS : (COSTOS_ENVIO[zonaEntrega] ?? 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
   function usarMiUbicacion() {
@@ -596,6 +604,7 @@ function CheckoutContent() {
             costoEnvio: envioGrupo,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
+            envioExpress: metodoEntrega === 'envio' ? envioExpress : false,
           }),
         })
         const dataPedido = await resPedido.json()
@@ -924,7 +933,9 @@ function CheckoutContent() {
           <div className="bg-panelalt rounded-lg px-3.5 py-3 mb-5">
             <div className="font-body text-[12px] text-inksoft mb-0.5">Subtotal: {bs(subtotalCarrito)}</div>
             {metodoEntrega === 'envio' && zonaEntrega && (
-              <div className="font-body text-[12px] text-inksoft mb-1">Envío: {bs(costoEnvio)}</div>
+              <div className="font-body text-[12px] text-inksoft mb-1">
+                {envioExpress ? 'Envío express' : 'Envío'}: {bs(costoEnvio)}
+              </div>
             )}
             <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
           </div>
@@ -1003,6 +1014,20 @@ function CheckoutContent() {
                     <option key={z.nombre} value={z.nombre}>{z.nombre}</option>
                   ))}
                 </select>
+              </label>
+
+              <label className="flex items-start gap-2.5 mb-3 bg-ochresoft border border-ochre rounded-lg px-3 py-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={envioExpress}
+                  onChange={(e) => setEnvioExpress(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span className="font-body text-[13px] text-ink">
+                  <strong>🚀 Envío express — {bs(COSTO_ENVIO_EXPRESS)}</strong>
+                  <br />
+                  Tu pedido llega hoy mismo (en vez del costo por barrio y la entrega al día siguiente).
+                </span>
               </label>
 
               <div className="mb-3">
@@ -1371,7 +1396,9 @@ function CheckoutContent() {
               <div className="font-display text-lg font-bold text-ink mb-1.5">Su compra se ha éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
-                  Estarás recibiendo el pedido {fechaEntregaTexto()}, horario a confirmar.
+                  {envioExpress
+                    ? 'El producto te llegará hoy, horario a confirmar.'
+                    : `Estarás recibiendo el pedido ${fechaEntregaTexto()}, horario a confirmar.`}
                 </div>
               ) : (
                 <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
@@ -1385,7 +1412,9 @@ function CheckoutContent() {
               por eso el texto dice "de" y no "a las". */}
           {metodoEntrega === 'envio' && subPedidos.every((s) => s.estadoActual === 'pagado') && (
             <div className="bg-panel border border-line rounded-xl p-4 mb-3">
-              <div className="font-body text-sm font-medium text-ink mb-2.5">¿En qué horario preferís recibirlo?</div>
+              <div className="font-body text-sm font-medium text-ink mb-2.5">
+                {envioExpress ? '¿En qué horario de hoy preferís recibirlo?' : '¿En qué horario preferís recibirlo?'}
+              </div>
               <div className="flex gap-2">
                 <button
                   type="button"
