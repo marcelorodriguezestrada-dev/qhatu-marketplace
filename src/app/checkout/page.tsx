@@ -1227,6 +1227,10 @@ function CheckoutContent() {
 
           <div className="font-display text-2xl font-bold text-ink mt-4 mb-4">{bs(subPedidos[pasoActual].total)}</div>
 
+          <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
+            Descargá el QR para el pago y, una vez realizado, volvé a esta página y subí el comprobante.
+          </div>
+
           <div className="text-left mb-4">
             <div className="font-body text-[13px] text-ink font-medium mb-2">
               📎 Subí la foto del comprobante
