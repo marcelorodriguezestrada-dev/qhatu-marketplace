@@ -157,7 +157,7 @@ export default function SeguimientoPedidoPage() {
             <div className="bg-tealsoft border border-teal rounded-xl p-4 mb-5 text-center">
               <div className="font-body text-[13px] text-ink">
                 Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt, pedido.fechaEntrega)}
-                {pedido.franjaHoraria ? `, en el horario de ${FRANJA_LABEL[pedido.franjaHoraria as '8-13' | '13-19']}` : ', horario a confirmar'}.
+                {pedido.franjaHoraria ? `, en el horario de ${FRANJA_LABEL[pedido.franjaHoraria as '8-13' | '13-19']}` : ''}.
                 {' '}Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
               </div>
 

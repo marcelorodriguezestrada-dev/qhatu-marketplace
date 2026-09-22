@@ -1415,13 +1415,13 @@ function CheckoutContent() {
           {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
-              <div className="font-display text-lg font-bold text-ink mb-1.5">Su compra se ha realizado con éxito!</div>
+              <div className="font-display text-lg font-bold text-ink mb-1.5">Su pago se ha realizado con éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
                   {envioExpress
-                    ? `El producto te llegará hoy${franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ', horario a confirmar'}.`
+                    ? `El producto te llegará hoy${franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ''}.`
                     : `Estará recibiendo el pedido ${fechaEntregaTexto(fechaElegida)}${
-                        franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ', horario a confirmar'
+                        franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ''
                       }.`}
                 </div>
               ) : (
