@@ -59,7 +59,9 @@ type Etapa = 'entrega' | 'creando' | 'pagando' | 'esperando' | 'resumen' | 'erro
 // Costo de envío por zona de Potosí — ver src/data/zonasPotosi.ts para
 // las coordenadas y ajustar los precios reales.
 const COSTOS_ENVIO: Record<string, number> = Object.fromEntries(ZONAS_ENVIO_POTOSI.map((z) => [z.nombre, z.costoEnvio]))
-const COSTO_ENVIO_EXPRESS = 15
+// Extra sobre el costo de envío normal de la zona (no lo reemplaza) —
+// a cambio, la moto lo entrega hoy mismo en vez de al día siguiente.
+const COSTO_ENVIO_EXPRESS_EXTRA = 10
 
 // QR/cuenta de la plataforma — se usa como respaldo para los items sin
 // vendedor identificado (datos de ejemplo) o para vendedores que
@@ -160,10 +162,10 @@ function CheckoutContent() {
   // sin verse las caras).
   const [metodoPago, setMetodoPago] = useState<'qr' | 'efectivo'>('qr')
 
-  // Envío express: en vez del costo por zona, un valor fijo — a cambio
-  // de que la moto lo entregue el mismo día en vez de al día siguiente
-  // (ver COSTO_ENVIO_EXPRESS más abajo). Solo aplica con envío, nunca
-  // con retiro en tienda.
+  // Envío express: se suma un extra fijo al costo de envío normal de
+  // la zona (ver COSTO_ENVIO_EXPRESS_EXTRA más abajo) — a cambio, la
+  // moto lo entrega el mismo día en vez de al día siguiente. Solo
+  // aplica con envío, nunca con retiro en tienda.
   const [envioExpress, setEnvioExpress] = useState(false)
 
   // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
@@ -478,7 +480,8 @@ function CheckoutContent() {
     if (!usuario || emailVerificado === false) router.push('/login')
   }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
-  const costoEnvio = metodoEntrega === 'retiro' ? 0 : envioExpress ? COSTO_ENVIO_EXPRESS : (COSTOS_ENVIO[zonaEntrega] ?? 0)
+  const costoEnvio =
+    metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0) + (envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
 
   function usarMiUbicacion() {
@@ -1038,9 +1041,9 @@ function CheckoutContent() {
                   className="mt-0.5"
                 />
                 <span className="font-body text-[13px] text-ink">
-                  <strong>🚀 Envío express — {bs(COSTO_ENVIO_EXPRESS)}</strong>
+                  <strong>🚀 Envío express — +{bs(COSTO_ENVIO_EXPRESS_EXTRA)} sobre el envío normal</strong>
                   <br />
-                  Tu pedido llega hoy mismo (en vez del costo por barrio y la entrega al día siguiente).
+                  Tu pedido llega hoy mismo, en vez de al día siguiente.
                 </span>
               </label>
 
