@@ -730,6 +730,11 @@ function CheckoutContent() {
       setError('Subí la foto del comprobante para confirmar el pago.')
       return
     }
+    // El monto leído por OCR no coincidió con el total — no se deja
+    // avanzar hasta que suba un comprobante que sí coincida (ver botón
+    // deshabilitado más abajo, esto es una segunda barrera por las
+    // dudas).
+    if (resultadoOCR?.coincide === false) return
     setError('')
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
@@ -1318,7 +1323,7 @@ function CheckoutContent() {
                 )}
                 {!leyendoOCR && resultadoOCR?.coincide === false && (
                   <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
-                    ⚠ Leímos {bs(resultadoOCR.montoDetectado!)} y el total es {bs(subPedidos[pasoActual].total)}. Revisá que sea el comprobante correcto — igual podés continuar y el vendedor lo verifica.
+                    Error al enviar el comprobante, vuelva a intentarlo.
                   </div>
                 )}
               </div>
@@ -1340,7 +1345,7 @@ function CheckoutContent() {
 
           <button
             onClick={declararPagoActual}
-            disabled={!comprobanteUrl || subiendoComprobante}
+            disabled={!comprobanteUrl || subiendoComprobante || leyendoOCR || resultadoOCR?.coincide === false}
             className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40"
           >
             ✓ Continuar
