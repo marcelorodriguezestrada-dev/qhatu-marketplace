@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
+import SelectorHorarioEntrega, { FRANJA_LABEL } from '@/components/SelectorHorarioEntrega'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -27,13 +28,42 @@ const ESTADOS_PREVIOS: Record<string, string> = {
   informado_pago: 'Avisaste que ya pagaste — estamos confirmándolo.',
 }
 
-// Igual que en el checkout: la entrega es al día siguiente del pago,
-// horario todavía sin confirmar — no una franja horaria del mismo día.
-function fechaEntregaTexto(pagadoAt?: string): string {
+// Igual que en el checkout: por default la entrega es al día siguiente
+// del pago — a menos que el comprador haya elegido otro día desde acá
+// o desde /checkout (pedido.fechaEntrega, yyyy-mm-dd).
+function fechaEntregaTexto(pagadoAt?: string, fechaEntrega?: string): string {
+  if (fechaEntrega) {
+    const [y, m, d] = fechaEntrega.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+  }
   const base = pagadoAt ? new Date(pagadoAt) : new Date()
   const manana = new Date(base)
   manana.setDate(manana.getDate() + 1)
   return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
+}
+
+// yyyy-mm-dd del día en que se entregaría el pedido según lo que haya
+// guardado — el default (mañana desde que se pagó) o lo que el
+// comprador haya elegido explícitamente (fechaEntrega).
+function fechaEntregaISO(pagadoAt?: string, fechaEntrega?: string): string {
+  if (fechaEntrega) return fechaEntrega
+  const base = pagadoAt ? new Date(pagadoAt) : new Date()
+  const manana = new Date(base)
+  manana.setDate(manana.getDate() + 1)
+  return `${manana.getFullYear()}-${String(manana.getMonth() + 1).padStart(2, '0')}-${String(manana.getDate()).padStart(2, '0')}`
+}
+
+// El comprador puede modificar el día/horario de entrega hasta las
+// 22hs de la noche anterior — después de eso la moto ya tiene la ruta
+// del día siguiente armada (ver /admin, pestaña Reparto), así que un
+// cambio de último momento ya no le llega a tiempo.
+function puedeModificarHorario(pedido: any): boolean {
+  if (pedido.metodoEntrega !== 'envio') return false
+  if (!['pagado', 'en_preparacion'].includes(pedido.estado)) return false
+  const iso = fechaEntregaISO(pedido.pagadoAt, pedido.fechaEntrega)
+  const [y, m, d] = iso.split('-').map(Number)
+  const corte = new Date(y, m - 1, d - 1, 22, 0, 0, 0)
+  return new Date() < corte
 }
 
 export default function SeguimientoPedidoPage() {
@@ -41,6 +71,7 @@ export default function SeguimientoPedidoPage() {
   const [pedido, setPedido] = useState<any>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [modificandoHorario, setModificandoHorario] = useState(false)
 
   useEffect(() => {
     let activo = true
@@ -125,8 +156,38 @@ export default function SeguimientoPedidoPage() {
           {esEnvio && pedido.estado !== 'entregado' && (
             <div className="bg-tealsoft border border-teal rounded-xl p-4 mb-5 text-center">
               <div className="font-body text-[13px] text-ink">
-                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt)}, horario a confirmar. Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
+                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt, pedido.fechaEntrega)}
+                {pedido.franjaHoraria ? `, en el horario de ${FRANJA_LABEL[pedido.franjaHoraria as '8-13' | '13-19']}` : ', horario a confirmar'}.
+                {' '}Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
               </div>
+
+              {puedeModificarHorario(pedido) && (
+                <div className="mt-3 text-left">
+                  {!modificandoHorario ? (
+                    <button
+                      type="button"
+                      onClick={() => setModificandoHorario(true)}
+                      className="w-full text-center font-body text-[12px] text-maroon underline"
+                    >
+                      Modificar día u horario de entrega
+                    </button>
+                  ) : (
+                    <div className="bg-panel border border-line rounded-lg p-3.5">
+                      <SelectorHorarioEntrega
+                        pedidoIds={[pedido.id]}
+                        franjaInicial={pedido.franjaHoraria || ''}
+                        fechaInicial={pedido.fechaEntrega || null}
+                        onGuardado={({ franjaHoraria, fechaEntrega }) =>
+                          setPedido((prev: any) => ({ ...prev, franjaHoraria, fechaEntrega }))
+                        }
+                      />
+                      <div className="font-body text-[11px] text-inksoft mt-3">
+                        Podés modificarlo hasta las 22:00 de la noche anterior a la entrega.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
