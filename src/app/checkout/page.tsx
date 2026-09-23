@@ -1042,12 +1042,12 @@ function CheckoutContent() {
                 </select>
               </label>
 
-              <div className="flex gap-1 p-1 mb-3 bg-panelalt rounded-full">
+              <div className="flex flex-col gap-2.5 mb-3">
                 <button
                   type="button"
                   onClick={() => setEnvioExpress(false)}
-                  className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                    !envioExpress ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                    !envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
                   }`}
                 >
                   🛵 Envío normal
@@ -1055,8 +1055,8 @@ function CheckoutContent() {
                 <button
                   type="button"
                   onClick={() => setEnvioExpress(true)}
-                  className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                    envioExpress ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                    envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
                   }`}
                 >
                   ⚡ Envío express
