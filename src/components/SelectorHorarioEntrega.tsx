@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 
 export type Franja = '' | '8-13' | '13-19'
 
@@ -134,15 +133,10 @@ export default function SelectorHorarioEntrega({
       <div className="text-center">
         <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3 text-xl">✓</div>
         <div className="font-body text-sm text-ink mb-2">
-          Su compra se ha realizado con éxito. Usted está recibiendo su pedido el {fechaTexto}, en el horario de{' '}
+          Su compra se ha realizado con éxito. Usted estará recibiendo su pedido el {fechaTexto}, en el horario de{' '}
           {FRANJA_LABEL[franjaConfirmada as '8-13' | '13-19']}.
         </div>
         <div className="font-display text-lg font-bold text-teal mb-3">Gracias por su compra.</div>
-        {pedidoIds.length === 1 && (
-          <Link href={`/mis-pedidos/${pedidoIds[0]}`} className="font-body text-[11px] text-maroon underline">
-            Ver seguimiento del pedido
-          </Link>
-        )}
       </div>
     )
   }
