@@ -30,7 +30,7 @@ export async function evaluarConIA(contenido: string): Promise<ResultadoModeraci
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant', // el más liviano y rápido de Groq — alcanza de sobra para clasificar riesgo
+        model: 'openai/gpt-oss-20b', // liviano y rápido — alcanza de sobra para clasificar riesgo. (llama-3.1-8b-instant quedó discontinuado por Groq el 16/08/2026, este es el reemplazo que recomienda Groq)
         max_tokens: 150,
         response_format: { type: 'json_object' },
         messages: [
@@ -87,7 +87,7 @@ export async function categorizarAnuncio(contenido: string, rubros: { id: string
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         max_tokens: 60,
         response_format: { type: 'json_object' },
         messages: [
@@ -156,10 +156,11 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        // Este sí se beneficia de un modelo más capaz que el 8b: tiene
-        // que leer texto desordenado de OCR y redactar bien, no solo
-        // clasificar — así que usamos el 70b, todavía gratis en Groq.
-        model: 'llama-3.3-70b-versatile',
+        // Este sí se beneficia de un modelo más capaz que el liviano de
+        // arriba: tiene que leer texto desordenado de OCR y redactar
+        // bien, no solo clasificar — así que usamos el modelo grande,
+        // todavía gratis en Groq.
+        model: 'openai/gpt-oss-120b',
         max_tokens: 500,
         response_format: { type: 'json_object' },
         messages: [
@@ -235,7 +236,7 @@ export async function sugerirMatcheosIA(
       method: 'POST',
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         max_tokens: 1200,
         response_format: { type: 'json_object' },
         messages: [
@@ -304,7 +305,7 @@ export async function contieneInsultos(comentario: string): Promise<boolean> {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         max_tokens: 50,
         response_format: { type: 'json_object' },
         messages: [
