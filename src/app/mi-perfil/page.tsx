@@ -20,6 +20,7 @@ type Profesional = {
   rubro: string
   especialidad?: string
   descripcion?: string
+  dondeTrabaja?: string
   experiencia?: string
   servicios?: string[]
   estado?: string
@@ -97,6 +98,7 @@ export default function MiPerfilPage() {
   // profesional lo puede completar aunque no suba ningún CV.
   const [misServicios, setMisServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
+  const [miDondeTrabaja, setMiDondeTrabaja] = useState('')
   const [guardandoServicios, setGuardandoServicios] = useState(false)
   const [serviciosGuardados, setServiciosGuardados] = useState(false)
   const [errorServicios, setErrorServicios] = useState('')
@@ -112,7 +114,10 @@ export default function MiPerfilPage() {
   }, [usuario])
 
   useEffect(() => {
-    if (profesional) setMisServicios(profesional.servicios || [])
+    if (profesional) {
+      setMisServicios(profesional.servicios || [])
+      setMiDondeTrabaja(profesional.dondeTrabaja || '')
+    }
   }, [profesional?.id])
 
   useEffect(() => {
@@ -381,11 +386,11 @@ export default function MiPerfilPage() {
       const res = await fetch(`/api/profesionales/${profesional.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ servicios: misServicios }),
+        body: JSON.stringify({ servicios: misServicios, dondeTrabaja: miDondeTrabaja }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setProfesional((p) => (p ? { ...p, servicios: misServicios } : p))
+      setProfesional((p) => (p ? { ...p, servicios: misServicios, dondeTrabaja: miDondeTrabaja } : p))
       setServiciosGuardados(true)
     } catch (e: any) {
       setErrorServicios(e?.message || 'No se pudo guardar tus servicios.')
@@ -560,16 +565,26 @@ export default function MiPerfilPage() {
         )}
       </div>
 
-      {/* --- Mis servicios: qué hago concretamente --- */}
+      {/* --- Mis servicios y dónde trabajo --- */}
       <div className="bg-panel border border-line rounded-xl p-4 mb-5">
-        <div className="font-body text-sm font-semibold text-ink mb-1">Mis servicios</div>
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mis servicios y dónde trabajo</div>
         <div className="font-body text-xs text-inksoft mb-3">
-          Contá, en puntos concretos, qué es lo que hacés (ej: "Instalación de grifería", "Reparación de fugas"). Se muestran en tu perfil público, además de la descripción.
+          Contá, en puntos concretos, qué es lo que hacés (ej: "Instalación de grifería", "Reparación de fugas") y un resumen corto de dónde atendés. Se muestran en tu perfil público, además de la descripción.
         </div>
 
         {errorServicios && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorServicios}</div>}
         {serviciosGuardados && <div className="font-body text-xs text-teal bg-teal/10 border border-teal rounded-md px-3 py-2 mb-3">Guardado ✓</div>}
 
+        <div className="font-body text-[11px] text-inksoft mb-1">Resumen de dónde trabajo</div>
+        <textarea
+          value={miDondeTrabaja}
+          onChange={(e) => { setMiDondeTrabaja(e.target.value); setServiciosGuardados(false) }}
+          placeholder="Ej: Consultorio propio en Sopocachi, atiendo también en Clínica del Sur los martes"
+          rows={2}
+          className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panelalt mb-3"
+        />
+
+        <div className="font-body text-[11px] text-inksoft mb-1">Servicios</div>
         {misServicios.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2.5">
             {misServicios.map((s, i) => (
@@ -607,7 +622,7 @@ export default function MiPerfilPage() {
           disabled={guardandoServicios}
           className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
         >
-          {guardandoServicios ? 'Guardando...' : 'Guardar servicios'}
+          {guardandoServicios ? 'Guardando...' : 'Guardar'}
         </button>
       </div>
 

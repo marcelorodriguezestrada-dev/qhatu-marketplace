@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -76,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios } = bodyPermitido
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -89,6 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (rubro !== undefined) cambios.rubro = rubro
     if (especialidad !== undefined) cambios.especialidad = especialidad
     if (descripcion !== undefined) cambios.descripcion = descripcion
+    if (dondeTrabaja !== undefined) cambios.dondeTrabaja = String(dondeTrabaja || '').trim().slice(0, 500)
     if (zona !== undefined) cambios.zona = zona
     if (direccion !== undefined) cambios.direccion = direccion
     if (lat !== undefined) cambios.lat = lat === '' || lat === null ? null : Number(lat)

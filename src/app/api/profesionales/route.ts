@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios } = body
+    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       // queda vacío, en el perfil se muestra directo el label del rubro.
       especialidad: especialidad || '',
       descripcion: descripcion || '',
+      dondeTrabaja: (dondeTrabaja || '').trim().slice(0, 500),
       servicios: serviciosLimpios,
       zona: zona || '',
       // Dirección puntual (calle/número), distinta de "zona" (el

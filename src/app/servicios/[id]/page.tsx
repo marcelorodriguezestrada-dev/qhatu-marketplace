@@ -271,8 +271,9 @@ export default function PerfilProfesionalPage() {
                 {perfil.especialidad || rubroInfo?.label || perfil.rubro}
               </div>
             )}
-            {(perfil.direccion || perfil.zona || perfil.experiencia) && (
+            {(perfil.direccion || perfil.zona || perfil.experiencia || perfil.dondeTrabaja) && (
               <div className="font-body text-xs text-inksoft mb-3 space-y-0.5">
+                {perfil.dondeTrabaja && <div className="whitespace-pre-line">Dónde trabaja: {perfil.dondeTrabaja}</div>}
                 {perfil.direccion && <div>Dirección: {perfil.direccion}</div>}
                 {perfil.zona && <div>Zona: {perfil.zona}</div>}
                 {perfil.experiencia && <div>Experiencia: {perfil.experiencia}</div>}

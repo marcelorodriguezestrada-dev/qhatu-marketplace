@@ -27,6 +27,7 @@ export default function PublicarServicioPage() {
   const [rubroPersonalizado, setRubroPersonalizado] = useState('')
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [dondeTrabaja, setDondeTrabaja] = useState('')
   const [servicios, setServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
@@ -144,7 +145,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          especialidad, descripcion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
+          especialidad, descripcion, dondeTrabaja, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -314,6 +315,16 @@ export default function PublicarServicioPage() {
           placeholder="Dirección (opcional, ej: Fortunato Gumiel)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+        <textarea
+          value={dondeTrabaja}
+          onChange={(e) => setDondeTrabaja(e.target.value)}
+          placeholder="Resumen de dónde trabajás (opcional, ej: Consultorio propio en Sopocachi, atiendo también en Clínica del Sur los martes)"
+          rows={2}
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-1"
+        />
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          Un resumen del lugar donde atendés o trabajás (distinto de la dirección, por si es un nombre conocido).
+        </div>
 
         <div className="mb-3">
           <button

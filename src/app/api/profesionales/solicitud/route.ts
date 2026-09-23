@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, dondeTrabaja, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
       rubro: rubroFinal,
       especialidad: especialidad || '',
       descripcion: descripcion || '',
+      dondeTrabaja: (dondeTrabaja || '').trim().slice(0, 500),
       servicios: serviciosLimpios,
       zona: zonaFinal,
       direccion: direccion || '',

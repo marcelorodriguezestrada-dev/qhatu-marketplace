@@ -165,6 +165,7 @@ export default function AdminPage() {
   const [categoriaSel, setCategoriaSel] = useState('')
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [dondeTrabaja, setDondeTrabaja] = useState('')
   const [servicios, setServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState('')
@@ -763,7 +764,7 @@ export default function AdminPage() {
     setPublicando(true)
     try {
       const datos = {
-        nombre, rubro, especialidad, descripcion, servicios, zona, direccion,
+        nombre, rubro, especialidad, descripcion, dondeTrabaja, servicios, zona, direccion,
         lat: lat || null, lng: lng || null,
         whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
@@ -783,7 +784,7 @@ export default function AdminPage() {
         setErrorForm(data.error)
         return
       }
-      setNombre(''); setDescripcion(''); setServicios([]); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
+      setNombre(''); setDescripcion(''); setServicios([]); setDondeTrabaja(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
       setProfesionalEditandoId(null)
       cargarProfesionales()
@@ -804,6 +805,7 @@ export default function AdminPage() {
     setEspecialidad(p.especialidad || '')
     setDescripcion(p.descripcion || '')
     setServicios(p.servicios || [])
+    setDondeTrabaja(p.dondeTrabaja || '')
     setZona(p.zona || '')
     setDireccion(p.direccion || '')
     setLat(p.lat != null ? String(p.lat) : '')
@@ -1733,6 +1735,13 @@ export default function AdminPage() {
               value={direccion}
               onChange={(e) => setDireccion(e.target.value)}
               placeholder="Dirección (opcional, ej: Fortunato Gumiel)"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
+            <textarea
+              value={dondeTrabaja}
+              onChange={(e) => setDondeTrabaja(e.target.value)}
+              placeholder="Resumen de dónde trabaja (opcional, ej: Consultorio propio en Sopocachi, atiende también en Clínica del Sur los martes)"
+              rows={2}
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <div className="grid grid-cols-2 gap-3 mb-3">
