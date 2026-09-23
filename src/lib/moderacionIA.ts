@@ -8,6 +8,16 @@
 // cualquier motivo, devolvemos null y seguimos adelante sin romper el
 // flujo de publicación — la moderación con IA es una ayuda opcional,
 // nunca un bloqueo.
+//
+// IMPORTANTE (fix 23/09/2026): los modelos openai/gpt-oss-* de Groq son
+// modelos de razonamiento. Groq dejó `max_tokens` deprecado para estos
+// modelos en favor de `max_completion_tokens` — usar el parámetro viejo
+// ahora devuelve 400 directo ("extraerDatosCV: Groq respondió 400" era
+// este mismo bug). Además, como son modelos de razonamiento, gastan
+// tokens "pensando" antes de escribir el contenido — por eso subimos un
+// poco los presupuestos y agregamos reasoning_effort: 'low' en las
+// tareas de clasificación simple, para que no gasten de más pensando y
+// se quede sin presupuesto para el contenido real.
 
 type ResultadoModeracion = { riesgo: 'bajo' | 'medio' | 'alto'; motivo: string } | null
 
@@ -31,7 +41,8 @@ export async function evaluarConIA(contenido: string): Promise<ResultadoModeraci
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b', // liviano y rápido — alcanza de sobra para clasificar riesgo. (llama-3.1-8b-instant quedó discontinuado por Groq el 16/08/2026, este es el reemplazo que recomienda Groq)
-        max_tokens: 150,
+        max_completion_tokens: 300,
+        reasoning_effort: 'low',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -88,7 +99,8 @@ export async function categorizarAnuncio(contenido: string, rubros: { id: string
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b',
-        max_tokens: 60,
+        max_completion_tokens: 200,
+        reasoning_effort: 'low',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -161,7 +173,8 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
         // bien, no solo clasificar — así que usamos el modelo grande,
         // todavía gratis en Groq.
         model: 'openai/gpt-oss-120b',
-        max_tokens: 500,
+        max_completion_tokens: 1200, // antes 500 con max_tokens (deprecado) — subido con margen porque es modelo de razonamiento y gasta tokens "pensando" antes de escribir
+        reasoning_effort: 'low', // no necesita razonar mucho, es redacción/extracción — así deja más presupuesto para el contenido
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT_CV },
@@ -237,7 +250,8 @@ export async function sugerirMatcheosIA(
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b',
-        max_tokens: 1200,
+        max_completion_tokens: 1800, // antes 1200 con max_tokens (deprecado) — subido con margen por ser modelo de razonamiento
+        reasoning_effort: 'low',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -306,7 +320,8 @@ export async function contieneInsultos(comentario: string): Promise<boolean> {
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b',
-        max_tokens: 50,
+        max_completion_tokens: 150,
+        reasoning_effort: 'low',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT_RESENA },
