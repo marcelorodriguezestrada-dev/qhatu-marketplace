@@ -66,6 +66,7 @@ export default function ProductoDetallePage() {
   const [tallaSel, setTallaSel] = useState('')
   const [colorSel, setColorSel] = useState('')
   const [errorSeleccion, setErrorSeleccion] = useState('')
+  const [linkCopiado, setLinkCopiado] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -142,6 +143,29 @@ export default function ProductoDetallePage() {
     )
   }
 
+  // Si el navegador soporta el selector nativo de compartir (celular,
+  // sobre todo), lo usamos — abre directo WhatsApp/Facebook/Instagram/
+  // copiar link, como en cualquier app. Si no existe (típico en
+  // desktop), copiamos el link al portapapeles como respaldo.
+  async function compartirProducto() {
+    const url = typeof window !== 'undefined' ? window.location.href : ''
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: producto.nombre, url })
+      } catch {
+        // La persona cerró el selector nativo, o el share falló — no hay nada más que hacer.
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopiado(true)
+      setTimeout(() => setLinkCopiado(false), 2000)
+    } catch {
+      // Portapapeles bloqueado (permiso denegado, contexto no seguro) — sin más respaldo razonable.
+    }
+  }
+
   const mostrarFoto = producto.imagenUrl && !imagenRota
   const tieneDescuento = producto.precioOriginal && producto.precioOriginal > producto.precio
   const porcentajeOff = tieneDescuento
@@ -161,23 +185,38 @@ export default function ProductoDetallePage() {
           <span>›</span>
           <span className="text-ink font-medium">{producto.nombre}</span>
         </div>
-        {/* Acceso directo al carrito desde la ficha del producto — antes
-            solo se podía llegar al carrito volviendo al catálogo, y si
-            alguien ya se decidió a comprar acá mismo no tenía forma de
-            ir directo a pagar. */}
-        <button
-          type="button"
-          onClick={() => setCarritoAbierto(true)}
-          className="relative shrink-0 w-10 h-10 rounded-full border border-line bg-panel flex items-center justify-center text-lg"
-          aria-label="Ver carrito"
-        >
-          🛒
-          {items.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-maroon text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
-              {items.length}
-            </span>
+        <div className="flex items-center gap-2 shrink-0 relative">
+          <button
+            type="button"
+            onClick={compartirProducto}
+            className="w-10 h-10 rounded-full border border-line bg-panel flex items-center justify-center text-lg"
+            aria-label="Compartir"
+          >
+            📤
+          </button>
+          {linkCopiado && (
+            <div className="absolute top-full right-0 mt-1.5 bg-ink text-white font-body text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-10">
+              Link copiado
+            </div>
           )}
-        </button>
+          {/* Acceso directo al carrito desde la ficha del producto — antes
+              solo se podía llegar al carrito volviendo al catálogo, y si
+              alguien ya se decidió a comprar acá mismo no tenía forma de
+              ir directo a pagar. */}
+          <button
+            type="button"
+            onClick={() => setCarritoAbierto(true)}
+            className="relative w-10 h-10 rounded-full border border-line bg-panel flex items-center justify-center text-lg"
+            aria-label="Ver carrito"
+          >
+            🛒
+            {items.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-maroon text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
+                {items.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Pestañas */}
