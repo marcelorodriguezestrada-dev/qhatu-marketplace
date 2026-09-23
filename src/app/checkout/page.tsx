@@ -1374,10 +1374,10 @@ function CheckoutContent() {
               pedidoCancelado ? 'bg-maroon' : 'bg-ochre animate-pulse'
             }`}
           >
-            {pedidoCancelado ? '✕' : '⏳'}
+            {pedidoCancelado ? '✕' : '🤔'}
           </div>
           <div className="font-display text-lg font-bold text-ink mb-1.5">
-            {pedidoCancelado ? 'Pedido cancelado' : 'Esperando la confirmación del pago'}
+            {pedidoCancelado ? 'Pedido cancelado' : 'Procesando Pago'}
           </div>
 
           {pedidoCancelado ? (
@@ -1395,7 +1395,7 @@ function CheckoutContent() {
             </>
           ) : (
             <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-4">
-              No cierres esta pantalla — se actualiza sola. Si prefieres cerrarla, puedés seguir tu pedido desde{' '}
+              (puede tardar unos minutos) o puedes seguir tu pedido desde{' '}
               <Link href="/mis-pedidos" className="text-maroon underline">Mis pedidos</Link>.
             </div>
           )}
