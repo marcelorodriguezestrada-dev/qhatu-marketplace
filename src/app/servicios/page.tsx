@@ -27,6 +27,7 @@ type Profesional = {
   imagenUrl?: string
   precio?: number | null
   experiencia?: string
+  servicios?: string[]
   plan: string
   ratingPromedio: number
   cantidadResenas: number
@@ -465,6 +466,11 @@ export default function ServiciosPage() {
                     <div className="font-body text-sm font-bold text-ink mb-1">{bs(p.precio)}</div>
                   ) : null}
                   {p.zona && <div className="font-body text-xs text-inksoft mb-1">Zona: {p.zona}</div>}
+                  {p.servicios && p.servicios.length > 0 && (
+                    <div className="font-body text-[11px] text-inksoft mb-1 truncate">
+                      {p.servicios.slice(0, 2).join(' · ')}
+                    </div>
+                  )}
                   {p.cantidadResenas > 0 ? (
                     <div className="flex items-center gap-1.5">
                       <Estrellas valor={p.ratingPromedio} />

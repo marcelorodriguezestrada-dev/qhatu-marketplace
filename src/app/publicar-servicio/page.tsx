@@ -27,6 +27,8 @@ export default function PublicarServicioPage() {
   const [rubroPersonalizado, setRubroPersonalizado] = useState('')
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [servicios, setServicios] = useState<string[]>([])
+  const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
   const [zonaPersonalizada, setZonaPersonalizada] = useState('')
   const [zonasExtra, setZonasExtra] = useState<string[]>([])
@@ -67,6 +69,24 @@ export default function PublicarServicioPage() {
   useEffect(() => {
     if (!cargando && !usuario) router.push('/login')
   }, [cargando, usuario, router])
+
+  // Lista de servicios concretos que ofrece (ej: "Instalación de
+  // grifería", "Destape de cañerías") — hasta 6, igual que del lado del
+  // servidor (ver /api/profesionales/solicitud).
+  function agregarServicio() {
+    const texto = nuevoServicio.trim()
+    if (!texto || servicios.length >= 6) return
+    if (servicios.some((s) => s.toLowerCase() === texto.toLowerCase())) {
+      setNuevoServicio('')
+      return
+    }
+    setServicios((s) => [...s, texto.slice(0, 80)])
+    setNuevoServicio('')
+  }
+
+  function quitarServicio(i: number) {
+    setServicios((s) => s.filter((_, idx) => idx !== i))
+  }
 
   function usarMiUbicacion() {
     setBuscandoUbicacion(true)
@@ -124,7 +144,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
+          especialidad, descripcion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -229,6 +249,44 @@ export default function PublicarServicioPage() {
           rows={3}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
         />
+
+        <div className="mb-3">
+          <div className="font-body text-xs font-semibold text-ink mb-1">¿Qué hacés concretamente? (opcional)</div>
+          <div className="font-body text-[11px] text-inksoft mb-2">
+            Agregá hasta 6 servicios puntuales, ej: "Instalación de grifería", "Reparación de fugas".
+          </div>
+          {servicios.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {servicios.map((s, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-panelalt border border-line font-body text-xs text-ink">
+                  {s}
+                  <button type="button" onClick={() => quitarServicio(i)} className="text-inksoft hover:text-maroon leading-none">✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+          {servicios.length < 6 && (
+            <div className="flex gap-2">
+              <input
+                value={nuevoServicio}
+                onChange={(e) => setNuevoServicio(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); agregarServicio() }
+                }}
+                placeholder="Ej: Instalación de grifería"
+                className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+              />
+              <button
+                type="button"
+                onClick={agregarServicio}
+                className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt"
+              >
+                Agregar
+              </button>
+            </div>
+          )}
+        </div>
+
         <select
           value={zona}
           onChange={(e) => setZona(e.target.value)}

@@ -165,6 +165,8 @@ export default function AdminPage() {
   const [categoriaSel, setCategoriaSel] = useState('')
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [servicios, setServicios] = useState<string[]>([])
+  const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState('')
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
@@ -702,6 +704,24 @@ export default function AdminPage() {
   // IA — vos los revisás y corregís en el formulario de siempre antes de
   // tocar "Publicar profesional" / "Guardar cambios", igual que con
   // cualquier otro dato que cargás a mano.
+  // Lista de servicios concretos del profesional (ej: "Instalación de
+  // grifería") — misma mecánica que en /publicar-servicio y /mi-perfil,
+  // hasta 6 items.
+  function agregarServicio() {
+    const texto = nuevoServicio.trim()
+    if (!texto || servicios.length >= 6) return
+    if (servicios.some((s) => s.toLowerCase() === texto.toLowerCase())) {
+      setNuevoServicio('')
+      return
+    }
+    setServicios((s) => [...s, texto.slice(0, 80)])
+    setNuevoServicio('')
+  }
+
+  function quitarServicio(i: number) {
+    setServicios((s) => s.filter((_, idx) => idx !== i))
+  }
+
   async function leerCVAdmin(file: File | null) {
     if (!file) return
     setLeyendoCVAdmin(true)
@@ -724,6 +744,7 @@ export default function AdminPage() {
       if (datos.especialidad) setEspecialidad(datos.especialidad)
       if (datos.experiencia) setExperiencia(datos.experiencia)
       if (datos.descripcion) setDescripcion(datos.descripcion)
+      if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
       if (datos.rubroSugerido) setRubroSugeridoCV(datos.rubroSugerido)
     } catch (e: any) {
       setErrorForm(e?.message || 'No se pudo leer el CV.')
@@ -742,7 +763,7 @@ export default function AdminPage() {
     setPublicando(true)
     try {
       const datos = {
-        nombre, rubro, especialidad, descripcion, zona, direccion,
+        nombre, rubro, especialidad, descripcion, servicios, zona, direccion,
         lat: lat || null, lng: lng || null,
         whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
@@ -762,7 +783,7 @@ export default function AdminPage() {
         setErrorForm(data.error)
         return
       }
-      setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
+      setNombre(''); setDescripcion(''); setServicios([]); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
       setProfesionalEditandoId(null)
       cargarProfesionales()
@@ -782,6 +803,7 @@ export default function AdminPage() {
     setRubro(p.rubro || '')
     setEspecialidad(p.especialidad || '')
     setDescripcion(p.descripcion || '')
+    setServicios(p.servicios || [])
     setZona(p.zona || '')
     setDireccion(p.direccion || '')
     setLat(p.lat != null ? String(p.lat) : '')
@@ -1601,6 +1623,43 @@ export default function AdminPage() {
               rows={2}
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
+
+            <div className="mb-3">
+              <div className="font-body text-xs font-semibold text-ink mb-1">Servicios (qué hace concretamente)</div>
+              <div className="font-body text-[11px] text-inksoft mb-2">
+                Hasta 6 puntos concretos, ej: "Instalación de grifería", "Reparación de fugas". Se muestran en el perfil público.
+              </div>
+              {servicios.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {servicios.map((s, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-panelalt border border-line font-body text-xs text-ink">
+                      {s}
+                      <button type="button" onClick={() => quitarServicio(i)} className="text-inksoft hover:text-maroon leading-none">✕</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {servicios.length < 6 && (
+                <div className="flex gap-2">
+                  <input
+                    value={nuevoServicio}
+                    onChange={(e) => setNuevoServicio(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); agregarServicio() }
+                    }}
+                    placeholder="Ej: Instalación de grifería"
+                    className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={agregarServicio}
+                    className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="mb-3">
               <div className="font-body text-xs text-inksoft mb-1.5">Foto (opcional)</div>

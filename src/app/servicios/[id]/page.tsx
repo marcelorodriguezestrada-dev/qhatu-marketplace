@@ -184,6 +184,20 @@ export default function PerfilProfesionalPage() {
             </>
           )}
 
+          {perfil.servicios && perfil.servicios.length > 0 && (
+            <>
+              <div className="font-display text-lg font-bold text-ink mb-2">Qué hace</div>
+              <ul className="mb-8 flex flex-col gap-1.5">
+                {perfil.servicios.map((s: string, i: number) => (
+                  <li key={i} className="font-body text-sm text-ink flex items-start gap-2">
+                    <span className="text-teal mt-0.5">✓</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           {perfil.fotosAdicionales && perfil.fotosAdicionales.length > 0 && (
             <>
               <div className="font-display text-lg font-bold text-ink mb-2">Fotos</div>

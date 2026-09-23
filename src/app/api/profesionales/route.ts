@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia } = body
+    const { nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -53,6 +53,16 @@ export async function POST(req: NextRequest) {
     }
     const whatsappCompleto = numeroConCodigoPais(whatsapp, buscarPais(paisId).codigo)
 
+    // Lista de servicios concretos (ej: "Instalación de grifería") —
+    // misma sanitización que en /api/profesionales/solicitud y en el
+    // PATCH de [id], para que da igual por dónde entre el dato.
+    const serviciosLimpios = Array.isArray(servicios)
+      ? servicios
+          .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
+          .map((s: string) => s.trim().slice(0, 80))
+          .slice(0, 6)
+      : []
+
     const db = getDb()
     const ref = await db.collection('profesionales').add({
       nombre,
@@ -62,6 +72,7 @@ export async function POST(req: NextRequest) {
       // queda vacío, en el perfil se muestra directo el label del rubro.
       especialidad: especialidad || '',
       descripcion: descripcion || '',
+      servicios: serviciosLimpios,
       zona: zona || '',
       // Dirección puntual (calle/número), distinta de "zona" (el
       // barrio). Las dos son opcionales y se muestran juntas en el

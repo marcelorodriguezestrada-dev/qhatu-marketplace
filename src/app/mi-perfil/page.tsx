@@ -21,6 +21,7 @@ type Profesional = {
   especialidad?: string
   descripcion?: string
   experiencia?: string
+  servicios?: string[]
   estado?: string
   notaAdmin?: string
   plan?: string
@@ -87,9 +88,18 @@ export default function MiPerfilPage() {
   // al tocar "Guardar" se escribe en tu perfil. Nunca se guarda solo.
   const [leyendoCV, setLeyendoCV] = useState(false)
   const [errorCV, setErrorCV] = useState('')
-  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; rubroSugerido?: string | null } | null>(null)
+  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; servicios: string[]; rubroSugerido?: string | null } | null>(null)
   const [guardandoCV, setGuardandoCV] = useState(false)
   const [cvGuardado, setCvGuardado] = useState(false)
+
+  // --- Mis servicios (qué hago concretamente) ---
+  // Editable directo, sin pasar por el flujo de CV — así cualquier
+  // profesional lo puede completar aunque no suba ningún CV.
+  const [misServicios, setMisServicios] = useState<string[]>([])
+  const [nuevoServicio, setNuevoServicio] = useState('')
+  const [guardandoServicios, setGuardandoServicios] = useState(false)
+  const [serviciosGuardados, setServiciosGuardados] = useState(false)
+  const [errorServicios, setErrorServicios] = useState('')
 
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
@@ -100,6 +110,10 @@ export default function MiPerfilPage() {
     cargarPerfil()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario])
+
+  useEffect(() => {
+    if (profesional) setMisServicios(profesional.servicios || [])
+  }, [profesional?.id])
 
   useEffect(() => {
     if (!profesional || !esPremiumVigente(profesional)) return
@@ -319,21 +333,64 @@ export default function MiPerfilPage() {
           especialidad: propuestaCV.especialidad,
           experiencia: propuestaCV.experiencia,
           descripcion: propuestaCV.descripcion,
+          servicios: propuestaCV.servicios,
         }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setProfesional((p) =>
         p
-          ? { ...p, nombre: propuestaCV.nombre || p.nombre, especialidad: propuestaCV.especialidad, experiencia: propuestaCV.experiencia, descripcion: propuestaCV.descripcion }
+          ? { ...p, nombre: propuestaCV.nombre || p.nombre, especialidad: propuestaCV.especialidad, experiencia: propuestaCV.experiencia, descripcion: propuestaCV.descripcion, servicios: propuestaCV.servicios }
           : p
       )
+      setMisServicios(propuestaCV.servicios || [])
       setPropuestaCV(null)
       setCvGuardado(true)
     } catch (e: any) {
       setErrorCV(e?.message || 'No se pudo guardar los cambios.')
     } finally {
       setGuardandoCV(false)
+    }
+  }
+
+  // Lista de servicios concretos que ofrece (ej: "Instalación de
+  // grifería", "Reparación de fugas") — hasta 6, saneado otra vez del
+  // lado del servidor igual que cualquier campo de texto libre.
+  function agregarMiServicio() {
+    const texto = nuevoServicio.trim()
+    if (!texto || misServicios.length >= 6) return
+    if (misServicios.some((s) => s.toLowerCase() === texto.toLowerCase())) {
+      setNuevoServicio('')
+      return
+    }
+    setMisServicios((s) => [...s, texto.slice(0, 80)])
+    setNuevoServicio('')
+  }
+
+  function quitarMiServicio(i: number) {
+    setMisServicios((s) => s.filter((_, idx) => idx !== i))
+  }
+
+  async function guardarMisServicios() {
+    if (!profesional) return
+    setGuardandoServicios(true)
+    setServiciosGuardados(false)
+    setErrorServicios('')
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/profesionales/${profesional.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ servicios: misServicios }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setProfesional((p) => (p ? { ...p, servicios: misServicios } : p))
+      setServiciosGuardados(true)
+    } catch (e: any) {
+      setErrorServicios(e?.message || 'No se pudo guardar tus servicios.')
+    } finally {
+      setGuardandoServicios(false)
     }
   }
 
@@ -456,6 +513,27 @@ export default function MiPerfilPage() {
               className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2.5"
             />
 
+            <div className="font-body text-[11px] text-inksoft mb-1">Servicios (qué hacés concretamente)</div>
+            {propuestaCV.servicios.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {propuestaCV.servicios.map((s, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-panel border border-line font-body text-xs text-ink">
+                    {s}
+                    <button
+                      type="button"
+                      onClick={() => setPropuestaCV((p) => (p ? { ...p, servicios: p.servicios.filter((_, idx) => idx !== i) } : p))}
+                      className="text-inksoft hover:text-maroon leading-none"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="font-body text-[11px] text-inksoft mb-2.5">
+              Los propuso la IA a partir de tu CV — sacá los que no correspondan.
+            </div>
+
             {propuestaCV.rubroSugerido && propuestaCV.rubroSugerido !== profesional.rubro && (
               <div className="font-body text-[11px] text-inksoft mb-3">
                 💡 Por lo que dice tu CV, tu rubro podría ser distinto al que tenés cargado. Si querés cambiarlo, escribinos por WhatsApp — el rubro lo maneja el admin para mantener ordenado el directorio.
@@ -480,6 +558,57 @@ export default function MiPerfilPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* --- Mis servicios: qué hago concretamente --- */}
+      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mis servicios</div>
+        <div className="font-body text-xs text-inksoft mb-3">
+          Contá, en puntos concretos, qué es lo que hacés (ej: "Instalación de grifería", "Reparación de fugas"). Se muestran en tu perfil público, además de la descripción.
+        </div>
+
+        {errorServicios && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorServicios}</div>}
+        {serviciosGuardados && <div className="font-body text-xs text-teal bg-teal/10 border border-teal rounded-md px-3 py-2 mb-3">Guardado ✓</div>}
+
+        {misServicios.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2.5">
+            {misServicios.map((s, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-panelalt border border-line font-body text-xs text-ink">
+                {s}
+                <button type="button" onClick={() => { quitarMiServicio(i); setServiciosGuardados(false) }} className="text-inksoft hover:text-maroon leading-none">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {misServicios.length < 6 && (
+          <div className="flex gap-2 mb-3">
+            <input
+              value={nuevoServicio}
+              onChange={(e) => { setNuevoServicio(e.target.value); setServiciosGuardados(false) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); agregarMiServicio(); setServiciosGuardados(false) }
+              }}
+              placeholder="Ej: Instalación de grifería"
+              className="flex-1 px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel"
+            />
+            <button
+              type="button"
+              onClick={() => { agregarMiServicio(); setServiciosGuardados(false) }}
+              className="px-3 py-2 rounded-lg border border-line font-body text-xs text-inksoft"
+            >
+              Agregar
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={guardarMisServicios}
+          disabled={guardandoServicios}
+          className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+        >
+          {guardandoServicios ? 'Guardando...' : 'Guardar servicios'}
+        </button>
       </div>
 
       {/* Oportunidades: gente que publicó "Busco X" con el mismo rubro
