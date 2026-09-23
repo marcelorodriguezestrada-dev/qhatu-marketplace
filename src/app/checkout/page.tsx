@@ -10,7 +10,7 @@ import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
-import SelectorHorarioEntrega, { FRANJA_LABEL } from '@/components/SelectorHorarioEntrega'
+import SelectorHorarioEntrega from '@/components/SelectorHorarioEntrega'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -1249,7 +1249,7 @@ function CheckoutContent() {
           </div>
 
           <div className="font-body text-base font-bold text-ink bg-ochresoft border border-ochre rounded-lg px-4 py-3 mb-4 text-center">
-            Descargué el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
+            Descargue el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
           </div>
 
           <div className="font-body text-[13px] text-ink font-medium mb-3">
@@ -1412,17 +1412,19 @@ function CheckoutContent() {
 
       {etapa === 'resumen' && !(metodoEntrega === 'retiro' && metodoPago === 'efectivo') && (
         <div>
-          {subPedidos.every((s) => s.estadoActual === 'pagado') ? (
+          {/* Una vez que se confirma el día/horario de entrega (ver
+              SelectorHorarioEntrega más abajo), este cartel desaparece
+              — la confirmación pasa a ser la de "Su compra se ha
+              realizado con éxito" del selector, no hace falta repetir
+              las dos. Con retiro en tienda no hay horario que elegir,
+              así que ahí este cartel se queda siempre. */}
+          {subPedidos.every((s) => s.estadoActual === 'pagado') && !(metodoEntrega === 'envio' && franjaHoraria) ? (
             <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center mb-4">
               <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
               <div className="font-display text-lg font-bold text-ink mb-1.5">Su pago se ha realizado con éxito!</div>
               {metodoEntrega === 'envio' ? (
                 <div className="font-body text-[13px] text-inksoft">
-                  {envioExpress
-                    ? `El producto te llegará hoy${franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ''}.`
-                    : `Estará recibiendo el pedido ${fechaEntregaTexto(fechaElegida)}${
-                        franjaHoraria ? `, en el horario de ${FRANJA_LABEL[franjaHoraria]}` : ''
-                      }.`}
+                  {envioExpress ? 'El producto te llegará hoy.' : `Estará recibiendo el pedido ${fechaEntregaTexto(fechaElegida)}.`}
                 </div>
               ) : (
                 <div className="font-body text-[13px] text-inksoft">Los vendedores ya pueden preparar tu pedido.</div>
