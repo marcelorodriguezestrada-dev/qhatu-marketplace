@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -57,6 +57,18 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb()
+
+    // Lista de servicios concretos (ej: "Diseña arquitecturas de
+    // datos") — llega sugerida por la IA desde /api/profesionales/
+    // extraer-cv, pero la persona la edita/completa a mano en el
+    // formulario antes de mandarla, así que la volvemos a sanear acá
+    // igual que cualquier otro campo de texto libre.
+    const serviciosLimpios = Array.isArray(servicios)
+      ? servicios
+          .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
+          .map((s: string) => s.trim().slice(0, 80))
+          .slice(0, 6)
+      : []
 
     // Igual que con el rubro: si escribió una zona nueva que no estaba
     // en la lista, la guardamos para que aparezca como opción de acá
@@ -111,6 +123,7 @@ export async function POST(req: NextRequest) {
       rubro: rubroFinal,
       especialidad: especialidad || '',
       descripcion: descripcion || '',
+      servicios: serviciosLimpios,
       zona: zonaFinal,
       direccion: direccion || '',
       lat: lat != null ? Number(lat) : null,

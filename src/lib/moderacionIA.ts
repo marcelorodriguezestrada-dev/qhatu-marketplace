@@ -142,6 +142,7 @@ export type DatosCVExtraidos = {
   especialidad: string
   experiencia: string
   descripcion: string
+  servicios: string[]
 }
 
 const SYSTEM_PROMPT_CV =
@@ -152,9 +153,13 @@ const SYSTEM_PROMPT_CV =
   '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal. ' +
   '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria — años de experiencia y/o los lugares más relevantes donde trabajó. ' +
   '"descripcion": descripción atractiva en 2 o 3 oraciones (máximo 60 palabras), en tercera persona, que combine quién es, dónde trabajó y qué servicios ofrece. ' +
-  'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") — NUNCA inventes datos que no estén en el texto. ' +
+  '"servicios": lista de 3 a 6 servicios CONCRETOS y accionables que esta persona puede ofrecer a un cliente, cada uno como una frase corta que empieza con un verbo ' +
+  '(ejemplo, si es ingeniero de datos: ["Diseña arquitecturas de datos", "Construye pipelines ETL", "Modela bases de datos analíticas"]). ' +
+  'Deducilos de su experiencia y especialidad real en el CV — no listes tareas genéricas que cualquiera pondría, y no inventes servicios que su perfil no respalda. ' +
+  'Si no hay suficiente información para armar ninguno con confianza, devolvé un array vacío []. ' +
+  'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
-  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "..."}'
+  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."]}'
 
 export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos | null> {
   const apiKey = process.env.GROQ_API_KEY
@@ -191,11 +196,16 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
     if (!texto) return null
 
     const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+    const serviciosCrudos = Array.isArray(parsed.servicios) ? parsed.servicios : []
     return {
       nombre: String(parsed.nombre || '').slice(0, 100),
       especialidad: String(parsed.especialidad || '').slice(0, 120),
       experiencia: String(parsed.experiencia || '').slice(0, 200),
       descripcion: String(parsed.descripcion || '').slice(0, 500),
+      servicios: serviciosCrudos
+        .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
+        .map((s: string) => s.trim().slice(0, 80))
+        .slice(0, 6),
     }
   } catch (err) {
     console.error('extraerDatosCV', err)

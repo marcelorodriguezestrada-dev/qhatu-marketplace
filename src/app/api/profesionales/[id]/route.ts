@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -76,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios } = bodyPermitido
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -109,6 +109,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (imagenUrl !== undefined) cambios.imagenUrl = imagenUrl
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
     if (experiencia !== undefined) cambios.experiencia = experiencia
+    // Lista de servicios concretos (ej: "Diseña arquitecturas de datos").
+    // La sanamos igual del lado del dueño que del admin — nunca
+    // confiamos en que el body ya venga limpio.
+    if (servicios !== undefined) {
+      cambios.servicios = Array.isArray(servicios)
+        ? servicios
+            .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
+            .map((s: string) => s.trim().slice(0, 80))
+            .slice(0, 6)
+        : []
+    }
     // El admin puede cargar/corregir la agenda de turnos de un
     // profesional (mismo campo que el self-service de
     // /api/profesionales/[id]/horarios, pero sin exigirle Premium —
