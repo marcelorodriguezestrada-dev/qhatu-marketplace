@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/firebaseAdmin'
+import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { validarHorario } from '@/data/turnos'
@@ -34,16 +34,49 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// PATCH: solo admin — usado para aprobar/rechazar solicitudes públicas,
-// o para editar un profesional ya publicado.
+// PATCH: dos niveles de permiso.
+//  - Admin (con ADMIN_PASSWORD) → puede editar cualquier campo, incluido
+//    estado, plan y demás datos "de gestión" de la plataforma.
+//  - El propio profesional (con su login de Firebase, dueño de este
+//    documento vía solicitanteUid) → puede editar solo los campos de su
+//    "presentación": nombre, especialidad, descripción y experiencia.
+//    Es lo que usa /mi-perfil al guardar la propuesta armada desde su
+//    CV (ver /api/profesionales/extraer-cv) — el resto de los campos
+//    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
+//    del admin para no abrir la puerta a que alguien se recategorice o
+//    se autoapruebe.
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia'] as const
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+
+  const db = getDb()
+  const ref = db.collection('profesionales').doc(params.id)
+
+  let esDueño = false
+  if (!esAdmin) {
+    const usuario = await getUsuarioDesdeRequest(req)
+    if (usuario) {
+      const doc = await ref.get()
+      esDueño = doc.exists && doc.data()?.solicitanteUid === usuario.uid
+    }
+    if (!esDueño) {
+      return NextResponse.json({ error: 'No autorizado para editar este perfil.' }, { status: 401 })
+    }
   }
+
   try {
     const body = await req.json()
-    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos } = body
+
+    // El dueño (no-admin) solo puede tocar su subset de campos — lo
+    // filtramos acá mismo para que ni por error se cuele un cambio de
+    // estado/plan/rubro/contacto desde un pedido armado a mano.
+    const bodyPermitido = esAdmin
+      ? body
+      : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
+
+    const { estado, nombre, rubro, especialidad, descripcion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos } = bodyPermitido
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -96,14 +129,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // cosas: plan Y una vigencia futura), y el profesional no vería
     // nada nuevo pese a que el admin cree que ya lo activó.
     if (cambios.plan === 'premium' && planVigenciaHasta === undefined) {
-      const ref = getDb().collection('profesionales').doc(params.id)
       const actual = (await ref.get()).data() || {}
       if (!esPremiumVigente(actual)) {
         cambios.planVigenciaHasta = calcularNuevaVigencia(actual.planVigenciaHasta)
       }
     }
 
-    await getDb().collection('profesionales').doc(params.id).update(cambios)
+    if (Object.keys(cambios).length === 0) {
+      return NextResponse.json({ error: 'No mandaste ningún campo para actualizar.' }, { status: 400 })
+    }
+    await ref.update(cambios)
 
     // Registro contable: solo cuando esto vino del flujo real de
     // "Confirmar pago recibido" (planEstadoPago:'ninguno' + una
@@ -111,8 +146,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Premium a mano desde el formulario general de edición (arriba),
     // porque ahí no hubo necesariamente un pago real de por medio.
     if (cambios.plan === 'premium' && planEstadoPago === 'ninguno' && planVigenciaHasta !== undefined) {
-      const profDoc = await getDb().collection('profesionales').doc(params.id).get()
-      await getDb().collection('pagos_premium').add({
+      const profDoc = await ref.get()
+      await db.collection('pagos_premium').add({
         profesionalId: params.id,
         profesionalNombre: profDoc.data()?.nombre || null,
         monto: PRECIO_PREMIUM_BS,

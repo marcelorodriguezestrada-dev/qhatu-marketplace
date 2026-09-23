@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
 import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
+import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -17,6 +18,9 @@ type Profesional = {
   id: string
   nombre: string
   rubro: string
+  especialidad?: string
+  descripcion?: string
+  experiencia?: string
   estado?: string
   notaAdmin?: string
   plan?: string
@@ -75,6 +79,17 @@ export default function MiPerfilPage() {
   // mi perfil" de lo mismo, con un botón directo para contactar.
   const [oportunidades, setOportunidades] = useState<any[]>([])
   const [cargandoOportunidades, setCargandoOportunidades] = useState(false)
+
+  // --- Armar mi presentación a partir del CV ---
+  // Flujo: subís el archivo → lo leemos en el navegador (PDF o
+  // foto/escaneo) → la IA propone nombre/especialidad/experiencia/
+  // descripción → vos revisás y editás la propuesta acá mismo → recién
+  // al tocar "Guardar" se escribe en tu perfil. Nunca se guarda solo.
+  const [leyendoCV, setLeyendoCV] = useState(false)
+  const [errorCV, setErrorCV] = useState('')
+  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; rubroSugerido?: string | null } | null>(null)
+  const [guardandoCV, setGuardandoCV] = useState(false)
+  const [cvGuardado, setCvGuardado] = useState(false)
 
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
@@ -263,6 +278,65 @@ export default function MiPerfilPage() {
     }
   }
 
+  async function subirCV(file: File | null) {
+    if (!file || !profesional) return
+    setErrorCV('')
+    setCvGuardado(false)
+    setPropuestaCV(null)
+    setLeyendoCV(true)
+    try {
+      const { texto } = await extraerTextoDeArchivo(file)
+      if (!texto || texto.trim().length < 30) {
+        throw new Error('No pudimos leer suficiente texto de ese archivo. Probá con un PDF con texto real o una foto más clara y derecha.')
+      }
+      const token = await obtenerToken()
+      const res = await fetch('/api/profesionales/extraer-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ texto }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setPropuestaCV(data.datos)
+    } catch (e: any) {
+      setErrorCV(e?.message || 'No se pudo leer el CV.')
+    } finally {
+      setLeyendoCV(false)
+    }
+  }
+
+  async function guardarPropuestaCV() {
+    if (!profesional || !propuestaCV) return
+    setGuardandoCV(true)
+    setErrorCV('')
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/profesionales/${profesional.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          nombre: propuestaCV.nombre,
+          especialidad: propuestaCV.especialidad,
+          experiencia: propuestaCV.experiencia,
+          descripcion: propuestaCV.descripcion,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setProfesional((p) =>
+        p
+          ? { ...p, nombre: propuestaCV.nombre || p.nombre, especialidad: propuestaCV.especialidad, experiencia: propuestaCV.experiencia, descripcion: propuestaCV.descripcion }
+          : p
+      )
+      setPropuestaCV(null)
+      setCvGuardado(true)
+    } catch (e: any) {
+      setErrorCV(e?.message || 'No se pudo guardar los cambios.')
+    } finally {
+      setGuardandoCV(false)
+    }
+  }
+
   async function borrarFoto(url: string) {
     if (!profesional) return
     try {
@@ -325,6 +399,88 @@ export default function MiPerfilPage() {
           )}
         </div>
       )}
+
+      {/* --- Armar mi presentación a partir del CV --- */}
+      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+        <div className="font-body text-sm font-semibold text-ink mb-1">Armá tu presentación con tu CV</div>
+        <div className="font-body text-xs text-inksoft mb-3">
+          Subí tu CV (PDF o una foto/escaneo) y una IA arma una propuesta de nombre, especialidad, experiencia y descripción para tu perfil. Vos la revisás, la editás si querés, y recién ahí se guarda — no se publica nada sola.
+        </div>
+
+        {errorCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorCV}</div>}
+        {cvGuardado && <div className="font-body text-xs text-teal bg-teal/10 border border-teal rounded-md px-3 py-2 mb-3">Guardado ✓ — tu perfil ya se actualizó.</div>}
+
+        {!propuestaCV && (
+          <label className="block text-center py-2.5 rounded-lg border border-dashed border-line font-body text-xs text-inksoft cursor-pointer">
+            {leyendoCV ? 'Leyendo tu CV...' : '📄 Subir mi CV (PDF, foto o escaneo)'}
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              className="hidden"
+              disabled={leyendoCV}
+              onChange={(e) => subirCV(e.target.files?.[0] || null)}
+            />
+          </label>
+        )}
+
+        {propuestaCV && (
+          <div className="bg-panelalt rounded-lg p-3">
+            <div className="font-body text-xs font-semibold text-ink mb-2">Revisá la propuesta antes de guardar</div>
+
+            <div className="font-body text-[11px] text-inksoft mb-1">Nombre</div>
+            <input
+              value={propuestaCV.nombre}
+              onChange={(e) => setPropuestaCV((p) => (p ? { ...p, nombre: e.target.value } : p))}
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2.5"
+            />
+
+            <div className="font-body text-[11px] text-inksoft mb-1">Especialidad</div>
+            <input
+              value={propuestaCV.especialidad}
+              onChange={(e) => setPropuestaCV((p) => (p ? { ...p, especialidad: e.target.value } : p))}
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2.5"
+            />
+
+            <div className="font-body text-[11px] text-inksoft mb-1">Experiencia</div>
+            <input
+              value={propuestaCV.experiencia}
+              onChange={(e) => setPropuestaCV((p) => (p ? { ...p, experiencia: e.target.value } : p))}
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2.5"
+            />
+
+            <div className="font-body text-[11px] text-inksoft mb-1">Descripción</div>
+            <textarea
+              value={propuestaCV.descripcion}
+              onChange={(e) => setPropuestaCV((p) => (p ? { ...p, descripcion: e.target.value } : p))}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel mb-2.5"
+            />
+
+            {propuestaCV.rubroSugerido && propuestaCV.rubroSugerido !== profesional.rubro && (
+              <div className="font-body text-[11px] text-inksoft mb-3">
+                💡 Por lo que dice tu CV, tu rubro podría ser distinto al que tenés cargado. Si querés cambiarlo, escribinos por WhatsApp — el rubro lo maneja el admin para mantener ordenado el directorio.
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={guardarPropuestaCV}
+                disabled={guardandoCV}
+                className="flex-1 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+              >
+                {guardandoCV ? 'Guardando...' : 'Guardar en mi perfil'}
+              </button>
+              <button
+                onClick={() => { setPropuestaCV(null); setErrorCV('') }}
+                disabled={guardandoCV}
+                className="px-3.5 py-2.5 rounded-lg border border-line font-body text-xs text-inksoft"
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Oportunidades: gente que publicó "Busco X" con el mismo rubro
           que este profesional — mismo criterio que el macheo automático

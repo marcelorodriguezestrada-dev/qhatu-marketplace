@@ -11,6 +11,7 @@ import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { parsearAnunciosWhatsapp, AnuncioParseado, mensajeInvitacionAnuncio } from '@/lib/parsearAnunciosWhatsapp'
+import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -176,6 +177,13 @@ export default function AdminPage() {
   const [precio, setPrecio] = useState('')
   const [experiencia, setExperiencia] = useState('')
   const [plan, setPlan] = useState<'basico' | 'premium'>('basico')
+  // Subir CV del profesional: la IA propone nombre/especialidad/
+  // experiencia/descripción y los precarga directo en los campos de
+  // arriba — el propio formulario (con su botón "Guardar cambios") ya
+  // hace de paso de revisión, así que acá no hace falta una vista previa
+  // aparte como en /mi-perfil.
+  const [leyendoCVAdmin, setLeyendoCVAdmin] = useState(false)
+  const [rubroSugeridoCV, setRubroSugeridoCV] = useState<string | null>(null)
   const [publicando, setPublicando] = useState(false)
   const [errorForm, setErrorForm] = useState('')
   // null = formulario en modo "publicar nuevo". Con un id, el mismo
@@ -689,6 +697,41 @@ export default function AdminPage() {
     }
   }
 
+  // Lee el CV (PDF o foto/escaneo) que subís desde acá, y precarga
+  // nombre/especialidad/experiencia/descripción con lo que propone la
+  // IA — vos los revisás y corregís en el formulario de siempre antes de
+  // tocar "Publicar profesional" / "Guardar cambios", igual que con
+  // cualquier otro dato que cargás a mano.
+  async function leerCVAdmin(file: File | null) {
+    if (!file) return
+    setLeyendoCVAdmin(true)
+    setErrorForm('')
+    setRubroSugeridoCV(null)
+    try {
+      const { texto } = await extraerTextoDeArchivo(file)
+      if (!texto || texto.trim().length < 30) {
+        throw new Error('No pudimos leer suficiente texto de ese archivo. Probá con un PDF con texto real o una foto más clara y derecha.')
+      }
+      const res = await fetch('/api/profesionales/extraer-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ texto }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const datos = data.datos
+      if (datos.nombre) setNombre(datos.nombre)
+      if (datos.especialidad) setEspecialidad(datos.especialidad)
+      if (datos.experiencia) setExperiencia(datos.experiencia)
+      if (datos.descripcion) setDescripcion(datos.descripcion)
+      if (datos.rubroSugerido) setRubroSugeridoCV(datos.rubroSugerido)
+    } catch (e: any) {
+      setErrorForm(e?.message || 'No se pudo leer el CV.')
+    } finally {
+      setLeyendoCVAdmin(false)
+    }
+  }
+
   async function publicarProfesional(e: React.FormEvent) {
     e.preventDefault()
     setErrorForm('')
@@ -720,7 +763,7 @@ export default function AdminPage() {
         return
       }
       setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
-      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
+      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -759,7 +802,7 @@ export default function AdminPage() {
   function cancelarEdicionProfesional() {
     setProfesionalEditandoId(null)
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
-    setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad('')
+    setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
     setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
     setErrorForm('')
   }
@@ -1580,6 +1623,26 @@ export default function AdminPage() {
                   {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
                 </div>
               </div>
+            </div>
+
+            <div className="bg-panelalt rounded-lg p-3 mb-3">
+              <div className="font-body text-xs font-semibold text-ink mb-1">Armar con IA a partir de un CV (opcional)</div>
+              <div className="font-body text-[11px] text-inksoft mb-2">
+                Subí el CV del profesional (PDF, foto o escaneo) y la IA precarga nombre, especialidad, experiencia y descripción acá arriba — revisalos y corregilos antes de publicar, igual que cualquier otro dato.
+              </div>
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                onChange={(e) => leerCVAdmin(e.target.files?.[0] || null)}
+                disabled={leyendoCVAdmin}
+                className="font-body text-xs"
+              />
+              {leyendoCVAdmin && <div className="font-body text-xs text-maroon mt-1">Leyendo el CV...</div>}
+              {rubroSugeridoCV && rubroSugeridoCV !== rubro && (
+                <div className="font-body text-[11px] text-teal mt-2">
+                  💡 Por el CV, este profesional podría encajar mejor en el rubro &quot;{categorias.flatMap((c) => c.rubros).find((r) => r.id === rubroSugeridoCV)?.label || rubroSugeridoCV}&quot;. Cambialo arriba en el selector de rubro si te parece correcto.
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">

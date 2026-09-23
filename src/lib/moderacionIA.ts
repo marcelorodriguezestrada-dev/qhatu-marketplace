@@ -113,6 +113,82 @@ export async function categorizarAnuncio(contenido: string, rubros: { id: string
     return null
   }
 }
+// Arma la presentación de un profesional (nombre, especialidad,
+// experiencia y descripción) a partir del texto crudo de su CV — ver
+// /api/profesionales/extraer-cv. El texto llega desde el navegador
+// (leído con pdf.js si era PDF, o con Tesseract si era foto/escaneo, en
+// src/lib/leerArchivoTexto.ts), así que puede traer errores de OCR,
+// saltos de línea raros o columnas mezcladas; el prompt está pensado
+// para tolerar eso.
+//
+// Es SOLO una propuesta: nunca se guarda directo en el perfil. La
+// persona (desde /mi-perfil) o vos (desde /admin) la ven en el
+// formulario, la pueden editar o descartar entera, y recién ahí se
+// guarda — igual que evaluarConIA no aprueba nada por su cuenta.
+export type DatosCVExtraidos = {
+  nombre: string
+  especialidad: string
+  experiencia: string
+  descripcion: string
+}
+
+const SYSTEM_PROMPT_CV =
+  'Sos un asistente que arma la presentación de un profesional para el directorio de Clasi Click, un marketplace boliviano de servicios profesionales, ' +
+  'a partir del texto crudo extraído de su CV (puede tener errores de OCR, columnas mezcladas o texto desordenado — hacé lo posible por entenderlo igual). ' +
+  'Armá una presentación breve pero lo más informativa posible, para que un cliente que nunca lo vio decida contactarlo. Devolvé estos campos: ' +
+  '"nombre": el nombre completo de la persona tal como aparece en el CV. ' +
+  '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal. ' +
+  '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria — años de experiencia y/o los lugares más relevantes donde trabajó. ' +
+  '"descripcion": descripción atractiva en 2 o 3 oraciones (máximo 60 palabras), en tercera persona, que combine quién es, dónde trabajó y qué servicios ofrece. ' +
+  'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") — NUNCA inventes datos que no estén en el texto. ' +
+  'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
+  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "..."}'
+
+export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey || !textoCV || !textoCV.trim()) return null
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        // Este sí se beneficia de un modelo más capaz que el 8b: tiene
+        // que leer texto desordenado de OCR y redactar bien, no solo
+        // clasificar — así que usamos el 70b, todavía gratis en Groq.
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 500,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT_CV },
+          { role: 'user', content: textoCV },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('extraerDatosCV: Groq respondió', res.status)
+      return null
+    }
+    const data = await res.json()
+    const texto = data.choices?.[0]?.message?.content
+    if (!texto) return null
+
+    const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+    return {
+      nombre: String(parsed.nombre || '').slice(0, 100),
+      especialidad: String(parsed.especialidad || '').slice(0, 120),
+      experiencia: String(parsed.experiencia || '').slice(0, 200),
+      descripcion: String(parsed.descripcion || '').slice(0, 500),
+    }
+  } catch (err) {
+    console.error('extraerDatosCV', err)
+    return null
+  }
+}
+
 export type SugerenciaMatcheoIA = { anuncioId: string; profesionalId: string; motivo: string }
 
 // El macheo automático (ejecutarMacheo, en macheoAnuncios.ts) solo cruza
