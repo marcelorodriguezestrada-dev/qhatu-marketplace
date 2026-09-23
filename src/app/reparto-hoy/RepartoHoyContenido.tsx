@@ -21,6 +21,7 @@ function Tanda({ titulo, tanda }: { titulo: string; tanda: any[] }) {
             <div className="font-body text-[13px] font-medium text-ink">
               {p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}
               {p.entreCalles && ` (${p.entreCalles})`}
+              {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
             </div>
             <div className="font-body text-[11px] text-inksoft">
               {p.nombreComprador || p.comprador || 'Sin nombre'} · {bs(p.total)}

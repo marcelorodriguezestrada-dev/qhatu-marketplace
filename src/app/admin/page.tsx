@@ -1231,6 +1231,7 @@ export default function AdminPage() {
                     <div className="font-body text-[11px] text-inksoft mt-1">
                       {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
                       {p.entreCalles && ` (${p.entreCalles})`}
+                      {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
                     </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
                   </div>
@@ -2457,6 +2458,7 @@ export default function AdminPage() {
                       <div className="font-body text-[13px] font-medium text-ink">
                         {p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}
                         {p.entreCalles && ` (${p.entreCalles})`}
+                        {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
                       </div>
                       <div className="font-body text-[11px] text-inksoft">
                         {p.comprador || 'Sin email'} · {bs(p.total)}

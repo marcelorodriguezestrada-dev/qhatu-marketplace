@@ -197,7 +197,11 @@ export default function SeguimientoPedidoPage() {
           ))}
         </div>
         <div className="font-body text-[11px] text-inksoft mt-3 pt-3 border-t border-line">
-          {esEnvio ? `Envío: ${pedido.zonaEntrega || 'Sin zona'} · ${pedido.direccion || 'Sin dirección'}${pedido.entreCalles ? ` (${pedido.entreCalles})` : ''}` : 'Retiro en tienda'}
+          {esEnvio
+            ? `Envío: ${pedido.zonaEntrega || 'Sin zona'} · ${pedido.direccion || 'Sin dirección'}${
+                pedido.entreCalles ? ` (${pedido.entreCalles})` : ''
+              }${pedido.referenciaAdicional ? ` — ${pedido.referenciaAdicional}` : ''}`
+            : 'Retiro en tienda'}
         </div>
       </div>
     </div>
