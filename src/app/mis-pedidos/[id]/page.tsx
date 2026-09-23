@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 import { FRANJA_LABEL } from '@/components/SelectorHorarioEntrega'
+import { fechaEntregaDefault } from '@/lib/entregaDias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -29,8 +30,9 @@ const ESTADOS_PREVIOS: Record<string, string> = {
 }
 
 // Igual que en el checkout: por default la entrega es al día siguiente
-// del pago — a menos que el comprador haya elegido otro día desde acá
-// o desde /checkout (pedido.fechaEntrega, yyyy-mm-dd).
+// del pago (o el lunes, si ese día siguiente cae domingo — no hay
+// reparto ese día) — a menos que el comprador haya elegido otro día
+// desde acá o desde /checkout (pedido.fechaEntrega, yyyy-mm-dd).
 function fechaEntregaTexto(pagadoAt?: string, fechaEntrega?: string): string {
   if (fechaEntrega) {
     const [y, m, d] = fechaEntrega.split('-').map(Number)
@@ -39,7 +41,10 @@ function fechaEntregaTexto(pagadoAt?: string, fechaEntrega?: string): string {
   const base = pagadoAt ? new Date(pagadoAt) : new Date()
   const manana = new Date(base)
   manana.setDate(manana.getDate() + 1)
-  return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
+  const entrega = fechaEntregaDefault(base)
+  const fechaLegible = entrega.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+  const esRealmenteManana = entrega.toDateString() === manana.toDateString()
+  return esRealmenteManana ? `mañana, ${fechaLegible}` : fechaLegible
 }
 
 export default function SeguimientoPedidoPage() {

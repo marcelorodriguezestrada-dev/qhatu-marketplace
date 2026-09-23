@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { fechaEntregaDefault, proximosDiasHabiles } from '@/lib/entregaDias'
 
 export type Franja = '' | '8-13' | '13-19'
 
@@ -11,33 +12,16 @@ export const FRANJA_LABEL: Record<'8-13' | '13-19', string> = {
   '13-19': 'de 14 a 19',
 }
 
-// Opciones de día para quien no puede recibir el pedido mañana —
-// arranca en pasado mañana (mañana ya está cubierto por las dos
-// franjas de siempre) y ofrece una semana completa de ahí en más.
-// `iso` es lo que se manda a guardar (yyyy-mm-dd); `label` es lo que
-// ve el comprador, ej: "vie 26 sep".
-export function proximosDias(cantidad: number): { iso: string; label: string }[] {
-  const dias: { iso: string; label: string }[] = []
-  for (let i = 2; i < 2 + cantidad; i++) {
-    const d = new Date()
-    d.setDate(d.getDate() + i)
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const label = d.toLocaleDateString('es-BO', { weekday: 'short', day: 'numeric', month: 'short' })
-    dias.push({ iso, label })
-  }
-  return dias
-}
-
 // yyyy-mm-dd → "viernes, 26 de septiembre", para el mensaje final de confirmación.
 function formatearFechaLarga(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-function formatearManana(): string {
-  const manana = new Date()
-  manana.setDate(manana.getDate() + 1)
-  return manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+// El día por default (mañana, salvo que caiga domingo — ver
+// fechaEntregaDefault) formateado largo para el mensaje final.
+function formatearDefault(): string {
+  return fechaEntregaDefault().toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
 // Reusado por /checkout, justo después de confirmar el pago (con
@@ -128,7 +112,7 @@ export default function SelectorHorarioEntrega({
   }
 
   if (confirmado && franjaConfirmada) {
-    const fechaTexto = fechaElegida ? formatearFechaLarga(fechaElegida) : soloHoy ? 'hoy' : formatearManana()
+    const fechaTexto = fechaElegida ? formatearFechaLarga(fechaElegida) : soloHoy ? 'hoy' : formatearDefault()
     return (
       <div className="text-center">
         <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3 text-xl">✓</div>
@@ -194,7 +178,7 @@ export default function SelectorHorarioEntrega({
     <div>
       <div className="font-body text-sm font-medium text-ink mb-2.5">Seleccioná el día que querés recibir tu pedido</div>
       <div className="grid grid-cols-2 gap-2 mb-3">
-        {proximosDias(7).map((d) => (
+        {proximosDiasHabiles(7).map((d) => (
           <button
             key={d.iso}
             type="button"
