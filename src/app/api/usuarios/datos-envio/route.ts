@@ -4,7 +4,8 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 export const dynamic = 'force-dynamic'
 
 // Guarda los datos que el comprador ya tipeó una vez en /checkout
-// (nombre, WhatsApp, barrio, dirección, entre calles), para no
+// (nombre, WhatsApp, barrio, dirección, entre calles, otro dato de
+// interés), para no
 // hacérselos escribir de nuevo en la próxima compra. Van dentro de
 // `usuarios/{uid}.datosEnvio` — un campo aparte del resto del
 // documento (celular, emailVerificado, etc.), porque es información
@@ -35,12 +36,12 @@ export async function POST(req: NextRequest) {
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
 
   try {
-    const { nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles } = await req.json()
+    const { nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional } = await req.json()
     // Solo pisamos los campos que vinieron con algo cargado — con
     // retiro en tienda, por ejemplo, no hay barrio/dirección/entre
     // calles, y no tiene sentido borrar esos datos guardados de una
     // compra anterior con envío solo porque esta vez no se usaron.
-    const campos: Record<string, string> = { nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles }
+    const campos: Record<string, string> = { nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional }
     const datosEnvio: Record<string, string> = {}
     for (const [clave, valor] of Object.entries(campos)) {
       if (typeof valor === 'string' && valor.trim()) datosEnvio[clave] = valor

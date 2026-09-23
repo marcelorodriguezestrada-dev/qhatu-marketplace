@@ -238,6 +238,10 @@ function CheckoutContent() {
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
+  // Opcional — un punto de referencia extra (ej: "portón verde",
+  // "al lado de la farmacia"), además de "entre calles". Le sirve a
+  // la moto para encontrar direcciones sin numeración clara.
+  const [referenciaAdicional, setReferenciaAdicional] = useState('')
   // Resultado de chequear la dirección contra OpenStreetMap:
   // - null    = todavía no se chequeó
   // - true    = la encontró → deja seguir
@@ -418,6 +422,7 @@ function CheckoutContent() {
         setZonaEntrega((prev) => prev || d.zonaEntrega || '')
         setDireccion((prev) => prev || d.direccion || '')
         setEntreCalles((prev) => prev || d.entreCalles || '')
+        setReferenciaAdicional((prev) => prev || d.referenciaAdicional || '')
       } catch {
         // Sin datos guardados (o falló la consulta): el comprador
         // arranca con el formulario vacío, como siempre.
@@ -635,6 +640,7 @@ function CheckoutContent() {
             zonaEntrega,
             direccion,
             entreCalles: entreCalles || null,
+            referenciaAdicional: referenciaAdicional || null,
             lat: metodoEntrega === 'envio' ? lat : null,
             lng: metodoEntrega === 'envio' ? lng : null,
             costoEnvio: envioGrupo,
@@ -685,7 +691,7 @@ function CheckoutContent() {
           fetch('/api/usuarios/datos-envio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles }),
+            body: JSON.stringify({ nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional }),
           }).catch(() => {})
         })
         .catch(() => {})
@@ -1082,7 +1088,7 @@ function CheckoutContent() {
               </div>
 
               <label className="block text-left mb-1">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección *</span>
+                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección (calle y número) *</span>
                 <input
                   value={direccion}
                   onChange={(e) => {
@@ -1119,6 +1125,15 @@ function CheckoutContent() {
                   value={entreCalles}
                   onChange={(e) => setEntreCalles(e.target.value)}
                   placeholder="Ej: entre Bolívar y Junín"
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                />
+              </label>
+              <label className="block text-left mb-3">
+                <span className="font-body text-[11px] text-inksoft block mb-1">Otro dato de interés (opcional)</span>
+                <input
+                  value={referenciaAdicional}
+                  onChange={(e) => setReferenciaAdicional(e.target.value)}
+                  placeholder="Ej: portón verde, al lado de la farmacia"
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
                 />
               </label>
