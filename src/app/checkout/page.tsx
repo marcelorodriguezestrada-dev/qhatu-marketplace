@@ -11,6 +11,7 @@ import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega from '@/components/SelectorHorarioEntrega'
+import { fechaEntregaDefault, hayEntregaHoy } from '@/lib/entregaDias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -31,9 +32,15 @@ function fechaEntregaTexto(fechaElegida?: string): string {
     const fecha = new Date(y, m - 1, d)
     return fecha.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
   }
-  const manana = new Date()
+  const hoy = new Date()
+  const manana = new Date(hoy)
   manana.setDate(manana.getDate() + 1)
-  return `mañana, ${manana.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })}`
+  const entrega = fechaEntregaDefault(hoy)
+  const fechaLegible = entrega.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+  // Si mañana cae domingo, la entrega se corre al lunes — ahí ya no
+  // tiene sentido decir "mañana" (no lo es).
+  const esRealmenteManana = entrega.toDateString() === manana.toDateString()
+  return esRealmenteManana ? `mañana, ${fechaLegible}` : fechaLegible
 }
 
 function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
@@ -167,6 +174,13 @@ function CheckoutContent() {
   // moto lo entrega el mismo día en vez de al día siguiente. Solo
   // aplica con envío, nunca con retiro en tienda.
   const [envioExpress, setEnvioExpress] = useState(false)
+
+  // Por si la pantalla quedó abierta de un día para el otro y ahora es
+  // domingo (o se restauró desde una espera guardada un sábado tarde):
+  // el express deja de tener sentido, se cae solo a envío normal.
+  useEffect(() => {
+    if (envioExpress && !hayEntregaHoy()) setEnvioExpress(false)
+  }, [envioExpress])
 
   // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
   // alcanza con que hayan subido la foto del QR — tienen que haber
@@ -1058,18 +1072,22 @@ function CheckoutContent() {
                 >
                   🛵 Envío normal
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEnvioExpress(true)}
-                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                    envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-                  }`}
-                >
-                  ⚡ Envío express
-                </button>
+                {/* Los domingos no hay reparto — no tiene sentido
+                    ofrecer "llega hoy mismo" ese día. */}
+                {hayEntregaHoy() && (
+                  <button
+                    type="button"
+                    onClick={() => setEnvioExpress(true)}
+                    className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                      envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                    }`}
+                  >
+                    ⚡ Envío express
+                  </button>
+                )}
               </div>
               <div className="font-body text-[11px] text-inksoft mb-3">
-                {envioExpress ? `Recibirá su pedido hoy mismo (+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}).` : 'Recibirá su pedido mañana.'}
+                {envioExpress ? `Recibirá su pedido hoy mismo (+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}).` : `Recibirá su pedido ${fechaEntregaTexto()}.`}
               </div>
 
               <div className="mb-3">
