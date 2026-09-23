@@ -745,8 +745,33 @@ export default function AdminPage() {
       if (datos.especialidad) setEspecialidad(datos.especialidad)
       if (datos.experiencia) setExperiencia(datos.experiencia)
       if (datos.descripcion) setDescripcion(datos.descripcion)
+      if (datos.dondeTrabaja) setDondeTrabaja(datos.dondeTrabaja)
+      if (datos.direccion) setDireccion(datos.direccion)
+      if (datos.email) setEmailProfesional(datos.email)
       if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
-      if (datos.rubroSugerido) setRubroSugeridoCV(datos.rubroSugerido)
+
+      // El teléfono del CV puede traer código de país, espacios o
+      // guiones — lo dejamos solo en dígitos y, si trae el 591 adelante,
+      // se lo sacamos porque el campo espera el número local (igual que
+      // el resto del formulario).
+      if (datos.telefono && !whatsapp.trim()) {
+        let digitos = String(datos.telefono).replace(/\D/g, '')
+        if (digitos.startsWith('591') && digitos.length > 8) digitos = digitos.slice(3)
+        if (digitos) setWhatsapp(digitos)
+      }
+
+      // Acá sí aplicamos directo la categoría/rubro sugeridos (a
+      // diferencia de /mi-perfil, acá quien revisa y publica es el
+      // admin, así que no hace falta el paso extra de "avisale al
+      // admin" — de última lo corrige él mismo antes de publicar).
+      if (datos.rubroSugerido) {
+        setRubroSugeridoCV(datos.rubroSugerido)
+        const encontrado = buscarRubro(datos.rubroSugerido)
+        if (encontrado) {
+          setCategoriaSel(encontrado.categoriaId)
+          setRubro(encontrado.id)
+        }
+      }
     } catch (e: any) {
       setErrorForm(e?.message || 'No se pudo leer el CV.')
     } finally {

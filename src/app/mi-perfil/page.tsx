@@ -89,7 +89,7 @@ export default function MiPerfilPage() {
   // al tocar "Guardar" se escribe en tu perfil. Nunca se guarda solo.
   const [leyendoCV, setLeyendoCV] = useState(false)
   const [errorCV, setErrorCV] = useState('')
-  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; servicios: string[]; rubroSugerido?: string | null } | null>(null)
+  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; servicios: string[]; dondeTrabaja?: string; rubroSugerido?: string | null } | null>(null)
   const [guardandoCV, setGuardandoCV] = useState(false)
   const [cvGuardado, setCvGuardado] = useState(false)
 
@@ -317,6 +317,11 @@ export default function MiPerfilPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setPropuestaCV(data.datos)
+      // "Dónde trabajo" se edita y guarda en su propia caja (más abajo,
+      // junto con los servicios) — la precargamos ahí directo si el CV
+      // trajo algo, así la persona no tiene que escribirla de nuevo,
+      // pero la revisa y la guarda desde esa misma caja como siempre.
+      if (data.datos?.dondeTrabaja) setMiDondeTrabaja(data.datos.dondeTrabaja)
     } catch (e: any) {
       setErrorCV(e?.message || 'No se pudo leer el CV.')
     } finally {
@@ -538,6 +543,12 @@ export default function MiPerfilPage() {
             <div className="font-body text-[11px] text-inksoft mb-2.5">
               Los propuso la IA a partir de tu CV — sacá los que no correspondan.
             </div>
+
+            {propuestaCV.dondeTrabaja && (
+              <div className="font-body text-[11px] text-inksoft mb-2.5">
+                💡 También precargamos "Dónde trabajo" con lo que encontramos en tu CV, más abajo en "Mis servicios y dónde trabajo" — revisalo ahí antes de guardarlo.
+              </div>
+            )}
 
             {propuestaCV.rubroSugerido && propuestaCV.rubroSugerido !== profesional.rubro && (
               <div className="font-body text-[11px] text-inksoft mb-3">

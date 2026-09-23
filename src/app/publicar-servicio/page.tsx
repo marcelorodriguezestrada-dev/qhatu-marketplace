@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth'
 import { useCategorias, agruparRubros } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
+import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 
 // Valor especial del select de rubro: "esta categoría no tiene mi
 // profesión, quiero escribirla yo". Es distinto del "otro" que ya
@@ -19,7 +20,7 @@ const RUBRO_ESCRIBIR_PROPIO = '__custom__'
 export default function PublicarServicioPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
   const router = useRouter()
-  const { categorias } = useCategorias()
+  const { categorias, rubrosFlat } = useCategorias()
 
   const [nombre, setNombre] = useState('')
   const [categoriaSel, setCategoriaSel] = useState('')
@@ -45,6 +46,10 @@ export default function PublicarServicioPage() {
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState('')
+
+  const [leyendoCV, setLeyendoCV] = useState(false)
+  const [errorCV, setErrorCV] = useState('')
+  const [cvAplicado, setCvAplicado] = useState(false)
 
   // Zonas que otros usuarios ya agregaron a mano — se suman a la lista
   // base para que no haga falta reescribirlas.
@@ -107,6 +112,69 @@ export default function PublicarServicioPage() {
         setBuscandoUbicacion(false)
       }
     )
+  }
+
+  // Lee el CV (PDF o foto/escaneo) que la persona sube ANTES de llenar el
+  // resto del formulario, y le pide a la IA que arme una propuesta para
+  // precargar todo lo que se pueda: es solo una propuesta editable, así
+  // que la persona revisa y corrige cada campo (o los borra) antes de
+  // mandar la solicitud, igual que si los hubiera escrito a mano.
+  async function subirCV(file: File | null) {
+    if (!file) return
+    setErrorCV('')
+    setCvAplicado(false)
+    setLeyendoCV(true)
+    try {
+      const { texto } = await extraerTextoDeArchivo(file)
+      if (!texto || texto.trim().length < 30) {
+        throw new Error('No pudimos leer suficiente texto de ese archivo. Probá con un PDF con texto real o una foto más clara y derecha.')
+      }
+      const token = await obtenerToken()
+      const res = await fetch('/api/profesionales/extraer-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ texto }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const datos = data.datos
+
+      if (datos.nombre) setNombre(datos.nombre)
+      if (datos.especialidad) setEspecialidad(datos.especialidad)
+      if (datos.descripcion) setDescripcion(datos.descripcion)
+      if (datos.experiencia) setExperiencia(datos.experiencia)
+      if (datos.dondeTrabaja) setDondeTrabaja(datos.dondeTrabaja)
+      if (datos.direccion) setDireccion(datos.direccion)
+      if (datos.email) setEmail(datos.email)
+      if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
+
+      // El teléfono del CV puede venir con código de país, espacios o
+      // guiones — lo dejamos solo en dígitos y, si trae el 591 boliviano
+      // adelante, se lo sacamos porque el campo espera el número local.
+      if (datos.telefono) {
+        let digitos = String(datos.telefono).replace(/\D/g, '')
+        if (digitos.startsWith('591') && digitos.length > 8) digitos = digitos.slice(3)
+        if (digitos) setWhatsapp(digitos)
+      }
+
+      // Rubro sugerido por la IA, buscado en el árbol REAL de
+      // categorías de la plataforma — si lo encontramos, seleccionamos
+      // de una vez tanto la categoría como el rubro en los selects de
+      // arriba (la persona igual los puede cambiar si no es correcto).
+      if (datos.rubroSugerido) {
+        const encontrado = rubrosFlat.find((r) => r.id === datos.rubroSugerido)
+        if (encontrado) {
+          setCategoriaSel(encontrado.categoriaId)
+          setRubro(encontrado.id)
+        }
+      }
+
+      setCvAplicado(true)
+    } catch (e: any) {
+      setErrorCV(e?.message || 'No se pudo leer el CV.')
+    } finally {
+      setLeyendoCV(false)
+    }
   }
 
   async function enviar(e: React.FormEvent) {
@@ -186,6 +254,26 @@ export default function PublicarServicioPage() {
       </p>
 
       <form onSubmit={enviar} className="bg-panel border border-line rounded-xl p-5">
+        <label className="block text-center py-2.5 rounded-lg border border-dashed border-line font-body text-xs text-inksoft cursor-pointer mb-1">
+          {leyendoCV ? 'Leyendo tu CV...' : '📄 Subir mi CV para completar el formulario (opcional)'}
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            className="hidden"
+            disabled={leyendoCV}
+            onChange={(e) => subirCV(e.target.files?.[0] || null)}
+          />
+        </label>
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          Aceptamos PDF, foto o escaneo. La IA completa los campos que pueda a partir de tu CV — revisalos igual antes de enviar, porque siguen siendo editables.
+        </div>
+        {errorCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorCV}</div>}
+        {cvAplicado && !errorCV && (
+          <div className="font-body text-xs text-teal bg-teal/10 border border-teal rounded-md px-3 py-2 mb-3">
+            Completamos lo que pudimos con tu CV ✓ — revisá los campos de abajo antes de enviar.
+          </div>
+        )}
+
         <input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}

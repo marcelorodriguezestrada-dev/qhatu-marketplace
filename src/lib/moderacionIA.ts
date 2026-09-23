@@ -143,12 +143,16 @@ export type DatosCVExtraidos = {
   experiencia: string
   descripcion: string
   servicios: string[]
+  telefono: string
+  email: string
+  direccion: string
+  dondeTrabaja: string
 }
 
 const SYSTEM_PROMPT_CV =
   'Sos un asistente que arma la presentación de un profesional para el directorio de Clasi Click, un marketplace boliviano de servicios profesionales, ' +
   'a partir del texto crudo extraído de su CV (puede tener errores de OCR, columnas mezcladas o texto desordenado — hacé lo posible por entenderlo igual). ' +
-  'Armá una presentación breve pero lo más informativa posible, para que un cliente que nunca lo vio decida contactarlo. Devolvé estos campos: ' +
+  'Armá una presentación breve pero lo más informativa posible, para que un cliente que nunca lo vio decida contactarlo, y de paso rescatá los datos de contacto que el CV ya trae para no hacérselos escribir de nuevo. Devolvé estos campos: ' +
   '"nombre": el nombre completo de la persona tal como aparece en el CV. ' +
   '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal. ' +
   '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria — años de experiencia y/o los lugares más relevantes donde trabajó. ' +
@@ -157,9 +161,13 @@ const SYSTEM_PROMPT_CV =
   '(ejemplo, si es ingeniero de datos: ["Diseña arquitecturas de datos", "Construye pipelines ETL", "Modela bases de datos analíticas"]). ' +
   'Deducilos de su experiencia y especialidad real en el CV — no listes tareas genéricas que cualquiera pondría, y no inventes servicios que su perfil no respalda. ' +
   'Si no hay suficiente información para armar ninguno con confianza, devolvé un array vacío []. ' +
+  '"telefono": su número de teléfono o WhatsApp tal como aparece en el CV (con código de país si lo tiene), o "" si no aparece ninguno. ' +
+  '"email": su email de contacto tal como aparece en el CV, o "" si no aparece. ' +
+  '"direccion": su dirección o ciudad de residencia si el CV la menciona explícitamente, o "" si no aparece. ' +
+  '"dondeTrabaja": frase corta (máximo 25 palabras) con el lugar donde trabaja actualmente o atiende (ej: nombre de la empresa, consultorio o institución de su experiencia más reciente), o "" si no se puede deducir con confianza. ' +
   'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
-  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."]}'
+  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "..."}'
 
 export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos | null> {
   const apiKey = process.env.GROQ_API_KEY
@@ -206,6 +214,14 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
         .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
         .map((s: string) => s.trim().slice(0, 80))
         .slice(0, 6),
+      // Datos de contacto/ubicación que a veces ya están en el CV — son
+      // solo una propuesta más: siempre se muestran en un campo
+      // editable para que la persona los revise (y complete o corrija)
+      // antes de guardar, igual que el resto.
+      telefono: String(parsed.telefono || '').slice(0, 40),
+      email: String(parsed.email || '').slice(0, 150),
+      direccion: String(parsed.direccion || '').slice(0, 200),
+      dondeTrabaja: String(parsed.dondeTrabaja || '').slice(0, 500),
     }
   } catch (err) {
     console.error('extraerDatosCV', err)
