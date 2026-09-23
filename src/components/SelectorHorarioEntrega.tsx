@@ -1,21 +1,33 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fechaEntregaDefault, proximosDiasHabiles } from '@/lib/entregaDias'
+import { fechaEntregaDefault, proximosDiasHabiles, franjasDisponibles, type ClaveFranja } from '@/lib/entregaDias'
 
-export type Franja = '' | '8-13' | '13-19'
+export type Franja = '' | ClaveFranja
 
-export const FRANJA_LABEL: Record<'8-13' | '13-19', string> = {
+export const FRANJA_LABEL: Record<string, string> = {
+  '9-13': '9 a 13',
+  // La moto sale a las 8:00 y a las 14:00 entre semana (ver
+  // src/lib/reparto.ts) — el rango de la tarde arranca ahí, no a las 13.
+  '14-19': 'de 14 a 19',
+  // Sábado tiene un horario de reparto distinto al resto de la semana.
+  '10-13': '10 a 13',
+  '14-16': '14 a 16',
+  // Claves viejas, de antes de separar el horario de sábado del resto
+  // — se mantienen para poder seguir mostrando bien pedidos ya
+  // guardados con esos valores (ya no se ofrecen como opción nueva).
   '8-13': '8 a 13',
-  // La moto sale a las 8:00 y a las 14:00 (ver src/lib/reparto.ts) — el
-  // rango de la tarde arranca ahí, no a las 13.
   '13-19': 'de 14 a 19',
+}
+
+function parsearIso(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 // yyyy-mm-dd → "viernes, 26 de septiembre", para el mensaje final de confirmación.
 function formatearFechaLarga(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+  return parsearIso(iso).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
 // El día por default (mañana, salvo que caiga domingo — ver
@@ -57,6 +69,13 @@ export default function SelectorHorarioEntrega({
   // que el botón atrás del navegador/celular vuelva acá adentro en vez
   // de sacar a la persona de la pantalla entera.
   const pushedHistoryRef = useRef(false)
+
+  // Franjas válidas para el día que se está por confirmar — cambian
+  // según sea sábado (10 a 13 / 14 a 16) o el resto de la semana
+  // (9 a 13 / de 14 a 19). Domingo nunca llega acá (ver hayEntregaHoy
+  // en /checkout y proximosDiasHabiles, que ya lo excluyen).
+  const diaParaFranjas = soloHoy ? new Date() : fechaElegida ? parsearIso(fechaElegida) : fechaEntregaDefault()
+  const franjasHoy = franjasDisponibles(diaParaFranjas)
 
   useEffect(() => {
     if (!otroDia) return
@@ -118,7 +137,7 @@ export default function SelectorHorarioEntrega({
         <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3 text-xl">✓</div>
         <div className="font-body text-sm text-ink mb-2">
           Su compra se ha realizado con éxito. Usted estará recibiendo su pedido el {fechaTexto}, en el horario de{' '}
-          {FRANJA_LABEL[franjaConfirmada as '8-13' | '13-19']}.
+          {FRANJA_LABEL[franjaConfirmada]}.
         </div>
         <div className="font-display text-lg font-bold text-teal mb-3">Gracias por su compra.</div>
       </div>
@@ -132,26 +151,19 @@ export default function SelectorHorarioEntrega({
           {soloHoy ? '¿En qué horario de hoy prefiere recibirlo?' : '¿En qué horario prefiere recibirlo?'}
         </div>
         <div className="flex flex-col gap-2.5 mb-3">
-          <button
-            type="button"
-            onClick={() => setFranjaSeleccion('8-13')}
-            disabled={guardando}
-            className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-              franjaSeleccion === '8-13' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-            }`}
-          >
-            8 a 13
-          </button>
-          <button
-            type="button"
-            onClick={() => setFranjaSeleccion('13-19')}
-            disabled={guardando}
-            className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-              franjaSeleccion === '13-19' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-            }`}
-          >
-            {FRANJA_LABEL['13-19']}
-          </button>
+          {franjasHoy.map((clave) => (
+            <button
+              key={clave}
+              type="button"
+              onClick={() => setFranjaSeleccion(clave)}
+              disabled={guardando}
+              className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                franjaSeleccion === clave ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+              }`}
+            >
+              {FRANJA_LABEL[clave]}
+            </button>
+          ))}
           {!soloHoy && (
             <button
               type="button"
@@ -199,26 +211,19 @@ export default function SelectorHorarioEntrega({
         <>
           <div className="font-body text-sm font-medium text-ink mb-2.5">¿En qué horario preferís recibirlo?</div>
           <div className="flex flex-col gap-2.5 mb-3">
-            <button
-              type="button"
-              onClick={() => setFranjaSeleccion('8-13')}
-              disabled={guardando}
-              className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                franjaSeleccion === '8-13' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-              }`}
-            >
-              8 a 13
-            </button>
-            <button
-              type="button"
-              onClick={() => setFranjaSeleccion('13-19')}
-              disabled={guardando}
-              className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                franjaSeleccion === '13-19' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-              }`}
-            >
-              {FRANJA_LABEL['13-19']}
-            </button>
+            {franjasHoy.map((clave) => (
+              <button
+                key={clave}
+                type="button"
+                onClick={() => setFranjaSeleccion(clave)}
+                disabled={guardando}
+                className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                  franjaSeleccion === clave ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
+                }`}
+              >
+                {FRANJA_LABEL[clave]}
+              </button>
+            ))}
           </div>
           <button
             type="button"

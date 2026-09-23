@@ -10,8 +10,8 @@ import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
-import SelectorHorarioEntrega from '@/components/SelectorHorarioEntrega'
-import { fechaEntregaDefault, hayEntregaHoy } from '@/lib/entregaDias'
+import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
+import { fechaEntregaDefault, hayEntregaHoy, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -355,7 +355,7 @@ function CheckoutContent() {
   // Preferencia de entrega ya guardada (ver SelectorHorarioEntrega,
   // que hace el PATCH a /api/pedidos/[id] — acá solo se refleja el
   // resultado para el texto de arriba del resumen).
-  const [franjaHoraria, setFranjaHoraria] = useState<'' | '8-13' | '13-19'>('')
+  const [franjaHoraria, setFranjaHoraria] = useState<Franja>('')
   const [fechaElegida, setFechaElegida] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // uid de la persona que CREÓ el pedido. Firebase Auth sincroniza la
@@ -531,6 +531,10 @@ function CheckoutContent() {
   }
 
   async function confirmarEntregaYCrearPedidos() {
+    if (!tiendaAbierta()) {
+      setError(mensajeTiendaCerrada())
+      return
+    }
     if (!nombreComprador.trim()) {
       setError('Escribí tu nombre y apellido antes de continuar.')
       return
