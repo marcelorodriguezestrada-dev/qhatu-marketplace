@@ -155,7 +155,7 @@ const SYSTEM_PROMPT_CV =
   'Armá una presentación breve pero lo más informativa posible, para que un cliente que nunca lo vio decida contactarlo, y de paso rescatá los datos de contacto que el CV ya trae para no hacérselos escribir de nuevo. Devolvé estos campos: ' +
   '"nombre": el nombre completo de la persona tal como aparece en el CV. ' +
   '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal. ' +
-  '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria — años de experiencia y/o los lugares más relevantes donde trabajó. ' +
+  '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria a nivel general — cuántos años de experiencia tiene y en qué industria, rubro o tipo de proyectos se mueve. NO menciones acá nombres de empresas, cargos puntuales ni fechas: eso va en "dondeTrabaja", para que los dos campos no digan lo mismo. ' +
   '"descripcion": descripción atractiva en 2 o 3 oraciones (máximo 60 palabras), en tercera persona, que combine quién es, dónde trabajó y qué servicios ofrece. ' +
   '"servicios": lista de 3 a 6 servicios CONCRETOS y accionables que esta persona puede ofrecer a un cliente, cada uno como una frase corta que empieza con un verbo ' +
   '(ejemplo, si es ingeniero de datos: ["Diseña arquitecturas de datos", "Construye pipelines ETL", "Modela bases de datos analíticas"]). ' +
@@ -164,7 +164,10 @@ const SYSTEM_PROMPT_CV =
   '"telefono": su número de teléfono o WhatsApp tal como aparece en el CV (con código de país si lo tiene), o "" si no aparece ninguno. ' +
   '"email": su email de contacto tal como aparece en el CV, o "" si no aparece. ' +
   '"direccion": su dirección o ciudad de residencia si el CV la menciona explícitamente, o "" si no aparece. ' +
-  '"dondeTrabaja": resumen DETALLADO (podés usar hasta 60 palabras, varias oraciones si hace falta) de dónde atiende o trabaja esta persona. Contá, si el CV lo menciona: el nombre de la empresa, consultorio, clínica o institución donde trabaja actualmente (y las anteriores relevantes si sigue vinculado a más de un lugar), el cargo o rol que ocupa ahí, la zona/barrio o dirección de ese lugar, y días u horarios de atención si aparecen. Si el CV menciona varios lugares donde atiende (ej: consultorio propio y además un hospital ciertos días), incluilos todos, no solo el primero. Si el CV no da nada de esto, dejalo en "". ' +
+  '"dondeTrabaja": resumen DETALLADO (hasta 70 palabras) de dónde atiende o trabaja esta persona, pero armado para leerse rápido, NO como un párrafo corrido: ' +
+  'primero una línea "Actualmente: " con el lugar donde trabaja o atiende HOY (empresa, consultorio, clínica o institución), el cargo o rol que ocupa ahí, la zona/dirección si la hay, y días u horarios de atención si el CV los da — si atiende en más de un lugar a la vez, sumalos ahí mismo, separados por coma. ' +
+  'Después, si hay experiencia previa relevante, otra línea aparte "Antes: " con los 2 o 3 empleadores anteriores más importantes, cada uno solo con nombre y años (sin repetir tareas ni tecnologías, de eso ya se encargan "servicios" y "descripcion"). ' +
+  'Separá esas dos líneas con un salto de línea real (\\n) dentro del string. Si no hay experiencia previa que valga la pena mencionar, dejá solo la línea "Actualmente: ". Si el CV no da nada de esto, dejalo en "". ' +
   'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
   '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "..."}'

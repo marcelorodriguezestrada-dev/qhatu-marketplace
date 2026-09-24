@@ -111,6 +111,20 @@ export const CATEGORIAS_BASE: Categoria[] = [
     ],
   },
   {
+    id: 'tecnologia',
+    label: 'Tecnología y datos',
+    rubros: [
+      { id: 'dev-software', label: 'Desarrollador/a de software' },
+      { id: 'dev-web', label: 'Desarrollador/a web' },
+      { id: 'ing-datos', label: 'Ingeniero/a de datos' },
+      { id: 'analista-datos', label: 'Analista de datos / BI' },
+      { id: 'devops', label: 'DevOps / administrador/a de sistemas' },
+      { id: 'diseno-ux', label: 'Diseñador/a UX/UI' },
+      { id: 'soporte-it', label: 'Soporte técnico / IT' },
+      { id: 'ciberseguridad', label: 'Especialista en ciberseguridad' },
+    ],
+  },
+  {
     id: 'otros',
     label: 'Otros',
     rubros: [
