@@ -164,7 +164,7 @@ const SYSTEM_PROMPT_CV =
   '"telefono": su número de teléfono o WhatsApp tal como aparece en el CV (con código de país si lo tiene), o "" si no aparece ninguno. ' +
   '"email": su email de contacto tal como aparece en el CV, o "" si no aparece. ' +
   '"direccion": su dirección o ciudad de residencia si el CV la menciona explícitamente, o "" si no aparece. ' +
-  '"dondeTrabaja": frase corta (máximo 25 palabras) con el lugar donde trabaja actualmente o atiende (ej: nombre de la empresa, consultorio o institución de su experiencia más reciente), o "" si no se puede deducir con confianza. ' +
+  '"dondeTrabaja": resumen DETALLADO (podés usar hasta 60 palabras, varias oraciones si hace falta) de dónde atiende o trabaja esta persona. Contá, si el CV lo menciona: el nombre de la empresa, consultorio, clínica o institución donde trabaja actualmente (y las anteriores relevantes si sigue vinculado a más de un lugar), el cargo o rol que ocupa ahí, la zona/barrio o dirección de ese lugar, y días u horarios de atención si aparecen. Si el CV menciona varios lugares donde atiende (ej: consultorio propio y además un hospital ciertos días), incluilos todos, no solo el primero. Si el CV no da nada de esto, dejalo en "". ' +
   'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
   '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "..."}'
