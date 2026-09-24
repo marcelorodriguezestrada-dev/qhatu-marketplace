@@ -12,6 +12,7 @@
     "firebase": "^10.12.2",
     "firebase-admin": "^12.1.0",
     "leaflet": "^1.9.4",
+    "mammoth": "^1.8.0",
     "next": "^14.2.35",
     "pdfjs-dist": "^4.7.76",
     "react": "^18.3.1",

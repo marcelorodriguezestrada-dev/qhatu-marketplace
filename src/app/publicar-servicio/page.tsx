@@ -260,14 +260,14 @@ export default function PublicarServicioPage() {
           {leyendoCV ? 'Leyendo tu CV...' : '📄 Subir mi CV para completar el formulario (opcional)'}
           <input
             type="file"
-            accept="application/pdf,image/*"
+            accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,image/*"
             className="hidden"
             disabled={leyendoCV}
             onChange={(e) => subirCV(e.target.files?.[0] || null)}
           />
         </label>
         <div className="font-body text-[11px] text-inksoft mb-3">
-          Aceptamos PDF, foto o escaneo. La IA completa los campos que pueda a partir de tu CV — revisalos igual antes de enviar, porque siguen siendo editables.
+          Aceptamos PDF, Word (.docx), foto o escaneo. La IA completa los campos que pueda a partir de tu CV — revisalos igual antes de enviar, porque siguen siendo editables.
         </div>
         {errorCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorCV}</div>}
         {cvAplicado && !errorCV && (

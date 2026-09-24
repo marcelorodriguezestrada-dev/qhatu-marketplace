@@ -1,11 +1,11 @@
-// Extrae el texto plano de un CV subido como PDF o como imagen (foto o
-// escaneo), para después mandárselo a la IA y que arme la presentación
-// del profesional (ver /api/profesionales/extraer-cv).
+// Extrae el texto plano de un CV subido como PDF, Word (.docx) o como
+// imagen (foto o escaneo), para después mandárselo a la IA y que arme
+// la presentación del profesional (ver /api/profesionales/extraer-cv).
 //
 // Igual que con ocrComprobante.ts, las librerías pesadas (pdfjs-dist,
-// tesseract.js) se importan de forma dinámica adentro de cada función:
-// así solo las descarga quien realmente sube un CV, no todo el que abre
-// /mi-perfil o /admin.
+// mammoth, tesseract.js) se importan de forma dinámica adentro de cada
+// función: así solo las descarga quien realmente sube un CV, no todo
+// el que abre /mi-perfil o /admin.
 
 export type ResultadoLecturaCV = {
   texto: string
@@ -38,6 +38,16 @@ async function extraerTextoPDF(file: File): Promise<ResultadoLecturaCV> {
   return { texto: textoCompleto.trim(), paginas: pdf.numPages }
 }
 
+// Word moderno (.docx): mammoth lee el XML del documento y devuelve el
+// texto plano. Corre entero en el navegador, sin subir el archivo a
+// ningún lado.
+async function extraerTextoDocx(file: File): Promise<ResultadoLecturaCV> {
+  const mammoth: any = await import('mammoth')
+  const arrayBuffer = await file.arrayBuffer()
+  const { value } = await mammoth.extractRawText({ arrayBuffer })
+  return { texto: (value || '').trim() }
+}
+
 // Imagen (foto del CV impreso, captura de pantalla, escaneo): OCR con
 // Tesseract, igual que el comprobante de pago.
 async function extraerTextoImagen(file: File): Promise<ResultadoLecturaCV> {
@@ -47,7 +57,23 @@ async function extraerTextoImagen(file: File): Promise<ResultadoLecturaCV> {
 }
 
 export async function extraerTextoDeArchivo(file: File): Promise<ResultadoLecturaCV> {
-  const esPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  const nombre = file.name.toLowerCase()
+  const esPDF = file.type === 'application/pdf' || nombre.endsWith('.pdf')
   if (esPDF) return extraerTextoPDF(file)
+
+  const esDocx =
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    nombre.endsWith('.docx')
+  if (esDocx) return extraerTextoDocx(file)
+
+  // .doc viejo (formato binario de Word 97-2003): no hay forma
+  // confiable de leerlo en el navegador sin una librería pesada de
+  // servidor — le pedimos a la persona que suba PDF, .docx o una foto
+  // en vez de este formato.
+  const esDocLegado = file.type === 'application/msword' || nombre.endsWith('.doc')
+  if (esDocLegado) {
+    throw new Error('El formato .doc (Word 97-2003) no se puede leer. Subí el CV como PDF, Word .docx o una foto/escaneo.')
+  }
+
   return extraerTextoImagen(file)
 }

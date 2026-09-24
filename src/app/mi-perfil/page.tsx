@@ -475,7 +475,7 @@ export default function MiPerfilPage() {
       <div className="bg-panel border border-line rounded-xl p-4 mb-5">
         <div className="font-body text-sm font-semibold text-ink mb-1">Armá tu presentación con tu CV</div>
         <div className="font-body text-xs text-inksoft mb-3">
-          Subí tu CV (PDF o una foto/escaneo) y una IA arma una propuesta de nombre, especialidad, experiencia y descripción para tu perfil. Vos la revisás, la editás si querés, y recién ahí se guarda — no se publica nada sola.
+          Subí tu CV (PDF, Word .docx o una foto/escaneo) y una IA arma una propuesta de nombre, especialidad, experiencia y descripción para tu perfil. Vos la revisás, la editás si querés, y recién ahí se guarda — no se publica nada sola.
         </div>
 
         {errorCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorCV}</div>}
@@ -483,10 +483,10 @@ export default function MiPerfilPage() {
 
         {!propuestaCV && (
           <label className="block text-center py-2.5 rounded-lg border border-dashed border-line font-body text-xs text-inksoft cursor-pointer">
-            {leyendoCV ? 'Leyendo tu CV...' : '📄 Subir mi CV (PDF, foto o escaneo)'}
+            {leyendoCV ? 'Leyendo tu CV...' : '📄 Subir mi CV (PDF, Word o foto)'}
             <input
               type="file"
-              accept="application/pdf,image/*"
+              accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,image/*"
               className="hidden"
               disabled={leyendoCV}
               onChange={(e) => subirCV(e.target.files?.[0] || null)}

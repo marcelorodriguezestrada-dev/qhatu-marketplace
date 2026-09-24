@@ -1717,11 +1717,11 @@ export default function AdminPage() {
             <div className="bg-panelalt rounded-lg p-3 mb-3">
               <div className="font-body text-xs font-semibold text-ink mb-1">Armar con IA a partir de un CV (opcional)</div>
               <div className="font-body text-[11px] text-inksoft mb-2">
-                Subí el CV del profesional (PDF, foto o escaneo) y la IA precarga nombre, especialidad, experiencia y descripción acá arriba — revisalos y corregilos antes de publicar, igual que cualquier otro dato.
+                Subí el CV del profesional (PDF, Word .docx, foto o escaneo) y la IA precarga nombre, especialidad, experiencia y descripción acá arriba — revisalos y corregilos antes de publicar, igual que cualquier otro dato.
               </div>
               <input
                 type="file"
-                accept="application/pdf,image/*"
+                accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,image/*"
                 onChange={(e) => leerCVAdmin(e.target.files?.[0] || null)}
                 disabled={leyendoCVAdmin}
                 className="font-body text-xs"
