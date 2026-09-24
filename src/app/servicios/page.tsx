@@ -22,6 +22,7 @@ type Profesional = {
   zona: string
   direccion?: string
   dondeTrabaja?: string
+  educacion?: string
   lat: number | null
   lng: number | null
   icono: string

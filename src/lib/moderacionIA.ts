@@ -147,6 +147,7 @@ export type DatosCVExtraidos = {
   email: string
   direccion: string
   dondeTrabaja: string
+  educacion: string
 }
 
 const SYSTEM_PROMPT_CV =
@@ -154,11 +155,15 @@ const SYSTEM_PROMPT_CV =
   'a partir del texto crudo extraído de su CV (puede tener errores de OCR, columnas mezcladas o texto desordenado — hacé lo posible por entenderlo igual). ' +
   'Armá una presentación breve pero lo más informativa posible, para que un cliente que nunca lo vio decida contactarlo, y de paso rescatá los datos de contacto que el CV ya trae para no hacérselos escribir de nuevo. Devolvé estos campos: ' +
   '"nombre": el nombre completo de la persona tal como aparece en el CV. ' +
-  '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal. ' +
+  '"especialidad": frase corta (máximo 8 palabras) con su profesión o especialidad principal — sirve de titular, así que puede ser un poco más vendedora que un cargo pelado (ej: en vez de "Ingeniero de sistemas" mejor "Ingeniero de Datos Senior"), pero siempre basada en el cargo/título real del CV, sin inventar un rango que no tiene. ' +
   '"experiencia": resumen corto (máximo 25 palabras) de su trayectoria a nivel general — cuántos años de experiencia tiene y en qué industria, rubro o tipo de proyectos se mueve. NO menciones acá nombres de empresas, cargos puntuales ni fechas: eso va en "dondeTrabaja", para que los dos campos no digan lo mismo. ' +
-  '"descripcion": descripción atractiva en 2 o 3 oraciones (máximo 60 palabras), en tercera persona, que combine quién es, dónde trabajó y qué servicios ofrece. ' +
-  '"servicios": lista de 3 a 6 servicios CONCRETOS y accionables que esta persona puede ofrecer a un cliente, cada uno como una frase corta que empieza con un verbo ' +
-  '(ejemplo, si es ingeniero de datos: ["Diseña arquitecturas de datos", "Construye pipelines ETL", "Modela bases de datos analíticas"]). ' +
+  '"descripcion": descripción tipo LANDING PAGE (2 o 3 oraciones, máximo 65 palabras, tercera persona), pensada para que alguien que nunca lo vio decida escribirle. No es un resumen neutro de CV: es un texto de venta, así que priorizá esto en orden — ' +
+  '1) quién es y su nivel (senior, especialidad, años); ' +
+  '2) el logro, resultado o número más fuerte que el CV realmente tenga (ej: "redujo 70% el tiempo de procesamiento", "lideró la migración de...") y/o nombres de empresas o clientes reconocibles como prueba social, si los hay; ' +
+  '3) cerrá conectando eso con el beneficio concreto para quien lo contrate — qué problema le resuelve o qué gana el cliente, no solo qué sabe hacer él. ' +
+  'Usá un tono profesional pero con gancho, de venta real, no un resumen aburrido de tareas. Nunca inventes números, logros o clientes que el CV no menciona — si no hay ningún logro medible, apoyate en la trayectoria y los lugares donde trabajó como prueba social. ' +
+  '"servicios": lista de 3 a 6 servicios que esta persona puede ofrecer a un cliente, redactados como el BENEFICIO o resultado que el cliente se lleva, no como una tarea técnica interna — cada uno una frase corta que empieza con un verbo de acción orientado a resultado ' +
+  '(ejemplo, si es ingeniero de datos: ["Ordena y centraliza los datos de tu empresa en un solo lugar confiable", "Automatiza reportes para que dejes de armarlos a mano", "Acelera tus consultas migrando a bases de datos en la nube"] — en vez de listar simplemente herramientas como "Usa Airflow" o "Sabe SQL"). ' +
   'Deducilos de su experiencia y especialidad real en el CV — no listes tareas genéricas que cualquiera pondría, y no inventes servicios que su perfil no respalda. ' +
   'Si no hay suficiente información para armar ninguno con confianza, devolvé un array vacío []. ' +
   '"telefono": su número de teléfono o WhatsApp tal como aparece en el CV (con código de país si lo tiene), o "" si no aparece ninguno. ' +
@@ -168,9 +173,10 @@ const SYSTEM_PROMPT_CV =
   'primero una línea "Actualmente: " con el lugar donde trabaja o atiende HOY (empresa, consultorio, clínica o institución), el cargo o rol que ocupa ahí, la zona/dirección si la hay, y días u horarios de atención si el CV los da — si atiende en más de un lugar a la vez, sumalos ahí mismo, separados por coma. ' +
   'Después, si hay experiencia previa relevante, otra línea aparte "Antes: " con los 2 o 3 empleadores anteriores más importantes, cada uno solo con nombre y años (sin repetir tareas ni tecnologías, de eso ya se encargan "servicios" y "descripcion"). ' +
   'Separá esas dos líneas con un salto de línea real (\\n) dentro del string. Si no hay experiencia previa que valga la pena mencionar, dejá solo la línea "Actualmente: ". Si el CV no da nada de esto, dejalo en "". ' +
+  '"educacion": estudios formales de la persona (títulos universitarios, maestrías, doctorados, certificaciones relevantes) — es otro punto fuerte para generar confianza, así que rescatalo si el CV lo trae. Formato compacto: cada título separado por " · ", como "Maestría en Data Mining (UBA) · Maestría en Finanzas (UTDT) · Ingeniería en Sistemas (UCB)". Máximo 40 palabras en total; si hay muchos títulos, priorizá los de nivel más alto o más relevantes para su especialidad. No incluyas colegio secundario. Si el CV no menciona estudios formales, dejalo en "". ' +
   'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
-  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "..."}'
+  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "...", "educacion": "..."}'
 
 export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos | null> {
   const apiKey = process.env.GROQ_API_KEY
@@ -189,7 +195,7 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
         // bien, no solo clasificar — así que usamos el modelo grande,
         // todavía gratis en Groq.
         model: 'openai/gpt-oss-120b',
-        max_completion_tokens: 1200, // antes 500 con max_tokens (deprecado) — subido con margen porque es modelo de razonamiento y gasta tokens "pensando" antes de escribir
+        max_completion_tokens: 1500, // antes 1200 — subido de nuevo porque descripcion/servicios ahora piden más elaboración (copy de venta) y sigue siendo modelo de razonamiento que gasta tokens "pensando" antes de escribir
         reasoning_effort: 'low', // no necesita razonar mucho, es redacción/extracción — así deja más presupuesto para el contenido
         response_format: { type: 'json_object' },
         messages: [
@@ -215,7 +221,7 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
       descripcion: String(parsed.descripcion || '').slice(0, 500),
       servicios: serviciosCrudos
         .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
-        .map((s: string) => s.trim().slice(0, 80))
+        .map((s: string) => s.trim().slice(0, 110)) // 80 se quedaba corto para frases de servicio orientadas a beneficio, más largas que un simple "Hace X"
         .slice(0, 6),
       // Datos de contacto/ubicación que a veces ya están en el CV — son
       // solo una propuesta más: siempre se muestran en un campo
@@ -225,6 +231,7 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
       email: String(parsed.email || '').slice(0, 150),
       direccion: String(parsed.direccion || '').slice(0, 200),
       dondeTrabaja: String(parsed.dondeTrabaja || '').slice(0, 500),
+      educacion: String(parsed.educacion || '').slice(0, 300),
     }
   } catch (err) {
     console.error('extraerDatosCV', err)

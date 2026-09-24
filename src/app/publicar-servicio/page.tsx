@@ -29,6 +29,7 @@ export default function PublicarServicioPage() {
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [dondeTrabaja, setDondeTrabaja] = useState('')
+  const [educacion, setEducacion] = useState('')
   const [servicios, setServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
@@ -144,6 +145,7 @@ export default function PublicarServicioPage() {
       if (datos.descripcion) setDescripcion(datos.descripcion)
       if (datos.experiencia) setExperiencia(datos.experiencia)
       if (datos.dondeTrabaja) setDondeTrabaja(datos.dondeTrabaja)
+      if (datos.educacion) setEducacion(datos.educacion)
       if (datos.direccion) setDireccion(datos.direccion)
       if (datos.email) setEmail(datos.email)
       if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
@@ -213,7 +215,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          especialidad, descripcion, dondeTrabaja, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
+          especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -412,6 +414,16 @@ export default function PublicarServicioPage() {
         />
         <div className="font-body text-[11px] text-inksoft mb-3">
           Un resumen del lugar donde atendés o trabajás (distinto de la dirección, por si es un nombre conocido).
+        </div>
+
+        <input
+          value={educacion}
+          onChange={(e) => setEducacion(e.target.value)}
+          placeholder="Estudios (opcional, ej: Maestría en Data Mining (UBA) · Ingeniería en Sistemas (UCB))"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-1"
+        />
+        <div className="font-body text-[11px] text-inksoft mb-3">
+          Títulos, maestrías o certificaciones relevantes — ayuda a generar confianza en quien te contrata.
         </div>
 
         <div className="mb-3">

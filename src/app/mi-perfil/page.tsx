@@ -21,6 +21,7 @@ type Profesional = {
   especialidad?: string
   descripcion?: string
   dondeTrabaja?: string
+  educacion?: string
   experiencia?: string
   servicios?: string[]
   estado?: string
@@ -99,6 +100,7 @@ export default function MiPerfilPage() {
   const [misServicios, setMisServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
   const [miDondeTrabaja, setMiDondeTrabaja] = useState('')
+  const [miEducacion, setMiEducacion] = useState('')
   const [guardandoServicios, setGuardandoServicios] = useState(false)
   const [serviciosGuardados, setServiciosGuardados] = useState(false)
   const [errorServicios, setErrorServicios] = useState('')
@@ -117,6 +119,7 @@ export default function MiPerfilPage() {
     if (profesional) {
       setMisServicios(profesional.servicios || [])
       setMiDondeTrabaja(profesional.dondeTrabaja || '')
+      setMiEducacion(profesional.educacion || '')
     }
   }, [profesional?.id])
 
@@ -322,6 +325,7 @@ export default function MiPerfilPage() {
       // trajo algo, así la persona no tiene que escribirla de nuevo,
       // pero la revisa y la guarda desde esa misma caja como siempre.
       if (data.datos?.dondeTrabaja) setMiDondeTrabaja(data.datos.dondeTrabaja)
+      if (data.datos?.educacion) setMiEducacion(data.datos.educacion)
     } catch (e: any) {
       setErrorCV(e?.message || 'No se pudo leer el CV.')
     } finally {
@@ -391,11 +395,11 @@ export default function MiPerfilPage() {
       const res = await fetch(`/api/profesionales/${profesional.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ servicios: misServicios, dondeTrabaja: miDondeTrabaja }),
+        body: JSON.stringify({ servicios: misServicios, dondeTrabaja: miDondeTrabaja, educacion: miEducacion }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setProfesional((p) => (p ? { ...p, servicios: misServicios, dondeTrabaja: miDondeTrabaja } : p))
+      setProfesional((p) => (p ? { ...p, servicios: misServicios, dondeTrabaja: miDondeTrabaja, educacion: miEducacion } : p))
       setServiciosGuardados(true)
     } catch (e: any) {
       setErrorServicios(e?.message || 'No se pudo guardar tus servicios.')
@@ -578,9 +582,9 @@ export default function MiPerfilPage() {
 
       {/* --- Mis servicios y dónde trabajo --- */}
       <div className="bg-panel border border-line rounded-xl p-4 mb-5">
-        <div className="font-body text-sm font-semibold text-ink mb-1">Mis servicios y dónde trabajo</div>
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mis servicios, dónde trabajo y estudios</div>
         <div className="font-body text-xs text-inksoft mb-3">
-          Contá, en puntos concretos, qué es lo que hacés (ej: "Instalación de grifería", "Reparación de fugas") y un resumen corto de dónde atendés. Se muestran en tu perfil público, además de la descripción.
+          Contá, en puntos concretos, qué es lo que hacés (ej: "Instalación de grifería", "Reparación de fugas"), un resumen corto de dónde atendés y tus estudios. Se muestran en tu perfil público, además de la descripción.
         </div>
 
         {errorServicios && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorServicios}</div>}
@@ -592,6 +596,14 @@ export default function MiPerfilPage() {
           onChange={(e) => { setMiDondeTrabaja(e.target.value); setServiciosGuardados(false) }}
           placeholder="Ej: Consultorio propio en Sopocachi, atiendo también en Clínica del Sur los martes"
           rows={2}
+          className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panelalt mb-3"
+        />
+
+        <div className="font-body text-[11px] text-inksoft mb-1">Estudios</div>
+        <input
+          value={miEducacion}
+          onChange={(e) => { setMiEducacion(e.target.value); setServiciosGuardados(false) }}
+          placeholder="Ej: Maestría en Data Mining (UBA) · Ingeniería en Sistemas (UCB)"
           className="w-full px-3 py-2 rounded-lg border border-line font-body text-sm bg-panelalt mb-3"
         />
 

@@ -166,6 +166,7 @@ export default function AdminPage() {
   const [especialidad, setEspecialidad] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [dondeTrabaja, setDondeTrabaja] = useState('')
+  const [educacion, setEducacion] = useState('')
   const [servicios, setServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
   const [zona, setZona] = useState('')
@@ -746,6 +747,7 @@ export default function AdminPage() {
       if (datos.experiencia) setExperiencia(datos.experiencia)
       if (datos.descripcion) setDescripcion(datos.descripcion)
       if (datos.dondeTrabaja) setDondeTrabaja(datos.dondeTrabaja)
+      if (datos.educacion) setEducacion(datos.educacion)
       if (datos.direccion) setDireccion(datos.direccion)
       if (datos.email) setEmailProfesional(datos.email)
       if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
@@ -789,7 +791,7 @@ export default function AdminPage() {
     setPublicando(true)
     try {
       const datos = {
-        nombre, rubro, especialidad, descripcion, dondeTrabaja, servicios, zona, direccion,
+        nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, direccion,
         lat: lat || null, lng: lng || null,
         whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
@@ -810,7 +812,7 @@ export default function AdminPage() {
         return
       }
       setNombre(''); setDescripcion(''); setServicios([]); setDondeTrabaja(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
-      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
+      setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null); setEducacion('')
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -831,6 +833,7 @@ export default function AdminPage() {
     setDescripcion(p.descripcion || '')
     setServicios(p.servicios || [])
     setDondeTrabaja(p.dondeTrabaja || '')
+    setEducacion(p.educacion || '')
     setZona(p.zona || '')
     setDireccion(p.direccion || '')
     setLat(p.lat != null ? String(p.lat) : '')
@@ -1767,6 +1770,12 @@ export default function AdminPage() {
               onChange={(e) => setDondeTrabaja(e.target.value)}
               placeholder="Resumen de dónde trabaja (opcional, ej: Consultorio propio en Sopocachi, atiende también en Clínica del Sur los martes)"
               rows={2}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+            />
+            <input
+              value={educacion}
+              onChange={(e) => setEducacion(e.target.value)}
+              placeholder="Estudios (opcional, ej: Maestría en Data Mining (UBA) · Ingeniería en Sistemas (UCB))"
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <div className="grid grid-cols-2 gap-3 mb-3">
