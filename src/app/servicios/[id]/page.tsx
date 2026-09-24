@@ -21,6 +21,27 @@ function Estrellas({ valor, size = 'text-sm' }: { valor: number; size?: string }
   )
 }
 
+function iniciales(nombre: string) {
+  const partes = nombre.trim().split(/\s+/).filter(Boolean)
+  return ((partes[0]?.[0] || '') + (partes[1]?.[0] || partes[0]?.[1] || '')).toUpperCase()
+}
+
+// Filas de datos con ícono para la tarjeta de contacto — se listan en
+// este orden porque es el que mejor "vende": primero lo que genera
+// confianza (dónde trabaja, estudios), después lo más logístico
+// (dirección/zona, experiencia).
+function FilaDato({ icono, label, valor }: { icono: string; label: string; valor: string }) {
+  return (
+    <div className="flex items-start gap-2.5 py-2 border-b border-line last:border-b-0">
+      <span className="shrink-0 text-base leading-none mt-0.5">{icono}</span>
+      <div className="min-w-0">
+        <div className="font-body text-[10px] font-semibold uppercase tracking-wide text-inksoft/70">{label}</div>
+        <div className="font-body text-xs text-ink whitespace-pre-line">{valor}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function PerfilProfesionalPage() {
   const params = useParams()
   const id = params?.id as string
@@ -187,10 +208,10 @@ export default function PerfilProfesionalPage() {
           {perfil.servicios && perfil.servicios.length > 0 && (
             <>
               <div className="font-display text-lg font-bold text-ink mb-2">Qué hace</div>
-              <ul className="mb-8 flex flex-col gap-1.5">
+              <ul className="mb-8 flex flex-col gap-2">
                 {perfil.servicios.map((s: string, i: number) => (
-                  <li key={i} className="font-body text-sm text-ink flex items-start gap-2">
-                    <span className="text-teal mt-0.5">✓</span>
+                  <li key={i} className="font-body text-sm text-ink flex items-start gap-2.5 bg-panel border border-line rounded-lg px-3 py-2.5">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-teal/15 text-teal flex items-center justify-center text-[11px] font-bold mt-0.5">✓</span>
                     <span>{s}</span>
                   </li>
                 ))}
@@ -264,35 +285,46 @@ export default function PerfilProfesionalPage() {
         </div>
 
         <div className="order-1 md:order-2">
-          <div className="bg-panel border border-line rounded-xl p-5 mb-4">
-            <div className="font-display text-lg font-bold text-ink mb-1 leading-snug">{perfil.nombre}</div>
-            {(perfil.especialidad || rubroInfo?.label || perfil.rubro) && (
-              <div className="font-body text-sm text-ink mb-2">
-                {perfil.especialidad || rubroInfo?.label || perfil.rubro}
+          <div className="bg-panel border border-line rounded-xl p-5 mb-4 md:sticky md:top-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="shrink-0 w-12 h-12 rounded-full bg-maroon text-white font-display font-bold text-base flex items-center justify-center">
+                {iniciales(perfil.nombre || '?')}
               </div>
-            )}
-            {(perfil.direccion || perfil.zona || perfil.experiencia || perfil.dondeTrabaja || perfil.educacion) && (
-              <div className="font-body text-xs text-inksoft mb-3 space-y-0.5">
-                {perfil.dondeTrabaja && <div className="whitespace-pre-line">Dónde trabaja: {perfil.dondeTrabaja}</div>}
-                {perfil.direccion && <div>Dirección: {perfil.direccion}</div>}
-                {perfil.zona && <div>Zona: {perfil.zona}</div>}
-                {perfil.experiencia && <div>Experiencia: {perfil.experiencia}</div>}
-                {perfil.educacion && <div>Estudios: {perfil.educacion}</div>}
+              <div className="min-w-0">
+                <div className="font-display text-lg font-bold text-ink leading-snug truncate">{perfil.nombre}</div>
+                {(perfil.especialidad || rubroInfo?.label || perfil.rubro) && (
+                  <div className="font-body text-sm text-maroon font-semibold truncate">
+                    {perfil.especialidad || rubroInfo?.label || perfil.rubro}
+                  </div>
+                )}
               </div>
-            )}
-            {perfil.precio ? (
-              <div className="font-display text-xl font-bold text-ink mb-3">{bs(perfil.precio)}</div>
-            ) : null}
+            </div>
 
             {perfil.cantidadResenas > 0 ? (
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mt-3 mb-1">
                 <Estrellas valor={perfil.ratingPromedio} />
                 <span className="font-body text-xs text-inksoft">
-                  {perfil.ratingPromedio} ({perfil.cantidadResenas})
+                  {perfil.ratingPromedio} ({perfil.cantidadResenas} reseña{perfil.cantidadResenas === 1 ? '' : 's'})
                 </span>
               </div>
             ) : (
-              <div className="font-body text-xs text-inksoft mb-3">Todavía sin reseñas</div>
+              <div className="inline-flex items-center gap-1 mt-3 mb-1 px-2 py-0.5 rounded-full bg-ochre/15 font-body text-[11px] font-semibold text-ochre">
+                ✨ Nuevo en Clasi Click
+              </div>
+            )}
+
+            {perfil.precio ? (
+              <div className="font-display text-xl font-bold text-ink mt-2 mb-1">{bs(perfil.precio)}</div>
+            ) : null}
+
+            {(perfil.direccion || perfil.zona || perfil.experiencia || perfil.dondeTrabaja || perfil.educacion) && (
+              <div className="mt-3 mb-4 bg-panelalt border border-line rounded-lg px-3">
+                {perfil.dondeTrabaja && <FilaDato icono="💼" label="Dónde trabaja" valor={perfil.dondeTrabaja} />}
+                {perfil.educacion && <FilaDato icono="🎓" label="Estudios" valor={perfil.educacion} />}
+                {perfil.experiencia && <FilaDato icono="⏳" label="Experiencia" valor={perfil.experiencia} />}
+                {perfil.direccion && <FilaDato icono="📍" label="Dirección" valor={perfil.direccion} />}
+                {perfil.zona && <FilaDato icono="📍" label="Zona" valor={perfil.zona} />}
+              </div>
             )}
 
             <a
@@ -300,10 +332,13 @@ export default function PerfilProfesionalPage() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => fetch(`/api/profesionales/${id}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
-              className="block text-center w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold"
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-lg border-none bg-teal text-white font-body text-sm font-bold shadow-md hover:brightness-110 active:scale-[0.99] transition"
             >
-              Contactar por WhatsApp
+              <span className="text-base">💬</span> Contactar por WhatsApp
             </a>
+            <div className="font-body text-[11px] text-inksoft text-center mt-2">
+              Respondé directo, sin intermediarios — es gratis escribir.
+            </div>
 
             {agendaActiva && (
               <div className="mt-4 pt-4 border-t border-line">
@@ -398,7 +433,7 @@ export default function PerfilProfesionalPage() {
                 href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink break-words"
+                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink break-words hover:bg-panelalt transition"
               >
                 📷 {perfil.instagram.replace('https://instagram.com/', '').replace('@', '')}
               </a>

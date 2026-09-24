@@ -178,6 +178,16 @@ const SYSTEM_PROMPT_CV =
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
   '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "...", "educacion": "..."}'
 
+// Recorta un texto a `max` caracteres sin partir una palabra al medio
+// (evita cosas como "...fuente de ve" en vez de "...fuente de verdad") —
+// si el corte cae a mitad de palabra, retrocede hasta el último espacio.
+function recortar(texto: string, max: number): string {
+  if (texto.length <= max) return texto
+  const cortado = texto.slice(0, max)
+  const ultimoEspacio = cortado.lastIndexOf(' ')
+  return (ultimoEspacio > max * 0.5 ? cortado.slice(0, ultimoEspacio) : cortado).trim()
+}
+
 export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos | null> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey || !textoCV || !textoCV.trim()) return null
@@ -215,23 +225,23 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
     const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
     const serviciosCrudos = Array.isArray(parsed.servicios) ? parsed.servicios : []
     return {
-      nombre: String(parsed.nombre || '').slice(0, 100),
-      especialidad: String(parsed.especialidad || '').slice(0, 120),
-      experiencia: String(parsed.experiencia || '').slice(0, 200),
-      descripcion: String(parsed.descripcion || '').slice(0, 500),
+      nombre: recortar(String(parsed.nombre || ''), 100),
+      especialidad: recortar(String(parsed.especialidad || ''), 120),
+      experiencia: recortar(String(parsed.experiencia || ''), 200),
+      descripcion: recortar(String(parsed.descripcion || ''), 500),
       servicios: serviciosCrudos
         .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
-        .map((s: string) => s.trim().slice(0, 110)) // 80 se quedaba corto para frases de servicio orientadas a beneficio, más largas que un simple "Hace X"
+        .map((s: string) => recortar(s.trim(), 110)) // 80 se quedaba corto para frases de servicio orientadas a beneficio, más largas que un simple "Hace X"
         .slice(0, 6),
       // Datos de contacto/ubicación que a veces ya están en el CV — son
       // solo una propuesta más: siempre se muestran en un campo
       // editable para que la persona los revise (y complete o corrija)
       // antes de guardar, igual que el resto.
-      telefono: String(parsed.telefono || '').slice(0, 40),
-      email: String(parsed.email || '').slice(0, 150),
-      direccion: String(parsed.direccion || '').slice(0, 200),
-      dondeTrabaja: String(parsed.dondeTrabaja || '').slice(0, 500),
-      educacion: String(parsed.educacion || '').slice(0, 300),
+      telefono: recortar(String(parsed.telefono || ''), 40),
+      email: recortar(String(parsed.email || ''), 150),
+      direccion: recortar(String(parsed.direccion || ''), 200),
+      dondeTrabaja: recortar(String(parsed.dondeTrabaja || ''), 500),
+      educacion: recortar(String(parsed.educacion || ''), 300),
     }
   } catch (err) {
     console.error('extraerDatosCV', err)
