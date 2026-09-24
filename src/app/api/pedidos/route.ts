@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,18 @@ export async function POST(req: NextRequest) {
     const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, envioExpress } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
+    }
+    // Mismo corte que el checkout (envioExpressDisponible), pero con la
+    // hora de Bolivia (UTC-4, sin horario de verano): el servidor corre
+    // en UTC y no podemos confiar en el reloj del navegador.
+    if (envioExpress) {
+      const ahoraBolivia = new Date(Date.now() - 4 * 60 * 60 * 1000)
+      if (ahoraBolivia.getUTCDay() === 0 || ahoraBolivia.getUTCHours() >= HORA_CORTE_EXPRESS) {
+        return NextResponse.json(
+          { error: `El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Elegí envío normal para continuar.` },
+          { status: 400 }
+        )
+      }
     }
     const db = getDb()
     const ref = await db.collection('pedidos').add({

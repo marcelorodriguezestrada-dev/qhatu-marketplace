@@ -11,7 +11,7 @@ import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
-import { fechaEntregaDefault, hayEntregaHoy, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
+import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -175,12 +175,18 @@ function CheckoutContent() {
   // aplica con envío, nunca con retiro en tienda.
   const [envioExpress, setEnvioExpress] = useState(false)
 
-  // Por si la pantalla quedó abierta de un día para el otro y ahora es
-  // domingo (o se restauró desde una espera guardada un sábado tarde):
-  // el express deja de tener sentido, se cae solo a envío normal.
+  // El express solo se ofrece antes de las 17:00 (y nunca domingo). Lo
+  // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
+  // hora de corte: ahí el botón se deshabilita y, si estaba elegido, se
+  // cae solo a envío normal.
+  const [expressDisponible, setExpressDisponible] = useState(() => envioExpressDisponible())
   useEffect(() => {
-    if (envioExpress && !hayEntregaHoy()) setEnvioExpress(false)
-  }, [envioExpress])
+    const t = setInterval(() => setExpressDisponible(envioExpressDisponible()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+  useEffect(() => {
+    if (envioExpress && !expressDisponible) setEnvioExpress(false)
+  }, [envioExpress, expressDisponible])
 
   // Qué vendedores del carrito habilitaron cobrar por QR. Ojo: no
   // alcanza con que hayan subido la foto del QR — tienen que haber
@@ -546,6 +552,11 @@ function CheckoutContent() {
     const validacionWhatsapp = validarWhatsappBoliviano(whatsappComprador)
     if (!validacionWhatsapp.valido) {
       setError(validacionWhatsapp.motivo || 'Revisá tu número de WhatsApp.')
+      return
+    }
+    if (metodoEntrega === 'envio' && envioExpress && !envioExpressDisponible()) {
+      setEnvioExpress(false)
+      setError(`El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Lo cambiamos a envío normal — revisá el total y volvé a confirmar.`)
       return
     }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
@@ -1077,22 +1088,31 @@ function CheckoutContent() {
                   🛵 Envío normal
                 </button>
                 {/* Los domingos no hay reparto — no tiene sentido
-                    ofrecer "llega hoy mismo" ese día. */}
+                    ofrecer "llega hoy mismo" ese día. Desde las 17:00
+                    se sigue mostrando, pero deshabilitado. */}
                 {hayEntregaHoy() && (
                   <button
                     type="button"
                     onClick={() => setEnvioExpress(true)}
-                    className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
+                    disabled={!expressDisponible}
+                    className={`w-full py-3 rounded-full border font-body text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${
                       envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
                     }`}
                   >
-                    ⚡ Envío express
+                    ⚡ Envío express{!expressDisponible && ' (no disponible)'}
                   </button>
                 )}
               </div>
-              <div className="font-body text-[11px] text-inksoft mb-3">
-                {envioExpress ? `Recibirá su pedido hoy mismo (+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}).` : `Recibirá su pedido ${fechaEntregaTexto()}.`}
-              </div>
+              {envioExpress ? (
+                <div className="font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2 mb-3">
+                  ⚡ <strong>Envío express:</strong> recibirá su pedido hoy mismo (+{bs(COSTO_ENVIO_EXPRESS_EXTRA)}). Válido para compras realizadas antes de las {HORA_CORTE_EXPRESS}:00.
+                </div>
+              ) : (
+                <div className="font-body text-[11px] text-inksoft mb-3">
+                  Recibirá su pedido {fechaEntregaTexto()}.
+                  {hayEntregaHoy() && !expressDisponible && ` El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00.`}
+                </div>
+              )}
 
               <div className="mb-3">
                 <button

@@ -23,6 +23,16 @@ export function hayEntregaHoy(ahora: Date = new Date()): boolean {
   return !esDomingo(ahora)
 }
 
+// El express se toma solo en compras hechas antes de las 17:00 — más
+// tarde ya no hay margen para prepararlo y entregarlo el mismo día.
+// Desde esa hora el botón queda deshabilitado en el checkout (y la API
+// de pedidos también lo rechaza, con la hora de Bolivia).
+export const HORA_CORTE_EXPRESS = 17
+
+export function envioExpressDisponible(ahora: Date = new Date()): boolean {
+  return hayEntregaHoy(ahora) && ahora.getHours() < HORA_CORTE_EXPRESS
+}
+
 // Próximos días hábiles (sin domingo) para elegir en "otro día",
 // empezando el día después de `desde` (normalmente la fecha de entrega
 // por default, ya corrida si hacía falta).
