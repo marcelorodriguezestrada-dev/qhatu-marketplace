@@ -12,6 +12,8 @@ import { calcularFranja, ordenarPorCercania, DEPOSITO } from '@/lib/reparto'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { parsearAnunciosWhatsapp, AnuncioParseado, mensajeInvitacionAnuncio } from '@/lib/parsearAnunciosWhatsapp'
 import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
+import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/components/EditorCV'
+import type { Idioma } from '@/lib/cvEstandar'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -169,6 +171,10 @@ export default function AdminPage() {
   const [educacion, setEducacion] = useState('')
   const [servicios, setServicios] = useState<string[]>([])
   const [nuevoServicio, setNuevoServicio] = useState('')
+  // CV estandarizado (historial laboral + idiomas) — mismo editor que
+  // en /mi-perfil, ver src/components/EditorCV.tsx.
+  const [historialCV, setHistorialCV] = useState<PuestoBorrador[]>([])
+  const [idiomasCV, setIdiomasCV] = useState<Idioma[]>([])
   const [zona, setZona] = useState('')
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
@@ -724,6 +730,17 @@ export default function AdminPage() {
     setServicios((s) => s.filter((_, idx) => idx !== i))
   }
 
+  async function mejorarPuestoConIAAdmin(p: PuestoBorrador) {
+    const res = await fetch('/api/profesionales/mejorar-puesto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ cargo: p.cargo, empresa: p.empresa, texto: p.logrosTexto, especialidad }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    return data as { logros: string[]; stack: string[] }
+  }
+
   async function leerCVAdmin(file: File | null) {
     if (!file) return
     setLeyendoCVAdmin(true)
@@ -751,6 +768,8 @@ export default function AdminPage() {
       if (datos.direccion) setDireccion(datos.direccion)
       if (datos.email) setEmailProfesional(datos.email)
       if (datos.servicios && datos.servicios.length > 0) setServicios(datos.servicios)
+      if (datos.historialLaboral && datos.historialLaboral.length > 0) setHistorialCV(aBorradores(datos.historialLaboral))
+      if (datos.idiomas && datos.idiomas.length > 0) setIdiomasCV(datos.idiomas)
 
       // El teléfono del CV puede traer código de país, espacios o
       // guiones — lo dejamos solo en dígitos y, si trae el 591 adelante,
@@ -796,6 +815,8 @@ export default function AdminPage() {
         whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
         experiencia,
+        historialLaboral: deBorradores(historialCV),
+        idiomas: idiomasCV,
       }
       const editando = !!profesionalEditandoId
       const res = await fetch(
@@ -813,6 +834,7 @@ export default function AdminPage() {
       }
       setNombre(''); setDescripcion(''); setServicios([]); setDondeTrabaja(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null); setEducacion('')
+      setHistorialCV([]); setIdiomasCV([])
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -845,6 +867,8 @@ export default function AdminPage() {
     setImagenUrl(p.imagenUrl || '')
     setPrecio(p.precio != null ? String(p.precio) : '')
     setExperiencia(p.experiencia || '')
+    setHistorialCV(aBorradores(p.historialLaboral))
+    setIdiomasCV(p.idiomas || [])
     setPlan(p.plan === 'premium' ? 'premium' : 'basico')
     setEditHorarioBloques(p.horarioTurnos?.bloques || [])
     setErrorForm('')
@@ -856,6 +880,7 @@ export default function AdminPage() {
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
     setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
+    setHistorialCV([]); setIdiomasCV([])
     setErrorForm('')
   }
 
@@ -1734,6 +1759,27 @@ export default function AdminPage() {
               )}
             </div>
 
+            <div className="border border-line rounded-lg p-3 mb-3">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="font-body text-xs font-semibold text-ink">CV estandarizado (opcional)</div>
+                {profesionalEditandoId && (
+                  <a href={`/servicios/${profesionalEditandoId}/cv`} target="_blank" rel="noopener noreferrer" className="font-body text-[11px] text-teal underline shrink-0">
+                    📄 Ver CV guardado
+                  </a>
+                )}
+              </div>
+              <div className="font-body text-[11px] text-inksoft mb-2.5">
+                Historial laboral e idiomas — con esto y el resto del formulario se arma su CV oficial descargable en PDF. Si subiste un CV arriba, ya viene precargado.
+              </div>
+              <EditorCV
+                historial={historialCV}
+                onHistorialChange={setHistorialCV}
+                idiomas={idiomasCV}
+                onIdiomasChange={setIdiomasCV}
+                mejorarConIA={mejorarPuestoConIAAdmin}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-3">
               <input
                 value={precio}
@@ -2256,6 +2302,14 @@ export default function AdminPage() {
                   👁 {p.vistas || 0} vistas · 💬 {p.clicsWhatsapp || 0} contactos
                 </div>
               </div>
+              <a
+                href={`/servicios/${p.id}/cv`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-body text-xs text-inksoft underline shrink-0"
+              >
+                CV
+              </a>
               <button
                 onClick={() => abrirEditarProfesional(p)}
                 className="font-body text-xs text-teal underline shrink-0"

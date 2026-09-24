@@ -8,6 +8,8 @@ import { esPremiumVigente, PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } fr
 import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { DIAS_SEMANA, HorarioProfesional, HORARIO_VACIO, INTERVALOS_TURNO, BloqueHorario } from '@/data/turnos'
 import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
+import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/components/EditorCV'
+import type { PuestoLaboral, Idioma } from '@/lib/cvEstandar'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
 const BANK_NAME = process.env.NEXT_PUBLIC_BANK_NAME || ''
@@ -24,6 +26,8 @@ type Profesional = {
   educacion?: string
   experiencia?: string
   servicios?: string[]
+  historialLaboral?: PuestoLaboral[]
+  idiomas?: Idioma[]
   estado?: string
   notaAdmin?: string
   plan?: string
@@ -90,7 +94,7 @@ export default function MiPerfilPage() {
   // al tocar "Guardar" se escribe en tu perfil. Nunca se guarda solo.
   const [leyendoCV, setLeyendoCV] = useState(false)
   const [errorCV, setErrorCV] = useState('')
-  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; servicios: string[]; dondeTrabaja?: string; rubroSugerido?: string | null } | null>(null)
+  const [propuestaCV, setPropuestaCV] = useState<{ nombre: string; especialidad: string; experiencia: string; descripcion: string; servicios: string[]; dondeTrabaja?: string; rubroSugerido?: string | null; historialLaboral?: PuestoLaboral[] } | null>(null)
   const [guardandoCV, setGuardandoCV] = useState(false)
   const [cvGuardado, setCvGuardado] = useState(false)
 
@@ -104,6 +108,17 @@ export default function MiPerfilPage() {
   const [guardandoServicios, setGuardandoServicios] = useState(false)
   const [serviciosGuardados, setServiciosGuardados] = useState(false)
   const [errorServicios, setErrorServicios] = useState('')
+
+  // --- Mi CV (historial laboral + idiomas) ---
+  // Con esto y el resto del perfil se arma el CV estandarizado en
+  // /servicios/[id]/cv — pensado sobre todo para quien no tiene un CV
+  // propio: carga sus puestos acá (con ayuda de la IA para redactar) y
+  // ese pasa a ser su CV oficial, descargable en PDF.
+  const [miHistorial, setMiHistorial] = useState<PuestoBorrador[]>([])
+  const [misIdiomas, setMisIdiomas] = useState<Idioma[]>([])
+  const [guardandoMiCV, setGuardandoMiCV] = useState(false)
+  const [miCVGuardado, setMiCVGuardado] = useState(false)
+  const [errorMiCV, setErrorMiCV] = useState('')
 
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
@@ -120,6 +135,8 @@ export default function MiPerfilPage() {
       setMisServicios(profesional.servicios || [])
       setMiDondeTrabaja(profesional.dondeTrabaja || '')
       setMiEducacion(profesional.educacion || '')
+      setMiHistorial(aBorradores(profesional.historialLaboral))
+      setMisIdiomas(profesional.idiomas || [])
     }
   }, [profesional?.id])
 
@@ -326,6 +343,13 @@ export default function MiPerfilPage() {
       // pero la revisa y la guarda desde esa misma caja como siempre.
       if (data.datos?.dondeTrabaja) setMiDondeTrabaja(data.datos.dondeTrabaja)
       if (data.datos?.educacion) setMiEducacion(data.datos.educacion)
+      // Lo mismo con el historial laboral e idiomas: se precargan en
+      // "Mi CV" y se guardan desde esa caja, después de revisarlos.
+      if (data.datos?.historialLaboral?.length > 0) {
+        setMiHistorial(aBorradores(data.datos.historialLaboral))
+        setMiCVGuardado(false)
+      }
+      if (data.datos?.idiomas?.length > 0) setMisIdiomas(data.datos.idiomas)
     } catch (e: any) {
       setErrorCV(e?.message || 'No se pudo leer el CV.')
     } finally {
@@ -406,6 +430,42 @@ export default function MiPerfilPage() {
     } finally {
       setGuardandoServicios(false)
     }
+  }
+
+  async function guardarMiCV() {
+    if (!profesional) return
+    setGuardandoMiCV(true)
+    setMiCVGuardado(false)
+    setErrorMiCV('')
+    try {
+      const historialLaboral = deBorradores(miHistorial)
+      const token = await obtenerToken()
+      const res = await fetch(`/api/profesionales/${profesional.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ historialLaboral, idiomas: misIdiomas }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setProfesional((p) => (p ? { ...p, historialLaboral, idiomas: misIdiomas } : p))
+      setMiCVGuardado(true)
+    } catch (e: any) {
+      setErrorMiCV(e?.message || 'No se pudo guardar tu CV.')
+    } finally {
+      setGuardandoMiCV(false)
+    }
+  }
+
+  async function mejorarPuestoConIA(p: PuestoBorrador) {
+    const token = await obtenerToken()
+    const res = await fetch('/api/profesionales/mejorar-puesto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ cargo: p.cargo, empresa: p.empresa, texto: p.logrosTexto, especialidad: profesional?.especialidad }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    return data as { logros: string[]; stack: string[] }
   }
 
   async function borrarFoto(url: string) {
@@ -554,6 +614,12 @@ export default function MiPerfilPage() {
               </div>
             )}
 
+            {(propuestaCV.historialLaboral?.length || 0) > 0 && (
+              <div className="font-body text-[11px] text-inksoft mb-2.5">
+                💡 También precargamos tu historial laboral e idiomas más abajo en "Mi CV" — revisalos y guardalos desde ahí.
+              </div>
+            )}
+
             {propuestaCV.rubroSugerido && propuestaCV.rubroSugerido !== profesional.rubro && (
               <div className="font-body text-[11px] text-inksoft mb-3">
                 💡 Por lo que dice tu CV, tu rubro podría ser distinto al que tenés cargado. Si querés cambiarlo, escribinos por WhatsApp — el rubro lo maneja el admin para mantener ordenado el directorio.
@@ -646,6 +712,42 @@ export default function MiPerfilPage() {
           className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
         >
           {guardandoServicios ? 'Guardando...' : 'Guardar'}
+        </button>
+      </div>
+
+      {/* --- Mi CV: historial laboral + idiomas → CV estandarizado --- */}
+      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="font-body text-sm font-semibold text-ink">Mi CV</div>
+          <Link href={`/servicios/${profesional.id}/cv`} target="_blank" className="font-body text-xs text-teal font-semibold underline shrink-0">
+            📄 Ver y descargar PDF
+          </Link>
+        </div>
+        <div className="font-body text-xs text-inksoft mb-3">
+          Cargá tus trabajos y la plataforma arma tu CV con un formato profesional, igual para todos — no hace falta que tengas uno propio. Usa también tu nombre, especialidad, descripción, estudios y servicios de más arriba.
+        </div>
+
+        {errorMiCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorMiCV}</div>}
+        {miCVGuardado && (
+          <div className="font-body text-xs text-teal bg-teal/10 border border-teal rounded-md px-3 py-2 mb-3">
+            Guardado ✓ — <Link href={`/servicios/${profesional.id}/cv`} target="_blank" className="underline">ver cómo quedó tu CV</Link>
+          </div>
+        )}
+
+        <EditorCV
+          historial={miHistorial}
+          onHistorialChange={(h) => { setMiHistorial(h); setMiCVGuardado(false) }}
+          idiomas={misIdiomas}
+          onIdiomasChange={(i) => { setMisIdiomas(i); setMiCVGuardado(false) }}
+          mejorarConIA={mejorarPuestoConIA}
+        />
+
+        <button
+          onClick={guardarMiCV}
+          disabled={guardandoMiCV}
+          className="w-full mt-4 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+        >
+          {guardandoMiCV ? 'Guardando...' : 'Guardar mi CV'}
         </button>
       </div>
 

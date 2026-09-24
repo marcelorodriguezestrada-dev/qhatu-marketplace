@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
+import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios } = body
+    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest) {
       dondeTrabaja: (dondeTrabaja || '').trim().slice(0, 500),
       educacion: (educacion || '').trim().slice(0, 300),
       servicios: serviciosLimpios,
+      historialLaboral: sanearHistorialLaboral(historialLaboral),
+      idiomas: sanearIdiomas(idiomas),
       zona: zona || '',
       // Dirección puntual (calle/número), distinta de "zona" (el
       // barrio). Las dos son opcionales y se muestran juntas en el

@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { validarHorario } from '@/data/turnos'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
+import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,8 +25,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Sumamos +1 a las vistas del perfil — no esperamos a que termine
     // (fire-and-forget) para no hacer más lenta la respuesta al
     // visitante. Si falla, no rompe nada; es solo una métrica.
-    ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
-    sumarMetricaDiaria('vistasProfesionales').catch(() => {})
+    // La página del CV (/servicios/[id]/cv) manda ?sinVista=1: la usan
+    // sobre todo el propio profesional y el admin para revisarlo y
+    // descargarlo, y no queremos inflar las vistas del perfil con eso.
+    if (!req.nextUrl.searchParams.get('sinVista')) {
+      ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
+      sumarMetricaDiaria('vistasProfesionales').catch(() => {})
+    }
 
     return NextResponse.json({ id: doc.id, ...doc.data(), resenas })
   } catch (err) {
@@ -39,13 +45,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //    estado, plan y demás datos "de gestión" de la plataforma.
 //  - El propio profesional (con su login de Firebase, dueño de este
 //    documento vía solicitanteUid) → puede editar solo los campos de su
-//    "presentación": nombre, especialidad, descripción y experiencia.
+//    "presentación": nombre, especialidad, descripción, experiencia,
+//    servicios, estudios y su CV (historial laboral e idiomas).
 //    Es lo que usa /mi-perfil al guardar la propuesta armada desde su
 //    CV (ver /api/profesionales/extraer-cv) — el resto de los campos
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -76,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas } = bodyPermitido
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -122,6 +129,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .slice(0, 6)
         : []
     }
+    // CV estandarizado (ver src/lib/cvEstandar.ts) — mismo saneo para
+    // el dueño y para el admin.
+    if (historialLaboral !== undefined) cambios.historialLaboral = sanearHistorialLaboral(historialLaboral)
+    if (idiomas !== undefined) cambios.idiomas = sanearIdiomas(idiomas)
     // El admin puede cargar/corregir la agenda de turnos de un
     // profesional (mismo campo que el self-service de
     // /api/profesionales/[id]/horarios, pero sin exigirle Premium —

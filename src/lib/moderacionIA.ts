@@ -1,3 +1,5 @@
+import { sanearHistorialLaboral, sanearIdiomas, type PuestoLaboral, type Idioma } from '@/lib/cvEstandar'
+
 // Pre-filtro de moderación con IA (API de Groq, gratis — mismo
 // proveedor que ya usa la app de consultorio). Esto NO reemplaza tu
 // revisión manual en /admin — solo le pone una etiqueta de riesgo a
@@ -148,6 +150,8 @@ export type DatosCVExtraidos = {
   direccion: string
   dondeTrabaja: string
   educacion: string
+  historialLaboral: PuestoLaboral[]
+  idiomas: Idioma[]
 }
 
 const SYSTEM_PROMPT_CV =
@@ -174,9 +178,17 @@ const SYSTEM_PROMPT_CV =
   'Después, si hay experiencia previa relevante, otra línea aparte "Antes: " con los 2 o 3 empleadores anteriores más importantes, cada uno solo con nombre y años (sin repetir tareas ni tecnologías, de eso ya se encargan "servicios" y "descripcion"). ' +
   'Separá esas dos líneas con un salto de línea real (\\n) dentro del string. Si no hay experiencia previa que valga la pena mencionar, dejá solo la línea "Actualmente: ". Si el CV no da nada de esto, dejalo en "". ' +
   '"educacion": estudios formales de la persona (títulos universitarios, maestrías, doctorados, certificaciones relevantes) — es otro punto fuerte para generar confianza, así que rescatalo si el CV lo trae. Formato compacto: cada título separado por " · ", como "Maestría en Data Mining (UBA) · Maestría en Finanzas (UTDT) · Ingeniería en Sistemas (UCB)". Máximo 40 palabras en total; si hay muchos títulos, priorizá los de nivel más alto o más relevantes para su especialidad. No incluyas colegio secundario. Si el CV no menciona estudios formales, dejalo en "". ' +
+  '"historialLaboral": lista de TODOS los puestos del CV (máximo 12), del más reciente al más viejo, para armar su CV estandarizado. Cada uno con: ' +
+  '"cargo" (tal como figura), "empresa" (nombre de la empresa o institución), "cliente" (aclaración opcional como "Cliente: KAVAK" o "Proyecto X vía Y", o ""), ' +
+  '"desde" y "hasta" en formato "AAAA-MM" si el CV da el mes, o "AAAA" si solo da el año, o "" si no da nada; "actual": true si es su trabajo actual (ahí "hasta" va ""); ' +
+  '"logros": de 1 a 5 logros o responsabilidades, cada uno con el formato "Título corto: descripción" (ej: "Optimización de pipelines: Reingeniería de los pipelines ETL, logrando una reducción del 70% en el tiempo de procesamiento") — respetá los números y resultados que el CV da, sin inventar ninguno; ' +
+  '"stack": herramientas, tecnologías o materiales que el CV menciona para ese puesto (máximo 12, nombres cortos), o [] si no menciona. ' +
+  'Si el CV no tiene experiencia laboral, devolvé []. ' +
+  '"idiomas": lista de idiomas que el CV menciona, cada uno {"idioma": "Español", "nivel": "Nativo"} (nivel tal como lo dice el CV, ej: "Profesional — Lectura y escritura técnica avanzada"), o [] si no menciona. ' +
   'Si algún dato no aparece en el CV, dejá ese campo como string vacío ("") o array vacío ([]) — NUNCA inventes datos que no estén en el texto. ' +
   'Respondé SOLO JSON válido, sin backticks ni texto adicional, con esta forma exacta: ' +
-  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "...", "educacion": "..."}'
+  '{"nombre": "...", "especialidad": "...", "experiencia": "...", "descripcion": "...", "servicios": ["...", "..."], "telefono": "...", "email": "...", "direccion": "...", "dondeTrabaja": "...", "educacion": "...", ' +
+  '"historialLaboral": [{"cargo": "...", "empresa": "...", "cliente": "...", "desde": "...", "hasta": "...", "actual": false, "logros": ["..."], "stack": ["..."]}], "idiomas": [{"idioma": "...", "nivel": "..."}]}'
 
 // Recorta un texto a `max` caracteres sin partir una palabra al medio
 // (evita cosas como "...fuente de ve" en vez de "...fuente de verdad") —
@@ -205,7 +217,7 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
         // bien, no solo clasificar — así que usamos el modelo grande,
         // todavía gratis en Groq.
         model: 'openai/gpt-oss-120b',
-        max_completion_tokens: 1500, // antes 1200 — subido de nuevo porque descripcion/servicios ahora piden más elaboración (copy de venta) y sigue siendo modelo de razonamiento que gasta tokens "pensando" antes de escribir
+        max_completion_tokens: 4500, // antes 1500 (y antes 1200) — ahora también devuelve el historial laboral completo con logros por puesto, que es lo más largo de la respuesta; — subido de nuevo porque descripcion/servicios ahora piden más elaboración (copy de venta) y sigue siendo modelo de razonamiento que gasta tokens "pensando" antes de escribir
         reasoning_effort: 'low', // no necesita razonar mucho, es redacción/extracción — así deja más presupuesto para el contenido
         response_format: { type: 'json_object' },
         messages: [
@@ -242,9 +254,72 @@ export async function extraerDatosCV(textoCV: string): Promise<DatosCVExtraidos 
       direccion: recortar(String(parsed.direccion || ''), 200),
       dondeTrabaja: recortar(String(parsed.dondeTrabaja || ''), 500),
       educacion: recortar(String(parsed.educacion || ''), 300),
+      // CV estandarizado: mismo saneo que cuando se guarda desde el
+      // formulario, así la propuesta ya viene con los mismos límites.
+      historialLaboral: sanearHistorialLaboral(parsed.historialLaboral),
+      idiomas: sanearIdiomas(parsed.idiomas),
     }
   } catch (err) {
     console.error('extraerDatosCV', err)
+    return null
+  }
+}
+
+// Ayuda para quien NO tiene CV propio y arma el suyo desde /mi-perfil o
+// /admin: escribe con sus palabras qué hacía en un puesto (aunque sea
+// desordenado, "arreglaba cañerías, hice la obra del edificio X") y la
+// IA lo devuelve redactado como logros prolijos "Título: descripción",
+// más las herramientas que se mencionan. Como siempre, es una
+// propuesta: vuelve al formulario para revisarla antes de guardar.
+const SYSTEM_PROMPT_PUESTO =
+  'Ayudás a profesionales bolivianos (de cualquier rubro: oficios, salud, ingeniería, comercio, etc.) a armar su CV en Clasi Click. ' +
+  'Te paso un puesto de trabajo (cargo, empresa) y lo que la persona escribió con sus palabras sobre lo que hacía ahí. ' +
+  'Reescribilo como de 2 a 5 logros o responsabilidades, cada uno con el formato "Título corto: descripción" (título de 2 a 5 palabras; descripción de una oración clara, en tercera persona implícita, empezando con un sustantivo o verbo de acción, ej: "Mantenimiento preventivo: Revisión mensual de instalaciones sanitarias en 3 edificios, reduciendo las urgencias por fugas"). ' +
+  'Usá SOLO lo que la persona dijo: podés ordenar, agrupar y mejorar la redacción, pero NUNCA inventes números, clientes, resultados ni tareas que no mencionó. ' +
+  'En "stack" devolvé las herramientas, tecnologías, equipos o materiales que la persona mencionó explícitamente (máximo 12, nombres cortos), o [] si no mencionó ninguna. ' +
+  'Respondé SOLO JSON válido, sin backticks: {"logros": ["...", "..."], "stack": ["..."]}'
+
+export async function mejorarPuestoLaboral(datos: { cargo: string; empresa: string; texto: string; especialidad?: string }): Promise<{ logros: string[]; stack: string[] } | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey || !datos.texto.trim()) return null
+
+  const contenido =
+    `Cargo: ${datos.cargo || '(sin cargo)'}\n` +
+    `Empresa: ${datos.empresa || '(sin empresa)'}\n` +
+    (datos.especialidad ? `Especialidad general de la persona: ${datos.especialidad}\n` : '') +
+    `Lo que hacía (con sus palabras):\n${datos.texto}`
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b', // redacción, igual que extraerDatosCV
+        max_completion_tokens: 1200,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT_PUESTO },
+          { role: 'user', content: contenido },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('mejorarPuestoLaboral: Groq respondió', res.status)
+      return null
+    }
+    const data = await res.json()
+    const texto = data.choices?.[0]?.message?.content
+    if (!texto) return null
+    const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+    // Reusamos el saneo del historial para aplicar los mismos límites.
+    const [puesto] = sanearHistorialLaboral([{ cargo: datos.cargo || '-', logros: parsed.logros, stack: parsed.stack }])
+    return puesto ? { logros: puesto.logros, stack: puesto.stack } : null
+  } catch (err) {
+    console.error('mejorarPuestoLaboral', err)
     return null
   }
 }

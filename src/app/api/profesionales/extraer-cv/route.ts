@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
     // Recortamos por las dudas — un CV largo no necesita mandarse
     // entero para que la IA saque lo esencial, y así el costo/latencia
     // no dependen de qué tan largo sea el archivo que subió la persona.
-    const textoRecortado = texto.trim().slice(0, 6000)
+    // 12.000 caracteres (antes 6.000) alcanzan para un CV de 2-3
+    // páginas: ahora también extraemos el historial laboral completo.
+    const textoRecortado = texto.trim().slice(0, 12000)
 
     const datos = await extraerDatosCV(textoRecortado)
     if (!datos) {
