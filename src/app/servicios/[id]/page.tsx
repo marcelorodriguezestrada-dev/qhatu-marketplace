@@ -345,9 +345,6 @@ export default function PerfilProfesionalPage() {
             >
               <span className="text-base">💬</span> Contactar por WhatsApp
             </a>
-            <div className="font-body text-[11px] text-inksoft text-center mt-2">
-              Respondé directo, sin intermediarios — es gratis escribir.
-            </div>
 
             {agendaActiva && (
               <div className="mt-4 pt-4 border-t border-line">
