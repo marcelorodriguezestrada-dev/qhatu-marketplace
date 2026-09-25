@@ -88,6 +88,9 @@ type SubPedido = {
   costoEnvio: number
   // Descuento del cupón en productos que le tocó a este pedido.
   descuento?: number
+  // Parte del envío que cubrió el cupón (envío gratis) — para mostrar
+  // "Envío: Bs 5 → Gratis" en el resumen del pago.
+  descuentoEnvio?: number
   total: number
   qrImageUrl: string
   cbu: string
@@ -774,6 +777,7 @@ function CheckoutContent() {
           subtotal,
           costoEnvio: envioGrupo,
           descuento: descuentoGrupo,
+          descuentoEnvio: descuentosEnvioRepartidos[i],
           total: totalGrupo,
           qrImageUrl,
           cbu,
@@ -960,7 +964,7 @@ function CheckoutContent() {
       // una falla técnica (red, ImgBB caído) como haber subido un
       // archivo que no es una imagen válida del comprobante.
       console.error('Error subiendo el comprobante:', e)
-      setError('Error al enviar el comprobante, vuelva a intentarlo.')
+      setError('Comprobante inválido, vuelva a intentarlo.')
     } finally {
       setSubiendoComprobante(false)
     }
@@ -1283,6 +1287,12 @@ function CheckoutContent() {
                   </button>
                 )}
               </div>
+              {descuentoEnvioCupon > 0 && (
+                <div className="font-body text-sm text-teal bg-tealsoft border border-teal rounded-lg px-3 py-2.5 mb-3">
+                  🎉 <strong>¡Envío gratis!</strong> con el cupón {cuponAplicado?.codigo}
+                  {costoEnvioFinal > 0 && <> — pagás solo el extra del express ({bs(costoEnvioFinal)})</>}
+                </div>
+              )}
               {envioExpress ? (
                 <div className="font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2 mb-3">
                   ⚡ <strong>Envío express:</strong> recibirá su pedido hoy mismo (+{bs(COSTO_ENVIO_EXPRESS_EXTRA)}). Válido para compras realizadas antes de las {HORA_CORTE_EXPRESS}:00.
@@ -1479,7 +1489,17 @@ function CheckoutContent() {
                 <span>−{bs(subPedidos[pasoActual].descuento || 0)}</span>
               </div>
             )}
-            {subPedidos[pasoActual].costoEnvio > 0 && (
+            {(subPedidos[pasoActual].descuentoEnvio || 0) > 0 ? (
+              <div className="flex items-center justify-between font-body text-[13px] text-inksoft">
+                <span>Envío</span>
+                <span>
+                  <span className="line-through mr-1.5">{bs(subPedidos[pasoActual].costoEnvio + (subPedidos[pasoActual].descuentoEnvio || 0))}</span>
+                  <span className="text-teal font-semibold">
+                    {subPedidos[pasoActual].costoEnvio === 0 ? '🎉 Gratis' : bs(subPedidos[pasoActual].costoEnvio)}
+                  </span>
+                </span>
+              </div>
+            ) : subPedidos[pasoActual].costoEnvio > 0 && (
               <div className="flex items-center justify-between font-body text-[13px] text-inksoft">
                 <span>Envío</span>
                 <span>{bs(subPedidos[pasoActual].costoEnvio)}</span>
@@ -1551,8 +1571,8 @@ function CheckoutContent() {
               📎 Subí la foto del comprobante
             </div>
             {rechazoComprobante && !comprobanteUrl && (
-              <div className="font-body text-xs text-maroon bg-maroonsoft border border-maroon rounded-lg px-3 py-2.5 mb-2.5">
-                <div className="font-semibold">❌ Comprobante inválido, vuelva a intentarlo.</div>
+              <div className="font-body text-sm text-maroon bg-maroonsoft border-2 border-maroon rounded-lg px-3.5 py-3 mb-3">
+                <div className="font-bold text-base">❌ Comprobante inválido, vuelva a intentarlo</div>
                 <div className="mt-0.5">{rechazoComprobante.motivo}</div>
                 {rechazoComprobante.intentos > 0 && (
                   <div className="mt-1 font-semibold">
@@ -1573,7 +1593,7 @@ function CheckoutContent() {
                       onClick={() => { setComprobanteUrl(''); setResultadoOCR(null) }}
                       className="font-body text-[11px] text-inksoft underline"
                     >
-                      Sacar y subir otra
+                      Volver a subir el comprobante
                     </button>
                   </div>
                 </div>
@@ -1604,7 +1624,7 @@ function CheckoutContent() {
             )}
           </div>
 
-          {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
+          {error && <div className="font-body text-base font-bold text-maroon bg-maroonsoft border-2 border-maroon rounded-lg px-3.5 py-3 mb-3">❌ {error}</div>}
 
           <button
             onClick={declararPagoActual}
