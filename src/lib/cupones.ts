@@ -33,6 +33,9 @@ export type Cupon = {
   unaVezPorUsuario: boolean
   // Solo envío gratis: si también cubre el extra del envío express.
   incluyeExpress: boolean
+  // Se muestra como banner público (portada y productos) — hasta a la
+  // gente sin sesión, para invitarla a entrar y usarlo.
+  destacado: boolean
   activo: boolean
   usosCount: number
   createdAt: string
@@ -125,7 +128,26 @@ export function sanearCupon(body: any): { datos?: Omit<Cupon, 'id' | 'usosCount'
       limiteUsos: Math.floor(num(body?.limiteUsos)),
       unaVezPorUsuario: !!body?.unaVezPorUsuario,
       incluyeExpress: tipo === 'envio_gratis' && !!body?.incluyeExpress,
+      destacado: !!body?.destacado,
       activo: body?.activo !== false,
     },
+  }
+}
+
+// Cupón que alguien eligió desde el banner (o que quedó pendiente
+// mientras iniciaba sesión): el checkout lo aplica solo al entrar.
+export const CLAVE_CUPON_PENDIENTE = 'clasiclick_cupon_pendiente'
+
+export function guardarCuponPendiente(codigo: string) {
+  try { localStorage.setItem(CLAVE_CUPON_PENDIENTE, normalizarCodigo(codigo)) } catch {}
+}
+
+export function tomarCuponPendiente(): string {
+  try {
+    const c = localStorage.getItem(CLAVE_CUPON_PENDIENTE) || ''
+    localStorage.removeItem(CLAVE_CUPON_PENDIENTE)
+    return normalizarCodigo(c)
+  } catch {
+    return ''
   }
 }

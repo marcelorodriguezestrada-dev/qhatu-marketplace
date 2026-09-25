@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import BannerCuponPromo from '@/components/BannerCuponPromo'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { expandirTalles } from '@/data/productos'
@@ -102,7 +103,7 @@ export default function ProductoDetallePage() {
 
   function agregarItemsAlCarrito() {
     if (!usuario) {
-      router.push('/login')
+      router.push(`/login?volver=${encodeURIComponent(`/producto/${id}`)}`)
       return false
     }
     if (!producto) return false
@@ -218,6 +219,8 @@ export default function ProductoDetallePage() {
           </button>
         </div>
       </div>
+
+      <BannerCuponPromo />
 
       {/* Pestañas */}
       <div className="flex gap-1 mb-6 border-b border-line">

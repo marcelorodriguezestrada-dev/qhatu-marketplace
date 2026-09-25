@@ -21,6 +21,7 @@ const FORM_VACIO = {
   limiteUsos: '',
   unaVezPorUsuario: true,
   incluyeExpress: false,
+  destacado: false,
 }
 
 function fechaLegible(iso: string) {
@@ -110,6 +111,7 @@ export default function AdminCupones({ password }: { password: string }) {
       limiteUsos: c.limiteUsos ? String(c.limiteUsos) : '',
       unaVezPorUsuario: !!c.unaVezPorUsuario,
       incluyeExpress: !!c.incluyeExpress,
+      destacado: !!c.destacado,
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -242,6 +244,10 @@ export default function AdminCupones({ password }: { password: string }) {
 
         <div className="flex flex-col gap-1.5 mb-3">
           <label className="flex items-center gap-2 font-body text-xs text-ink cursor-pointer">
+            <input type="checkbox" checked={form.destacado} onChange={(e) => campo('destacado', e.target.checked)} className="accent-teal" />
+            <span><span className="font-semibold">Mostrar como banner</span> en la portada y en cada producto (lo ve todo el mundo, aunque no haya iniciado sesión)</span>
+          </label>
+          <label className="flex items-center gap-2 font-body text-xs text-ink cursor-pointer">
             <input type="checkbox" checked={form.unaVezPorUsuario} onChange={(e) => campo('unaVezPorUsuario', e.target.checked)} className="accent-teal" />
             Una sola vez por cliente
           </label>
@@ -286,6 +292,7 @@ export default function AdminCupones({ password }: { password: string }) {
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="font-display text-base font-bold text-ink tracking-wide">🎟️ {c.codigo}</span>
               <span className={`border rounded-full px-2 py-0.5 font-body text-[10px] font-semibold ${estado.clase}`}>{estado.label}</span>
+              {c.destacado && <span className="border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold">📣 Banner</span>}
               {c.campana && <span className="font-body text-xs text-inksoft">· {c.campana}</span>}
             </div>
             <div className="font-body text-xs text-ink">

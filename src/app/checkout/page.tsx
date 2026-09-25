@@ -11,7 +11,7 @@ import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
-import { evaluarCupon, type Cupon } from '@/lib/cupones'
+import { evaluarCupon, tomarCuponPendiente, type Cupon } from '@/lib/cupones'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
@@ -527,9 +527,10 @@ function CheckoutContent() {
   const costoEnvioFinal = costoEnvio - descuentoEnvioCupon
   const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
 
-  async function aplicarCupon() {
-    const codigo = codigoCupon.trim()
+  async function aplicarCupon(codigoForzado?: string) {
+    const codigo = (codigoForzado ?? codigoCupon).trim()
     if (!codigo) return
+    setCodigoCupon(codigo)
     setAplicandoCupon(true)
     setErrorCupon('')
     try {
@@ -550,6 +551,17 @@ function CheckoutContent() {
       setAplicandoCupon(false)
     }
   }
+
+  // Cupón elegido desde el banner de la portada/producto (ver
+  // BannerCuponPromo): se aplica solo una vez que hay carrito y sesión.
+  const cuponPendienteRevisado = useRef(false)
+  useEffect(() => {
+    if (cuponPendienteRevisado.current || !usuario || items.length === 0 || cuponAplicado) return
+    cuponPendienteRevisado.current = true
+    const pendiente = tomarCuponPendiente()
+    if (pendiente) aplicarCupon(pendiente)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, items.length])
 
   function quitarCupon() {
     setCuponAplicado(null)
@@ -1107,7 +1119,7 @@ function CheckoutContent() {
                     />
                     <button
                       type="button"
-                      onClick={aplicarCupon}
+                      onClick={() => aplicarCupon()}
                       disabled={aplicandoCupon || !codigoCupon.trim()}
                       className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
                     >

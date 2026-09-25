@@ -9,6 +9,7 @@ import { ProductCard } from '@/components/ProductCard'
 import { CartDrawer } from '@/components/CartDrawer'
 import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { BannerCarousel } from '@/components/BannerCarousel'
+import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -190,6 +191,8 @@ export default function CatalogoPage() {
             </button>
           ))}
         </div>
+
+        <BannerCuponPromo />
 
         {publico === 'Todo' ? (
           <BannerCarousel />

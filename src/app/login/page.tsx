@@ -14,6 +14,14 @@ const MENSAJES_FIREBASE: Record<string, string> = {
   'auth/user-not-found': 'No hay ninguna cuenta con ese email.',
 }
 
+// ?volver=/producto/123 → después de entrar vuelve ahí (ej. desde el
+// banner de un cupón). Solo rutas internas, nunca a otro sitio.
+function destinoTrasLogin() {
+  if (typeof window === 'undefined') return '/'
+  const v = new URLSearchParams(window.location.search).get('volver') || ''
+  return v.startsWith('/') && !v.startsWith('//') ? v : '/'
+}
+
 export default function LoginPage() {
   const { usuario, emailVerificado, login, registrarse, recuperarPassword, obtenerToken, logout, marcarEmailVerificado } = useAuth()
   const router = useRouter()
@@ -48,7 +56,7 @@ export default function LoginPage() {
     // a las cuentas viejas de antes de este sistema).
     if (modo !== 'login') return
     if (emailVerificado === true) {
-      router.push('/')
+      router.push(destinoTrasLogin())
       return
     }
     setEmail(usuario.email || '')
@@ -160,7 +168,7 @@ export default function LoginPage() {
       // solo, el gate global todavía ve el valor viejo (false) durante
       // ese instante y rebota a la persona de vuelta para acá.
       marcarEmailVerificado()
-      router.push('/')
+      router.push(destinoTrasLogin())
     } catch {
       setError('No pudimos verificar el código. Probá de nuevo.')
     } finally {
