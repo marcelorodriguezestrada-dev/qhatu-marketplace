@@ -7,7 +7,7 @@ import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano, distanciaKm } from '@/data/zonasPotosi'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
-import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
+import { leerComprobante, comprobanteValido, motivoRechazo, MAX_INTENTOS_COMPROBANTE, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
@@ -368,6 +368,12 @@ function CheckoutContent() {
   const [resultadoOCR, setResultadoOCR] = useState<ResultadoOCR | null>(null)
   const [leyendoOCR, setLeyendoOCR] = useState(false)
   const [subiendoComprobante, setSubiendoComprobante] = useState(false)
+  // Comprobante rechazado por la lectura automática: se avisa, se deja
+  // subir otro y a los 3 intentos el servidor anula la compra (ver
+  // comprobanteRechazado en /api/pedidos/[id]).
+  const [rechazoComprobante, setRechazoComprobante] = useState<{ intentos: number; motivo: string } | null>(null)
+  const [registrandoRechazo, setRegistrandoRechazo] = useState(false)
+  const rechazoRegistradoRef = useRef('')
   // Preferencia de entrega ya guardada (ver SelectorHorarioEntrega,
   // que hace el PATCH a /api/pedidos/[id] — acá solo se refleja el
   // resultado para el texto de arriba del resumen).
@@ -838,6 +844,47 @@ function CheckoutContent() {
   // Confirma el pago DENTRO de la app. Exige comprobante subido — sin
   // eso no se puede avanzar (antes era opcional y el paso real pasaba
   // por WhatsApp; ahora WhatsApp es un extra).
+  // Cuando ya están la imagen subida y la lectura, si el comprobante no
+  // es válido se registra el intento fallido y se vuelve a pedir otro.
+  useEffect(() => {
+    const sub = subPedidos[pasoActual]
+    if (!sub?.pedidoId || !comprobanteUrl || !resultadoOCR || leyendoOCR) return
+    if (comprobanteValido(resultadoOCR)) return
+    if (rechazoRegistradoRef.current === comprobanteUrl) return
+    rechazoRegistradoRef.current = comprobanteUrl
+    const motivo = motivoRechazo(resultadoOCR, sub.total)
+    setRegistrandoRechazo(true)
+    ;(async () => {
+      try {
+        const token = await obtenerToken()
+        const res = await fetch(`/api/pedidos/${sub.pedidoId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ comprobanteRechazado: { url: comprobanteUrl, motivo, montoLeido: resultadoOCR.montoDetectado } }),
+        })
+        const data = await res.json()
+        if (data.error) throw new Error(data.error)
+        setRechazoComprobante({ intentos: data.intentos, motivo })
+        if (data.anulado) {
+          setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, estadoActual: 'cancelado' } : s)))
+        }
+      } catch (e: any) {
+        setRechazoComprobante({ intentos: 0, motivo })
+        console.error('No se pudo registrar el comprobante rechazado:', e)
+      } finally {
+        setComprobanteUrl('')
+        setResultadoOCR(null)
+        setRegistrandoRechazo(false)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comprobanteUrl, resultadoOCR, leyendoOCR, pasoActual])
+
+  // Al pasar al pago del siguiente vendedor arranca de cero.
+  useEffect(() => {
+    setRechazoComprobante(null)
+  }, [pasoActual])
+
   function declararPagoActual() {
     const sub = subPedidos[pasoActual]
     if (!sub.pedidoId) return
@@ -849,7 +896,8 @@ function CheckoutContent() {
     // avanzar hasta que suba un comprobante que sí coincida (ver botón
     // deshabilitado más abajo, esto es una segunda barrera por las
     // dudas).
-    if (resultadoOCR?.coincide === false || resultadoOCR?.pareceComprobante === false) return
+    if (resultadoOCR && !comprobanteValido(resultadoOCR)) return
+    if (sub.estadoActual === 'cancelado') return
     setError('')
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
@@ -1487,10 +1535,33 @@ function CheckoutContent() {
 
           <div className="font-display text-2xl font-bold text-ink mt-4 mb-4">{bs(subPedidos[pasoActual].total)}</div>
 
+          {subPedidos[pasoActual].estadoActual === 'cancelado' ? (
+            <div className="font-body text-sm text-maroon bg-maroonsoft border border-maroon rounded-lg px-4 py-4 text-left">
+              <div className="font-bold text-base mb-1">❌ Compra anulada</div>
+              <div>
+                Se rechazaron {MAX_INTENTOS_COMPROBANTE} comprobantes que no eran válidos para este pago, así que anulamos la compra.
+                Si realmente pagaste, escribinos por WhatsApp con el comprobante y lo revisamos.
+              </div>
+              <Link href="/" className="inline-block mt-3 font-semibold underline">Volver al inicio</Link>
+            </div>
+          ) : (
+          <>
           <div className="text-left mb-4">
             <div className="font-body text-[13px] text-ink font-medium mb-2">
               📎 Subí la foto del comprobante
             </div>
+            {rechazoComprobante && !comprobanteUrl && (
+              <div className="font-body text-xs text-maroon bg-maroonsoft border border-maroon rounded-lg px-3 py-2.5 mb-2.5">
+                <div className="font-semibold">❌ Comprobante inválido, vuelva a intentarlo.</div>
+                <div className="mt-0.5">{rechazoComprobante.motivo}</div>
+                {rechazoComprobante.intentos > 0 && (
+                  <div className="mt-1 font-semibold">
+                    Intento {rechazoComprobante.intentos} de {MAX_INTENTOS_COMPROBANTE}
+                    {MAX_INTENTOS_COMPROBANTE - rechazoComprobante.intentos === 1 && ' — si el próximo tampoco es válido, la compra se anula.'}
+                  </div>
+                )}
+              </div>
+            )}
             {comprobanteUrl ? (
               <div>
                 <div className="flex items-center gap-2.5 mb-2">
@@ -1515,15 +1586,8 @@ function CheckoutContent() {
                     ✓ Comprobante verificado
                   </div>
                 )}
-                {!leyendoOCR && resultadoOCR?.pareceComprobante === false && (
-                  <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
-                    Esta imagen no parece un comprobante de pago. Subí la captura del comprobante que te dio tu banco o billetera (con el monto y la fecha).
-                  </div>
-                )}
-                {!leyendoOCR && resultadoOCR?.coincide === false && (
-                  <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
-                    Error al enviar el comprobante, vuelva a intentarlo.
-                  </div>
+                {(registrandoRechazo || (!leyendoOCR && resultadoOCR && !comprobanteValido(resultadoOCR))) && (
+                  <div className="font-body text-[11px] text-inksoft">Revisando el comprobante...</div>
                 )}
               </div>
             ) : (
@@ -1544,11 +1608,13 @@ function CheckoutContent() {
 
           <button
             onClick={declararPagoActual}
-            disabled={!comprobanteUrl || subiendoComprobante || leyendoOCR || resultadoOCR?.coincide === false || resultadoOCR?.pareceComprobante === false}
+            disabled={!comprobanteUrl || subiendoComprobante || leyendoOCR || registrandoRechazo || (!!resultadoOCR && !comprobanteValido(resultadoOCR))}
             className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40"
           >
             ✓ Continuar
           </button>
+          </>
+          )}
         </div>
       )}
 

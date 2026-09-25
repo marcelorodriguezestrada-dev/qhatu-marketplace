@@ -19,7 +19,27 @@ export type ResultadoOCR = {
   // foto cualquiera, una captura de otra cosa). En ese caso coincide y
   // montoDetectado quedan en null: no damos por "leído" ningún número.
   pareceComprobante: boolean
+  // El comprobante muestra montos en otra moneda ($, USD, ARS, €) — por
+  // ejemplo una transferencia argentina de "$ 20.000".
+  otraMoneda: boolean
   textoCrudo: string
+}
+
+export const MAX_INTENTOS_COMPROBANTE = 3
+
+// Regla del checkout: el comprobante SOLO se acepta si parece un
+// comprobante y el monto leído coincide con el total. Cualquier otra
+// cosa (foto cualquiera, monto distinto, otra moneda, monto ilegible)
+// cuenta como un intento fallido — a los 3, la compra se anula.
+export function comprobanteValido(r: ResultadoOCR | null): boolean {
+  return !!r && r.pareceComprobante && r.coincide === true
+}
+
+export function motivoRechazo(r: ResultadoOCR, montoEsperado: number): string {
+  if (!r.pareceComprobante) return 'La imagen no parece un comprobante de pago.'
+  if (r.otraMoneda && r.coincide !== true) return 'El comprobante está en otra moneda (no en Bs).'
+  if (r.coincide === false && r.montoDetectado != null) return `El monto del comprobante (${r.montoDetectado}) no coincide con el total (Bs ${montoEsperado}).`
+  return 'No se pudo leer el monto del comprobante.'
 }
 
 // Palabras que aparecen en los comprobantes de bancos y billeteras
@@ -64,20 +84,23 @@ function aNumero(crudo: string): number {
  * NO cuenta — antes cualquier cifra servía y una foto de un gato daba
  * "coincide" si por casualidad aparecía el número del total.
  */
-function extraerMontos(texto: string): number[] {
-  const montos: number[] = []
+function extraerMontos(texto: string): { valor: number; extranjera: boolean }[] {
+  const montos: { valor: number; extranjera: boolean }[] = []
   for (const linea of texto.split(/\n+/)) {
     const lineaNorm = normalizar(linea)
     const lineaDeMonto = /\b(monto|importe|total|pago|pagado|pagaste|enviaste)\b/.test(lineaNorm)
-    const regex = /(bs\.?|bob)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(bs\.?|bob)?/gi
+    // Moneda antes o después del número. "$", "US$", "USD", "ARS", "€"
+    // también cuentan como monto, pero marcados como otra moneda: así un
+    // "$ 20.000" se detecta (y se rechaza) en vez de pasar como ilegible.
+    const regex = /(bs\.?|bob|us\$|usd|ars|\$|€)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(bs\.?|bob|usd|ars|€)?/gi
     let match
     while ((match = regex.exec(linea)) !== null) {
       const crudo = match[2]
-      const conMoneda = !!(match[1] || match[3])
+      const moneda = normalizar(match[1] || match[3] || '')
       const conDecimales = /[.,]\d{2}$/.test(crudo)
-      if (!conMoneda && !lineaDeMonto && !conDecimales) continue
+      if (!moneda && !lineaDeMonto && !conDecimales) continue
       const valor = aNumero(crudo)
-      if (!isNaN(valor) && valor > 0) montos.push(valor)
+      if (!isNaN(valor) && valor > 0) montos.push({ valor, extranjera: !!moneda && !moneda.startsWith('bs') && moneda !== 'bob' })
     }
   }
   return montos
@@ -101,10 +124,13 @@ export async function leerComprobante(file: File, montoEsperado: number): Promis
   // sin texto, Tesseract "lee" basura con confianza muy baja).
   const pareceComprobante = contarPalabrasComprobante(texto) >= 3 && (data.confidence ?? 0) >= 35
   if (!pareceComprobante) {
-    return { montoDetectado: null, fechaDetectada, coincide: null, pareceComprobante: false, textoCrudo: texto }
+    return { montoDetectado: null, fechaDetectada, coincide: null, pareceComprobante: false, otraMoneda: false, textoCrudo: texto }
   }
 
-  const montos = extraerMontos(texto)
+  const todos = extraerMontos(texto)
+  const otraMoneda = todos.some((m) => m.extranjera)
+  // Solo los montos en Bs (o sin moneda) pueden coincidir con el total.
+  const montos = todos.filter((m) => !m.extranjera).map((m) => m.valor)
   // Buscamos si ALGUNO de los montos coincide con el esperado. Un
   // comprobante trae varios (saldo, comisión, monto): no alcanza con el
   // primero. Tolerancia de centavos nada más — antes era ±1 Bs, que en
@@ -112,13 +138,15 @@ export async function leerComprobante(file: File, montoEsperado: number): Promis
   const coincidente = montos.find((m) => Math.abs(m - montoEsperado) < 0.05)
   // Si no coincide ninguno, mostramos el monto más grande como
   // referencia — suele ser el del pago.
-  const montoDetectado = coincidente ?? (montos.length ? Math.max(...montos) : null)
+  const referencia = montos.length ? montos : todos.map((m) => m.valor)
+  const montoDetectado = coincidente ?? (referencia.length ? Math.max(...referencia) : null)
 
   return {
     montoDetectado,
     fechaDetectada,
     coincide: montoDetectado === null ? null : coincidente !== undefined,
     pareceComprobante: true,
+    otraMoneda,
     textoCrudo: texto,
   }
 }

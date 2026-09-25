@@ -1416,6 +1416,32 @@ export default function AdminPage() {
                   )}
                 </div>
 
+                {p.comprobantesRechazados?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-line">
+                    <div className="font-body text-[11px] font-semibold text-maroon mb-1.5">
+                      ❌ {p.comprobantesRechazados.length} comprobante{p.comprobantesRechazados.length === 1 ? '' : 's'} rechazado{p.comprobantesRechazados.length === 1 ? '' : 's'} automáticamente
+                      {p.canceladoMotivo && ` — ${p.canceladoMotivo}`}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {p.comprobantesRechazados.map((c: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2">
+                          {c.url ? (
+                            <a href={c.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                              <img src={c.url} alt={`Rechazado ${i + 1}`} className="w-10 h-10 rounded-md object-cover border border-maroon/40" />
+                            </a>
+                          ) : (
+                            <div className="w-10 h-10 rounded-md bg-panelalt border border-line shrink-0" />
+                          )}
+                          <div className="font-body text-[11px] text-inksoft">
+                            {i + 1}. {c.motivo}
+                            {c.fecha && <span className="block text-[10px]">{new Date(c.fecha).toLocaleString('es-BO')}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {p.comprobanteUrl && (
                   <div className="mt-3 pt-3 border-t border-line">
                     <div className="font-body text-[11px] text-inksoft mb-1.5">Comprobante enviado por el comprador</div>

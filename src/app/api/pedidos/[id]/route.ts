@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { FieldValue } from 'firebase-admin/firestore'
+import { MAX_INTENTOS_COMPROBANTE } from '@/lib/ocrComprobante'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +41,51 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const db = getDb()
     const ref = db.collection('pedidos').doc(params.id)
+
+    // Comprobante rechazado por la lectura automática del checkout (no
+    // parece comprobante, monto distinto, otra moneda o ilegible). Lo
+    // manda el propio comprador (con su login). Suma un intento; al
+    // tercero la compra se anula sola. Se guarda cada imagen rechazada
+    // para que el admin la pueda ver.
+    if (body.comprobanteRechazado) {
+      const usuario = await getUsuarioDesdeRequest(req)
+      if (!usuario?.email) return NextResponse.json({ error: 'Iniciá sesión para subir el comprobante.' }, { status: 401 })
+      const r = body.comprobanteRechazado
+      const resultado = await db.runTransaction(async (tx) => {
+        const doc = await tx.get(ref)
+        if (!doc.exists) return { error: 'Pedido no encontrado.', status: 404 }
+        const pedido = doc.data() as any
+        if (String(pedido.comprador || '').toLowerCase() !== usuario.email!.toLowerCase()) {
+          return { error: 'Este pedido no es tuyo.', status: 401 }
+        }
+        if (pedido.estado === 'cancelado') return { intentos: pedido.intentosComprobante || MAX_INTENTOS_COMPROBANTE, anulado: true }
+        if (!['pendiente_pago', 'verificando_stock'].includes(pedido.estado)) {
+          return { error: 'Este pedido ya no está esperando el pago.', status: 400 }
+        }
+        const intentos = (pedido.intentosComprobante || 0) + 1
+        const anulado = intentos >= MAX_INTENTOS_COMPROBANTE
+        const ahora = new Date().toISOString()
+        const cambios: Record<string, unknown> = {
+          intentosComprobante: intentos,
+          comprobantesRechazados: FieldValue.arrayUnion({
+            url: typeof r.url === 'string' ? r.url.slice(0, 500) : '',
+            motivo: String(r.motivo || '').slice(0, 200),
+            montoLeido: typeof r.montoLeido === 'number' ? r.montoLeido : null,
+            fecha: ahora,
+          }),
+          updatedAt: ahora,
+        }
+        if (anulado) {
+          cambios.estado = 'cancelado'
+          cambios.canceladoAt = ahora
+          cambios.canceladoMotivo = `Compra anulada: ${MAX_INTENTOS_COMPROBANTE} comprobantes inválidos.`
+        }
+        tx.update(ref, cambios)
+        return { intentos, anulado }
+      })
+      if ('error' in resultado) return NextResponse.json({ error: resultado.error }, { status: resultado.status })
+      return NextResponse.json({ ...resultado, maxIntentos: MAX_INTENTOS_COMPROBANTE })
+    }
 
     // El comprador elige en qué franja del día prefiere recibir el
     // envío, ya con el pedido pagado y confirmado — es solo una
@@ -92,6 +139,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (estado === 'informado_pago') {
+      // Una compra anulada (3 comprobantes inválidos) ya no se puede
+      // "revivir" avisando que se pagó.
+      const actual = await ref.get()
+      if (actual.data()?.estado === 'cancelado') {
+        return NextResponse.json({ error: 'Esta compra fue anulada.' }, { status: 400 })
+      }
       const cambios: Record<string, unknown> = { estado: 'informado_pago', informadoPagoAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
       // Opcional: la URL de la captura del comprobante, si el comprador
       // la subió desde el checkout — así el vendedor/admin la puede ver
