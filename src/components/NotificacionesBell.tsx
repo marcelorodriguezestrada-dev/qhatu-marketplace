@@ -8,6 +8,9 @@ type Notificacion = {
   id: string
   mensaje: string
   anuncioId?: string
+  // A dónde lleva al tocarla (ej. cupones → la home). Sin link, como
+  // antes: a /anuncios (las de macheo de anuncios).
+  link?: string
   leida: boolean
   createdAt: string
 }
@@ -108,7 +111,7 @@ export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' 
             {notificaciones.map((n) => (
               <Link
                 key={n.id}
-                href="/anuncios"
+                href={n.link || '/anuncios'}
                 onClick={() => marcarLeida(n.id)}
                 className={`block p-3 border-b border-line last:border-b-0 font-body text-xs ${n.leida ? 'text-inksoft' : 'text-ink bg-maroonsoft/30'}`}
               >

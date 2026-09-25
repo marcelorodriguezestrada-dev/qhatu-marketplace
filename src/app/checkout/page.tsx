@@ -11,6 +11,7 @@ import { leerComprobante, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
+import { evaluarCupon, type Cupon } from '@/lib/cupones'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
@@ -85,6 +86,8 @@ type SubPedido = {
   items: ItemCarrito[]
   subtotal: number
   costoEnvio: number
+  // Descuento del cupón en productos que le tocó a este pedido.
+  descuento?: number
   total: number
   qrImageUrl: string
   cbu: string
@@ -174,6 +177,13 @@ function CheckoutContent() {
   // moto lo entrega el mismo día en vez de al día siguiente. Solo
   // aplica con envío, nunca con retiro en tienda.
   const [envioExpress, setEnvioExpress] = useState(false)
+  // Cupón de descuento / campaña (ver src/lib/cupones.ts). Se valida con
+  // el servidor al tocar "Aplicar" y después se recalcula acá solo si
+  // cambia el carrito, la zona o el método de entrega.
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [cuponAplicado, setCuponAplicado] = useState<Cupon | null>(null)
+  const [errorCupon, setErrorCupon] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
 
   // El express solo se ofrece antes de las 17:00 (y nunca domingo). Lo
   // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
@@ -508,6 +518,44 @@ function CheckoutContent() {
   const costoEnvio =
     metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0) + (envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0)
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
+  const extraExpress = metodoEntrega === 'envio' && envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0
+  const resultadoCupon = cuponAplicado
+    ? evaluarCupon(cuponAplicado, { subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega })
+    : null
+  const descuentoCupon = resultadoCupon?.ok ? resultadoCupon.descuentoProductos : 0
+  const descuentoEnvioCupon = resultadoCupon?.ok ? resultadoCupon.descuentoEnvio : 0
+  const costoEnvioFinal = costoEnvio - descuentoEnvioCupon
+  const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
+
+  async function aplicarCupon() {
+    const codigo = codigoCupon.trim()
+    if (!codigo) return
+    setAplicandoCupon(true)
+    setErrorCupon('')
+    try {
+      const token = await obtenerToken()
+      const res = await fetch('/api/cupones/validar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ codigo, subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setCuponAplicado(data.cupon)
+      setCodigoCupon(data.cupon.codigo)
+    } catch (e: any) {
+      setCuponAplicado(null)
+      setErrorCupon(e?.message || 'No se pudo aplicar el cupón.')
+    } finally {
+      setAplicandoCupon(false)
+    }
+  }
+
+  function quitarCupon() {
+    setCuponAplicado(null)
+    setCodigoCupon('')
+    setErrorCupon('')
+  }
 
   function usarMiUbicacion() {
     setBuscandoUbicacion(true)
@@ -609,7 +657,14 @@ function CheckoutContent() {
 
     const clavesVendedor = Array.from(grupos.keys())
     const subtotales = clavesVendedor.map((k) => grupos.get(k)!.reduce((s, i) => s + i.precio * i.cantidad, 0))
-    const enviosRepartidos = repartirEnvio(subtotales, costoEnvio)
+    const enviosRepartidos = repartirEnvio(subtotales, costoEnvioFinal)
+    // El descuento del cupón se reparte entre los vendedores igual que el
+    // envío (proporcional al subtotal de cada uno).
+    const cuponVigente = cuponAplicado && resultadoCupon?.ok ? cuponAplicado : null
+    const descuentosRepartidos = repartirEnvio(subtotales, cuponVigente ? descuentoCupon : 0)
+    const descuentosEnvioRepartidos = repartirEnvio(subtotales, cuponVigente ? descuentoEnvioCupon : 0)
+    const checkoutId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+    const tokenCupon = cuponVigente ? await obtenerToken() : null
 
     try {
       const nuevos: SubPedido[] = []
@@ -619,7 +674,8 @@ function CheckoutContent() {
         const vendedorId = clave === 'plataforma' ? null : clave
         const subtotal = subtotales[i]
         const envioGrupo = enviosRepartidos[i]
-        const totalGrupo = subtotal + envioGrupo
+        const descuentoGrupo = descuentosRepartidos[i]
+        const totalGrupo = subtotal - descuentoGrupo + envioGrupo
 
         let qrImageUrl = qrPlataforma
         let cbu = cbuPlataforma
@@ -656,7 +712,7 @@ function CheckoutContent() {
 
         const resPedido = await fetch('/api/pedidos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(tokenCupon ? { Authorization: `Bearer ${tokenCupon}` } : {}) },
           body: JSON.stringify({
             items: grupoItems,
             total: totalGrupo,
@@ -676,6 +732,17 @@ function CheckoutContent() {
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
             envioExpress: metodoEntrega === 'envio' ? envioExpress : false,
+            cupon: cuponVigente
+              ? {
+                  codigo: cuponVigente.codigo,
+                  checkoutId,
+                  subtotalCarrito,
+                  costoEnvioCarrito: costoEnvio,
+                  extraExpressCarrito: extraExpress,
+                  descuentoProductos: descuentoGrupo,
+                  descuentoEnvio: descuentosEnvioRepartidos[i],
+                }
+              : null,
           }),
         })
         const dataPedido = await resPedido.json()
@@ -688,6 +755,7 @@ function CheckoutContent() {
           items: grupoItems,
           subtotal,
           costoEnvio: envioGrupo,
+          descuento: descuentoGrupo,
           total: totalGrupo,
           qrImageUrl,
           cbu,
@@ -993,12 +1061,63 @@ function CheckoutContent() {
 
           <div className="bg-panelalt rounded-lg px-3.5 py-3 mb-5">
             <div className="font-body text-[12px] text-inksoft mb-0.5">Subtotal: {bs(subtotalCarrito)}</div>
+            {descuentoCupon > 0 && (
+              <div className="font-body text-[12px] text-teal font-semibold mb-0.5">Cupón {cuponAplicado?.codigo}: −{bs(descuentoCupon)}</div>
+            )}
             {metodoEntrega === 'envio' && zonaEntrega && (
               <div className="font-body text-[12px] text-inksoft mb-1">
-                {envioExpress ? 'Envío express' : 'Envío'}: {bs(costoEnvio)}
+                {envioExpress ? 'Envío express' : 'Envío'}:{' '}
+                {descuentoEnvioCupon > 0 ? (
+                  <>
+                    <span className="line-through">{bs(costoEnvio)}</span>{' '}
+                    <span className="text-teal font-semibold">{costoEnvioFinal === 0 ? 'Gratis' : bs(costoEnvioFinal)}</span>
+                  </>
+                ) : (
+                  bs(costoEnvio)
+                )}
               </div>
             )}
-            <div className="font-display text-xl font-bold text-ink">{bs(subtotalCarrito + costoEnvio)}</div>
+            <div className="font-display text-xl font-bold text-ink">{bs(totalCarrito)}</div>
+
+            {/* Cupón de descuento */}
+            <div className="mt-3 pt-3 border-t border-line">
+              {cuponAplicado ? (
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-body text-xs">
+                    <div className="font-semibold text-ink">🎟️ {cuponAplicado.codigo}</div>
+                    {resultadoCupon?.ok ? (
+                      <div className="text-teal">{resultadoCupon.descripcion} ✓</div>
+                    ) : (
+                      <div className="text-maroon">{resultadoCupon?.error}</div>
+                    )}
+                  </div>
+                  <button type="button" onClick={quitarCupon} className="shrink-0 font-body text-[11px] text-maroon underline">
+                    quitar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      value={codigoCupon}
+                      onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCupon() } }}
+                      placeholder="¿Tenés un cupón?"
+                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
+                    />
+                    <button
+                      type="button"
+                      onClick={aplicarCupon}
+                      disabled={aplicandoCupon || !codigoCupon.trim()}
+                      className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+                    >
+                      {aplicandoCupon ? '...' : 'Aplicar'}
+                    </button>
+                  </div>
+                  {errorCupon && <div className="font-body text-[11px] text-maroon mt-1.5">{errorCupon}</div>}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo quieres recibir tu pedido?</div>
@@ -1293,6 +1412,12 @@ function CheckoutContent() {
               <span>Subtotal</span>
               <span>{bs(subPedidos[pasoActual].subtotal)}</span>
             </div>
+            {(subPedidos[pasoActual].descuento || 0) > 0 && (
+              <div className="flex items-center justify-between font-body text-[13px] text-teal">
+                <span>Descuento cupón</span>
+                <span>−{bs(subPedidos[pasoActual].descuento || 0)}</span>
+              </div>
+            )}
             {subPedidos[pasoActual].costoEnvio > 0 && (
               <div className="flex items-center justify-between font-body text-[13px] text-inksoft">
                 <span>Envío</span>

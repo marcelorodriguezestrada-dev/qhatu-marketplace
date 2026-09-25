@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
+import { evaluarCupon } from '@/lib/cupones'
+import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, envioExpress } = body
+    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, envioExpress, cupon } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -74,7 +76,43 @@ export async function POST(req: NextRequest) {
       }
     }
     const db = getDb()
-    const ref = await db.collection('pedidos').add({
+    const ref = db.collection('pedidos').doc()
+
+    // Cupón: el checkout manda el código, la compra completa (una compra
+    // con varios vendedores se parte en varios pedidos, todos con el
+    // mismo checkoutId) y la parte del descuento que le toca a este
+    // pedido. Volvemos a evaluar el cupón acá y registramos el uso antes
+    // de guardar el pedido, así no se pasa el límite ni se usa dos veces.
+    let cuponPedido: Record<string, unknown> | null = null
+    if (cupon?.codigo) {
+      const usuario = await getUsuarioDesdeRequest(req)
+      if (!usuario) return NextResponse.json({ error: 'Iniciá sesión para usar un cupón.' }, { status: 401 })
+      const c = await buscarCuponPorCodigo(cupon.codigo)
+      if (!c) return NextResponse.json({ error: 'El cupón ya no existe. Sacalo y volvé a intentar.' }, { status: 400 })
+      const resultado = evaluarCupon(c, {
+        subtotal: Number(cupon.subtotalCarrito) || 0,
+        costoEnvio: Number(cupon.costoEnvioCarrito) || 0,
+        extraExpress: Number(cupon.extraExpressCarrito) || 0,
+        metodoEntrega: metodoEntrega === 'retiro' ? 'retiro' : 'envio',
+      })
+      if (!resultado.ok) return NextResponse.json({ error: `Cupón ${c.codigo}: ${resultado.error}` }, { status: 400 })
+      const descuentoProductos = Math.max(0, Number(cupon.descuentoProductos) || 0)
+      const descuentoEnvio = Math.max(0, Number(cupon.descuentoEnvio) || 0)
+      // La parte de este pedido nunca puede superar el descuento de toda
+      // la compra (+1 Bs de margen por el redondeo del reparto).
+      if (descuentoProductos > resultado.descuentoProductos + 1 || descuentoEnvio > resultado.descuentoEnvio + 1) {
+        return NextResponse.json({ error: 'El descuento del cupón no coincide. Volvé a aplicarlo.' }, { status: 400 })
+      }
+      const checkoutId = String(cupon.checkoutId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60) || ref.id
+      const uso = await registrarUsoCupon(c, { checkoutId, uid: usuario.uid, email: usuario.email, pedidoId: ref.id })
+      if (!uso.ok) return NextResponse.json({ error: `Cupón ${c.codigo}: ${uso.error}` }, { status: 400 })
+      cuponPedido = { cuponId: c.id, codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descuentoProductos, descuentoEnvio, checkoutId }
+    }
+
+    await ref.set({
+      // Descuento de cupón (lo absorbe Clasi Click, ver src/lib/cupones.ts).
+      // `total` y `costoEnvio` ya vienen con el descuento aplicado.
+      cupon: cuponPedido,
       items,
       total: Number(total),
       comprador: comprador || null,

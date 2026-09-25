@@ -14,6 +14,7 @@ import { parsearAnunciosWhatsapp, AnuncioParseado, mensajeInvitacionAnuncio } fr
 import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/components/EditorCV'
 import type { Idioma } from '@/lib/cvEstandar'
+import AdminCupones from '@/components/admin/AdminCupones'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -72,7 +73,7 @@ export default function AdminPage() {
   const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -1360,7 +1361,15 @@ export default function AdminPage() {
         >
           Métricas
         </button>
+        <button
+          onClick={() => setTab('cupones')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'cupones' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Cupones
+        </button>
       </div>
+
+      {tab === 'cupones' && <AdminCupones password={password} />}
 
       {tab === 'pedidos' && (
         <div>
@@ -1457,6 +1466,14 @@ export default function AdminPage() {
                       <div className="font-body text-xs text-inksoft shrink-0">{bs(it.precio * it.cantidad)}</div>
                     </div>
                   ))}
+                  {p.cupon && (
+                    <div className="font-body text-[11px] text-teal text-right">
+                      🎟️ Cupón {p.cupon.codigo}
+                      {p.cupon.descuentoProductos > 0 && ` · −${bs(p.cupon.descuentoProductos)} en productos`}
+                      {p.cupon.descuentoEnvio > 0 && ` · −${bs(p.cupon.descuentoEnvio)} de envío`}
+                      {' '}(lo absorbe Clasi Click)
+                    </div>
+                  )}
                   <div className="font-body text-xs font-semibold text-ink text-right">Total: {bs(p.total)}</div>
                 </div>
 
