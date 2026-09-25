@@ -435,14 +435,25 @@ export default function PerfilProfesionalPage() {
             )}
 
             {perfil.instagram && (
-              <a
-                href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center w-full py-2.5 mt-2 rounded-lg border border-line font-body text-sm text-ink break-words hover:bg-panelalt transition"
-              >
-                📷 {perfil.instagram.replace('https://instagram.com/', '').replace('@', '')}
-              </a>
+              // Solo el ícono de Instagram (sin el @usuario escrito): se
+              // reconoce al toque y no ocupa un botón entero.
+              <div className="flex justify-center mt-3">
+                <a
+                  href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  title="Instagram"
+                  className="flex items-center justify-center w-11 h-11 rounded-full text-white shadow-sm hover:opacity-90 transition"
+                  style={{ background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)' }}
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+                    <circle cx="12" cy="12" r="4.2" />
+                    <circle cx="17.4" cy="6.6" r="0.9" fill="currentColor" stroke="none" />
+                  </svg>
+                </a>
+              </div>
             )}
           </div>
         </div>
