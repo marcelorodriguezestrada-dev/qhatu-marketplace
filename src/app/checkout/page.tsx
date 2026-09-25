@@ -1187,7 +1187,7 @@ function CheckoutContent() {
                       value={codigoCupon}
                       onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCupon() } }}
-                      placeholder="¿Tienes un cupón?"
+                      placeholder="Coloque el código de su cupón"
                       className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
                     />
                     <button
@@ -1219,7 +1219,7 @@ function CheckoutContent() {
                                 Código <span className="font-semibold text-teal tracking-wide">{c.codigo}</span>{c.vence && ` · válido hasta el ${c.vence}`}
                               </span>
                             </span>
-                            <span className="shrink-0 font-body text-[11px] font-semibold text-teal">Aplicar</span>
+                            <span className="shrink-0 px-3 py-1.5 rounded-md bg-teal text-white font-body text-xs font-bold shadow-sm">Aplicar</span>
                           </button>
                         ))}
                       </div>
@@ -1334,18 +1334,17 @@ function CheckoutContent() {
               </div>
               {descuentoEnvioCupon > 0 && (
                 <div className="font-body text-sm text-teal bg-tealsoft border border-teal rounded-lg px-3 py-2.5 mb-3">
-                  🎉 <strong>¡Envío gratis!</strong> con el cupón {cuponAplicado?.codigo}
+                  🎉 <strong>¡Envío gratis!</strong>
                   {costoEnvioFinal > 0 && <> — pagás solo el extra del express ({bs(costoEnvioFinal)})</>}
                 </div>
               )}
               {envioExpress ? (
                 <div className="font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2 mb-3">
-                  ⚡ <strong>Envío express:</strong> recibirá su pedido hoy mismo (+{bs(COSTO_ENVIO_EXPRESS_EXTRA)}). Válido para compras realizadas antes de las {HORA_CORTE_EXPRESS}:00.
+                  ⚡ Para realizar esta opción debe ser usada antes de las {HORA_CORTE_EXPRESS} hs
                 </div>
               ) : (
                 <div className="font-body text-[11px] text-inksoft mb-3">
                   Recibirá su pedido {fechaEntregaTexto()}.
-                  {hayEntregaHoy() && !expressDisponible && ` El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00.`}
                 </div>
               )}
 
