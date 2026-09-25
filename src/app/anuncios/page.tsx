@@ -10,6 +10,30 @@ function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
 }
 
+// "hace 2 h", "hace 3 días"... a partir del createdAt (ISO).
+function haceCuanto(iso?: string) {
+  if (!iso) return ''
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (!Number.isFinite(min) || min < 0) return ''
+  if (min < 1) return 'recién'
+  if (min < 60) return `hace ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `hace ${h} h`
+  const d = Math.floor(h / 24)
+  if (d < 30) return d === 1 ? 'hace 1 día' : `hace ${d} días`
+  const m = Math.floor(d / 30)
+  return m === 1 ? 'hace 1 mes' : m < 12 ? `hace ${m} meses` : 'hace más de un año'
+}
+
+// Color y emoji por tipo de anuncio: la etiqueta sobre la foto y el
+// fondo del marcador cuando el anuncio no tiene foto.
+const ESTILO_TIPO: Record<string, { etiqueta: string; fondo: string; emoji: string }> = {
+  venta: { etiqueta: 'bg-teal text-white', fondo: 'bg-tealsoft text-teal', emoji: '🏷️' },
+  busqueda: { etiqueta: 'bg-ochre text-white', fondo: 'bg-ochresoft text-ochre', emoji: '🔎' },
+  aviso: { etiqueta: 'bg-maroon text-white', fondo: 'bg-maroonsoft text-maroon', emoji: '📢' },
+  otro: { etiqueta: 'bg-ink text-white', fondo: 'bg-panelalt text-inksoft', emoji: '📌' },
+}
+
 export default function AnunciosPage() {
   const { usuario } = useAuth()
   const { buscarRubro } = useCategorias()
@@ -17,6 +41,9 @@ export default function AnunciosPage() {
   const [cargando, setCargando] = useState(true)
   const [tipoFiltro, setTipoFiltro] = useState('Todos')
   const [busqueda, setBusqueda] = useState('')
+  // Fotos que no cargaron (link roto o borrado): mostramos el marcador de
+  // color en vez del texto alternativo del navegador.
+  const [fotosRotas, setFotosRotas] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/anuncios')
@@ -56,7 +83,7 @@ export default function AnunciosPage() {
         </div>
       </div>
 
-      <div className="max-w-[720px] mx-auto px-5 py-8">
+      <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-6 sm:py-8">
         <input
           type="text"
           value={busqueda}
@@ -93,33 +120,67 @@ export default function AnunciosPage() {
           </div>
         )}
 
-        {filtrados.map((a) => (
-          <Link key={a.id} href={`/anuncios/${a.id}`} className="bg-panel border border-line rounded-xl p-4 mb-3 flex gap-3">
-            {a.imagenUrl && (
-              <img src={a.imagenUrl} alt={a.titulo} className="w-16 h-16 rounded-lg object-cover border border-line shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="font-body text-[10px] font-semibold text-maroon uppercase tracking-wide mb-0.5">
-                {labelTipoAnuncio(a.tipo)}
-                {a.rubro && buscarRubro(a.rubro) && (
-                  <span className="text-inksoft normal-case font-normal"> · {buscarRubro(a.rubro)?.label}</span>
-                )}
-              </div>
-              <div className="font-body text-sm font-semibold text-ink">{a.titulo}</div>
-              <div className="font-body text-xs text-inksoft mt-1 line-clamp-2">{a.descripcion}</div>
-              {a.precio && <div className="font-body text-sm font-bold text-ink mt-1">{bs(a.precio)}</div>}
-              <a
-                href={`https://wa.me/${(a.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Te escribo por tu anuncio "${a.titulo}" en Clasi Click.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-block mt-2 px-3 py-1.5 rounded-md bg-teal text-white font-body text-xs font-semibold"
-              >
-                💬 Contactar
-              </a>
-            </div>
-          </Link>
-        ))}
+        {filtrados.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {filtrados.map((a) => {
+              const estilo = ESTILO_TIPO[a.tipo] || ESTILO_TIPO.otro
+              const rubroLabel = a.rubro ? buscarRubro(a.rubro)?.label : ''
+              const meta = [haceCuanto(a.createdAt), a.zona].filter(Boolean).join(' · ')
+              const whatsapp = (a.whatsapp || '').replace(/\D/g, '')
+              const conFoto = !!a.imagenUrl && !fotosRotas.has(a.id)
+              return (
+                // La tarjeta no es un <a> entero: el link al detalle y el
+                // botón de WhatsApp son hermanos (un <a> dentro de otro es
+                // HTML inválido y el toque a veces abría el anuncio).
+                <div key={a.id} className="bg-panel border border-line rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                  <Link href={`/anuncios/${a.id}`} className="flex flex-col flex-1">
+                    <div className="relative aspect-square bg-panelalt">
+                      {conFoto ? (
+                        <img
+                          src={a.thumbUrl || a.imagenUrl}
+                          alt={a.titulo}
+                          loading="lazy"
+                          decoding="async"
+                          onError={() => setFotosRotas((prev) => new Set(prev).add(a.id))}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className={`w-full h-full flex flex-col items-center justify-center gap-1.5 px-3 text-center ${estilo.fondo}`}>
+                          <span className="text-4xl" aria-hidden="true">{estilo.emoji}</span>
+                          {rubroLabel && <span className="font-body text-[11px] font-semibold opacity-80 line-clamp-2">{rubroLabel}</span>}
+                        </div>
+                      )}
+                      <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full font-body text-[10px] font-semibold shadow-sm ${estilo.etiqueta}`}>
+                        {labelTipoAnuncio(a.tipo)}
+                      </span>
+                    </div>
+                    <div className="p-3 flex flex-col flex-1">
+                      {a.precio ? (
+                        <div className="font-display text-lg font-bold text-ink leading-tight">{bs(a.precio)}</div>
+                      ) : null}
+                      <div className="font-body text-sm font-semibold text-ink line-clamp-2 mt-0.5">{a.titulo}</div>
+                      {a.descripcion && <div className="font-body text-xs text-inksoft mt-1 line-clamp-2">{a.descripcion}</div>}
+                      <div className="font-body text-[11px] text-inksoft mt-auto pt-2 truncate">
+                        {meta}
+                        {rubroLabel && conFoto && <>{meta ? ' · ' : ''}{rubroLabel}</>}
+                      </div>
+                    </div>
+                  </Link>
+                  {whatsapp && (
+                    <a
+                      href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola! Te escribo por tu anuncio "${a.titulo}" en Clasi Click.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mx-3 mb-3 py-2 rounded-lg bg-teal text-white font-body text-xs font-semibold text-center"
+                    >
+                      💬 Contactar
+                    </a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
