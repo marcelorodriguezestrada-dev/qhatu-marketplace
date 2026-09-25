@@ -1424,7 +1424,12 @@ export default function AdminPage() {
                         <img src={p.comprobanteUrl} alt="Comprobante" className="w-16 h-16 rounded-lg object-cover border border-line" />
                       </a>
                       <div className="flex-1 min-w-0">
-                        {p.ocrCoincide === true && (
+                        {p.ocrPareceComprobante === false && (
+                          <div className="font-body text-[11px] font-semibold text-maroon bg-maroonsoft border border-maroon rounded-md px-2 py-1 mb-1">
+                            ⚠ La imagen no parece un comprobante de pago. Revisala antes de confirmar.
+                          </div>
+                        )}
+                        {p.ocrCoincide === true && p.ocrPareceComprobante !== false && (
                           <div className="font-body text-[11px] text-teal mb-0.5">
                             ✓ Lectura automática: {bs(p.ocrMonto)} — coincide con el total
                           </div>
@@ -1434,7 +1439,7 @@ export default function AdminPage() {
                             ⚠ Lectura automática: {bs(p.ocrMonto)} — no coincide con {bs(p.total)}. Revisá la imagen.
                           </div>
                         )}
-                        {p.ocrCoincide == null && (
+                        {p.ocrCoincide == null && p.ocrPareceComprobante !== false && (
                           <div className="font-body text-[11px] text-inksoft mb-0.5">
                             No se pudo leer el monto automáticamente — revisá la imagen a mano.
                           </div>

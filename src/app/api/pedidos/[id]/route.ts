@@ -102,6 +102,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // No decide nada por sí solo: la confirmación sigue siendo manual.
       if (typeof body.ocrMonto === 'number') cambios.ocrMonto = body.ocrMonto
       if (typeof body.ocrCoincide === 'boolean') cambios.ocrCoincide = body.ocrCoincide
+      // false = la imagen no tiene texto de comprobante (ej. una foto
+      // cualquiera) — el admin lo ve marcado en rojo antes de confirmar.
+      if (typeof body.ocrPareceComprobante === 'boolean') cambios.ocrPareceComprobante = body.ocrPareceComprobante
       await ref.update(cambios)
       return NextResponse.json({ ok: true })
     }

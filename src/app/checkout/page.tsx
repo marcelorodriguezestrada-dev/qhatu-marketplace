@@ -849,7 +849,7 @@ function CheckoutContent() {
     // avanzar hasta que suba un comprobante que sí coincida (ver botón
     // deshabilitado más abajo, esto es una segunda barrera por las
     // dudas).
-    if (resultadoOCR?.coincide === false) return
+    if (resultadoOCR?.coincide === false || resultadoOCR?.pareceComprobante === false) return
     setError('')
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
@@ -862,6 +862,7 @@ function CheckoutContent() {
         // confirmar — le ahorra tener que comparar el monto a ojo.
         ocrMonto: resultadoOCR?.montoDetectado ?? null,
         ocrCoincide: resultadoOCR?.coincide ?? null,
+        ocrPareceComprobante: resultadoOCR ? resultadoOCR.pareceComprobante : null,
       }),
     }).then(() => {
       setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, declarado: true, estadoActual: 'informado_pago' } : s)))
@@ -1514,6 +1515,11 @@ function CheckoutContent() {
                     ✓ Comprobante verificado
                   </div>
                 )}
+                {!leyendoOCR && resultadoOCR?.pareceComprobante === false && (
+                  <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
+                    Esta imagen no parece un comprobante de pago. Subí la captura del comprobante que te dio tu banco o billetera (con el monto y la fecha).
+                  </div>
+                )}
                 {!leyendoOCR && resultadoOCR?.coincide === false && (
                   <div className="font-body text-[11px] text-maroon bg-maroonsoft border border-maroon rounded-lg px-2.5 py-2">
                     Error al enviar el comprobante, vuelva a intentarlo.
@@ -1538,7 +1544,7 @@ function CheckoutContent() {
 
           <button
             onClick={declararPagoActual}
-            disabled={!comprobanteUrl || subiendoComprobante || leyendoOCR || resultadoOCR?.coincide === false}
+            disabled={!comprobanteUrl || subiendoComprobante || leyendoOCR || resultadoOCR?.coincide === false || resultadoOCR?.pareceComprobante === false}
             className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40"
           >
             ✓ Continuar
