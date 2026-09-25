@@ -187,6 +187,10 @@ function CheckoutContent() {
   const [cuponAplicado, setCuponAplicado] = useState<Cupon | null>(null)
   const [errorCupon, setErrorCupon] = useState('')
   const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  // Cupones que este usuario puede usar ya (los del banner y los que le
+  // avisaron por la campanita) — se muestran como botones para tocar y
+  // aplicar sin escribir el código.
+  const [cuponesDisponibles, setCuponesDisponibles] = useState<{ codigo: string; campana: string; tipo: string; descripcion: string; vence: string }[]>([])
 
   // El express solo se ofrece antes de las 17:00 (y nunca domingo). Lo
   // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
@@ -571,6 +575,18 @@ function CheckoutContent() {
     if (pendiente) aplicarCupon(pendiente)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario, items.length])
+
+  useEffect(() => {
+    if (!usuario) return
+    let cancelado = false
+    obtenerToken()
+      .then((token) => (token ? fetch('/api/cupones/disponibles', { headers: { Authorization: `Bearer ${token}` } }) : null))
+      .then((r) => r?.json())
+      .then((d) => { if (!cancelado && d?.cupones) setCuponesDisponibles(d.cupones) })
+      .catch(() => {})
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario?.uid])
 
   function quitarCupon() {
     setCuponAplicado(null)
@@ -1167,7 +1183,7 @@ function CheckoutContent() {
                       value={codigoCupon}
                       onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCupon() } }}
-                      placeholder="¿Tenés un cupón?"
+                      placeholder="¿Tienes un cupón?"
                       className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
                     />
                     <button
@@ -1180,6 +1196,31 @@ function CheckoutContent() {
                     </button>
                   </div>
                   {errorCupon && <div className="font-body text-[11px] text-maroon mt-1.5">{errorCupon}</div>}
+                  {cuponesDisponibles.length > 0 && (
+                    <div className="mt-2.5">
+                      <div className="font-body text-[11px] text-inksoft mb-1.5">Cupones disponibles para vos — tocá uno para aplicarlo:</div>
+                      <div className="flex flex-col gap-1.5">
+                        {cuponesDisponibles.map((c) => (
+                          <button
+                            key={c.codigo}
+                            type="button"
+                            onClick={() => aplicarCupon(c.codigo)}
+                            disabled={aplicandoCupon}
+                            className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg border border-dashed border-teal bg-tealsoft hover:bg-tealsoft/70 disabled:opacity-60"
+                          >
+                            <span className="text-lg leading-none" aria-hidden="true">{c.tipo === 'envio_gratis' ? '🚚' : '🎁'}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-body text-xs font-semibold text-ink">{c.campana ? `${c.campana}: ` : ''}{c.descripcion}</span>
+                              <span className="block font-body text-[11px] text-inksoft">
+                                Código <span className="font-semibold text-teal tracking-wide">{c.codigo}</span>{c.vence && ` · válido hasta el ${c.vence}`}
+                              </span>
+                            </span>
+                            <span className="shrink-0 font-body text-[11px] font-semibold text-teal">Aplicar</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
