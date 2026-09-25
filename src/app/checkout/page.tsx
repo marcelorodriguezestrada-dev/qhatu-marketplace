@@ -964,7 +964,7 @@ function CheckoutContent() {
       // una falla técnica (red, ImgBB caído) como haber subido un
       // archivo que no es una imagen válida del comprobante.
       console.error('Error subiendo el comprobante:', e)
-      setError('Comprobante inválido, vuelva a intentarlo.')
+      setError('Comprobante Inválido, vuelva a intentarlo')
     } finally {
       setSubiendoComprobante(false)
     }
@@ -1572,8 +1572,9 @@ function CheckoutContent() {
             </div>
             {rechazoComprobante && !comprobanteUrl && (
               <div className="font-body text-sm text-maroon bg-maroonsoft border-2 border-maroon rounded-lg px-3.5 py-3 mb-3">
-                <div className="font-bold text-base">❌ Comprobante inválido, vuelva a intentarlo</div>
-                <div className="mt-0.5">{rechazoComprobante.motivo}</div>
+                <div className="font-bold text-base">❌ Comprobante Inválido, vuelva a intentarlo</div>
+                {/* El motivo exacto no se le muestra al comprador (queda
+                    guardado en el pedido y lo ve el admin). */}
                 {rechazoComprobante.intentos > 0 && (
                   <div className="mt-1 font-semibold">
                     Intento {rechazoComprobante.intentos} de {MAX_INTENTOS_COMPROBANTE}
