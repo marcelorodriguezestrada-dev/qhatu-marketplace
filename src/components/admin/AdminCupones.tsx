@@ -62,7 +62,19 @@ export default function AdminCupones({ password }: { password: string }) {
     setCargando(true)
     fetch('/api/admin/cupones', { headers })
       .then((r) => r.json())
-      .then((d) => setCupones(d.cupones || []))
+      .then((d) => {
+        if (d.error) {
+          setError(`No se pudieron cargar los cupones: ${d.error}`)
+          return
+        }
+        const lista: Cupon[] = d.cupones || []
+        setCupones(lista)
+        // Si el cupón que se estaba editando ya no existe (se borró), el
+        // formulario vuelve a "Nuevo cupón" con los mismos datos, para
+        // que se pueda crear de nuevo en vez de fallar al guardar.
+        setEditandoId((id) => (id && !lista.some((c) => c.id === id) ? null : id))
+      })
+      .catch(() => setError('No se pudieron cargar los cupones. Revisá tu conexión.'))
       .finally(() => setCargando(false))
   }
 
@@ -80,11 +92,16 @@ export default function AdminCupones({ password }: { password: string }) {
     setGuardando(true)
     setError('')
     try {
-      const res = await fetch(editandoId ? `/api/admin/cupones/${editandoId}` : '/api/admin/cupones', {
+      let res = await fetch(editandoId ? `/api/admin/cupones/${editandoId}` : '/api/admin/cupones', {
         method: editandoId ? 'PATCH' : 'POST',
         headers,
         body: JSON.stringify(form),
       })
+      // Editando un cupón que ya no existe (lo borraron): se crea de nuevo
+      // con estos datos en vez de quedar trabado.
+      if (editandoId && res.status === 404) {
+        res = await fetch('/api/admin/cupones', { method: 'POST', headers, body: JSON.stringify(form) })
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setForm(FORM_VACIO)
@@ -126,6 +143,11 @@ export default function AdminCupones({ password }: { password: string }) {
   async function borrar(c: Cupon) {
     if (!confirm(`¿Borrar el cupón ${c.codigo}? Los pedidos que ya lo usaron no cambian.`)) return
     await fetch(`/api/admin/cupones/${c.id}`, { method: 'DELETE', headers })
+    if (editandoId === c.id) {
+      setEditandoId(null)
+      setForm(FORM_VACIO)
+      setError('')
+    }
     cargar()
   }
 
