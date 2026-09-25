@@ -28,6 +28,7 @@ type Profesional = {
   servicios?: string[]
   historialLaboral?: PuestoLaboral[]
   idiomas?: Idioma[]
+  cvPublico?: boolean
   estado?: string
   notaAdmin?: string
   plan?: string
@@ -119,6 +120,7 @@ export default function MiPerfilPage() {
   const [guardandoMiCV, setGuardandoMiCV] = useState(false)
   const [miCVGuardado, setMiCVGuardado] = useState(false)
   const [errorMiCV, setErrorMiCV] = useState('')
+  const [guardandoCvPublico, setGuardandoCvPublico] = useState(false)
 
   useEffect(() => {
     if (!authCargando && !usuario) router.push('/login')
@@ -456,6 +458,29 @@ export default function MiPerfilPage() {
     }
   }
 
+  // Mostrar u ocultar el "Ver CV completo" del perfil público. Se guarda
+  // al toque, sin pasar por "Guardar mi CV".
+  async function cambiarCvPublico(cvPublico: boolean) {
+    if (!profesional) return
+    setGuardandoCvPublico(true)
+    setErrorMiCV('')
+    try {
+      const token = await obtenerToken()
+      const res = await fetch(`/api/profesionales/${profesional.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ cvPublico }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setProfesional((p) => (p ? { ...p, cvPublico } : p))
+    } catch (e: any) {
+      setErrorMiCV(e?.message || 'No se pudo cambiar la visibilidad de tu CV.')
+    } finally {
+      setGuardandoCvPublico(false)
+    }
+  }
+
   async function mejorarPuestoConIA(p: PuestoBorrador) {
     const token = await obtenerToken()
     const res = await fetch('/api/profesionales/mejorar-puesto', {
@@ -726,6 +751,25 @@ export default function MiPerfilPage() {
         <div className="font-body text-xs text-inksoft mb-3">
           Cargá tus trabajos y la plataforma arma tu CV con un formato profesional, igual para todos — no hace falta que tengas uno propio. Usa también tu nombre, especialidad, descripción, estudios y servicios de más arriba.
         </div>
+
+        <label className="flex items-start gap-2.5 bg-panelalt border border-line rounded-lg px-3 py-2.5 mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={profesional.cvPublico !== false}
+            disabled={guardandoCvPublico}
+            onChange={(e) => cambiarCvPublico(e.target.checked)}
+            className="mt-0.5 accent-teal"
+          />
+          <span className="font-body text-xs text-ink">
+            <span className="font-semibold">Mostrar mi CV en mi perfil público</span>
+            <span className="block text-inksoft mt-0.5">
+              {profesional.cvPublico !== false
+                ? 'Los clientes ven el botón "Ver CV completo" y pueden descargarlo en PDF.'
+                : 'Tu CV está oculto: solo vos (y el admin) pueden verlo y descargarlo.'}
+              {guardandoCvPublico && ' Guardando...'}
+            </span>
+          </span>
+        </label>
 
         {errorMiCV && <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorMiCV}</div>}
         {miCVGuardado && (

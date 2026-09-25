@@ -33,7 +33,27 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       sumarMetricaDiaria('vistasProfesionales').catch(() => {})
     }
 
-    return NextResponse.json({ id: doc.id, ...doc.data(), resenas })
+    const datos: Record<string, any> = { ...doc.data() }
+    // CV oculto (cvPublico === false, lo elige el profesional en
+    // /mi-perfil o el admin): al público no le mandamos el historial
+    // laboral ni los idiomas — así desaparece el botón "Ver CV completo"
+    // del perfil y /servicios/[id]/cv muestra "no disponible". El dueño
+    // y el admin lo siguen viendo para poder revisarlo y descargarlo.
+    if (datos.cvPublico === false) {
+      const password = req.headers.get('x-admin-password')
+      let puedeVerCV = !!password && password === process.env.ADMIN_PASSWORD
+      if (!puedeVerCV) {
+        const usuario = await getUsuarioDesdeRequest(req)
+        puedeVerCV = !!usuario && datos.solicitanteUid === usuario.uid
+      }
+      if (!puedeVerCV) {
+        delete datos.historialLaboral
+        delete datos.idiomas
+        datos.cvOculto = true
+      }
+    }
+
+    return NextResponse.json({ id: doc.id, ...datos, resenas })
   } catch (err) {
     console.error('GET /api/profesionales/[id]', err)
     return NextResponse.json({ error: 'No se pudo cargar el perfil.' }, { status: 500 })
@@ -46,13 +66,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //  - El propio profesional (con su login de Firebase, dueño de este
 //    documento vía solicitanteUid) → puede editar solo los campos de su
 //    "presentación": nombre, especialidad, descripción, experiencia,
-//    servicios, estudios y su CV (historial laboral e idiomas).
+//    servicios, estudios y su CV (historial laboral, idiomas y si el CV
+//    se muestra o no en el perfil público).
 //    Es lo que usa /mi-perfil al guardar la propuesta armada desde su
 //    CV (ver /api/profesionales/extraer-cv) — el resto de los campos
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas', 'cvPublico'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -83,7 +104,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico } = bodyPermitido
     const cambios: Record<string, unknown> = {}
 
     if (estado !== undefined) {
@@ -133,6 +154,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // el dueño y para el admin.
     if (historialLaboral !== undefined) cambios.historialLaboral = sanearHistorialLaboral(historialLaboral)
     if (idiomas !== undefined) cambios.idiomas = sanearIdiomas(idiomas)
+    if (cvPublico !== undefined) cambios.cvPublico = cvPublico !== false
     // El admin puede cargar/corregir la agenda de turnos de un
     // profesional (mismo campo que el self-service de
     // /api/profesionales/[id]/horarios, pero sin exigirle Premium —
