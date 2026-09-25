@@ -12,6 +12,7 @@ import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
 import { evaluarCupon, tomarCuponPendiente, type Cupon } from '@/lib/cupones'
+import { track } from '@/lib/tracking'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
@@ -561,6 +562,7 @@ function CheckoutContent() {
       if (data.error) throw new Error(data.error)
       setCuponAplicado(data.cupon)
       setCodigoCupon(data.cupon.codigo)
+      track('aplicar_cupon', { cupon: data.cupon.codigo, tipo: data.cupon.tipo, subtotal: subtotalCarrito })
     } catch (e: any) {
       setCuponAplicado(null)
       setErrorCupon(e?.message || 'No se pudo aplicar el cupón.')
@@ -571,6 +573,15 @@ function CheckoutContent() {
 
   // Cupón elegido desde el banner de la portada/producto (ver
   // BannerCuponPromo): se aplica solo una vez que hay carrito y sesión.
+  // Evento "iniciar_checkout": una vez por visita al checkout con carrito.
+  const checkoutRegistrado = useRef(false)
+  useEffect(() => {
+    if (checkoutRegistrado.current || !usuario || items.length === 0) return
+    checkoutRegistrado.current = true
+    track('iniciar_checkout', { productos: items.length, total: subtotalCarrito })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario, items.length])
+
   const cuponPendienteRevisado = useRef(false)
   useEffect(() => {
     if (cuponPendienteRevisado.current || !usuario || items.length === 0 || cuponAplicado) return
@@ -889,6 +900,7 @@ function CheckoutContent() {
         const data = await res.json()
         if (data.error) throw new Error(data.error)
         setRechazoComprobante({ intentos: data.intentos, motivo })
+        track('comprobante_rechazado', { intento: data.intentos, anulado: data.anulado ? 1 : 0, cupon: cuponAplicado?.codigo || '' })
         if (data.anulado) {
           setSubPedidos((prev) => prev.map((s, i) => (i === pasoActual ? { ...s, estadoActual: 'cancelado' } : s)))
         }
@@ -923,6 +935,7 @@ function CheckoutContent() {
     if (resultadoOCR && !comprobanteValido(resultadoOCR)) return
     if (sub.estadoActual === 'cancelado') return
     setError('')
+    track('compra_confirmada', { total: sub.total, cupon: cuponAplicado?.codigo || '', envio: metodoEntrega, express: envioExpress ? 1 : 0 })
 
     fetch(`/api/pedidos/${sub.pedidoId}`, {
       method: 'PATCH',
@@ -956,6 +969,7 @@ function CheckoutContent() {
     setSubiendoComprobante(true)
     setError('')
     setResultadoOCR(null)
+    track('subir_comprobante', { total: subPedidos[pasoActual]?.total ?? 0, cupon: cuponAplicado?.codigo || '' })
 
     // El OCR arranca en paralelo y NUNCA bloquea la subida: si tarda o
     // falla (conexión lenta, foto borrosa), el comprobante igual queda

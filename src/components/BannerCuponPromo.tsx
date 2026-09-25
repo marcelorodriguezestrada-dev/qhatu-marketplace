@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { guardarCuponPendiente } from '@/lib/cupones'
+import { track } from '@/lib/tracking'
 
 type CuponDestacado = { codigo: string; campana: string; tipo: string; descripcion: string; hasta: string; vence?: string }
 
@@ -32,6 +33,7 @@ export default function BannerCuponPromo() {
   function usar() {
     if (!cupon) return
     guardarCuponPendiente(cupon.codigo)
+    track('click_banner', { cupon: cupon.codigo, conSesion: usuario ? 1 : 0 })
     if (!usuario) {
       router.push(`/login?volver=${encodeURIComponent(pathname || '/')}`)
       return

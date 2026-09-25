@@ -8,6 +8,7 @@ import { ProductIcon } from './ProductIcon'
 import { useCarrito } from '@/lib/store'
 import { useFavoritos } from '@/lib/favoritos'
 import { useAuth } from '@/lib/auth'
+import { track } from '@/lib/tracking'
 
 function esNuevo(createdAt?: string) {
   if (!createdAt) return false
@@ -48,6 +49,7 @@ export function ProductCard({ p }: { p: Producto }) {
       return
     }
     agregar(p)
+    track('agregar_carrito', { productoId: p.id, precio: p.precio, categoria: p.rubro, desde: 'grilla' })
   }
 
   const tieneDescuento = p.precioOriginal && p.precioOriginal > p.precio
@@ -88,6 +90,7 @@ export function ProductCard({ p }: { p: Producto }) {
         <button
           onClick={(e) => {
             e.preventDefault()
+            if (!favorito) track('guardar_favorito', { productoId: p.id, precio: p.precio, categoria: p.rubro })
             toggleFavorito(p.id)
           }}
           aria-label={favorito ? 'Quitar de favoritos' : 'Agregar a favoritos'}

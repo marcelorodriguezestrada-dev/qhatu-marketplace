@@ -15,6 +15,7 @@ import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/components/EditorCV'
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
+import AdminAnalitica from '@/components/admin/AdminAnalitica'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -73,7 +74,7 @@ export default function AdminPage() {
   const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones'>('pedidos')
+  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica'>('pedidos')
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -1367,9 +1368,16 @@ export default function AdminPage() {
         >
           Cupones
         </button>
+        <button
+          onClick={() => setTab('analitica')}
+          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'analitica' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
+        >
+          Analítica
+        </button>
       </div>
 
       {tab === 'cupones' && <AdminCupones password={password} />}
+      {tab === 'analitica' && <AdminAnalitica password={password} />}
 
       {tab === 'pedidos' && (
         <div>

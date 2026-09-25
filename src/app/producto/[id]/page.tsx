@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { labelPublicoProducto } from '@/data/publicoProducto'
 import { CartDrawer } from '@/components/CartDrawer'
+import { track } from '@/lib/tracking'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -91,6 +92,7 @@ export default function ProductoDetallePage() {
           )
           setRelacionados(otros.slice(0, 4))
           fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
+          track('ver_producto', { productoId: detalle.id, precio: detalle.precio, categoria: detalle.rubro })
 
           if (detalle.vendedorId) {
             const t = await fetch(`/api/vendedores/${detalle.vendedorId}`).then((r) => r.json())
@@ -121,6 +123,7 @@ export default function ProductoDetallePage() {
     setErrorSeleccion('')
     const minimo = producto.compraMinima && producto.compraMinima > 1 ? producto.compraMinima : cantidad
     for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto, { talla: tallaSel || undefined, color: colorSel || undefined })
+    track('agregar_carrito', { productoId: producto.id, precio: producto.precio, categoria: producto.rubro, talla: tallaSel || '', color: colorSel || '', cantidad: Math.max(cantidad, minimo) })
     return true
   }
 

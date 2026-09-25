@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { track } from '@/lib/tracking'
 
 type Notificacion = {
   id: string
@@ -51,6 +52,8 @@ export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' 
   }, [usuario])
 
   async function marcarLeida(id: string) {
+    const n = notificaciones.find((x) => x.id === id) as any
+    track('abrir_notificacion', { tipo: n?.tipo || '', cupon: n?.cuponCodigo || '' })
     const token = await obtenerToken()
     setNotificaciones((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)))
     fetch(`/api/notificaciones/${id}`, {
