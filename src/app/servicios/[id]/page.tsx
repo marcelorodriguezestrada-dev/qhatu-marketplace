@@ -327,7 +327,7 @@ export default function PerfilProfesionalPage() {
               </div>
             )}
 
-            {perfil.historialLaboral && perfil.historialLaboral.length > 0 && (
+            {perfil.cvPublico !== false && perfil.historialLaboral && perfil.historialLaboral.length > 0 && (
               <Link
                 href={`/servicios/${id}/cv`}
                 className="flex items-center justify-center gap-2 w-full py-2.5 mb-2.5 rounded-lg border border-line bg-panel font-body text-sm font-semibold text-ink hover:bg-panelalt"

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useAuth } from '@/lib/auth'
 import {
   PuestoLaboral,
   Idioma,
@@ -40,6 +41,10 @@ type Perfil = {
   whatsapp?: string
   historialLaboral?: PuestoLaboral[]
   idiomas?: Idioma[]
+  cvPublico?: boolean
+  // Lo agrega la API cuando el CV está oculto y quien mira no es ni el
+  // dueño ni el admin (ver GET /api/profesionales/[id]).
+  cvOculto?: boolean
 }
 
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
@@ -74,13 +79,32 @@ export default function CVPage() {
   const params = useParams()
   const id = params.id as string
   const [perfil, setPerfil] = useState<Perfil | null | undefined>(undefined)
+  const { usuario, cargando: authCargando, obtenerToken } = useAuth()
 
+  // Mandamos el login (dueño) o la contraseña de admin guardada: si el
+  // CV está oculto al público, la API solo lo devuelve a ellos dos.
   useEffect(() => {
-    fetch(`/api/profesionales/${id}?sinVista=1`)
-      .then((r) => r.json())
-      .then((data) => setPerfil(data.error ? null : data))
-      .catch(() => setPerfil(null))
-  }, [id])
+    if (authCargando) return
+    let cancelado = false
+    ;(async () => {
+      const headers: Record<string, string> = {}
+      try {
+        const pw = localStorage.getItem('clasiclick_admin_pw')
+        if (pw) headers['x-admin-password'] = pw
+      } catch {}
+      if (usuario) {
+        const token = await obtenerToken().catch(() => null)
+        if (token) headers.Authorization = `Bearer ${token}`
+      }
+      try {
+        const data = await fetch(`/api/profesionales/${id}?sinVista=1`, { headers }).then((r) => r.json())
+        if (!cancelado) setPerfil(data.error ? null : data)
+      } catch {
+        if (!cancelado) setPerfil(null)
+      }
+    })()
+    return () => { cancelado = true }
+  }, [id, authCargando, usuario?.uid])
 
   // El título de la pestaña es el nombre que el navegador propone para
   // el PDF al "Guardar como PDF".
@@ -96,6 +120,14 @@ export default function CVPage() {
   }
   if (!perfil) {
     return <div className="py-16 text-center font-body text-sm text-inksoft">No encontramos este perfil.</div>
+  }
+  if (perfil.cvOculto) {
+    return (
+      <div className="py-16 px-4 text-center font-body text-sm text-inksoft">
+        El CV de este profesional no está disponible para descargar.{' '}
+        <Link href={`/servicios/${id}`} className="underline">Volver al perfil</Link>
+      </div>
+    )
   }
 
   const historial = ordenarHistorial(perfil.historialLaboral || [])
@@ -133,6 +165,11 @@ export default function CVPage() {
         <div className="w-full font-body text-[11px] text-inksoft text-right">
           En la ventana que se abre elegí &quot;Guardar como PDF&quot; como destino.
         </div>
+        {perfil.cvPublico === false && (
+          <div className="w-full font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2">
+            🔒 Este CV está oculto: no aparece en el perfil público y solo lo ven el profesional y el admin.
+          </div>
+        )}
         {incompleto && (
           <div className="w-full font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2">
             Este CV todavía no tiene historial laboral. Cargalo desde <Link href="/mi-perfil" className="underline">Mi perfil → Mi CV</Link> para que quede completo.

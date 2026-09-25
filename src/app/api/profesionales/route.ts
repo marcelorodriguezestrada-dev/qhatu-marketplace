@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas } = body
+    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas, cvPublico } = body
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
       servicios: serviciosLimpios,
       historialLaboral: sanearHistorialLaboral(historialLaboral),
       idiomas: sanearIdiomas(idiomas),
+      // Si el CV descargable se muestra en el perfil público (por defecto sí).
+      cvPublico: cvPublico !== false,
       zona: zona || '',
       // Dirección puntual (calle/número), distinta de "zona" (el
       // barrio). Las dos son opcionales y se muestran juntas en el

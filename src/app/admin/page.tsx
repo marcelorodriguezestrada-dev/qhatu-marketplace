@@ -175,6 +175,7 @@ export default function AdminPage() {
   // en /mi-perfil, ver src/components/EditorCV.tsx.
   const [historialCV, setHistorialCV] = useState<PuestoBorrador[]>([])
   const [idiomasCV, setIdiomasCV] = useState<Idioma[]>([])
+  const [cvPublico, setCvPublico] = useState(true)
   const [zona, setZona] = useState('')
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
@@ -817,6 +818,7 @@ export default function AdminPage() {
         experiencia,
         historialLaboral: deBorradores(historialCV),
         idiomas: idiomasCV,
+        cvPublico,
       }
       const editando = !!profesionalEditandoId
       const res = await fetch(
@@ -834,7 +836,7 @@ export default function AdminPage() {
       }
       setNombre(''); setDescripcion(''); setServicios([]); setDondeTrabaja(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null); setEducacion('')
-      setHistorialCV([]); setIdiomasCV([])
+      setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -869,6 +871,7 @@ export default function AdminPage() {
     setExperiencia(p.experiencia || '')
     setHistorialCV(aBorradores(p.historialLaboral))
     setIdiomasCV(p.idiomas || [])
+    setCvPublico(p.cvPublico !== false)
     setPlan(p.plan === 'premium' ? 'premium' : 'basico')
     setEditHorarioBloques(p.horarioTurnos?.bloques || [])
     setErrorForm('')
@@ -880,7 +883,7 @@ export default function AdminPage() {
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
     setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
-    setHistorialCV([]); setIdiomasCV([])
+    setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
     setErrorForm('')
   }
 
@@ -1771,6 +1774,10 @@ export default function AdminPage() {
               <div className="font-body text-[11px] text-inksoft mb-2.5">
                 Historial laboral e idiomas — con esto y el resto del formulario se arma su CV oficial descargable en PDF. Si subiste un CV arriba, ya viene precargado.
               </div>
+              <label className="flex items-center gap-2 font-body text-xs text-ink mb-2.5 cursor-pointer">
+                <input type="checkbox" checked={cvPublico} onChange={(e) => setCvPublico(e.target.checked)} className="accent-teal" />
+                Mostrar el CV para descargar en su perfil público
+              </label>
               <EditorCV
                 historial={historialCV}
                 onHistorialChange={setHistorialCV}
@@ -2307,8 +2314,9 @@ export default function AdminPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-body text-xs text-inksoft underline shrink-0"
+                title={p.cvPublico === false ? 'CV oculto en el perfil público' : undefined}
               >
-                CV
+                {p.cvPublico === false ? 'CV 🔒' : 'CV'}
               </a>
               <button
                 onClick={() => abrirEditarProfesional(p)}
