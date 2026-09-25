@@ -2138,6 +2138,20 @@ export default function AdminPage() {
                       >
                         Pedir más info
                       </button>
+                      {p.whatsapp && (
+                        // Mismo botón que en Anuncios: abre WhatsApp con el
+                        // mensaje de invitación y pasa la solicitud a
+                        // "Esperando respuesta".
+                        <a
+                          href={`https://wa.me/${String(p.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => cambiarEstadoProfesional(p.id, 'info_solicitada', p.notaAdmin || 'Se le mandó la invitación por WhatsApp.')}
+                          className="px-3.5 py-1.5 rounded-md border border-indigo-200 font-body text-xs text-indigo-600"
+                        >
+                          💬 Invitar por WhatsApp
+                        </a>
+                      )}
                       <button
                         onClick={() => abrirEditarProfesional(p)}
                         className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-teal"
