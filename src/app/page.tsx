@@ -69,6 +69,10 @@ export default function CatalogoPage() {
           <div className="flex items-center gap-3 mb-2.5">
             <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
             <div className="flex-1" />
+            {/* La campanita va acá arriba (no en la fila de links de abajo):
+                esa fila se desplaza de costado en el celular y cortaba
+                tanto la campanita como su panel. */}
+            {usuario && <NotificacionesBell variante="oscura" />}
             <button
               onClick={() => setCarritoAbierto(true)}
               className="border-none bg-white/10 text-white px-3 sm:px-4 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
@@ -121,7 +125,6 @@ export default function CatalogoPage() {
                 <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
                   Mis pedidos
                 </Link>
-                <NotificacionesBell variante="oscura" />
                 <button onClick={() => logout()} className="border-none bg-transparent text-white/60 font-body text-[12px] shrink-0 whitespace-nowrap">
                   {usuario.email?.split('@')[0]} · salir
                 </button>

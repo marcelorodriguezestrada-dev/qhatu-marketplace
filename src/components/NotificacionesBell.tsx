@@ -94,8 +94,11 @@ export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' 
 
       {abierto && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setAbierto(false)} />
-          <div className="absolute right-0 top-11 w-80 max-w-[85vw] bg-panel border border-line rounded-lg shadow-lg z-20 max-h-[70vh] overflow-y-auto">
+          <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
+          {/* En el celular el panel es fijo al ancho de la pantalla (así
+              nunca queda cortado ni fuera de la vista); desde sm vuelve a
+              colgar de la campanita. */}
+          <div className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-11 sm:w-80 bg-panel border border-line rounded-lg shadow-lg z-50 max-h-[70vh] overflow-y-auto text-left">
             <div className="flex items-center justify-between p-3 border-b border-line">
               <span className="font-body text-sm font-semibold text-ink">Notificaciones</span>
               {noLeidas > 0 && (
