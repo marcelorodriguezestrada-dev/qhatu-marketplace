@@ -14,6 +14,7 @@ export default function AnuncioDetallePage() {
   const [anuncio, setAnuncio] = useState<any>(null)
   const [cargando, setCargando] = useState(true)
   const [noEncontrado, setNoEncontrado] = useState(false)
+  const [linkCopiado, setLinkCopiado] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -25,6 +26,31 @@ export default function AnuncioDetallePage() {
       })
       .finally(() => setCargando(false))
   }, [id])
+
+  // Compartir: en el celular abre el menú nativo (WhatsApp, Facebook...);
+  // si el navegador no lo tiene, abre WhatsApp con el texto y el link.
+  // El link muestra foto y título en la vista previa (ver ./layout.tsx).
+  async function compartir() {
+    const url = `${window.location.origin}/anuncios/${id}`
+    const texto = `${anuncio.titulo}${anuncio.precio ? ` — ${bs(anuncio.precio)}` : ''} en Clasi Click`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: anuncio.titulo, text: texto, url })
+        return
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${texto}\n${url}`)}`, '_blank', 'noopener,noreferrer')
+  }
+
+  async function copiarLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/anuncios/${id}`)
+      setLinkCopiado(true)
+      setTimeout(() => setLinkCopiado(false), 2000)
+    } catch {}
+  }
 
   if (cargando) {
     return <div className="max-w-[560px] mx-auto px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
@@ -62,6 +88,23 @@ export default function AnuncioDetallePage() {
       >
         💬 Contactar
       </a>
+
+      <div className="flex gap-2 mt-2.5">
+        <button
+          type="button"
+          onClick={compartir}
+          className="flex-1 py-2.5 rounded-lg border border-line bg-panel font-body text-sm font-semibold text-ink hover:bg-panelalt"
+        >
+          📤 Compartir
+        </button>
+        <button
+          type="button"
+          onClick={copiarLink}
+          className="px-4 py-2.5 rounded-lg border border-line bg-panel font-body text-sm text-inksoft hover:bg-panelalt"
+        >
+          {linkCopiado ? '✓ Copiado' : '🔗 Copiar link'}
+        </button>
+      </div>
     </div>
   )
 }
