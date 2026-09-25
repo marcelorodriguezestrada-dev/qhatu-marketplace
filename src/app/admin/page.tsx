@@ -162,6 +162,8 @@ export default function AdminPage() {
   // más info" en este momento (null = ninguna abierta), y el texto que
   // se va tipeando ahí.
   const [pidiendoInfoId, setPidiendoInfoId] = useState<string | null>(null)
+  const [priorizandoIA, setPriorizandoIA] = useState(false)
+  const [errorPriorizarIA, setErrorPriorizarIA] = useState('')
   const [notaPidiendoInfo, setNotaPidiendoInfo] = useState('')
   const [rubro, setRubro] = useState('')
   const [categoriaSel, setCategoriaSel] = useState('')
@@ -341,6 +343,33 @@ export default function AdminPage() {
     fetch('/api/profesionales', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
+  }
+
+  // "Ordenar por prioridad con IA" en las solicitudes pendientes: la IA
+  // puntúa a quién conviene invitar primero (ver
+  // /api/admin/profesionales/priorizar) y la lista se ordena por eso.
+  async function priorizarPendientesConIA() {
+    setPriorizandoIA(true)
+    setErrorPriorizarIA('')
+    try {
+      const res = await fetch('/api/admin/profesionales/priorizar', {
+        method: 'POST',
+        headers: { 'x-admin-password': password },
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const porId = new Map<string, any>((data.prioridades || []).map((pr: any) => [pr.id, pr]))
+      setProfesionales((lista) =>
+        lista.map((p) => {
+          const pr = porId.get(p.id)
+          return pr ? { ...p, prioridadInvitacionIA: { puntaje: pr.puntaje, motivo: pr.motivo, evaluadoEn: pr.evaluadoEn } } : p
+        })
+      )
+    } catch (e: any) {
+      setErrorPriorizarIA(e?.message || 'No se pudo priorizar con IA.')
+    } finally {
+      setPriorizandoIA(false)
+    }
   }
 
   function cargarMetricas(pw?: string) {
@@ -2071,12 +2100,29 @@ export default function AdminPage() {
 
           {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
             <div className="mb-8">
-              <div className="font-body text-sm font-semibold text-ochre mb-3">
-                Solicitudes pendientes de revisión ({profesionales.filter((p) => p.estado === 'pendiente_revision').length})
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="font-body text-sm font-semibold text-ochre">
+                  Solicitudes pendientes de revisión ({profesionales.filter((p) => p.estado === 'pendiente_revision').length})
+                </div>
+                <button
+                  onClick={priorizarPendientesConIA}
+                  disabled={priorizandoIA}
+                  className="px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 font-body text-xs font-semibold text-indigo-700 disabled:opacity-60"
+                >
+                  {priorizandoIA ? 'Analizando con IA...' : '🤖 Ordenar por prioridad con IA'}
+                </button>
               </div>
+              {errorPriorizarIA && (
+                <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorPriorizarIA}</div>
+              )}
               {[...profesionales]
                 .filter((p) => p.estado === 'pendiente_revision')
                 .sort((a, b) => {
+                  // Primero por la prioridad de invitación de la IA (mayor
+                  // puntaje arriba; los que no se evaluaron van al final).
+                  const pa = a.prioridadInvitacionIA?.puntaje ?? -1
+                  const pb = b.prioridadInvitacionIA?.puntaje ?? -1
+                  if (pa !== pb) return pb - pa
                   const orden: Record<string, number> = { alto: 0, medio: 1, bajo: 2 }
                   const oa = orden[a.moderacionIA?.riesgo] ?? 3
                   const ob = orden[b.moderacionIA?.riesgo] ?? 3
@@ -2095,6 +2141,14 @@ export default function AdminPage() {
                     {p.experiencia && ` · Experiencia: ${p.experiencia}`}
                   </div>
                   <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
+                  {p.prioridadInvitacionIA && (
+                    <div className="font-body text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md px-2.5 py-1.5 mt-1.5">
+                      <span className="font-semibold">
+                        {p.prioridadInvitacionIA.puntaje >= 70 ? '🔥' : p.prioridadInvitacionIA.puntaje >= 40 ? '👍' : '💤'} Prioridad de invitación: {p.prioridadInvitacionIA.puntaje}/100
+                      </span>
+                      {p.prioridadInvitacionIA.motivo && <> — {p.prioridadInvitacionIA.motivo}</>}
+                    </div>
+                  )}
 
                   {pidiendoInfoId === p.id ? (
                     <div className="mt-3">

@@ -461,3 +461,76 @@ export async function contieneInsultos(comentario: string): Promise<boolean> {
     return false
   }
 }
+
+export type PrioridadInvitacionIA = { id: string; puntaje: number; motivo: string }
+
+// Orden de invitación para las solicitudes de profesionales pendientes
+// (casi todas importadas de avisos de Cambalache): la IA le pone a cada
+// una un puntaje 0-100 según qué tan probable es que la persona acepte
+// sumarse a Clasi Click y que valga la pena tenerla en el directorio,
+// para que el admin invite primero a los mejores. No manda nada ni
+// cambia estados — solo ordena (ver /api/admin/profesionales/priorizar).
+export async function priorizarInvitacionesIA(
+  profesionales: { id: string; nombre: string; rubroLabel: string; especialidad: string; descripcion: string; zona: string; experiencia: string; precio: string }[]
+): Promise<PrioridadInvitacionIA[]> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey || profesionales.length === 0) return []
+
+  const systemPrompt =
+    'Sos un asistente comercial de Clasi Click, un marketplace de Potosí, Bolivia, que suma profesionales a su directorio gratis. ' +
+    'Te paso solicitudes de personas que ofrecen servicios (la mayoría sacadas de avisos en grupos de WhatsApp como Cambalache). ' +
+    'A cada una ponele un puntaje de 0 a 100 de PRIORIDAD DE INVITACIÓN: qué tan probable es que acepte la invitación y que sea un buen profesional para el directorio. ' +
+    'Puntuá alto: servicios profesionales u oficios claros (médicos, abogados, contadores, técnicos, electricistas, plomeros, docentes, profesionales de salud, etc.), ' +
+    'que ofrecen su servicio de forma activa y buscan clientes, con descripción concreta, zona, experiencia o precio (señales de que viven de eso y quieren más clientes). ' +
+    'Puntuá bajo: avisos que en realidad son venta de productos y no un servicio, pedidos ("busco..."), textos vagos o sin datos, spam, ' +
+    'esquemas de ganancias/multinivel/préstamos, o contenido dudoso. ' +
+    'NO inventes ids. Respondé SOLO JSON válido, sin backticks, con esta forma exacta: ' +
+    '{"prioridades": [{"id": "...", "puntaje": 0-100, "motivo": "máximo 15 palabras"}]}'
+
+  const idsValidos = new Set(profesionales.map((p) => p.id))
+  const resultados: PrioridadInvitacionIA[] = []
+
+  // De a 25 para no pasarnos de tokens con listas largas.
+  for (let i = 0; i < profesionales.length; i += 25) {
+    const tanda = profesionales.slice(i, i + 25)
+    const contenido = tanda
+      .map((p) =>
+        [p.id, p.rubroLabel, p.nombre, p.especialidad, p.zona, p.experiencia && `exp: ${p.experiencia}`, p.precio && `precio: ${p.precio}`, (p.descripcion || '').slice(0, 300)]
+          .filter(Boolean)
+          .join(' | ')
+      )
+      .join('\n')
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-20b',
+          max_completion_tokens: 2500,
+          reasoning_effort: 'low',
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: contenido },
+          ],
+        }),
+      })
+      if (!res.ok) {
+        console.error('priorizarInvitacionesIA: Groq respondió', res.status)
+        continue
+      }
+      const data = await res.json()
+      const texto = data.choices?.[0]?.message?.content
+      if (!texto) continue
+      const parsed = JSON.parse(texto.replace(/```json|```/g, '').trim())
+      for (const r of Array.isArray(parsed.prioridades) ? parsed.prioridades : []) {
+        const puntaje = Number(r?.puntaje)
+        if (typeof r?.id !== 'string' || !idsValidos.has(r.id) || !Number.isFinite(puntaje)) continue
+        resultados.push({ id: r.id, puntaje: Math.max(0, Math.min(100, Math.round(puntaje))), motivo: String(r.motivo || '').slice(0, 200) })
+      }
+    } catch (err) {
+      console.error('priorizarInvitacionesIA', err)
+    }
+  }
+  return resultados
+}
