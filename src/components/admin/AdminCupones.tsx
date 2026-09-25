@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TIPOS_CUPON, describirCupon, hoyBolivia, type Cupon, type TipoCupon } from '@/lib/cupones'
+import { TIPOS_CUPON, describirCupon, hoyBolivia, cuponVencido, textoVencimiento, type Cupon, type TipoCupon } from '@/lib/cupones'
 
 // Pestaña "Cupones" de /admin: crear campañas con código (envío gratis,
 // % o Bs de descuento), pausarlas, ver cuántas veces se usaron y avisar
@@ -18,6 +18,7 @@ const FORM_VACIO = {
   compraMinima: '',
   desde: '',
   hasta: '',
+  horaHasta: '',
   limiteUsos: '',
   unaVezPorUsuario: true,
   incluyeExpress: false,
@@ -31,7 +32,7 @@ function fechaLegible(iso: string) {
 function estadoCupon(c: Cupon): { label: string; clase: string } {
   const hoy = hoyBolivia()
   if (!c.activo) return { label: 'Pausado', clase: 'bg-panelalt text-inksoft border-line' }
-  if (c.hasta && hoy > c.hasta) return { label: 'Vencido', clase: 'bg-maroonsoft text-maroon border-maroon' }
+  if (cuponVencido(c)) return { label: 'Vencido', clase: 'bg-maroonsoft text-maroon border-maroon' }
   if (c.desde && hoy < c.desde) return { label: 'Programado', clase: 'bg-ochresoft text-ochre border-ochre' }
   if (c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos) return { label: 'Agotado', clase: 'bg-maroonsoft text-maroon border-maroon' }
   return { label: 'Activo', clase: 'bg-tealsoft text-teal border-teal' }
@@ -108,6 +109,7 @@ export default function AdminCupones({ password }: { password: string }) {
       compraMinima: c.compraMinima ? String(c.compraMinima) : '',
       desde: c.desde || '',
       hasta: c.hasta || '',
+      horaHasta: c.horaHasta || '',
       limiteUsos: c.limiteUsos ? String(c.limiteUsos) : '',
       unaVezPorUsuario: !!c.unaVezPorUsuario,
       incluyeExpress: !!c.incluyeExpress,
@@ -133,7 +135,7 @@ export default function AdminCupones({ password }: { password: string }) {
     setSeleccion(new Set())
     setBusquedaUsuario('')
     setResultadoAviso('')
-    const hasta = c.hasta ? ` Válido hasta el ${fechaLegible(c.hasta)}.` : ''
+    const hasta = c.hasta ? ` Válido hasta el ${textoVencimiento(c)}.` : ''
     setMensaje(`🎁 ${c.campana ? `${c.campana}: ` : ''}${describirCupon(c)} con el cupón ${c.codigo}.${hasta} Usalo al finalizar tu compra.`)
     if (usuarios.length === 0) {
       fetch('/api/admin/usuarios', { headers })
@@ -240,6 +242,17 @@ export default function AdminCupones({ password }: { password: string }) {
             <span className={etiqueta}>Hasta</span>
             <input type="date" value={form.hasta} onChange={(e) => campo('hasta', e.target.value)} className={input} />
           </label>
+          <label>
+            <span className={etiqueta}>Hora fin (opcional)</span>
+            <input
+              type="time"
+              value={form.horaHasta}
+              onChange={(e) => campo('horaHasta', e.target.value)}
+              disabled={!form.hasta}
+              title={form.hasta ? 'Hora de Bolivia. Vacío = hasta las 23:59' : 'Primero elegí la fecha de fin'}
+              className={`${input} disabled:opacity-50`}
+            />
+          </label>
         </div>
 
         <div className="flex flex-col gap-1.5 mb-3">
@@ -286,7 +299,7 @@ export default function AdminCupones({ password }: { password: string }) {
 
       {cupones.map((c) => {
         const estado = estadoCupon(c)
-        const vigencia = [c.desde && `desde ${fechaLegible(c.desde)}`, c.hasta && `hasta ${fechaLegible(c.hasta)}`].filter(Boolean).join(' ')
+        const vigencia = [c.desde && `desde ${fechaLegible(c.desde)}`, c.hasta && `hasta ${textoVencimiento(c)}`].filter(Boolean).join(' ')
         return (
           <div key={c.id} className="bg-panel border border-line rounded-lg p-4 mb-3">
             <div className="flex flex-wrap items-center gap-2 mb-1">

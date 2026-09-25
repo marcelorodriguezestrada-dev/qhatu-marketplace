@@ -28,6 +28,9 @@ export type Cupon = {
   // Fechas ISO (YYYY-MM-DD) inclusive, en hora de Bolivia. '' = sin límite.
   desde: string
   hasta: string
+  // Hora de fin del último día (HH:MM, hora de Bolivia). '' = hasta las
+  // 23:59 de ese día.
+  horaHasta: string
   // 0 = sin límite.
   limiteUsos: number
   unaVezPorUsuario: boolean
@@ -48,6 +51,28 @@ export function normalizarCodigo(codigo: unknown): string {
 // Fecha de hoy en Bolivia (UTC-4, sin horario de verano) como YYYY-MM-DD.
 export function hoyBolivia(ahora = Date.now()): string {
   return new Date(ahora - 4 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+// Hora actual de Bolivia como HH:MM.
+function horaBolivia(ahora = Date.now()): string {
+  return new Date(ahora - 4 * 60 * 60 * 1000).toISOString().slice(11, 16)
+}
+
+// ¿Ya pasó la fecha (y hora) de fin?
+export function cuponVencido(c: Pick<Cupon, 'hasta' | 'horaHasta'>, ahora = Date.now()): boolean {
+  if (!c.hasta) return false
+  const hoy = hoyBolivia(ahora)
+  if (hoy !== c.hasta) return hoy > c.hasta
+  return !!c.horaHasta && horaBolivia(ahora) >= c.horaHasta
+}
+
+// "26/09/2026 20 hs" / "26/09/2026 20:30 hs" / "26/09/2026".
+export function textoVencimiento(c: Pick<Cupon, 'hasta' | 'horaHasta'>): string {
+  if (!c.hasta) return ''
+  const fecha = c.hasta.split('-').reverse().join('/')
+  if (!c.horaHasta) return fecha
+  const [h, m] = c.horaHasta.split(':')
+  return `${fecha} ${m === '00' ? String(Number(h)) : `${Number(h)}:${m}`} hs`
 }
 
 export function describirCupon(c: Pick<Cupon, 'tipo' | 'valor' | 'compraMinima' | 'descuentoMaximo'>): string {
@@ -77,7 +102,7 @@ export function evaluarCupon(c: Cupon, compra: ContextoCompra, ahora = Date.now(
   if (!c.activo) return { ok: false, error: 'Este cupón está pausado.' }
   const hoy = hoyBolivia(ahora)
   if (c.desde && hoy < c.desde) return { ok: false, error: 'Este cupón todavía no está vigente.' }
-  if (c.hasta && hoy > c.hasta) return { ok: false, error: 'Este cupón ya venció.' }
+  if (cuponVencido(c, ahora)) return { ok: false, error: 'Este cupón ya venció.' }
   if (c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos) return { ok: false, error: 'Este cupón ya alcanzó su límite de usos.' }
   if (c.compraMinima > 0 && compra.subtotal < c.compraMinima) {
     return { ok: false, error: `Este cupón es para compras desde Bs ${c.compraMinima}.` }
@@ -125,6 +150,7 @@ export function sanearCupon(body: any): { datos?: Omit<Cupon, 'id' | 'usosCount'
       compraMinima: num(body?.compraMinima),
       desde,
       hasta,
+      horaHasta: hasta && typeof body?.horaHasta === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.horaHasta) ? body.horaHasta : '',
       limiteUsos: Math.floor(num(body?.limiteUsos)),
       unaVezPorUsuario: !!body?.unaVezPorUsuario,
       incluyeExpress: tipo === 'envio_gratis' && !!body?.incluyeExpress,

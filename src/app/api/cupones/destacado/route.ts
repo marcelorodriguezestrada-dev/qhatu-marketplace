@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
-import { describirCupon, hoyBolivia, type Cupon } from '@/lib/cupones'
+import { describirCupon, hoyBolivia, cuponVencido, textoVencimiento, type Cupon } from '@/lib/cupones'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,12 +13,12 @@ export async function GET() {
     const hoy = hoyBolivia()
     const vigentes = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }) as Cupon)
-      .filter((c) => c.activo && (!c.desde || hoy >= c.desde) && (!c.hasta || hoy <= c.hasta) && !(c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos))
+      .filter((c) => c.activo && (!c.desde || hoy >= c.desde) && !cuponVencido(c) && !(c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos))
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     const c = vigentes[0]
     if (!c) return NextResponse.json({ cupon: null })
     return NextResponse.json(
-      { cupon: { codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descripcion: describirCupon(c), hasta: c.hasta || '' } },
+      { cupon: { codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descripcion: describirCupon(c), hasta: c.hasta || '', vence: textoVencimiento(c) } },
       { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
     )
   } catch (err) {

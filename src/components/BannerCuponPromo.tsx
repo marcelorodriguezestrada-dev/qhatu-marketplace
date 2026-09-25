@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { guardarCuponPendiente } from '@/lib/cupones'
 
-type CuponDestacado = { codigo: string; campana: string; tipo: string; descripcion: string; hasta: string }
+type CuponDestacado = { codigo: string; campana: string; tipo: string; descripcion: string; hasta: string; vence?: string }
 
 // Banner del cupón destacado (Admin → Cupones → "Mostrar como banner").
 // Lo ve todo el mundo, con o sin sesión:
@@ -40,7 +40,7 @@ export default function BannerCuponPromo() {
   }
 
   const emoji = cupon.tipo === 'envio_gratis' ? '🚚' : '🎁'
-  const hasta = cupon.hasta ? ` · hasta el ${cupon.hasta.split('-').reverse().join('/')}` : ''
+  const vence = cupon.vence || (cupon.hasta ? cupon.hasta.split('-').reverse().join('/') : '')
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-tealsoft border border-teal rounded-xl px-4 py-3 mb-5">
@@ -51,7 +51,9 @@ export default function BannerCuponPromo() {
             {cupon.campana ? `${cupon.campana}: ` : ''}{cupon.descripcion}
           </div>
           <div className="font-body text-xs text-inksoft">
-            Con el cupón <span className="font-semibold text-teal tracking-wide">{cupon.codigo}</span>{hasta}
+            Para {cupon.tipo === 'envio_gratis' ? 'el envío gratis' : 'el descuento'} use el código:{' '}
+            <span className="font-semibold text-teal tracking-wide">{cupon.codigo}</span>
+            {vence && <>, válido hasta el {vence}</>}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
-import { describirCupon, type Cupon } from '@/lib/cupones'
+import { describirCupon, textoVencimiento, type Cupon } from '@/lib/cupones'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     uids = Array.from(new Set(uids))
     if (uids.length === 0) return NextResponse.json({ error: 'Elegí al menos un usuario.' }, { status: 400 })
 
-    const hasta = cupon.hasta ? ` Válido hasta el ${cupon.hasta.split('-').reverse().join('/')}.` : ''
+    const hasta = cupon.hasta ? ` Válido hasta el ${textoVencimiento(cupon)}.` : ''
     const mensaje =
       String(body.mensaje || '').trim().slice(0, 300) ||
       `🎁 ${cupon.campana ? `${cupon.campana}: ` : ''}${describirCupon(cupon)} con el cupón ${cupon.codigo}.${hasta} Usalo al finalizar tu compra.`
