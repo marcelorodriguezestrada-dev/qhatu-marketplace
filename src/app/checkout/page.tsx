@@ -155,12 +155,16 @@ function CheckoutContent() {
   // nunca se queda sin QR para mostrar.
   const [qrPlataforma, setQrPlataforma] = useState(QR_PLATAFORMA)
   const [cbuPlataforma, setCbuPlataforma] = useState(BANK_ACCOUNT_NUMBER)
+  // WhatsApp de Clasi Click (Admin → configuración de pagos) — para el
+  // botón de contacto cuando se anula una compra.
+  const [whatsappPlataforma, setWhatsappPlataforma] = useState('')
   useEffect(() => {
     fetch('/api/configuracion/pagos')
       .then((r) => r.json())
       .then((data) => {
         if (data.qrImageUrl) setQrPlataforma(data.qrImageUrl)
         if (data.cbu) setCbuPlataforma(data.cbu)
+        if (data.whatsapp) setWhatsappPlataforma(String(data.whatsapp).replace(/\D/g, ''))
       })
       .catch(() => {})
   }, [])
@@ -1599,10 +1603,17 @@ function CheckoutContent() {
           {subPedidos[pasoActual].estadoActual === 'cancelado' ? (
             <div className="font-body text-sm text-maroon bg-maroonsoft border border-maroon rounded-lg px-4 py-4 text-left">
               <div className="font-bold text-base mb-1">❌ Compra anulada</div>
-              <div>
-                Se rechazaron {MAX_INTENTOS_COMPROBANTE} comprobantes que no eran válidos para este pago, así que anulamos la compra.
-                Si realmente pagaste, escribinos por WhatsApp con el comprobante y lo revisamos.
-              </div>
+              <div>Se rechazaron {MAX_INTENTOS_COMPROBANTE} comprobantes inválidos para este pago, cualquier duda contactese por WhatsApp.</div>
+              {whatsappPlataforma && (
+                <a
+                  href={`https://wa.me/${whatsappPlataforma.length === 8 ? `591${whatsappPlataforma}` : whatsappPlataforma}?text=${encodeURIComponent(`Hola Clasi Click, mi compra #${(subPedidos[pasoActual].pedidoId || '').slice(0, 6)} fue anulada por el comprobante. ¿Me pueden ayudar?`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full mt-3 py-2.5 rounded-lg bg-teal text-white font-body text-sm font-semibold no-underline"
+                >
+                  💬 Escribir a Clasi Click por WhatsApp
+                </a>
+              )}
               <Link href="/" className="inline-block mt-3 font-semibold underline">Volver al inicio</Link>
             </div>
           ) : (
