@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
     // Cuenta de prueba (Admin → Usuarios): sin restricciones de horario.
     const esPrueba = registro.customClaims?.esPrueba === true
     const creadaAntesDelSistema = new Date(registro.metadata.creationTime) < VERIFICACION_DESDE
-    if (creadaAntesDelSistema) {
+    // El admin "entrando como" el vendedor (ver src/lib/modoAdmin.ts)
+    // no tiene el código de verificación — no lo frenamos.
+    if (creadaAntesDelSistema || usuario.cargaAdmin) {
       return NextResponse.json({ emailVerificado: true, esPrueba })
     }
 

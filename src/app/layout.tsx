@@ -5,6 +5,7 @@ import { CarritoProvider } from '@/lib/store'
 import { AuthProvider } from '@/lib/auth'
 import RegistrarVisita from '@/components/RegistrarVisita'
 import VerificacionGate from '@/components/VerificacionGate'
+import BarraModoAdmin from '@/components/BarraModoAdmin'
 
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-space-grotesk' })
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter' })
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RegistrarVisita />
         <AuthProvider>
           <VerificacionGate />
+          <BarraModoAdmin />
           <CarritoProvider>{children}</CarritoProvider>
         </AuthProvider>
       </body>

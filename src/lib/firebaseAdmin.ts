@@ -40,7 +40,10 @@ export async function getUsuarioDesdeRequest(req: NextRequest) {
   if (!token) return null
   try {
     const decoded = await getAuth(getApp()).verifyIdToken(token)
-    return { uid: decoded.uid, email: decoded.email || null }
+    // cargaAdmin: la sesión la abrió el admin "entrando como" este
+    // usuario (Admin → Usuarios → Cargar productos) — ver
+    // /api/admin/usuarios/[uid] accion 'ingresar'.
+    return { uid: decoded.uid, email: decoded.email || null, cargaAdmin: decoded.cargaAdmin === true }
   } catch {
     return null
   }
