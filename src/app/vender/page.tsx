@@ -53,6 +53,8 @@ export default function VenderPage() {
   const [coloresTexto, setColoresTexto] = useState('')
   const [materiales, setMateriales] = useState('')
   const [compraMinima, setCompraMinima] = useState('1')
+  // Stock en unidades; vacío = sin control de stock (ver src/lib/stock.ts).
+  const [stock, setStock] = useState('')
   const [imagenUrl, setImagenUrl] = useState('')
   const [imagenViewerUrl, setImagenViewerUrl] = useState('')
   const [thumbUrl, setThumbUrl] = useState('')
@@ -626,6 +628,7 @@ export default function VenderPage() {
             colores: coloresTexto.split(',').map((c) => c.trim()).filter(Boolean),
             materiales,
             compraMinima: Number(compraMinima) || 1,
+            stock: stock.trim() === '' ? null : Number(stock),
           }),
         })
         const data = await res.json()
@@ -655,6 +658,7 @@ export default function VenderPage() {
             colores: coloresTexto.split(',').map((c) => c.trim()).filter(Boolean),
             materiales,
             compraMinima: Number(compraMinima) || 1,
+            stock: stock.trim() === '' ? null : Number(stock),
           }),
         })
         const data = await res.json()
@@ -676,6 +680,7 @@ export default function VenderPage() {
       setColoresTexto('')
       setMateriales('')
       setCompraMinima('1')
+      setStock('')
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -1132,6 +1137,18 @@ export default function VenderPage() {
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
             />
           </div>
+          <div>
+            <div className="font-body text-xs text-inksoft mb-1.5">Stock (unidades)</div>
+            <input
+              type="number"
+              min={0}
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              placeholder="Sin control"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+            />
+            <div className="font-body text-[10px] text-inksoft mt-1">Se descuenta solo con cada venta. Vacío = no se controla.</div>
+          </div>
         </div>
         <div className="mb-4">
           <div className="font-body text-xs text-inksoft mb-1.5">Plan del vendedor</div>
@@ -1345,6 +1362,11 @@ export default function VenderPage() {
                 bs(p.precio)
               )}
             </div>
+            {typeof p.stock === 'number' && (
+              <div className={`font-body text-[11px] font-semibold mt-0.5 ${p.stock <= 0 ? 'text-maroon' : p.stock <= 3 ? 'text-ochre' : 'text-teal'}`}>
+                {p.stock <= 0 ? 'Agotado — cargá más stock para volver a venderlo' : `Stock: ${p.stock} unidad${p.stock === 1 ? '' : 'es'}`}
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -1369,6 +1391,7 @@ export default function VenderPage() {
                 setColoresTexto((p.colores || []).join(', '))
                 setMateriales(p.materiales || '')
                 setCompraMinima(String(p.compraMinima || 1))
+                setStock(typeof p.stock === 'number' ? String(p.stock) : '')
                 setPlan(p.plan || 'basico')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}

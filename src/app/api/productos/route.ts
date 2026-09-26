@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { sanearStock } from '@/lib/stock'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { LEGACY_CATEGORIA_A_RUBRO } from '@/data/categoriasProductos'
 import { evaluarConIA } from '@/lib/moderacionIA'
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, plan, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima, stock } = body
     if (!nombre || !rubro || !precio) {
       return NextResponse.json({ error: 'Faltan datos del producto.' }, { status: 400 })
     }
@@ -115,6 +116,8 @@ export async function POST(req: NextRequest) {
       colores: Array.isArray(colores) ? colores.filter(Boolean) : [],
       materiales: materiales || '',
       compraMinima: compraMinima ? Math.max(1, Number(compraMinima)) : 1,
+      // Unidades disponibles; null = sin control de stock (ver src/lib/stock.ts).
+      stock: sanearStock(stock),
       vendedorId: usuario.uid,
       vendedor: usuario.email,
       tiendaNombre,

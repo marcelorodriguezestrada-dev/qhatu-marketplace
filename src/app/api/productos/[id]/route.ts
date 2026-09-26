@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { sanearStock } from '@/lib/stock'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima, stock } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
@@ -87,6 +88,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (colores !== undefined) cambios.colores = Array.isArray(colores) ? colores.filter(Boolean) : []
     if (materiales !== undefined) cambios.materiales = materiales
     if (compraMinima !== undefined) cambios.compraMinima = Math.max(1, Number(compraMinima) || 1)
+    // Stock: número de unidades, o null = sin control de stock.
+    if (stock !== undefined) cambios.stock = sanearStock(stock)
     if (estado !== undefined) {
       if (!esAdmin) {
         return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado del producto.' }, { status: 403 })

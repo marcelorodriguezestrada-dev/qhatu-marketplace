@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
+import { agotado, ultimasUnidades } from '@/lib/stock'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { expandirTalles } from '@/data/productos'
@@ -120,6 +121,17 @@ export default function ProductoDetallePage() {
       setErrorSeleccion('Elegí un color antes de continuar.')
       return false
     }
+    // Stock: no se puede agregar más de lo que queda (el servidor lo
+    // vuelve a controlar al comprar).
+    if (agotado(producto)) {
+      setErrorSeleccion('Este producto está agotado.')
+      return false
+    }
+    const unidadesPedidas = Math.max(cantidad, producto.compraMinima || 1)
+    if (typeof producto.stock === 'number' && unidadesPedidas > producto.stock) {
+      setErrorSeleccion(`Quedan solo ${producto.stock} unidad${producto.stock === 1 ? '' : 'es'}.`)
+      return false
+    }
     setErrorSeleccion('')
     const minimo = producto.compraMinima && producto.compraMinima > 1 ? producto.compraMinima : cantidad
     for (let i = 0; i < Math.max(cantidad, minimo); i++) agregar(producto, { talla: tallaSel || undefined, color: colorSel || undefined })
@@ -152,10 +164,13 @@ export default function ProductoDetallePage() {
   // copiar link, como en cualquier app. Si no existe (típico en
   // desktop), copiamos el link al portapapeles como respaldo.
   async function compartirProducto() {
-    const url = typeof window !== 'undefined' ? window.location.href : ''
+    // Link limpio (sin ?parámetros): la vista previa con foto y precio la
+    // arma ./layout.tsx del lado del servidor.
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/producto/${id}` : ''
+    const texto = `${producto.nombre}${producto.precio ? ` — Bs ${Number(producto.precio).toLocaleString('es-BO')}` : ''} en Clasi Click`
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: producto.nombre, url })
+        await navigator.share({ title: producto.nombre, text: texto, url })
       } catch {
         // La persona cerró el selector nativo, o el share falló — no hay nada más que hacer.
       }
@@ -304,6 +319,14 @@ export default function ProductoDetallePage() {
                   <span className="font-body text-sm font-semibold text-teal">{porcentajeOff}% OFF</span>
                 )}
               </div>
+              {agotado(producto) && (
+                <div className="-mt-4 mb-5 inline-block font-body text-sm font-bold text-white bg-ink rounded-lg px-3 py-1.5">Agotado</div>
+              )}
+              {ultimasUnidades(producto) && (
+                <div className="-mt-4 mb-5 inline-block font-body text-sm font-bold text-maroon bg-maroonsoft border border-maroon rounded-lg px-3 py-1.5">
+                  🔥 ¡{ultimasUnidades(producto) === 1 ? 'Última unidad' : `Últimas ${ultimasUnidades(producto)} unidades`}!
+                </div>
+              )}
 
               {producto.descripcionLarga && (
                 <div className="mb-6 font-body text-sm text-inksoft whitespace-pre-line">{producto.descripcionLarga}</div>
@@ -364,7 +387,7 @@ export default function ProductoDetallePage() {
                   </button>
                   <span className="font-body text-sm w-6 text-center">{cantidad}</span>
                   <button
-                    onClick={() => setCantidad((c) => c + 1)}
+                    onClick={() => setCantidad((c) => (typeof producto.stock === 'number' ? Math.min(Math.max(1, producto.stock), c + 1) : c + 1))}
                     className="w-7 h-7 border-none bg-transparent text-lg text-ink"
                   >
                     +
@@ -375,9 +398,10 @@ export default function ProductoDetallePage() {
               <div className="flex flex-col gap-2.5 mb-4">
                 <button
                   onClick={comprarAhora}
-                  className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold"
+                  disabled={agotado(producto)}
+                  className="w-full py-3 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Comprar
+                  {agotado(producto) ? 'Agotado' : 'Comprar'}
                 </button>
                 {tienda?.whatsapp && (
                   <a
@@ -394,7 +418,8 @@ export default function ProductoDetallePage() {
                 )}
                 <button
                   onClick={agregarAlCarrito}
-                  className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+                  disabled={agotado(producto)}
+                  className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {agregado ? 'Agregado ✓' : 'Agregar al carrito'}
                 </button>

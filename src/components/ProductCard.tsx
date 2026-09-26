@@ -9,6 +9,7 @@ import { useCarrito } from '@/lib/store'
 import { useFavoritos } from '@/lib/favoritos'
 import { useAuth } from '@/lib/auth'
 import { track } from '@/lib/tracking'
+import { agotado, ultimasUnidades } from '@/lib/stock'
 
 function esNuevo(createdAt?: string) {
   if (!createdAt) return false
@@ -48,10 +49,13 @@ export function ProductCard({ p }: { p: Producto }) {
       router.push(`/producto/${p.id}`)
       return
     }
+    if (sinStock) return
     agregar(p)
     track('agregar_carrito', { productoId: p.id, precio: p.precio, categoria: p.rubro, desde: 'grilla' })
   }
 
+  const sinStock = agotado(p)
+  const quedan = ultimasUnidades(p)
   const tieneDescuento = p.precioOriginal && p.precioOriginal > p.precio
   const porcentajeOff = tieneDescuento
     ? Math.round((1 - p.precio / (p.precioOriginal as number)) * 100)
@@ -85,6 +89,14 @@ export function ProductCard({ p }: { p: Producto }) {
         {!tieneDescuento && esNuevo(p.createdAt) && (
           <span className="absolute top-2 left-2 bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded font-body">
             Nuevo
+          </span>
+        )}
+        {sinStock && (
+          <span className="absolute inset-x-0 bottom-0 bg-ink/80 text-white text-center text-[11px] font-bold py-1 font-body">Agotado</span>
+        )}
+        {quedan && (
+          <span className="absolute inset-x-0 bottom-0 bg-maroon/90 text-white text-center text-[11px] font-bold py-1 font-body">
+            ¡{quedan === 1 ? 'Última unidad' : `Últimas ${quedan} unidades`}!
           </span>
         )}
         <button
@@ -140,9 +152,10 @@ export function ProductCard({ p }: { p: Producto }) {
 
         <button
           onClick={agregarAlCarrito}
-          className="w-full py-1.5 sm:py-2 rounded-md bg-maroon text-white font-body text-[11px] sm:text-xs font-semibold"
+          disabled={sinStock}
+          className="w-full py-1.5 sm:py-2 rounded-md bg-maroon text-white font-body text-[11px] sm:text-xs font-semibold disabled:bg-inksoft/40 disabled:cursor-not-allowed"
         >
-          Agregar al carrito
+          {sinStock ? 'Agotado' : 'Agregar al carrito'}
         </button>
       </div>
     </div>

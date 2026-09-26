@@ -64,7 +64,10 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     const clave = claveLinea(nuevo)
     setItems((prev) => {
       const existe = prev.find((i) => claveLinea(i) === clave)
-      if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: i.cantidad + 1 } : i))
+      // Tope por el stock que se conocía al agregar (el servidor lo vuelve
+      // a controlar al comprar).
+      const tope = (i: ItemCarrito) => (typeof p.stock === 'number' ? Math.min(i.cantidad + 1, Math.max(1, p.stock)) : i.cantidad + 1)
+      if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: tope(i) } : i))
       return [...prev, nuevo]
     })
   }
@@ -72,7 +75,11 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   function cambiarCantidad(item: ItemCarrito, delta: number) {
     const clave = claveLinea(item)
     setItems((prev) =>
-      prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: Math.max(1, i.cantidad + delta) } : i))
+      prev.map((i) =>
+        claveLinea(i) === clave
+          ? { ...i, cantidad: Math.max(1, typeof i.stock === 'number' ? Math.min(Math.max(1, i.stock), i.cantidad + delta) : i.cantidad + delta) }
+          : i
+      )
     )
   }
 

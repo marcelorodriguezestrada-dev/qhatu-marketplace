@@ -5,6 +5,7 @@ import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
 import { evaluarCupon } from '@/lib/cupones'
 import { esCuentaPruebaServidor } from '@/lib/cuentasPrueba'
 import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
+import { descontarStock, unidadesPorProducto, reponerStockDePedido } from '@/lib/stockServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,9 +87,10 @@ export async function POST(req: NextRequest) {
     // Cupón: el checkout manda el código, la compra completa (una compra
     // con varios vendedores se parte en varios pedidos, todos con el
     // mismo checkoutId) y la parte del descuento que le toca a este
-    // pedido. Volvemos a evaluar el cupón acá y registramos el uso antes
-    // de guardar el pedido, así no se pasa el límite ni se usa dos veces.
+    // pedido. Volvemos a evaluar el cupón acá; el uso se registra recién
+    // después de guardar el pedido (si ahí falla, se deshace el pedido).
     let cuponPedido: Record<string, unknown> | null = null
+    let usoCuponPendiente: { c: NonNullable<Awaited<ReturnType<typeof buscarCuponPorCodigo>>>; checkoutId: string; uid: string; email: string | null } | null = null
     if (cupon?.codigo) {
       const usuario = usuarioLogueado
       if (!usuario) return NextResponse.json({ error: 'Iniciá sesión para usar un cupón.' }, { status: 401 })
@@ -109,12 +111,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'El descuento del cupón no coincide. Volvé a aplicarlo.' }, { status: 400 })
       }
       const checkoutId = String(cupon.checkoutId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60) || ref.id
-      const uso = await registrarUsoCupon(c, { checkoutId, uid: usuario.uid, email: usuario.email, pedidoId: ref.id })
-      if (!uso.ok) return NextResponse.json({ error: `Cupón ${c.codigo}: ${uso.error}` }, { status: 400 })
+      usoCuponPendiente = { c, checkoutId, uid: usuario.uid, email: usuario.email }
       cuponPedido = { cuponId: c.id, codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descuentoProductos, descuentoEnvio, checkoutId }
     }
 
-    await ref.set({
+    const datosPedido = {
       // Descuento de cupón (lo absorbe Clasi Click, ver src/lib/cupones.ts).
       // `total` y `costoEnvio` ya vienen con el descuento aplicado.
       cupon: cuponPedido,
@@ -173,7 +174,31 @@ export async function POST(req: NextRequest) {
       estado: metodoEntrega === 'envio' ? 'verificando_stock' : 'pendiente_pago',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    }
+
+    // Stock: se verifica y descuenta en la misma transacción que crea el
+    // pedido — así dos personas no pueden comprar la última unidad a la
+    // vez. Productos sin stock cargado no se controlan (ver src/lib/stock.ts).
+    const unidades = unidadesPorProducto(items)
+    const creado = await db.runTransaction(async (tx) => {
+      const r = await descontarStock(tx, unidades)
+      if (!r.ok) return r
+      tx.set(ref, { ...datosPedido, stockDescontado: r.descontado })
+      return r
     })
+    if (!creado.ok) return NextResponse.json({ error: creado.error, sinStock: true }, { status: 409 })
+
+    if (usoCuponPendiente) {
+      const { c, checkoutId, uid, email } = usoCuponPendiente
+      const uso = await registrarUsoCupon(c, { checkoutId, uid, email, pedidoId: ref.id })
+      if (!uso.ok) {
+        // El cupón ya no se podía usar (límite alcanzado justo ahora, etc.):
+        // deshacemos el pedido y devolvemos el stock.
+        await reponerStockDePedido(ref)
+        await ref.delete().catch(() => {})
+        return NextResponse.json({ error: `Cupón ${c.codigo}: ${uso.error}` }, { status: 400 })
+      }
+    }
     return NextResponse.json({ id: ref.id })
   } catch (err) {
     console.error('POST /api/pedidos', err)

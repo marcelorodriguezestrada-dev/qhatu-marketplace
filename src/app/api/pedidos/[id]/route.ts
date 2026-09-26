@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { MAX_INTENTOS_COMPROBANTE } from '@/lib/ocrComprobante'
+import { reponerStockDePedido } from '@/lib/stockServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +85,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         return { intentos, anulado }
       })
       if ('error' in resultado) return NextResponse.json({ error: resultado.error }, { status: resultado.status })
+      // Compra anulada: las unidades vuelven al stock.
+      if (resultado.anulado) await reponerStockDePedido(ref)
       return NextResponse.json({ ...resultado, maxIntentos: MAX_INTENTOS_COMPROBANTE })
     }
 
@@ -194,6 +197,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (estado === 'cancelado') payload.canceladoAt = new Date().toISOString()
 
     await ref.update(payload)
+    // Pedido cancelado: las unidades vuelven al stock (una sola vez).
+    if (estado === 'cancelado') await reponerStockDePedido(ref)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/pedidos/[id]', err)
@@ -210,7 +215,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
   try {
     const db = getDb()
-    await db.collection('pedidos').doc(params.id).delete()
+    const ref = db.collection('pedidos').doc(params.id)
+    // Si se borra un pedido que no llegó a entregarse, sus unidades
+    // vuelven al stock.
+    const doc = await ref.get()
+    if (doc.exists && doc.data()?.estado !== 'entregado') await reponerStockDePedido(ref)
+    await ref.delete()
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('DELETE /api/pedidos/[id]', err)

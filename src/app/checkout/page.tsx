@@ -724,8 +724,8 @@ function CheckoutContent() {
     // (el servidor la reconoce por el login para saltear el horario).
     const tokenCupon = await obtenerToken().catch(() => null)
 
+    const nuevos: SubPedido[] = []
     try {
-      const nuevos: SubPedido[] = []
       for (let i = 0; i < clavesVendedor.length; i++) {
         const clave = clavesVendedor[i]
         const grupoItems = grupos.get(clave)!
@@ -878,7 +878,9 @@ function CheckoutContent() {
       }
     } catch (e: any) {
       setError(e.message || 'No se pudieron crear los pedidos.')
-      setEtapa('error')
+      // Si no se llegó a crear ningún pedido (ej. un producto se agotó
+      // justo ahora), vuelve al carrito para que ajuste y reintente.
+      setEtapa(nuevos.length === 0 ? 'entrega' : 'error')
     }
   }
 

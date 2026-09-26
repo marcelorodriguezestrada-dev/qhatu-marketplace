@@ -19,6 +19,8 @@ export type Producto = {
   // con datos ya guardados en Firestore; la UI nueva usa `rubro`.
   categoria?: 'Calzado' | 'Ropa' | 'Accesorios' | 'Hogar'
   precio: number // en Bolivianos
+  // Unidades disponibles; null/ausente = sin control de stock (ver src/lib/stock.ts).
+  stock?: number | null
   precioOriginal?: number // opcional — si el vendedor carga un precio "antes de", se muestra tachado con el % de descuento real
   icono: string
   imagenUrl?: string
