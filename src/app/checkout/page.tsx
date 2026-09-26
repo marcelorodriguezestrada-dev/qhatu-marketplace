@@ -13,7 +13,6 @@ import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
 import { evaluarCupon, tomarCuponPendiente, type Cupon } from '@/lib/cupones'
 import { track } from '@/lib/tracking'
-import { esCuentaPrueba } from '@/lib/cuentasPrueba'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
@@ -135,7 +134,7 @@ export default function CheckoutPage() {
 
 function CheckoutContent() {
   const { items: itemsCarrito, cambiarCantidad, quitar, vaciarTienda } = useCarrito()
-  const { usuario, cargando: authCargando, emailVerificado, obtenerToken } = useAuth()
+  const { usuario, cargando: authCargando, emailVerificado, obtenerToken , esPrueba } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -209,7 +208,7 @@ function CheckoutContent() {
   }, [])
   // Cuentas de prueba (ver src/lib/cuentasPrueba.ts): sin restricciones
   // de horario — tienda abierta y express siempre disponibles.
-  const cuentaPrueba = esCuentaPrueba(usuario?.email)
+  const cuentaPrueba = esPrueba
   const expressDisponible = cuentaPrueba || expressHorario
   useEffect(() => {
     if (envioExpress && !expressDisponible) setEnvioExpress(false)

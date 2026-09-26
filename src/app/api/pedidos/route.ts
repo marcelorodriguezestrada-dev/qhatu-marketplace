@@ -3,7 +3,7 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
 import { evaluarCupon } from '@/lib/cupones'
-import { esCuentaPrueba } from '@/lib/cuentasPrueba'
+import { esCuentaPruebaServidor } from '@/lib/cuentasPrueba'
 import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 
 export const dynamic = 'force-dynamic'
@@ -67,10 +67,10 @@ export async function POST(req: NextRequest) {
     // Mismo corte que el checkout (envioExpressDisponible), pero con la
     // hora de Bolivia (UTC-4, sin horario de verano): el servidor corre
     // en UTC y no podemos confiar en el reloj del navegador.
-    // Las cuentas de prueba no tienen restricción de horario (verificado
-    // con el login, no con el email que manda el navegador).
+    // Las cuentas de prueba (Admin → Usuarios) no tienen restricción de
+    // horario — verificado con el login, no con lo que mande el navegador.
     const usuarioLogueado = await getUsuarioDesdeRequest(req)
-    const esPrueba = esCuentaPrueba(usuarioLogueado?.email)
+    const esPrueba = await esCuentaPruebaServidor(usuarioLogueado)
     if (envioExpress && !esPrueba) {
       const ahoraBolivia = new Date(Date.now() - 4 * 60 * 60 * 1000)
       if (ahoraBolivia.getUTCDay() === 0 || ahoraBolivia.getUTCHours() >= HORA_CORTE_EXPRESS) {

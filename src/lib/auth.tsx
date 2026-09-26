@@ -27,6 +27,9 @@ type AuthContextType = {
   // gate seguía viendo el valor viejo (false) después de verificar
   // bien, y rebotaba a la persona de vuelta al login en un bucle.
   marcarEmailVerificado: () => void
+  // Cuenta de prueba (Admin → Usuarios): puede comprar sin restricciones
+  // de horario. Viene de /api/usuarios/estado al iniciar la sesión.
+  esPrueba: boolean
   login: (email: string, password: string) => Promise<void>
   registrarse: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -42,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<User | null>(null)
   const [cargando, setCargando] = useState(true)
   const [emailVerificado, setEmailVerificado] = useState<boolean | null>(null)
+  const [esPrueba, setEsPrueba] = useState(false)
 
   useEffect(() => {
     // Si auth es null (todavía no estamos en el navegador, o faltan las
@@ -57,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!u) {
         setEmailVerificado(null)
+        setEsPrueba(false)
         return
       }
       // Se chequea acá, una sola vez por sesión iniciada — así CUALQUIER
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch('/api/usuarios/estado', { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json()
         setEmailVerificado(data.emailVerificado !== false)
+        setEsPrueba(data.esPrueba === true)
       } catch {
         // si falla la consulta, no dejamos a la persona trabada sin poder
         // usar la cuenta por un error nuestro de red
@@ -109,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, login, registrarse, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, login, registrarse, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )

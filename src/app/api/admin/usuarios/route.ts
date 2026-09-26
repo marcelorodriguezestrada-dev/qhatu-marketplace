@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
       email: u.email || null,
       nombre: u.displayName || null,
       pausado: u.disabled,
+      esPrueba: u.customClaims?.esPrueba === true,
       creadoEl: u.metadata.creationTime,
       ultimoLogin: u.metadata.lastSignInTime || null,
       productosCount: conteoProductos.get(u.uid) || 0,

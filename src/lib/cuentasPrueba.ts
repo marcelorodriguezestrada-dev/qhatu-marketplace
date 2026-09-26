@@ -1,16 +1,20 @@
+import { getAuthAdmin } from '@/lib/firebaseAdmin'
+
 // Cuentas de prueba: pueden comprar a cualquier hora (sin el horario de
 // atención 8–20 ni el corte de las 17:00 / domingos del envío express),
-// para probar el circuito completo. Se pueden cambiar sin tocar código
-// con la variable NEXT_PUBLIC_CUENTAS_PRUEBA en Vercel (emails separados
-// por coma). El servidor lo verifica con el login, no con lo que diga el
-// navegador. Sus pedidos quedan marcados como "prueba" en el admin.
-const DEFECTO = ['pipicucu@yahoo.com', 'test@test.com']
-
-export const CUENTAS_PRUEBA: string[] = (process.env.NEXT_PUBLIC_CUENTAS_PRUEBA || DEFECTO.join(','))
-  .split(',')
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean)
-
-export function esCuentaPrueba(email: string | null | undefined): boolean {
-  return !!email && CUENTAS_PRUEBA.includes(email.trim().toLowerCase())
+// para probar el circuito completo. Se marcan y desmarcan desde
+// Admin → Usuarios ("Hacer de prueba" / "Quitar prueba"), que guarda la
+// marca en la propia cuenta de Firebase Auth (custom claim `esPrueba`):
+// no gasta lecturas de Firestore. Sus pedidos quedan marcados como
+// "prueba" en el admin.
+//
+// Solo servidor. En el navegador, la marca llega por useAuth().esPrueba.
+export async function esCuentaPruebaServidor(usuario: { uid: string } | null | undefined): Promise<boolean> {
+  if (!usuario?.uid) return false
+  try {
+    const u = await getAuthAdmin().getUser(usuario.uid)
+    return u.customClaims?.esPrueba === true
+  } catch {
+    return false
+  }
 }

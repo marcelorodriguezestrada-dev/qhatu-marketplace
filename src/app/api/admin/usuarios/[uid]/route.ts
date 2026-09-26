@@ -3,7 +3,9 @@ import { getAuthAdmin } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
-// PATCH { pausado: boolean } — solo admin. Pausar bloquea el login del
+// PATCH { pausado: boolean } o { esPrueba: boolean } — solo admin.
+// esPrueba marca/desmarca la cuenta de prueba (custom claim en Firebase
+// Auth; ver src/lib/cuentasPrueba.ts). Pausar bloquea el login del
 // usuario en Firebase Auth (no puede volver a entrar hasta que se lo
 // reactive); NO borra ni oculta sus productos o perfiles profesionales,
 // que siguen visibles en el catálogo tal cual estaban.
@@ -13,8 +15,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {
-    const { pausado } = await req.json()
-    await getAuthAdmin().updateUser(params.uid, { disabled: !!pausado })
+    const body = await req.json()
+    const authAdmin = getAuthAdmin()
+    if (typeof body.esPrueba === 'boolean') {
+      const actual = (await authAdmin.getUser(params.uid)).customClaims || {}
+      await authAdmin.setCustomUserClaims(params.uid, { ...actual, esPrueba: body.esPrueba })
+      return NextResponse.json({ ok: true })
+    }
+    await authAdmin.updateUser(params.uid, { disabled: !!body.pausado })
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error('PATCH /api/admin/usuarios/[uid]', err)

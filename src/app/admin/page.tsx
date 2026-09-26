@@ -586,6 +586,14 @@ export default function AdminPage() {
     }).then(() => cargarUsuarios())
   }
 
+  function marcarUsuarioPrueba(uid: string, esPrueba: boolean) {
+    fetch(`/api/admin/usuarios/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ esPrueba }),
+    }).then(() => cargarUsuarios())
+  }
+
   function eliminarUsuario(uid: string) {
     if (!confirm('¿Eliminar esta cuenta definitivamente? El usuario no va a poder volver a entrar con este login. Esta acción no se puede deshacer.')) return
     fetch(`/api/admin/usuarios/${uid}`, {
@@ -2962,6 +2970,9 @@ export default function AdminPage() {
                         {u.pausado && (
                           <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pausado</span>
                         )}
+                        {u.esPrueba && (
+                          <span className="inline-block bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Puede comprar sin restricciones de horario">🧪 Prueba</span>
+                        )}
                       </div>
                       <div className="font-body text-[11px] text-inksoft mt-0.5">
                         Registrado: {u.creadoEl ? new Date(u.creadoEl).toLocaleDateString('es-BO') : '—'}
@@ -2982,6 +2993,14 @@ export default function AdminPage() {
                         className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
                       >
                         {u.pausado ? 'Reactivar' : 'Pausar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => marcarUsuarioPrueba(u.uid, !u.esPrueba)}
+                        title="Las cuentas de prueba compran sin restricciones de horario"
+                        className={`px-2.5 py-1.5 rounded-md border font-body text-[11px] ${u.esPrueba ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-line'}`}
+                      >
+                        {u.esPrueba ? 'Quitar prueba' : '🧪 Hacer de prueba'}
                       </button>
                       <button
                         type="button"

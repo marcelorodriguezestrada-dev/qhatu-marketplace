@@ -28,15 +28,17 @@ export async function GET(req: NextRequest) {
     // (que no depende de ninguna otra escritura nuestra) saca esa
     // carrera de en medio.
     const registro = await getAuthAdmin().getUser(usuario.uid)
+    // Cuenta de prueba (Admin → Usuarios): sin restricciones de horario.
+    const esPrueba = registro.customClaims?.esPrueba === true
     const creadaAntesDelSistema = new Date(registro.metadata.creationTime) < VERIFICACION_DESDE
     if (creadaAntesDelSistema) {
-      return NextResponse.json({ emailVerificado: true })
+      return NextResponse.json({ emailVerificado: true, esPrueba })
     }
 
     const db = getDb()
     const doc = await db.collection('usuarios').doc(usuario.uid).get()
     const emailVerificado = doc.exists && doc.data()?.emailVerificado === true
-    return NextResponse.json({ emailVerificado })
+    return NextResponse.json({ emailVerificado, esPrueba })
   } catch (err) {
     console.error('GET /api/usuarios/estado', err)
     // Si falla la consulta, dejamos pasar — mejor no bloquear a nadie
