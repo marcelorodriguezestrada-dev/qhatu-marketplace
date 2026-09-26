@@ -19,6 +19,8 @@ import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
+import CrearUsuario, { mensajeAcceso, abrirWhatsapp } from '@/components/admin/CrearUsuario'
+import { entrarComoUsuario } from '@/lib/modoAdmin'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
 function bs(n: number) {
@@ -608,6 +610,40 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ esPrueba }),
     }).then(() => cargarUsuarios())
+  }
+
+  const [vendedorParaCargar, setVendedorParaCargar] = useState('')
+  async function cargarProductosComo(uid: string) {
+    if (!uid) return
+    if (!confirm('Vas a entrar a la cuenta de este vendedor en esta pestaña para cargarle la tienda y los productos (quedan marcados como "cargado por admin"). Si tenías tu propia sesión abierta en el sitio, se cierra. ¿Seguir?')) return
+    try {
+      await entrarComoUsuario(uid, password)
+    } catch (err: any) {
+      alert(err?.message || 'No se pudo entrar como ese usuario.')
+    }
+  }
+
+  // Link nuevo para elegir contraseña (el anterior vence a la hora) y
+  // WhatsApp con el mensaje de acceso.
+  async function enviarAccesoUsuario(u: any) {
+    const ventana = window.open('', '_blank')
+    try {
+      const d = await fetch(`/api/admin/usuarios/${u.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'link' }),
+      }).then((r) => r.json())
+      if (d.error) throw new Error(d.error)
+      const vendedor = vendedoresAdmin.find((v) => v.id === u.uid)
+      const texto = mensajeAcceso({ nombre: u.nombre, negocio: vendedor?.nombreNegocio, email: u.email, link: d.link })
+      const numero = String(u.whatsapp || vendedor?.whatsapp || '').replace(/\D/g, '')
+      const url = numero ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`
+      if (ventana) ventana.location.href = url
+      else abrirWhatsapp(numero, texto)
+    } catch (err: any) {
+      ventana?.close()
+      alert(err?.message || 'No se pudo generar el link.')
+    }
   }
 
   function eliminarUsuario(uid: string) {
@@ -1467,7 +1503,7 @@ export default function AdminPage() {
           Banners
         </button>
         <button
-          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios() }}
+          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios(); if (vendedoresAdmin.length === 0) cargarVendedoresAdmin() }}
           className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
         >
           Usuarios
@@ -1767,6 +1803,43 @@ export default function AdminPage() {
             </div>
           )}
 
+          <div className="bg-panel border border-indigo-200 rounded-xl p-3.5 mb-5">
+            <div className="font-body text-sm font-semibold text-ink mb-1">➕ Publicar productos para un vendedor</div>
+            <div className="font-body text-[11px] text-inksoft mb-2">
+              Entrás a su cuenta y cargás como él (formulario o Excel); los productos quedan a su nombre y marcados “🛠️ cargado por admin”. ¿No tiene cuenta? Creala en la pestaña Usuarios.
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <select
+                value={vendedorParaCargar}
+                onFocus={() => { if (usuarios.length === 0) cargarUsuarios() }}
+                onChange={(e) => setVendedorParaCargar(e.target.value)}
+                aria-label="Vendedor"
+                className="flex-1 min-w-[200px] px-2 py-1.5 rounded-lg border border-line bg-panel font-body text-xs text-ink"
+              >
+                <option value="">{usuarios.length === 0 ? (cargandoUsuarios ? 'Cargando usuarios...' : 'Elegí el vendedor (tocá para cargar)') : 'Elegí el vendedor'}</option>
+                {[...usuarios]
+                  .filter((u) => !u.pausado)
+                  .sort((a, b) => (b.productosCount || 0) - (a.productosCount || 0) || String(a.email).localeCompare(String(b.email)))
+                  .map((u) => {
+                    const tienda = vendedoresAdmin.find((v) => v.id === u.uid)?.nombreNegocio
+                    return (
+                      <option key={u.uid} value={u.uid}>
+                        {tienda ? `${tienda} — ` : ''}{u.email || u.nombre || u.uid}{u.productosCount ? ` (${u.productosCount} productos)` : ''}
+                      </option>
+                    )
+                  })}
+              </select>
+              <button
+                type="button"
+                onClick={() => cargarProductosComo(vendedorParaCargar)}
+                disabled={!vendedorParaCargar}
+                className="px-3 py-1.5 rounded-lg border-none bg-indigo-600 text-white font-body text-xs font-semibold disabled:opacity-50"
+              >
+                🛍️ Cargar productos como este vendedor
+              </button>
+            </div>
+          </div>
+
           <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
           {productos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
           {[...productos]
@@ -1784,7 +1857,10 @@ export default function AdminPage() {
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
                 <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
-                <div className="font-body text-[11px] text-inksoft mt-1">Estado: {p.estado || 'activo'}</div>
+                <div className="font-body text-[11px] text-inksoft mt-1">
+                  Estado: {p.estado || 'activo'}
+                  {p.cargadoPorAdmin && <span className="ml-2 inline-block bg-tealsoft text-teal border border-teal text-[10px] font-bold px-1.5 py-0.5 rounded-full">🛠️ Cargado por admin</span>}
+                </div>
                 <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
               </div>
               <div className="flex gap-2 flex-wrap justify-end">
@@ -3116,6 +3192,7 @@ export default function AdminPage() {
 
       {tab === 'usuarios' && (
         <div>
+          <CrearUsuario password={password} onCreado={() => cargarUsuarios()} />
           <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
             <div className="font-body text-sm font-semibold text-ink">
               Usuarios registrados {usuarios.length > 0 && <span className="text-inksoft font-normal">({usuarios.length})</span>}
@@ -3143,11 +3220,14 @@ export default function AdminPage() {
               return (
                 <div key={u.uid} className="bg-panel border border-line rounded-lg p-3.5 mb-3">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-[240px]">
                       <div className="font-body text-sm font-medium text-ink truncate flex items-center gap-2">
                         {u.email || u.nombre || u.uid}
                         {u.pausado && (
                           <span className="inline-block bg-maroonsoft text-maroon text-[10px] font-bold px-1.5 py-0.5 rounded-full">Pausado</span>
+                        )}
+                        {u.creadoPorAdmin && (
+                          <span className="inline-block bg-tealsoft text-teal border border-teal text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Cuenta creada desde el admin">🛠️ Creado por admin</span>
                         )}
                         {u.esPrueba && (
                           <span className="inline-block bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Puede comprar sin restricciones de horario">🧪 Prueba</span>
@@ -3166,6 +3246,25 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
+                      <button
+                        type="button"
+                        onClick={() => cargarProductosComo(u.uid)}
+                        disabled={u.pausado}
+                        title="Entrar a su cuenta para cargarle la tienda y productos"
+                        className="px-2.5 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 font-body text-[11px] font-semibold disabled:opacity-50"
+                      >
+                        🛍️ Cargar productos
+                      </button>
+                      {u.email && (
+                        <button
+                          type="button"
+                          onClick={() => enviarAccesoUsuario(u)}
+                          title="Genera un link nuevo para elegir contraseña y lo manda por WhatsApp"
+                          className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
+                        >
+                          🔑 Enviar acceso
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => pausarUsuario(u.uid, !u.pausado)}

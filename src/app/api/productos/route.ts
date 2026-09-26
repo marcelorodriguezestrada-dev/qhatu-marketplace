@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
       fotosAdicionales: Array.isArray(fotosAdicionales) && fotosAdicionales.length > 0 && (await vendedorPremium(usuario.uid)) ? sanearFotosAdicionales(fotosAdicionales) : [],
       vendedorId: usuario.uid,
       vendedor: usuario.email,
+      ...(usuario.cargaAdmin ? { cargadoPorAdmin: true } : {}),
       tiendaNombre,
       tiendaLogoUrl,
       plan: planValido,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthAdmin } from '@/lib/firebaseAdmin'
+import { linkParaElegirContrasena } from '@/lib/linkContrasena'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
   try {
     const body = await req.json()
     const authAdmin = getAuthAdmin()
+    // Link nuevo para que elija/cambie su contraseña (vence a la hora,
+    // por eso se genera recién al momento de mandarlo).
+    if (body.accion === 'link') {
+      const u = await authAdmin.getUser(params.uid)
+      if (!u.email) return NextResponse.json({ error: 'Ese usuario no tiene email.' }, { status: 400 })
+      return NextResponse.json({ link: await linkParaElegirContrasena(u.email) })
+    }
+    // "Entrar como" este usuario para cargarle productos: token de un
+    // solo uso con la marca cargaAdmin (queda en cada producto que se
+    // publique en esa sesión como cargadoPorAdmin).
+    if (body.accion === 'ingresar') {
+      const u = await authAdmin.getUser(params.uid)
+      if (u.disabled) return NextResponse.json({ error: 'El usuario está pausado. Reactivalo primero.' }, { status: 400 })
+      const token = await authAdmin.createCustomToken(params.uid, { cargaAdmin: true })
+      return NextResponse.json({ token, email: u.email || null })
+    }
     if (typeof body.esPrueba === 'boolean') {
       const actual = (await authAdmin.getUser(params.uid)).customClaims || {}
       await authAdmin.setCustomUserClaims(params.uid, { ...actual, esPrueba: body.esPrueba })
