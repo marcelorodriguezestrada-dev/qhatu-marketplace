@@ -13,6 +13,7 @@ import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
 import { evaluarCupon, tomarCuponPendiente, type Cupon } from '@/lib/cupones'
 import { track } from '@/lib/tracking'
+import { esCuentaPrueba } from '@/lib/cuentasPrueba'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
 function bs(n: number) {
@@ -201,11 +202,15 @@ function CheckoutContent() {
   // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
   // hora de corte: ahí el botón se deshabilita y, si estaba elegido, se
   // cae solo a envío normal.
-  const [expressDisponible, setExpressDisponible] = useState(() => envioExpressDisponible())
+  const [expressHorario, setExpressHorario] = useState(() => envioExpressDisponible())
   useEffect(() => {
-    const t = setInterval(() => setExpressDisponible(envioExpressDisponible()), 60_000)
+    const t = setInterval(() => setExpressHorario(envioExpressDisponible()), 60_000)
     return () => clearInterval(t)
   }, [])
+  // Cuentas de prueba (ver src/lib/cuentasPrueba.ts): sin restricciones
+  // de horario — tienda abierta y express siempre disponibles.
+  const cuentaPrueba = esCuentaPrueba(usuario?.email)
+  const expressDisponible = cuentaPrueba || expressHorario
   useEffect(() => {
     if (envioExpress && !expressDisponible) setEnvioExpress(false)
   }, [envioExpress, expressDisponible])
@@ -637,7 +642,7 @@ function CheckoutContent() {
   }
 
   async function confirmarEntregaYCrearPedidos() {
-    if (!tiendaAbierta()) {
+    if (!cuentaPrueba && !tiendaAbierta()) {
       setError(mensajeTiendaCerrada())
       return
     }
@@ -654,7 +659,7 @@ function CheckoutContent() {
       setError(validacionWhatsapp.motivo || 'Revisá tu número de WhatsApp.')
       return
     }
-    if (metodoEntrega === 'envio' && envioExpress && !envioExpressDisponible()) {
+    if (metodoEntrega === 'envio' && envioExpress && !expressDisponible) {
       setEnvioExpress(false)
       setError(`El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Lo cambiamos a envío normal — revisá el total y volvé a confirmar.`)
       return
@@ -716,7 +721,9 @@ function CheckoutContent() {
     const descuentosRepartidos = repartirEnvio(subtotales, cuponVigente ? descuentoCupon : 0)
     const descuentosEnvioRepartidos = repartirEnvio(subtotales, cuponVigente ? descuentoEnvioCupon : 0)
     const checkoutId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-    const tokenCupon = cuponVigente ? await obtenerToken() : null
+    // El token va siempre: lo usa el cupón y también la cuenta de prueba
+    // (el servidor la reconoce por el login para saltear el horario).
+    const tokenCupon = await obtenerToken().catch(() => null)
 
     try {
       const nuevos: SubPedido[] = []
@@ -1095,6 +1102,12 @@ function CheckoutContent() {
         ← Volver a la tienda
       </button>
 
+      {cuentaPrueba && (
+        <div className="font-body text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-4">
+          🧪 Cuenta de prueba: sin restricciones de horario (tienda y envío express siempre disponibles).
+        </div>
+      )}
+
       {etapa === 'entrega' && (
         <div className="bg-panel border border-line rounded-xl p-6">
           {/* Detalle de lo que se está comprando, con foto de cada
@@ -1333,7 +1346,7 @@ function CheckoutContent() {
                 {/* Los domingos no hay reparto — no tiene sentido
                     ofrecer "llega hoy mismo" ese día. Desde las 17:00
                     se sigue mostrando, pero deshabilitado. */}
-                {hayEntregaHoy() && (
+                {(cuentaPrueba || hayEntregaHoy()) && (
                   <button
                     type="button"
                     onClick={() => setEnvioExpress(true)}

@@ -3,6 +3,7 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
 import { evaluarCupon } from '@/lib/cupones'
+import { esCuentaPrueba } from '@/lib/cuentasPrueba'
 import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 
 export const dynamic = 'force-dynamic'
@@ -66,7 +67,11 @@ export async function POST(req: NextRequest) {
     // Mismo corte que el checkout (envioExpressDisponible), pero con la
     // hora de Bolivia (UTC-4, sin horario de verano): el servidor corre
     // en UTC y no podemos confiar en el reloj del navegador.
-    if (envioExpress) {
+    // Las cuentas de prueba no tienen restricción de horario (verificado
+    // con el login, no con el email que manda el navegador).
+    const usuarioLogueado = await getUsuarioDesdeRequest(req)
+    const esPrueba = esCuentaPrueba(usuarioLogueado?.email)
+    if (envioExpress && !esPrueba) {
       const ahoraBolivia = new Date(Date.now() - 4 * 60 * 60 * 1000)
       if (ahoraBolivia.getUTCDay() === 0 || ahoraBolivia.getUTCHours() >= HORA_CORTE_EXPRESS) {
         return NextResponse.json(
@@ -85,7 +90,7 @@ export async function POST(req: NextRequest) {
     // de guardar el pedido, así no se pasa el límite ni se usa dos veces.
     let cuponPedido: Record<string, unknown> | null = null
     if (cupon?.codigo) {
-      const usuario = await getUsuarioDesdeRequest(req)
+      const usuario = usuarioLogueado
       if (!usuario) return NextResponse.json({ error: 'Iniciá sesión para usar un cupón.' }, { status: 401 })
       const c = await buscarCuponPorCodigo(cupon.codigo)
       if (!c) return NextResponse.json({ error: 'El cupón ya no existe. Sacalo y volvé a intentar.' }, { status: 400 })
@@ -113,6 +118,8 @@ export async function POST(req: NextRequest) {
       // Descuento de cupón (lo absorbe Clasi Click, ver src/lib/cupones.ts).
       // `total` y `costoEnvio` ya vienen con el descuento aplicado.
       cupon: cuponPedido,
+      // Pedido hecho con una cuenta de prueba (ver src/lib/cuentasPrueba.ts).
+      esPrueba,
       items,
       total: Number(total),
       comprador: comprador || null,

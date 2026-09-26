@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
+import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -1291,6 +1292,18 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <AlarmaPedidos
+        password={password}
+        pedidosIniciales={pedidos}
+        onCambios={(cambiados) =>
+          setPedidos((prev) => {
+            const porId = new Map(prev.map((p: any) => [p.id, p]))
+            for (const c of cambiados) porId.set(c.id, { ...(porId.get(c.id) || {}), ...c })
+            return Array.from(porId.values()).sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+          })
+        }
+      />
+
       <div className="flex gap-2 mb-6 border-b border-line flex-wrap">
         <button
           onClick={() => setTab('pedidos')}
@@ -1505,6 +1518,9 @@ export default function AdminPage() {
                       <div className="font-body text-xs text-inksoft shrink-0">{bs(it.precio * it.cantidad)}</div>
                     </div>
                   ))}
+                  {p.esPrueba && (
+                    <div className="font-body text-[11px] font-semibold text-indigo-700 text-right">🧪 Pedido de prueba</div>
+                  )}
                   {p.cupon && (
                     <div className="font-body text-[11px] text-teal text-right">
                       🎟️ Cupón {p.cupon.codigo}
