@@ -135,6 +135,14 @@ export function ProductCard({ p }: { p: Producto }) {
           <div className="font-body text-[12px] text-inksoft mb-2 truncate">{p.descripcionCorta}</div>
         )}
 
+        {(p.cantidadResenas || 0) > 0 && (
+          <div className="flex items-center gap-1 mb-1.5 font-body text-[11px] text-inksoft">
+            <span className="text-ochre">★</span>
+            <span className="font-semibold text-ink">{Number(p.ratingPromedio || 0).toFixed(1)}</span>
+            <span>({p.cantidadResenas})</span>
+          </div>
+        )}
+
         {/* A propósito no se muestra ningún precio acá en la grilla — la
             idea por ahora es generar curiosidad y que haga falta entrar
             al producto para verlo. El precio real sigue mostrándose

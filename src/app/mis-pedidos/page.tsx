@@ -161,6 +161,11 @@ export default function MisPedidosPage() {
                     <div className="font-body text-sm text-ink truncate">{item.nombre}</div>
                     <div className="font-body text-[11px] text-inksoft">{item.cantidad} x {bs(item.precio || 0)}</div>
                   </div>
+                  {p.estado === 'entregado' && item.id && !esMiPedidoComoVendedor(p) && (
+                    <Link href={`/producto/${item.id}#resenas`} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-ochre bg-ochresoft font-body text-[11px] font-semibold text-ink">
+                      ⭐ Calificá
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>

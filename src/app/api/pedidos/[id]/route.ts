@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { getDb, getUsuarioDesdeRequest, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { MAX_INTENTOS_COMPROBANTE } from '@/lib/ocrComprobante'
 import { reponerStockDePedido } from '@/lib/stockServer'
@@ -199,6 +199,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await ref.update(payload)
     // Pedido cancelado: las unidades vuelven al stock (una sola vez).
     if (estado === 'cancelado') await reponerStockDePedido(ref)
+    // Entregado: aviso en la campanita del comprador invitándolo a
+    // calificar lo que compró (reseñas de producto). Nunca frena nada.
+    if (estado === 'entregado') {
+      try {
+        const pedido = (await ref.get()).data() as any
+        const item = (pedido?.items || []).find((it: any) => it?.id)
+        if (pedido?.comprador && item && !pedido.avisoResenaEnviado) {
+          const comprador = await getAuthAdmin().getUserByEmail(pedido.comprador)
+          await db.collection('notificaciones').add({
+            uid: comprador.uid,
+            tipo: 'resena_producto',
+            pedidoId: params.id,
+            mensaje: `📦 ¡Tu pedido llegó! ¿Qué te pareció ${pedido.items.length > 1 ? 'tu compra' : `"${item.nombre}"`}? Tocá acá y dejá tu opinión ⭐`,
+            link: `/producto/${item.id}#resenas`,
+            leida: false,
+            createdAt: new Date().toISOString(),
+          })
+          await ref.update({ avisoResenaEnviado: true })
+        }
+      } catch (err) {
+        console.error('aviso de reseña', err)
+      }
+    }
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/pedidos/[id]', err)

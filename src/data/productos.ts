@@ -21,6 +21,9 @@ export type Producto = {
   precio: number // en Bolivianos
   // Unidades disponibles; null/ausente = sin control de stock (ver src/lib/stock.ts).
   stock?: number | null
+  // Reseñas de compradores (ver /api/productos/[id]/resenas).
+  ratingPromedio?: number
+  cantidadResenas?: number
   precioOriginal?: number // opcional — si el vendedor carga un precio "antes de", se muestra tachado con el % de descuento real
   icono: string
   imagenUrl?: string

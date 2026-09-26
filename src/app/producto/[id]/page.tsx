@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { agotado, ultimasUnidades } from '@/lib/stock'
+import ResenasProducto, { Estrellas } from '@/components/ResenasProducto'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { expandirTalles } from '@/data/productos'
@@ -313,6 +314,13 @@ export default function ProductoDetallePage() {
               {tieneDescuento && (
                 <div className="font-body text-sm text-inksoft line-through mb-1">{bs(producto.precioOriginal)}</div>
               )}
+              {producto.cantidadResenas > 0 && (
+                <a href="#resenas" className="flex items-center gap-1.5 mb-1.5 font-body text-xs text-inksoft hover:underline">
+                  <Estrellas valor={producto.ratingPromedio || 0} />
+                  <span className="text-ink font-semibold">{Number(producto.ratingPromedio || 0).toFixed(1)}</span>
+                  ({producto.cantidadResenas} {producto.cantidadResenas === 1 ? 'opinión' : 'opiniones'})
+                </a>
+              )}
               <div className="flex items-baseline gap-2 mb-6">
                 <span className="font-display text-3xl font-bold text-ink">{bs(producto.precio)}</span>
                 {tieneDescuento && (
@@ -538,6 +546,8 @@ export default function ProductoDetallePage() {
           )}
         </div>
       )}
+
+      <ResenasProducto productoId={String(id)} />
 
       {relacionados.length > 0 && (
         <div className="mt-14">
