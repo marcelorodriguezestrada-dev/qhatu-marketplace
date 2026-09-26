@@ -16,6 +16,25 @@ type Pedido = { id: string; estado?: string; nombreComprador?: string; comprador
 
 const CLAVE = 'clasiclick_alarma_pedidos'
 
+// Horario en que la alarma SUENA (hora de Bolivia). Fuera de horario los
+// pedidos igual se suman a la lista y aparece el cartel, pero en silencio.
+type Horario = { modo: 'siempre' | 'horario'; desde: string; hasta: string; dias: number[] }
+const HORARIO_OFICINA: Horario = { modo: 'horario', desde: '08:00', hasta: '20:00', dias: [1, 2, 3, 4, 5, 6] }
+const HORARIO_DEFECTO: Horario = { ...HORARIO_OFICINA, modo: 'siempre' }
+const DIAS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
+
+function dentroDeHorario(h: Horario, ahora = Date.now()): boolean {
+  if (h.modo === 'siempre') return true
+  const bo = new Date(ahora - 4 * 3600_000)
+  const hhmm = bo.toISOString().slice(11, 16)
+  const dia = bo.getUTCDay()
+  // Rango que cruza la medianoche (ej. 20:00–02:00): la parte de la
+  // madrugada cuenta para el día anterior.
+  if (h.desde <= h.hasta) return h.dias.includes(dia) && hhmm >= h.desde && hhmm < h.hasta
+  if (hhmm >= h.desde) return h.dias.includes(dia)
+  return hhmm < h.hasta && h.dias.includes((dia + 6) % 7)
+}
+
 function bs(n?: number) {
   return 'Bs ' + (n || 0).toLocaleString('es-BO')
 }
@@ -33,6 +52,11 @@ export default function AlarmaPedidos({
 }) {
   const [activa, setActiva] = useState(false)
   const [conPago, setConPago] = useState(true)
+  const [horario, setHorario] = useState<Horario>(HORARIO_DEFECTO)
+  const [editandoHorario, setEditandoHorario] = useState(false)
+  const horarioRef = useRef<Horario>(HORARIO_DEFECTO)
+  horarioRef.current = horario
+  const [, forzar] = useState(0)
   const [avisos, setAvisos] = useState<{ id: string; texto: string; tipo: 'nuevo' | 'pago' }[]>([])
   const conocidos = useRef<Map<string, string> | null>(null)
   const desdeRef = useRef<string>('')
@@ -43,7 +67,11 @@ export default function AlarmaPedidos({
   useEffect(() => {
     try {
       const g = JSON.parse(localStorage.getItem(CLAVE) || 'null')
-      if (g) { setActiva(!!g.activa); setConPago(g.conPago !== false) }
+      if (g) {
+        setActiva(!!g.activa)
+        setConPago(g.conPago !== false)
+        if (g.horario?.modo) setHorario({ ...HORARIO_DEFECTO, ...g.horario })
+      }
     } catch {}
     // Cualquier toque en la página desbloquea el audio (requisito del navegador).
     const desbloquear = () => { if (!audioRef.current) try { audioRef.current = new AudioContext() } catch {} ; audioRef.current?.resume() }
@@ -51,9 +79,20 @@ export default function AlarmaPedidos({
     return () => window.removeEventListener('pointerdown', desbloquear)
   }, [])
 
-  function guardarPref(a: boolean, p: boolean) {
-    try { localStorage.setItem(CLAVE, JSON.stringify({ activa: a, conPago: p })) } catch {}
+  function guardarPref(a: boolean, p: boolean, h: Horario = horario) {
+    try { localStorage.setItem(CLAVE, JSON.stringify({ activa: a, conPago: p, horario: h })) } catch {}
   }
+
+  function cambiarHorario(h: Horario) {
+    setHorario(h)
+    guardarPref(activa, conPago, h)
+  }
+
+  // Refresca cada minuto el cartelito "sonando / en silencio".
+  useEffect(() => {
+    const t = setInterval(() => forzar((n) => n + 1), 60_000)
+    return () => clearInterval(t)
+  }, [])
 
   // Sirena: alterna dos tonos fuertes durante ~4 segundos.
   function sonar() {
@@ -123,7 +162,9 @@ export default function AlarmaPedidos({
           ...nuevos.map((p) => ({ id: p.id, tipo: 'nuevo' as const, texto: `🛒 Nuevo pedido de ${quien(p)} — ${bs(p.total)}${p.vendedorNombre ? ` · ${p.vendedorNombre}` : ''}${p.esPrueba ? ' (prueba)' : ''}` })),
           ...pagos.map((p) => ({ id: p.id + '-pago', tipo: 'pago' as const, texto: `💸 ${quien(p)} avisó que pagó — ${bs(p.total)}. Revisá el comprobante.` })),
         ]
-        setAvisos((a) => [...nuevosAvisos, ...a].slice(0, 10))
+        const conSonido = dentroDeHorario(horarioRef.current)
+        setAvisos((a) => [...nuevosAvisos.map((x) => (conSonido ? x : { ...x, texto: x.texto + ' 🔕' })), ...a].slice(0, 10))
+        if (!conSonido) return // fuera de horario: cartel sí, sonido y notificación no
         sonar()
         notificar(nuevos.length ? `Nuevo pedido de ${quien(nuevos[0])}` : `${quien(pagos[0])} avisó que pagó`, nuevosAvisos.map((x) => x.texto).join('\n'))
       } catch {}
@@ -158,6 +199,78 @@ export default function AlarmaPedidos({
             </label>
             <button type="button" onClick={sonar} className="font-body text-xs text-teal underline">Probar sonido</button>
             <button type="button" onClick={() => { setActiva(false); guardarPref(false, conPago) }} className="font-body text-xs text-inksoft underline ml-auto">Desactivar</button>
+            <div className="w-full flex flex-wrap items-center gap-2 pt-2 mt-1 border-t border-line">
+              <span className="font-body text-xs text-ink">
+                ⏰ Suena:{' '}
+                <strong>
+                  {horario.modo === 'siempre'
+                    ? 'siempre'
+                    : `${horario.dias.length === 7 ? 'todos los días' : horario.dias.slice().sort().map((d) => DIAS[d]).join(', ')} de ${horario.desde} a ${horario.hasta}`}
+                </strong>
+              </span>
+              <span className={`rounded-full px-2 py-0.5 font-body text-[10px] font-semibold border ${dentroDeHorario(horario) ? 'border-teal bg-tealsoft text-teal' : 'border-line bg-panelalt text-inksoft'}`}>
+                {dentroDeHorario(horario) ? '🔔 Sonando ahora' : '🔕 En silencio ahora (fuera de horario)'}
+              </span>
+              <button type="button" onClick={() => setEditandoHorario((v) => !v)} className="font-body text-xs text-teal underline ml-auto">
+                {editandoHorario ? 'Cerrar' : 'Cambiar horario'}
+              </button>
+            </div>
+            {editandoHorario && (
+              <div className="w-full bg-panelalt border border-line rounded-lg p-3 flex flex-col gap-2.5">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cambiarHorario({ ...horario, modo: 'siempre' })}
+                    className={`px-3 py-1.5 rounded-lg border font-body text-xs font-semibold ${horario.modo === 'siempre' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-ink'}`}
+                  >
+                    Siempre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarHorario(HORARIO_OFICINA)}
+                    className="px-3 py-1.5 rounded-lg border border-line bg-panel font-body text-xs font-semibold text-ink"
+                  >
+                    🏢 Horario de oficina (Lu–Sá 8:00–20:00)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarHorario({ ...horario, modo: 'horario' })}
+                    className={`px-3 py-1.5 rounded-lg border font-body text-xs font-semibold ${horario.modo === 'horario' ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-ink'}`}
+                  >
+                    Rango personalizado
+                  </button>
+                </div>
+                {horario.modo === 'horario' && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2 font-body text-xs text-ink">
+                      De
+                      <input type="time" value={horario.desde} onChange={(e) => e.target.value && cambiarHorario({ ...horario, desde: e.target.value })} className="px-2 py-1.5 rounded-lg border border-line bg-panel" />
+                      a
+                      <input type="time" value={horario.hasta} onChange={(e) => e.target.value && cambiarHorario({ ...horario, hasta: e.target.value })} className="px-2 py-1.5 rounded-lg border border-line bg-panel" />
+                      <span className="text-inksoft">(hora de Bolivia)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                        const on = horario.dias.includes(d)
+                        return (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => cambiarHorario({ ...horario, dias: on ? horario.dias.filter((x) => x !== d) : [...horario.dias, d] })}
+                            className={`w-9 h-8 rounded-lg border font-body text-xs font-semibold ${on ? 'border-teal bg-teal text-white' : 'border-line bg-panel text-inksoft'}`}
+                          >
+                            {DIAS[d]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+                <div className="font-body text-[11px] text-inksoft">
+                  Fuera de horario los pedidos igual aparecen en la lista y en el cartel (marcados 🔕), pero sin sonido ni notificación. Se guarda en este navegador.
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>
