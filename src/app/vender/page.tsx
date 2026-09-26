@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { ProductIcon } from '@/components/ProductIcon'
@@ -10,6 +11,7 @@ import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } fr
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
 import { PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
+import PublicarMasivo from '@/components/PublicarMasivo'
 import { buscarMercados } from '@/data/mercadosPotosi'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
@@ -122,6 +124,11 @@ export default function VenderPage() {
   // Fotos extra del producto que se está publicando/editando (beneficio
   // Premium). Se suben a ImgBB al elegirlas y se guardan con el producto.
   const [fotosExtra, setFotosExtra] = useState<string[]>([])
+  // Confirmación después de publicar/actualizar: "¡Listo! ya está
+  // publicado" con botones para verlo, ir al catálogo o publicar otro.
+  const [publicadoOk, setPublicadoOk] = useState<{ id: string; nombre: string; editado: boolean } | null>(null)
+  const avisoPublicadoRef = useRef<HTMLDivElement | null>(null)
+  const [mostrarMasivo, setMostrarMasivo] = useState(false)
   const [subiendoExtra, setSubiendoExtra] = useState(0)
 
   useEffect(() => {
@@ -602,6 +609,10 @@ export default function VenderPage() {
       return
     }
     setPublicando(true)
+    setPublicadoOk(null)
+    const nombrePublicado = nombre.trim()
+    let idPublicado = editingId || ''
+    const fueEdicion = !!editingId
     try {
       const token = await obtenerToken()
       if (editingId) {
@@ -664,7 +675,10 @@ export default function VenderPage() {
           setError(data.error)
           return
         }
+        idPublicado = data.id
       }
+      setPublicadoOk({ id: idPublicado, nombre: nombrePublicado, editado: fueEdicion })
+      setTimeout(() => avisoPublicadoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
       setNombre('')
       setPrecio('')
       setPrecioOriginal('')
@@ -935,7 +949,46 @@ export default function VenderPage() {
         {cobroGuardado && <span className="font-body text-xs text-teal ml-3">Guardado ✓</span>}
       </div>
 
-      <form onSubmit={publicar} className="bg-panel border border-line rounded-xl p-5 mb-8">
+      {publicadoOk && (
+        <div ref={avisoPublicadoRef} className="bg-tealsoft border-2 border-teal rounded-xl p-5 mb-4">
+          <div className="font-display text-lg font-bold text-ink mb-1">
+            ✅ ¡Listo! {publicadoOk.editado ? 'Guardaste los cambios de' : 'Ya está publicado'} “{publicadoOk.nombre}”
+          </div>
+          <div className="font-body text-sm text-inksoft mb-3">
+            {publicadoOk.editado ? 'Los cambios ya se ven en el catálogo.' : 'Ya aparece en el catálogo y los compradores lo pueden ver y comprar.'}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {publicadoOk.id && (
+              <Link href={`/producto/${publicadoOk.id}`} className="px-4 py-2 rounded-lg bg-teal text-white font-body text-sm font-semibold">
+                👀 Ver cómo quedó
+              </Link>
+            )}
+            <Link href={usuario ? `/tienda/${usuario.uid}` : '/'} className="px-4 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-sm font-semibold">
+              🛍️ Ver mi catálogo
+            </Link>
+            <button
+              type="button"
+              onClick={() => { setPublicadoOk(null); document.getElementById('form-producto')?.scrollIntoView({ behavior: 'smooth' }) }}
+              className="px-4 py-2 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold"
+            >
+              ➕ Publicar otro
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-panel border border-line rounded-xl px-4 py-3 mb-4">
+        <div className="font-body text-sm text-ink">
+          <span className="font-semibold">¿Tenés muchos productos?</span>{' '}
+          <span className="text-inksoft">Publicalos todos juntos con una planilla Excel.</span>
+        </div>
+        <button type="button" onClick={() => setMostrarMasivo((v) => !v)} className="px-3.5 py-2 rounded-lg border border-teal bg-tealsoft text-teal font-body text-sm font-semibold">
+          📊 {mostrarMasivo ? 'Cerrar' : 'Publicar con Excel'}
+        </button>
+      </div>
+      {mostrarMasivo && <PublicarMasivo misProductos={misProductos} alTerminar={() => cargarMisProductos()} />}
+
+      <form id="form-producto" onSubmit={publicar} className="bg-panel border border-line rounded-xl p-5 mb-8">
         <div className="font-body text-sm font-semibold text-ink mb-3">Nuevo producto</div>
         <input
           value={nombre}
