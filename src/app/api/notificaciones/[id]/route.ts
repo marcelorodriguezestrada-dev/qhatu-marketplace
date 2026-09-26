@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { sumarMetricaRecuperacion } from '@/lib/recuperacionServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Esta notificación no te pertenece.' }, { status: 403 })
     }
     await ref.update({ leida: true })
+    // Métrica de "Estabas mirando esto": aviso abierto (la primera vez).
+    if (doc.data()?.tipo === 'recuperacion' && !doc.data()?.leida) await sumarMetricaRecuperacion('abiertos')
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('PATCH /api/notificaciones/[id]', err)

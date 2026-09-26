@@ -10,6 +10,7 @@ import { useFavoritos } from '@/lib/favoritos'
 import { useAuth } from '@/lib/auth'
 import { track } from '@/lib/tracking'
 import { agotado, ultimasUnidades } from '@/lib/stock'
+import { registrarInteres } from '@/lib/interes'
 
 function esNuevo(createdAt?: string) {
   if (!createdAt) return false
@@ -51,6 +52,7 @@ export function ProductCard({ p }: { p: Producto }) {
     }
     if (sinStock) return
     agregar(p)
+    registrarInteres(p.id, 'carrito', p.nombre)
     track('agregar_carrito', { productoId: p.id, precio: p.precio, categoria: p.rubro, desde: 'grilla' })
   }
 

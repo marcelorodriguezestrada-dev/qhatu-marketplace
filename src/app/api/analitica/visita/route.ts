@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { intentarRecuperacionAutomatica } from '@/lib/recuperacionServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,5 +11,9 @@ export const dynamic = 'force-dynamic'
 // user-agent ni ningún otro dato: es un contador de un solo campo.
 export async function POST() {
   await sumarMetricaDiaria('visitas').catch(() => {})
+  // Avisos "Estabas mirando esto": si es la hora de envío elegida y hoy
+  // todavía no se mandaron, los manda ahora (el tráfico del sitio hace de
+  // reloj, sin cron). Casi siempre vuelve al instante sin leer nada.
+  await intentarRecuperacionAutomatica().catch((err) => console.error('recuperación automática', err))
   return NextResponse.json({ ok: true })
 }

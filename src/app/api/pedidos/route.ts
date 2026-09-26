@@ -6,6 +6,7 @@ import { evaluarCupon } from '@/lib/cupones'
 import { esCuentaPruebaServidor } from '@/lib/cuentasPrueba'
 import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 import { descontarStock, unidadesPorProducto, reponerStockDePedido } from '@/lib/stockServer'
+import { sumarMetricaRecuperacion } from '@/lib/recuperacionServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -197,6 +198,26 @@ export async function POST(req: NextRequest) {
         await reponerStockDePedido(ref)
         await ref.delete().catch(() => {})
         return NextResponse.json({ error: `Cupón ${c.codigo}: ${uso.error}` }, { status: 400 })
+      }
+    }
+    // Métrica de "Estabas mirando esto": compra de un producto que se le
+    // recordó a esta persona en los últimos 7 días (se cuenta una vez).
+    if (usuarioLogueado) {
+      try {
+        const ids = Object.keys(unidades).slice(0, 10)
+        const intereses = ids.length ? await db.getAll(...ids.map((pid) => db.collection('intereses').doc(`${usuarioLogueado.uid}_${pid}`))) : []
+        for (const d of intereses) {
+          const i = d.data()
+          if (d.exists && i?.avisadoEn && !i.convertido && Date.now() - Date.parse(i.avisadoEn) < 7 * 86400_000) {
+            await d.ref.update({ convertido: new Date().toISOString(), pedidoId: ref.id })
+            await sumarMetricaRecuperacion('compras')
+          } else if (d.exists && !i?.avisadoEn) {
+            // Compró antes de que hiciera falta avisarle: no se le avisa.
+            await d.ref.update({ descartado: 'compro' })
+          }
+        }
+      } catch (err) {
+        console.error('métrica recuperación', err)
       }
     }
     return NextResponse.json({ id: ref.id })

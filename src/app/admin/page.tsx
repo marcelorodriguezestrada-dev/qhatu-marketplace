@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
+import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 
 function bs(n: number) {
@@ -1398,7 +1399,12 @@ export default function AdminPage() {
       </div>
 
       {tab === 'cupones' && <AdminCupones password={password} />}
-      {tab === 'analitica' && <AdminAnalitica password={password} />}
+      {tab === 'analitica' && (
+        <>
+          <AdminRecuperacion password={password} />
+          <AdminAnalitica password={password} />
+        </>
+      )}
 
       {tab === 'pedidos' && (
         <div>
