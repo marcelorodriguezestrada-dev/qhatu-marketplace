@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
@@ -64,6 +64,9 @@ export default function ProductoDetallePage() {
   const [cargando, setCargando] = useState(true)
   const [cantidad, setCantidad] = useState(1)
   const [imagenRota, setImagenRota] = useState(false)
+  // Galería: foto principal + fotos extra (Premium del vendedor).
+  const [fotoIdx, setFotoIdx] = useState(0)
+  const toqueX = useRef<number | null>(null)
   const [agregado, setAgregado] = useState(false)
   const [tab, setTab] = useState<'publicacion' | 'tienda'>('publicacion')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
@@ -78,6 +81,7 @@ export default function ProductoDetallePage() {
     setAgregado(false)
     setCantidad(1)
     setImagenRota(false)
+    setFotoIdx(0)
     setTab('publicacion')
     setTallaSel('')
     setColorSel('')
@@ -187,6 +191,10 @@ export default function ProductoDetallePage() {
   }
 
   const mostrarFoto = producto.imagenUrl && !imagenRota
+  const fotos: string[] = [
+    ...(mostrarFoto ? [producto.imagenUrl] : []),
+    ...(Array.isArray(producto.fotosAdicionales) ? producto.fotosAdicionales.filter((f: unknown) => typeof f === 'string' && f) : []),
+  ]
   const tieneDescuento = producto.precioOriginal && producto.precioOriginal > producto.precio
   const porcentajeOff = tieneDescuento
     ? Math.round((1 - producto.precio / producto.precioOriginal) * 100)
@@ -260,16 +268,50 @@ export default function ProductoDetallePage() {
       {tab === 'publicacion' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[48vh] md:h-[380px] relative">
-              {mostrarFoto ? (
+            <div>
+            <div
+              className="bg-panelalt rounded-xl overflow-hidden flex items-center justify-center h-[48vh] md:h-[380px] relative"
+              onTouchStart={(e) => { toqueX.current = e.touches[0].clientX }}
+              onTouchEnd={(e) => {
+                if (toqueX.current == null || fotos.length < 2) return
+                const dx = e.changedTouches[0].clientX - toqueX.current
+                toqueX.current = null
+                if (Math.abs(dx) > 40) setFotoIdx((i) => (i + (dx < 0 ? 1 : -1) + fotos.length) % fotos.length)
+              }}
+            >
+              {fotos.length > 0 ? (
                 <img
-                  src={producto.imagenUrl}
-                  alt={producto.nombre}
+                  key={fotos[fotoIdx]}
+                  src={fotos[fotoIdx]}
+                  alt={`${producto.nombre}${fotos.length > 1 ? ` — foto ${fotoIdx + 1} de ${fotos.length}` : ''}`}
                   className="max-w-full max-h-full object-contain"
-                  onError={() => setImagenRota(true)}
+                  onError={() => { if (fotoIdx === 0 && mostrarFoto) { setImagenRota(true); setFotoIdx(0) } }}
                 />
               ) : (
                 <ProductIcon kind={producto.icono} size={72} />
+              )}
+              {fotos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setFotoIdx((i) => (i - 1 + fotos.length) % fotos.length)}
+                    aria-label="Foto anterior"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 shadow flex items-center justify-center text-ink"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFotoIdx((i) => (i + 1) % fotos.length)}
+                    aria-label="Foto siguiente"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/85 shadow flex items-center justify-center text-ink"
+                  >
+                    ›
+                  </button>
+                  <span className="absolute bottom-2 right-2 bg-ink/70 text-white font-body text-[11px] px-2 py-0.5 rounded-full">
+                    {fotoIdx + 1}/{fotos.length}
+                  </span>
+                </>
               )}
               {tieneDescuento && (
                 <span className="absolute top-3 left-3 bg-teal text-white text-xs font-bold px-2.5 py-1 rounded font-body">
@@ -281,6 +323,22 @@ export default function ProductoDetallePage() {
                   Nuevo
                 </span>
               )}
+            </div>
+            {fotos.length > 1 && (
+              <div className="flex gap-2 mt-2.5 overflow-x-auto pb-1">
+                {fotos.map((f, i) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFotoIdx(i)}
+                    aria-label={`Ver foto ${i + 1}`}
+                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${i === fotoIdx ? 'border-maroon' : 'border-line'} bg-panelalt`}
+                  >
+                    <img src={f} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
             </div>
 
             <div>

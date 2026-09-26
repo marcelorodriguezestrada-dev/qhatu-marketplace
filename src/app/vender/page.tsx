@@ -9,7 +9,7 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID, buscarPais } from '@/data/paises'
-import { PRECIO_PREMIUM_BS } from '@/lib/planPremium'
+import { PRECIO_PREMIUM_BS, MAX_FOTOS_ADICIONALES_PREMIUM } from '@/lib/planPremium'
 import { buscarMercados } from '@/data/mercadosPotosi'
 
 const QR_PLATAFORMA = process.env.NEXT_PUBLIC_QR_IMAGE_URL || ''
@@ -119,8 +119,10 @@ export default function VenderPage() {
 
   // Galería de fotos extra por producto (Premium) — qué producto tiene
   // abierto su editor de galería ahora mismo.
-  const [galeriaAbiertaId, setGaleriaAbiertaId] = useState<string | null>(null)
-  const [subiendoFotoGaleria, setSubiendoFotoGaleria] = useState(false)
+  // Fotos extra del producto que se está publicando/editando (beneficio
+  // Premium). Se suben a ImgBB al elegirlas y se guardan con el producto.
+  const [fotosExtra, setFotosExtra] = useState<string[]>([])
+  const [subiendoExtra, setSubiendoExtra] = useState(0)
 
   useEffect(() => {
     if (cargando) return
@@ -278,50 +280,44 @@ export default function VenderPage() {
     setMisProductos(propios)
   }
 
-  // Galería de fotos extra por producto — solo tiene efecto real si la
-  // tienda tiene Premium vigente (el servidor lo vuelve a chequear
-  // igual, esto es solo para no ofrecer el botón si no va a andar).
-  async function subirFotoGaleria(productoId: string, file: File | null) {
-    if (!file) return
-    setSubiendoFotoGaleria(true)
+  // Sube varias fotos extra a la vez (hasta completar el máximo).
+  async function subirFotosExtra(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const libres = MAX_FOTOS_ADICIONALES_PREMIUM - fotosExtra.length
+    const lista = Array.from(files).slice(0, Math.max(0, libres))
+    if (files.length > lista.length) setError(`Podés tener hasta ${MAX_FOTOS_ADICIONALES_PREMIUM} fotos extra — se subieron las primeras ${lista.length}.`)
+    if (lista.length === 0) return
+    setSubiendoExtra(lista.length)
     try {
-      const comprimido = (await compressImage(file, 800, 0.7)) || file
-      const formData = new FormData()
-      formData.append('image', comprimido)
       const token = await obtenerToken()
-      const subida = await fetch('/api/upload-image', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      const subidaData = await subida.json()
-      if (subidaData.error) throw new Error(subidaData.error)
-
-      const res = await fetch(`/api/productos/${productoId}/galeria`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ url: subidaData.url }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setMisProductos((prev) => prev.map((p: any) => (p.id === productoId ? { ...p, fotosAdicionales: data.fotosAdicionales } : p)))
-    } catch (e: any) {
-      setError(e?.message || 'No se pudo subir la foto.')
+      for (const file of lista) {
+        try {
+          const comprimido = (await compressImage(file, 1000, 0.75)) || file
+          const formData = new FormData()
+          formData.append('image', comprimido)
+          const res = await fetch('/api/upload-image', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
+          const data = await res.json()
+          if (data.error) throw new Error(data.error)
+          setFotosExtra((prev) => (prev.length < MAX_FOTOS_ADICIONALES_PREMIUM ? [...prev, data.url] : prev))
+        } catch (e: any) {
+          setError(e?.message || 'No se pudo subir una de las fotos.')
+        } finally {
+          setSubiendoExtra((n) => Math.max(0, n - 1))
+        }
+      }
     } finally {
-      setSubiendoFotoGaleria(false)
+      setSubiendoExtra(0)
     }
   }
 
-  async function quitarFotoGaleria(productoId: string, url: string) {
-    const token = await obtenerToken()
-    const res = await fetch(`/api/productos/${productoId}/galeria`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ url }),
+  function moverFotoExtra(i: number, delta: number) {
+    setFotosExtra((prev) => {
+      const j = i + delta
+      if (j < 0 || j >= prev.length) return prev
+      const copia = [...prev]
+      ;[copia[i], copia[j]] = [copia[j], copia[i]]
+      return copia
     })
-    const data = await res.json()
-    if (data.error) return
-    setMisProductos((prev) => prev.map((p: any) => (p.id === productoId ? { ...p, fotosAdicionales: data.fotosAdicionales } : p)))
   }
 
   async function cargarMisPedidos() {
@@ -629,6 +625,7 @@ export default function VenderPage() {
             materiales,
             compraMinima: Number(compraMinima) || 1,
             stock: stock.trim() === '' ? null : Number(stock),
+            fotosAdicionales: premiumVendedorVigente ? fotosExtra : undefined,
           }),
         })
         const data = await res.json()
@@ -659,6 +656,7 @@ export default function VenderPage() {
             materiales,
             compraMinima: Number(compraMinima) || 1,
             stock: stock.trim() === '' ? null : Number(stock),
+            fotosAdicionales: premiumVendedorVigente ? fotosExtra : undefined,
           }),
         })
         const data = await res.json()
@@ -681,6 +679,7 @@ export default function VenderPage() {
       setMateriales('')
       setCompraMinima('1')
       setStock('')
+      setFotosExtra([])
       await cargarMisProductos()
     } finally {
       setPublicando(false)
@@ -723,37 +722,6 @@ export default function VenderPage() {
         </div>
       )}
 
-      {editingId && premiumVendedorVigente && (
-        <div className="mb-4 p-4 rounded-lg bg-panel border border-line">
-          <div className="font-body text-sm font-semibold text-ink mb-1">Galería extra de este producto</div>
-          <div className="font-body text-[11px] text-inksoft mb-3">
-            Hasta 4 fotos además de la principal — beneficio de tu membresía Premium.
-          </div>
-          <div className="flex gap-2 flex-wrap mb-2">
-            {(misProductos.find((p: any) => p.id === editingId)?.fotosAdicionales || []).map((url: string) => (
-              <div key={url} className="relative w-16 h-16">
-                <img src={url} alt="Foto extra" className="w-16 h-16 object-cover rounded-lg border border-line" />
-                <button
-                  onClick={() => quitarFotoGaleria(editingId, url)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] border-none"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-          {(misProductos.find((p: any) => p.id === editingId)?.fotosAdicionales || []).length < 4 && (
-            <input
-              type="file"
-              accept="image/*"
-              disabled={subiendoFotoGaleria}
-              onChange={(e) => subirFotoGaleria(editingId, e.target.files?.[0] || null)}
-              className="font-body text-xs"
-            />
-          )}
-          {subiendoFotoGaleria && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
-        </div>
-      )}
 
       <div className="bg-panel border border-line rounded-xl p-5 mb-8">
         <div className="flex items-center justify-between mb-1">
@@ -1220,6 +1188,62 @@ export default function VenderPage() {
           </div>
         </div>
 
+        {/* Fotos extra — beneficio Premium de la tienda */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="font-body text-xs text-inksoft">Más fotos del producto</div>
+            <span className="font-body text-[9px] font-bold text-white bg-ochre px-1.5 py-0.5 rounded-full">PREMIUM</span>
+          </div>
+          {premiumVendedorVigente ? (
+            <>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {fotosExtra.map((url, i) => (
+                  <div key={url} className="relative w-20 h-20">
+                    <img src={url} alt={`Foto extra ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-line" />
+                    <button
+                      type="button"
+                      onClick={() => setFotosExtra((prev) => prev.filter((f) => f !== url))}
+                      aria-label="Quitar foto"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] border-none"
+                    >
+                      ✕
+                    </button>
+                    <div className="absolute bottom-0.5 inset-x-0.5 flex justify-between">
+                      <button type="button" onClick={() => moverFotoExtra(i, -1)} disabled={i === 0} aria-label="Mover a la izquierda" className="w-5 h-5 rounded bg-white/85 text-[10px] disabled:opacity-0">◀</button>
+                      <button type="button" onClick={() => moverFotoExtra(i, 1)} disabled={i === fotosExtra.length - 1} aria-label="Mover a la derecha" className="w-5 h-5 rounded bg-white/85 text-[10px] disabled:opacity-0">▶</button>
+                    </div>
+                  </div>
+                ))}
+                {Array.from({ length: subiendoExtra }).map((_, i) => (
+                  <div key={`subiendo-${i}`} className="w-20 h-20 rounded-lg border border-dashed border-line bg-panelalt flex items-center justify-center font-body text-[10px] text-inksoft">
+                    Subiendo...
+                  </div>
+                ))}
+                {fotosExtra.length + subiendoExtra < MAX_FOTOS_ADICIONALES_PREMIUM && (
+                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-teal bg-tealsoft flex flex-col items-center justify-center font-body text-[10px] text-teal font-semibold cursor-pointer text-center">
+                    <span className="text-xl leading-none">＋</span>
+                    Agregar fotos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => { subirFotosExtra(e.target.files); e.target.value = '' }}
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="font-body text-[11px] text-inksoft">
+                Hasta {MAX_FOTOS_ADICIONALES_PREMIUM} fotos además de la principal. Podés elegir varias a la vez y ordenarlas con ◀ ▶. Se guardan al {editingId ? 'actualizar' : 'publicar'} el producto.
+              </div>
+            </>
+          ) : (
+            <div className="font-body text-[11px] text-inksoft bg-panelalt border border-line rounded-lg px-3 py-2">
+              Con la membresía Premium de tu tienda podés sumar hasta {MAX_FOTOS_ADICIONALES_PREMIUM} fotos más por producto (distintos ángulos, detalles, puesto). Mirá más abajo cómo activarla.
+            </div>
+          )}
+        </div>
+
         {previewProcessedUrl && (
           <div className="mt-3 p-3 border rounded-lg bg-white/50">
             <div className="font-body text-sm font-semibold mb-2">Previsualización sin fondo</div>
@@ -1261,6 +1285,7 @@ export default function VenderPage() {
               type="button"
               onClick={() => {
                 setEditingId(null)
+                setFotosExtra([])
                 setNombre('')
                 setCategoriaProductoSel(categoriasProductos[0]?.id || '')
                 setRubro(categoriasProductos[0]?.rubros[0]?.id || '')
@@ -1392,6 +1417,7 @@ export default function VenderPage() {
                 setMateriales(p.materiales || '')
                 setCompraMinima(String(p.compraMinima || 1))
                 setStock(typeof p.stock === 'number' ? String(p.stock) : '')
+                setFotosExtra(Array.isArray(p.fotosAdicionales) ? p.fotosAdicionales : [])
                 setPlan(p.plan || 'basico')
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}

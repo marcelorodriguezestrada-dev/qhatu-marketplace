@@ -37,3 +37,11 @@ export function calcularNuevaVigencia(vigenciaActual?: string | null): string {
   base.setDate(base.getDate() + DURACION_PREMIUM_DIAS)
   return base.toISOString()
 }
+
+// Fotos extra de un producto que manda el formulario de /vender: solo
+// URLs https, sin repetir, hasta MAX_FOTOS_ADICIONALES_PREMIUM.
+export function sanearFotosAdicionales(v: unknown): string[] {
+  if (!Array.isArray(v)) return []
+  const urls = v.filter((u): u is string => typeof u === 'string' && /^https:\/\//.test(u)).map((u) => u.slice(0, 500))
+  return Array.from(new Set(urls)).slice(0, MAX_FOTOS_ADICIONALES_PREMIUM)
+}

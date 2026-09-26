@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 import { sanearStock } from '@/lib/stock'
 
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json()
-    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima, stock } = body
+    const { nombre, rubro, publico, precio, icono, imagenUrl, imagenViewerUrl, precioOriginal, estado, descripcionCorta, descripcionLarga, thumbUrl, talles, colores, materiales, compraMinima, stock, fotosAdicionales } = body
     const cambios: Record<string, unknown> = {}
 
     if (nombre !== undefined) cambios.nombre = nombre
@@ -90,6 +91,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (compraMinima !== undefined) cambios.compraMinima = Math.max(1, Number(compraMinima) || 1)
     // Stock: número de unidades, o null = sin control de stock.
     if (stock !== undefined) cambios.stock = sanearStock(stock)
+    // Galería extra (beneficio Premium del vendedor): se puede vaciar
+    // siempre; agregar fotos solo con Premium vigente (o el admin).
+    if (fotosAdicionales !== undefined) {
+      const fotos = sanearFotosAdicionales(fotosAdicionales)
+      if (fotos.length > 0 && !esAdmin) {
+        const vendedor = await db.collection('vendedores').doc(doc.data()?.vendedorId || '').get()
+        if (!esPremiumVigente(vendedor.data() || {})) {
+          return NextResponse.json({ error: 'Las fotos extra son un beneficio Premium de tu tienda. Activá la membresía para usarlas.' }, { status: 403 })
+        }
+      }
+      cambios.fotosAdicionales = fotos
+    }
     if (estado !== undefined) {
       if (!esAdmin) {
         return NextResponse.json({ error: 'Solo el administrador puede cambiar el estado del producto.' }, { status: 403 })
