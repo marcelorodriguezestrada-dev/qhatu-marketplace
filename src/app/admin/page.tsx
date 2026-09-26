@@ -18,6 +18,7 @@ import AdminCupones from '@/components/admin/AdminCupones'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
+import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -65,6 +66,19 @@ function BadgeRiesgoIA({ moderacionIA }: { moderacionIA: { riesgo: string; motiv
   return (
     <div className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[10px] font-semibold font-body mt-1 ${clase}`} title={moderacionIA.motivo}>
       IA: riesgo {moderacionIA.riesgo}
+    </div>
+  )
+}
+
+// Prioridad de invitación que calculó la IA (profesionales y anuncios).
+function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
+  const estilo = pr.puntaje >= 70 ? 'text-teal bg-tealsoft border-teal' : pr.puntaje >= 40 ? 'text-indigo-700 bg-indigo-50 border-indigo-200' : 'text-inksoft bg-panelalt border-line'
+  return (
+    <div className={`font-body text-[11px] border rounded-md px-2.5 py-1.5 my-1.5 ${estilo}`}>
+      <span className="font-semibold">
+        {pr.puntaje >= 70 ? '🔥' : pr.puntaje >= 40 ? '👍' : '💤'} Prioridad de invitación: {pr.puntaje}/100
+      </span>
+      {pr.motivo && <> — {pr.motivo}</>}
     </div>
   )
 }
@@ -1126,6 +1140,11 @@ export default function AdminPage() {
     return String(t || '').replace(/\D/g, '').slice(-8)
   }
   const [invitadosLocal, setInvitadosLocal] = useState<Record<string, string>>({})
+  const [filtrosPros, setFiltrosPros] = useState<Filtros>(FILTROS_INICIALES)
+  const [filtrosAnuncios, setFiltrosAnuncios] = useState<Filtros>(FILTROS_INICIALES)
+  const [verHistorialAnuncios, setVerHistorialAnuncios] = useState(false)
+  const [priorizandoAnunciosIA, setPriorizandoAnunciosIA] = useState(false)
+  const [errorPriorizarAnunciosIA, setErrorPriorizarAnunciosIA] = useState('')
   useEffect(() => {
     try { setInvitadosLocal(JSON.parse(localStorage.getItem('clasiclick_invitados') || '{}')) } catch {}
   }, [])
@@ -1148,6 +1167,57 @@ export default function AdminPage() {
       body: JSON.stringify({ registrarInvitacion: true, estado: 'info_solicitada', notaAdmin: p.notaAdmin || 'Se le mandó la invitación por WhatsApp.' }),
     }).then(() => cargarProfesionales())
   }
+  function invitarAnuncio(a: any) {
+    marcarInvitadoLocal(a.whatsapp || a.telefonoOriginal)
+    setAnuncios((lista) => lista.map((x) => (x.id === a.id ? { ...x, invitadoEn: new Date().toISOString(), invitaciones: (x.invitaciones || 0) + 1, estado: 'info_solicitada' } : x)))
+    fetch(`/api/anuncios/${a.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ registrarInvitacion: true, estado: 'info_solicitada', notaAdmin: a.notaAdmin || 'Se le mandó la invitación por WhatsApp.' }),
+    }).then(() => cargarAnuncios())
+  }
+
+  async function priorizarAnunciosConIA() {
+    setPriorizandoAnunciosIA(true)
+    setErrorPriorizarAnunciosIA('')
+    try {
+      const res = await fetch('/api/admin/anuncios/priorizar', { method: 'POST', headers: { 'x-admin-password': password } })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const porId = new Map<string, any>((data.prioridades || []).map((pr: any) => [pr.id, pr]))
+      setAnuncios((lista) => lista.map((a) => (porId.has(a.id) ? { ...a, prioridadInvitacionIA: porId.get(a.id) } : a)))
+      setFiltrosAnuncios((f) => ({ ...f, orden: 'ia' }))
+    } catch (e: any) {
+      setErrorPriorizarAnunciosIA(e?.message || 'No se pudo priorizar con IA.')
+    } finally {
+      setPriorizandoAnunciosIA(false)
+    }
+  }
+
+  // Filtros de las listas largas (ver components/admin/FiltrosLista.tsx).
+  function rubrosDe(lista: any[]) {
+    const ids = Array.from(new Set(lista.map((x) => x.rubro).filter(Boolean))) as string[]
+    return ids.map((id) => ({ id, label: buscarRubro(id)?.label || id })).sort((a, b) => a.label.localeCompare(b.label))
+  }
+  function filtrarPros(lista: any[]) {
+    return aplicarFiltros(lista, filtrosPros, {
+      texto: (p) => [p.nombre, p.especialidad, p.descripcion, p.whatsapp, p.zona, p.email, buscarRubro(p.rubro)?.label].filter(Boolean).join(' '),
+      rubro: (p) => p.rubro,
+      fecha: (p) => p.createdAt,
+      invitado: (p) => !!(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)]),
+      puntaje: (p) => p.prioridadInvitacionIA?.puntaje,
+    })
+  }
+  function filtrarAnuncios(lista: any[]) {
+    return aplicarFiltros(lista, filtrosAnuncios, {
+      texto: (a) => [a.titulo, a.descripcion, a.whatsapp, a.telefonoOriginal, buscarRubro(a.rubro)?.label].filter(Boolean).join(' '),
+      rubro: (a) => a.rubro,
+      fecha: (a) => a.createdAt,
+      invitado: (a) => !!(a.invitadoEn || invitadosLocal[soloNumero(a.whatsapp || a.telefonoOriginal)]),
+      puntaje: (a) => a.prioridadInvitacionIA?.puntaje,
+    })
+  }
+
   function fechaInvitacion(iso?: string) {
     return iso ? new Date(iso).toLocaleString('es-BO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
   }
@@ -2223,36 +2293,43 @@ export default function AdminPage() {
             )}
           </div>
 
+          {profesionales.some((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada') && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="font-body text-xs text-inksoft">
+                La IA ordena pendientes y en espera según qué tan probable es que acepten (los invitados hace días sin respuesta bajan).
+              </div>
+              <button
+                onClick={() => { priorizarPendientesConIA(); setFiltrosPros((f) => ({ ...f, orden: 'ia' })) }}
+                disabled={priorizandoIA}
+                className="px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 font-body text-xs font-semibold text-indigo-700 disabled:opacity-60"
+              >
+                {priorizandoIA ? 'Analizando con IA...' : '🤖 Ordenar por prioridad con IA'}
+              </button>
+            </div>
+          )}
+          {errorPriorizarIA && (
+            <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorPriorizarIA}</div>
+          )}
+          {profesionales.some((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada') && (
+            <FiltrosLista
+              filtros={filtrosPros}
+              onChange={setFiltrosPros}
+              rubros={rubrosDe(profesionales.filter((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada'))}
+              total={profesionales.filter((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada').length}
+              visibles={filtrarPros(profesionales.filter((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada')).length}
+            />
+          )}
           {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
             <div className="mb-8">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="font-body text-sm font-semibold text-ochre">
                   Solicitudes pendientes de revisión ({profesionales.filter((p) => p.estado === 'pendiente_revision').length})
                 </div>
-                <button
-                  onClick={priorizarPendientesConIA}
-                  disabled={priorizandoIA}
-                  className="px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 font-body text-xs font-semibold text-indigo-700 disabled:opacity-60"
-                >
-                  {priorizandoIA ? 'Analizando con IA...' : '🤖 Ordenar por prioridad con IA'}
-                </button>
               </div>
-              {errorPriorizarIA && (
-                <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorPriorizarIA}</div>
+              {filtrarPros(profesionales.filter((p) => p.estado === 'pendiente_revision')).length === 0 && (
+                <div className="font-body text-xs text-inksoft mb-3">Ninguna solicitud pendiente coincide con los filtros.</div>
               )}
-              {[...profesionales]
-                .filter((p) => p.estado === 'pendiente_revision')
-                .sort((a, b) => {
-                  // Primero por la prioridad de invitación de la IA (mayor
-                  // puntaje arriba; los que no se evaluaron van al final).
-                  const pa = a.prioridadInvitacionIA?.puntaje ?? -1
-                  const pb = b.prioridadInvitacionIA?.puntaje ?? -1
-                  if (pa !== pb) return pb - pa
-                  const orden: Record<string, number> = { alto: 0, medio: 1, bajo: 2 }
-                  const oa = orden[a.moderacionIA?.riesgo] ?? 3
-                  const ob = orden[b.moderacionIA?.riesgo] ?? 3
-                  return oa - ob
-                })
+              {filtrarPros(profesionales.filter((p) => p.estado === 'pendiente_revision'))
                 .map((p) => (
                 <div key={p.id} className="bg-panel border border-ochre rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
@@ -2272,14 +2349,7 @@ export default function AdminPage() {
                     {p.experiencia && ` · Experiencia: ${p.experiencia}`}
                   </div>
                   <BadgeRiesgoIA moderacionIA={p.moderacionIA} />
-                  {p.prioridadInvitacionIA && (
-                    <div className="font-body text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md px-2.5 py-1.5 mt-1.5">
-                      <span className="font-semibold">
-                        {p.prioridadInvitacionIA.puntaje >= 70 ? '🔥' : p.prioridadInvitacionIA.puntaje >= 40 ? '👍' : '💤'} Prioridad de invitación: {p.prioridadInvitacionIA.puntaje}/100
-                      </span>
-                      {p.prioridadInvitacionIA.motivo && <> — {p.prioridadInvitacionIA.motivo}</>}
-                    </div>
-                  )}
+                  {p.prioridadInvitacionIA && <BadgePrioridad pr={p.prioridadInvitacionIA} />}
 
                   {pidiendoInfoId === p.id ? (
                     <div className="mt-3">
@@ -2361,11 +2431,14 @@ export default function AdminPage() {
               <div className="font-body text-sm font-semibold text-indigo-600 mb-3">
                 ⏳ Esperando respuesta ({profesionales.filter((p) => p.estado === 'info_solicitada').length})
               </div>
-              {profesionales
-                .filter((p) => p.estado === 'info_solicitada')
+              {filtrarPros(profesionales.filter((p) => p.estado === 'info_solicitada')).length === 0 && (
+                <div className="font-body text-xs text-inksoft mb-3">Nadie en espera coincide con los filtros.</div>
+              )}
+              {filtrarPros(profesionales.filter((p) => p.estado === 'info_solicitada'))
                 .map((p) => (
                 <div key={p.id} className="bg-panel border border-indigo-200 rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
+                  {p.prioridadInvitacionIA && <BadgePrioridad pr={p.prioridadInvitacionIA} />}
                   <div className="font-body text-xs text-inksoft mb-1">
                     {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
@@ -2759,19 +2832,38 @@ export default function AdminPage() {
 
           <div className="border-t border-line my-6" />
 
-          <div className="font-body text-sm font-semibold text-ink mb-3">
-            Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="font-body text-sm font-semibold text-ink">
+              Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
+            </div>
+            <button
+              onClick={priorizarAnunciosConIA}
+              disabled={priorizandoAnunciosIA}
+              className="px-3 py-1.5 rounded-md border border-indigo-200 bg-indigo-50 font-body text-xs font-semibold text-indigo-700 disabled:opacity-60"
+            >
+              {priorizandoAnunciosIA ? 'Analizando con IA...' : '🤖 Ordenar por prioridad con IA'}
+            </button>
           </div>
+          {errorPriorizarAnunciosIA && (
+            <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorPriorizarAnunciosIA}</div>
+          )}
           {anuncios.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay ningún anuncio publicado.</div>}
-          {anuncios
-            .slice()
-            .sort((a, b) => {
-              // Los pendientes de revisar primero — son los que hay que
-              // atender; aprobados/rechazados quedan abajo como
-              // historial.
-              const orden: Record<string, number> = { pendiente_revision: 0, info_solicitada: 1, aprobado: 2, rechazado: 3 }
-              return (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3) || (b.createdAt || '').localeCompare(a.createdAt || '')
-            })
+          {anuncios.length > 0 && (
+            <>
+              <FiltrosLista
+                filtros={filtrosAnuncios}
+                onChange={setFiltrosAnuncios}
+                rubros={rubrosDe(anuncios)}
+                total={verHistorialAnuncios ? anuncios.length : anuncios.filter((a) => ['pendiente_revision', 'info_solicitada'].includes(a.estado)).length}
+                visibles={filtrarAnuncios(anuncios.filter((a) => verHistorialAnuncios || ['pendiente_revision', 'info_solicitada'].includes(a.estado))).length}
+              />
+              <label className="flex items-center gap-2 font-body text-xs text-ink mb-3 cursor-pointer">
+                <input type="checkbox" checked={verHistorialAnuncios} onChange={(e) => setVerHistorialAnuncios(e.target.checked)} className="accent-teal" />
+                Ver también aprobados y rechazados ({anuncios.filter((a) => !['pendiente_revision', 'info_solicitada'].includes(a.estado)).length})
+              </label>
+            </>
+          )}
+          {filtrarAnuncios(anuncios.filter((a) => verHistorialAnuncios || ['pendiente_revision', 'info_solicitada'].includes(a.estado)))
             .map((a) => (
               <div key={a.id} className="bg-panel border border-line rounded-lg p-3.5 mb-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -2807,7 +2899,15 @@ export default function AdminPage() {
                     )}
                     <div className="font-body text-[11px] text-inksoft mt-1.5">
                       {a.autorEmail || (a.creadoPorAdmin ? 'Importado (sin cuenta)' : '')} · {a.whatsapp || a.telefonoOriginal || 'sin contacto'} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
+                      {a.createdAt && ` · ${new Date(a.createdAt).toLocaleDateString('es-BO')}`}
                     </div>
+                    {(a.invitadoEn || invitadosLocal[soloNumero(a.whatsapp || a.telefonoOriginal)]) && (
+                      <div className="inline-block mt-1.5 px-2 py-0.5 rounded-full bg-tealsoft border border-teal font-body text-[11px] font-semibold text-teal">
+                        ✓ Invitado por WhatsApp el {fechaInvitacion(a.invitadoEn || invitadosLocal[soloNumero(a.whatsapp || a.telefonoOriginal)])}
+                        {(a.invitaciones || 0) > 1 && ` · ${a.invitaciones} veces`}
+                      </div>
+                    )}
+                    {a.prioridadInvitacionIA && ['pendiente_revision', 'info_solicitada'].includes(a.estado) && <BadgePrioridad pr={a.prioridadInvitacionIA} />}
                     {a.moderacionIA && (
                       <div className={`font-body text-[11px] mt-1.5 ${a.moderacionIA.riesgo === 'alto' ? 'text-maroon' : a.moderacionIA.riesgo === 'medio' ? 'text-ochre' : 'text-inksoft'}`}>
                         🤖 Riesgo {a.moderacionIA.riesgo}: {a.moderacionIA.motivo}
@@ -2827,10 +2927,10 @@ export default function AdminPage() {
                       href={`https://wa.me/${(a.whatsapp || `591${a.telefonoOriginal}`).replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => cambiarEstadoAnuncioConNota(a.id, 'info_solicitada', a.notaAdmin || 'Se le pidió más información por WhatsApp.')}
+                      onClick={() => invitarAnuncio(a)}
                       className="px-2.5 py-1.5 rounded-md border border-indigo-200 font-body text-[11px] text-indigo-600"
                     >
-                      💬 Invitar por WhatsApp
+                      💬 {a.invitadoEn || invitadosLocal[soloNumero(a.whatsapp || a.telefonoOriginal)] ? 'Invitar de nuevo' : 'Invitar por WhatsApp'}
                     </a>
                   )}
                   {a.estado !== 'rechazado' && (

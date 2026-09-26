@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
-import { priorizarInvitacionesIA } from '@/lib/moderacionIA'
+import { priorizarInvitacionesIA, textoEspera } from '@/lib/moderacionIA'
 
 export const dynamic = 'force-dynamic'
 
 // POST — botón "Ordenar por prioridad con IA" de /admin → Servicios.
-// Toma las solicitudes de profesionales pendientes de revisión, le pide
+// Toma las solicitudes de profesionales pendientes de revisión y las ya
+// invitadas que esperan respuesta (la espera baja el puntaje), le pide
 // a la IA un puntaje de a quién invitar primero (ver
 // priorizarInvitacionesIA) y lo guarda en cada una como
 // prioridadInvitacionIA, para que el orden quede aunque se recargue.
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     const db = getDb()
     const [snap, arbol] = await Promise.all([
-      db.collection('profesionales').where('estado', '==', 'pendiente_revision').get(),
+      db.collection('profesionales').where('estado', 'in', ['pendiente_revision', 'info_solicitada']).get(),
       construirArbolCategorias(),
     ])
     if (snap.empty) return NextResponse.json({ evaluados: 0, prioridades: [] })
@@ -40,6 +41,8 @@ export async function POST(req: NextRequest) {
         zona: String(p.zona || ''),
         experiencia: String(p.experiencia || ''),
         precio: p.precio ? `Bs ${p.precio}` : '',
+        // Si ya se lo invitó y no respondió, la IA lo baja en la lista.
+        espera: p.estado === 'info_solicitada' ? textoEspera(p.invitadoEn, p.invitaciones) || 'se le pidió info, sin respuesta' : '',
       }
     })
 

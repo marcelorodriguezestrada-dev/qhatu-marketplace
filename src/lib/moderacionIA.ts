@@ -470,36 +470,14 @@ export type PrioridadInvitacionIA = { id: string; puntaje: number; motivo: strin
 // sumarse a Clasi Click y que valga la pena tenerla en el directorio,
 // para que el admin invite primero a los mejores. No manda nada ni
 // cambia estados — solo ordena (ver /api/admin/profesionales/priorizar).
-export async function priorizarInvitacionesIA(
-  profesionales: { id: string; nombre: string; rubroLabel: string; especialidad: string; descripcion: string; zona: string; experiencia: string; precio: string }[]
-): Promise<PrioridadInvitacionIA[]> {
+// Motor común: manda la lista en tandas de 25 y devuelve {id, puntaje, motivo}.
+async function puntuarConIA(lineas: { id: string; linea: string }[], systemPrompt: string): Promise<PrioridadInvitacionIA[]> {
   const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey || profesionales.length === 0) return []
-
-  const systemPrompt =
-    'Sos un asistente comercial de Clasi Click, un marketplace de Potosí, Bolivia, que suma profesionales a su directorio gratis. ' +
-    'Te paso solicitudes de personas que ofrecen servicios (la mayoría sacadas de avisos en grupos de WhatsApp como Cambalache). ' +
-    'A cada una ponele un puntaje de 0 a 100 de PRIORIDAD DE INVITACIÓN: qué tan probable es que acepte la invitación y que sea un buen profesional para el directorio. ' +
-    'Puntuá alto: servicios profesionales u oficios claros (médicos, abogados, contadores, técnicos, electricistas, plomeros, docentes, profesionales de salud, etc.), ' +
-    'que ofrecen su servicio de forma activa y buscan clientes, con descripción concreta, zona, experiencia o precio (señales de que viven de eso y quieren más clientes). ' +
-    'Puntuá bajo: avisos que en realidad son venta de productos y no un servicio, pedidos ("busco..."), textos vagos o sin datos, spam, ' +
-    'esquemas de ganancias/multinivel/préstamos, o contenido dudoso. ' +
-    'NO inventes ids. Respondé SOLO JSON válido, sin backticks, con esta forma exacta: ' +
-    '{"prioridades": [{"id": "...", "puntaje": 0-100, "motivo": "máximo 15 palabras"}]}'
-
-  const idsValidos = new Set(profesionales.map((p) => p.id))
+  if (!apiKey || lineas.length === 0) return []
+  const idsValidos = new Set(lineas.map((l) => l.id))
   const resultados: PrioridadInvitacionIA[] = []
-
-  // De a 25 para no pasarnos de tokens con listas largas.
-  for (let i = 0; i < profesionales.length; i += 25) {
-    const tanda = profesionales.slice(i, i + 25)
-    const contenido = tanda
-      .map((p) =>
-        [p.id, p.rubroLabel, p.nombre, p.especialidad, p.zona, p.experiencia && `exp: ${p.experiencia}`, p.precio && `precio: ${p.precio}`, (p.descripcion || '').slice(0, 300)]
-          .filter(Boolean)
-          .join(' | ')
-      )
-      .join('\n')
+  for (let i = 0; i < lineas.length; i += 25) {
+    const contenido = lineas.slice(i, i + 25).map((l) => `${l.id} | ${l.linea}`).join('\n')
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -516,7 +494,7 @@ export async function priorizarInvitacionesIA(
         }),
       })
       if (!res.ok) {
-        console.error('priorizarInvitacionesIA: Groq respondió', res.status)
+        console.error('puntuarConIA: Groq respondió', res.status)
         continue
       }
       const data = await res.json()
@@ -529,8 +507,67 @@ export async function priorizarInvitacionesIA(
         resultados.push({ id: r.id, puntaje: Math.max(0, Math.min(100, Math.round(puntaje))), motivo: String(r.motivo || '').slice(0, 200) })
       }
     } catch (err) {
-      console.error('priorizarInvitacionesIA', err)
+      console.error('puntuarConIA', err)
     }
   }
   return resultados
+}
+
+const REGLA_ESPERA =
+  'Algunos ya fueron invitados (dice "invitado hace N días, X veces, sin respuesta"): cuanto más tiempo y más invitaciones sin respuesta, MÁS BAJO el puntaje ' +
+  '(1 invitación hace 1-2 días casi no baja; 3+ días o 2+ invitaciones sin respuesta baja bastante). Los nunca invitados se evalúan solo por su perfil. '
+const FORMATO_JSON =
+  'NO inventes ids. Respondé SOLO JSON válido, sin backticks, con esta forma exacta: ' +
+  '{"prioridades": [{"id": "...", "puntaje": 0-100, "motivo": "máximo 15 palabras"}]}'
+
+// Profesionales pendientes o ya invitados ("esperando respuesta").
+export async function priorizarInvitacionesIA(
+  profesionales: { id: string; nombre: string; rubroLabel: string; especialidad: string; descripcion: string; zona: string; experiencia: string; precio: string; espera?: string }[]
+): Promise<PrioridadInvitacionIA[]> {
+  const systemPrompt =
+    'Sos un asistente comercial de Clasi Click, un marketplace de Potosí, Bolivia, que suma profesionales a su directorio gratis. ' +
+    'Te paso solicitudes de personas que ofrecen servicios (la mayoría sacadas de avisos en grupos de WhatsApp como Cambalache). ' +
+    'A cada una ponele un puntaje de 0 a 100 de PRIORIDAD DE INVITACIÓN: qué tan probable es que acepte la invitación y que sea un buen profesional para el directorio. ' +
+    'Puntuá alto: servicios profesionales u oficios claros (médicos, abogados, contadores, técnicos, electricistas, plomeros, docentes, profesionales de salud, etc.), ' +
+    'que ofrecen su servicio de forma activa y buscan clientes, con descripción concreta, zona, experiencia o precio. ' +
+    'Puntuá bajo: avisos que en realidad son venta de productos y no un servicio, pedidos ("busco..."), textos vagos o sin datos, spam, ' +
+    'esquemas de ganancias/multinivel/préstamos, o contenido dudoso. ' + REGLA_ESPERA + FORMATO_JSON
+  return puntuarConIA(
+    profesionales.map((p) => ({
+      id: p.id,
+      linea: [p.rubroLabel, p.nombre, p.especialidad, p.zona, p.experiencia && `exp: ${p.experiencia}`, p.precio && `precio: ${p.precio}`, p.espera, (p.descripcion || '').slice(0, 300)]
+        .filter(Boolean)
+        .join(' | '),
+    })),
+    systemPrompt
+  )
+}
+
+// Anuncios (en general importados de grupos de WhatsApp) pendientes o ya
+// invitados: a quién conviene invitar primero a publicar en Clasi Click.
+export async function priorizarAnunciosIA(
+  anuncios: { id: string; titulo: string; descripcion: string; tipo: string; precio: string; rubroLabel: string; espera?: string }[]
+): Promise<PrioridadInvitacionIA[]> {
+  const systemPrompt =
+    'Sos un asistente comercial de Clasi Click, un marketplace de Potosí, Bolivia. Te paso anuncios sacados de grupos de WhatsApp (Cambalache) ' +
+    'cuyos autores queremos invitar a publicar GRATIS en Clasi Click. A cada uno ponele un puntaje de 0 a 100 de PRIORIDAD DE INVITACIÓN: ' +
+    'qué tan probable es que el anunciante acepte y que su anuncio le sume valor a la plataforma. ' +
+    'Puntuá alto: vendedores o negocios que ofrecen productos o servicios de forma recurrente (tienda, emprendimiento, varios productos, stock), ' +
+    'con precio y datos claros, que claramente quieren vender más. Puntuá medio: ventas de particulares de algo concreto con precio. ' +
+    'Puntuá bajo: pedidos personales puntuales ("busco..."), avisos únicos sin datos, textos vagos, spam, cadenas, préstamos/multinivel o contenido dudoso. ' +
+    REGLA_ESPERA + FORMATO_JSON
+  return puntuarConIA(
+    anuncios.map((a) => ({
+      id: a.id,
+      linea: [a.tipo, a.rubroLabel, a.titulo, a.precio && `precio: ${a.precio}`, a.espera, (a.descripcion || '').slice(0, 300)].filter(Boolean).join(' | '),
+    })),
+    systemPrompt
+  )
+}
+
+// "invitado hace 3 días, 2 veces, sin respuesta" (o '' si nunca se lo invitó).
+export function textoEspera(invitadoEn?: string | null, invitaciones?: number | null): string {
+  if (!invitadoEn) return ''
+  const dias = Math.max(0, Math.floor((Date.now() - Date.parse(invitadoEn)) / 86400_000))
+  return `invitado hace ${dias === 0 ? 'menos de 1 día' : `${dias} día${dias === 1 ? '' : 's'}`}, ${invitaciones || 1} ${(invitaciones || 1) === 1 ? 'vez' : 'veces'}, sin respuesta`
 }

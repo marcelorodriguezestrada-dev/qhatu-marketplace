@@ -44,6 +44,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (tipo !== undefined) cambios.tipo = tipo
     if (precio !== undefined) cambios.precio = precio ? Number(precio) : null
     if (notaAdmin !== undefined) cambios.notaAdmin = notaAdmin
+    // Invitación por WhatsApp desde /admin: cuándo y cuántas veces.
+    if (body.registrarInvitacion) {
+      cambios.invitadoEn = new Date().toISOString()
+      cambios.invitaciones = FieldValue.increment(1)
+    }
 
     await getDb().collection('anuncios').doc(params.id).update(cambios)
 
