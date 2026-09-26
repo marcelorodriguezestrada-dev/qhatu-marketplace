@@ -1119,6 +1119,39 @@ export default function AdminPage() {
     }).then(() => cargarProfesionales())
   }
 
+  // Invitaciones por WhatsApp: en los profesionales ya cargados se guarda
+  // en su documento (invitadoEn / invitaciones); en los avisos pegados de
+  // WhatsApp que todavía no se importaron, en este navegador, por número.
+  function soloNumero(t: string) {
+    return String(t || '').replace(/\D/g, '').slice(-8)
+  }
+  const [invitadosLocal, setInvitadosLocal] = useState<Record<string, string>>({})
+  useEffect(() => {
+    try { setInvitadosLocal(JSON.parse(localStorage.getItem('clasiclick_invitados') || '{}')) } catch {}
+  }, [])
+  function marcarInvitadoLocal(telefono: string) {
+    const clave = soloNumero(telefono)
+    if (!clave) return
+    setInvitadosLocal((prev) => {
+      const nuevo = { ...prev, [clave]: new Date().toISOString() }
+      try { localStorage.setItem('clasiclick_invitados', JSON.stringify(nuevo)) } catch {}
+      return nuevo
+    })
+  }
+  function invitarProfesional(p: any) {
+    marcarInvitadoLocal(p.whatsapp)
+    // Se marca al toque en pantalla y queda guardado en el perfil.
+    setProfesionales((lista) => lista.map((x) => (x.id === p.id ? { ...x, invitadoEn: new Date().toISOString(), invitaciones: (x.invitaciones || 0) + 1, estado: 'info_solicitada' } : x)))
+    fetch(`/api/profesionales/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ registrarInvitacion: true, estado: 'info_solicitada', notaAdmin: p.notaAdmin || 'Se le mandó la invitación por WhatsApp.' }),
+    }).then(() => cargarProfesionales())
+  }
+  function fechaInvitacion(iso?: string) {
+    return iso ? new Date(iso).toLocaleString('es-BO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+  }
+
   // Confirma que el pago de la membresía Premium realmente llegó (lo
   // revisás vos a mano contra el banco/QR, como con los pedidos de
   // productos) — activa Premium y extiende la vigencia 30 días desde
@@ -2149,13 +2182,19 @@ export default function AdminPage() {
                         rows={2}
                         className="w-full px-2 py-1.5 rounded-md border border-line font-body text-[11px] mb-2"
                       />
+                      {invitadosLocal[soloNumero(p.telefono)] && (
+                        <span className="inline-block mr-2 mb-1 px-2 py-0.5 rounded-full bg-tealsoft border border-teal font-body text-[10px] font-semibold text-teal">
+                          ✓ Invitado el {fechaInvitacion(invitadosLocal[soloNumero(p.telefono)])}
+                        </span>
+                      )}
                       <a
                         href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block px-2.5 py-1 rounded-md bg-teal text-white font-body text-[11px] font-semibold"
+                        onClick={() => marcarInvitadoLocal(p.telefono)}
+                        className={`inline-block px-2.5 py-1 rounded-md font-body text-[11px] font-semibold ${invitadosLocal[soloNumero(p.telefono)] ? 'border border-line bg-panel text-inksoft' : 'bg-teal text-white'}`}
                       >
-                        💬 Invitar por WhatsApp
+                        💬 {invitadosLocal[soloNumero(p.telefono)] ? 'Invitar de nuevo' : 'Invitar por WhatsApp'}
                       </a>
                     </div>
                   ))}
@@ -2221,6 +2260,12 @@ export default function AdminPage() {
                     {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
+                  {(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)]) && (
+                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded-full bg-tealsoft border border-teal font-body text-[11px] font-semibold text-teal">
+                      ✓ Invitado por WhatsApp el {fechaInvitacion(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)])}
+                      {(p.invitaciones || 0) > 1 && ` · ${p.invitaciones} veces`}
+                    </div>
+                  )}
                   {p.descripcion && <div className="font-body text-xs text-ink mb-2">{p.descripcion}</div>}
                   <div className="font-body text-[11px] text-inksoft mb-2">
                     {p.precio ? `Bs ${Number(p.precio).toLocaleString('es-BO')}` : 'Precio a convenir'}
@@ -2286,10 +2331,10 @@ export default function AdminPage() {
                           href={`https://wa.me/${String(p.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => cambiarEstadoProfesional(p.id, 'info_solicitada', p.notaAdmin || 'Se le mandó la invitación por WhatsApp.')}
+                          onClick={() => invitarProfesional(p)}
                           className="px-3.5 py-1.5 rounded-md border border-indigo-200 font-body text-xs text-indigo-600"
                         >
-                          💬 Invitar por WhatsApp
+                          💬 {p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)] ? 'Invitar de nuevo' : 'Invitar por WhatsApp'}
                         </a>
                       )}
                       <button
@@ -2325,6 +2370,12 @@ export default function AdminPage() {
                     {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
+                  {(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)]) && (
+                    <div className="inline-block mb-1.5 px-2 py-0.5 rounded-full bg-tealsoft border border-teal font-body text-[11px] font-semibold text-teal">
+                      ✓ Invitado por WhatsApp el {fechaInvitacion(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)])}
+                      {(p.invitaciones || 0) > 1 && ` · ${p.invitaciones} veces`}
+                    </div>
+                  )}
                   {p.notaAdmin && (
                     <div className="font-body text-xs text-indigo-700 bg-indigo-50 rounded-md px-2.5 py-2 mb-2">
                       📝 {p.notaAdmin}
@@ -2360,12 +2411,21 @@ export default function AdminPage() {
                   ) : (
                     <div className="flex gap-2 flex-wrap">
                       <a
-                        href={`https://wa.me/${p.whatsapp}`}
+                        href={`https://wa.me/${String(p.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent(mensajeInvitacionAnuncio())}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => invitarProfesional(p)}
                         className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-teal"
                       >
-                        💬 Escribirle de nuevo
+                        💬 Invitar de nuevo
+                      </a>
+                      <a
+                        href={`https://wa.me/${String(p.whatsapp).replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-md border border-line font-body text-xs text-inksoft"
+                      >
+                        Escribirle
                       </a>
                       <button
                         onClick={() => { setPidiendoInfoId(p.id); setNotaPidiendoInfo(p.notaAdmin || '') }}

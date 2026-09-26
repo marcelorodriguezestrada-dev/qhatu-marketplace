@@ -106,6 +106,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico } = bodyPermitido
     const cambios: Record<string, unknown> = {}
+    // Invitación por WhatsApp desde /admin: queda registrado cuándo (y
+    // cuántas veces) se le escribió, para no invitar dos veces sin querer.
+    if (esAdmin && bodyPermitido.registrarInvitacion) {
+      cambios.invitadoEn = new Date().toISOString()
+      cambios.invitaciones = FieldValue.increment(1)
+    }
 
     if (estado !== undefined) {
       if (!['pendiente_revision', 'info_solicitada', 'aprobado', 'rechazado'].includes(estado)) {
