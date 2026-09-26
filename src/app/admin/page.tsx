@@ -18,6 +18,7 @@ import AdminCupones from '@/components/admin/AdminCupones'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
+import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
 function bs(n: number) {
@@ -1143,6 +1144,7 @@ export default function AdminPage() {
   const [filtrosPros, setFiltrosPros] = useState<Filtros>(FILTROS_INICIALES)
   const [filtrosAnuncios, setFiltrosAnuncios] = useState<Filtros>(FILTROS_INICIALES)
   const [verHistorialAnuncios, setVerHistorialAnuncios] = useState(false)
+  const [verPublicacionFacebook, setVerPublicacionFacebook] = useState(false)
   const [priorizandoAnunciosIA, setPriorizandoAnunciosIA] = useState(false)
   const [errorPriorizarAnunciosIA, setErrorPriorizarAnunciosIA] = useState('')
   useEffect(() => {
@@ -1195,6 +1197,7 @@ export default function AdminPage() {
   }
 
   // Filtros de las listas largas (ver components/admin/FiltrosLista.tsx).
+  const rubroLabelAnuncio = (id?: string) => (id ? buscarRubro(id)?.label : undefined)
   function rubrosDe(lista: any[]) {
     const ids = Array.from(new Set(lista.map((x) => x.rubro).filter(Boolean))) as string[]
     return ids.map((id) => ({ id, label: buscarRubro(id)?.label || id })).sort((a, b) => a.label.localeCompare(b.label))
@@ -2836,6 +2839,14 @@ export default function AdminPage() {
             <div className="font-body text-sm font-semibold text-ink">
               Anuncios clasificados {anuncios.length > 0 && <span className="text-inksoft font-normal">({anuncios.length})</span>}
             </div>
+            <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setVerPublicacionFacebook((v) => !v)}
+              className="px-3 py-1.5 rounded-md border border-indigo-200 bg-panel font-body text-xs font-semibold text-indigo-700"
+            >
+              {verPublicacionFacebook ? 'Cerrar publicación' : '📣 Armar publicación para Facebook'}
+            </button>
             <button
               onClick={priorizarAnunciosConIA}
               disabled={priorizandoAnunciosIA}
@@ -2843,7 +2854,9 @@ export default function AdminPage() {
             >
               {priorizandoAnunciosIA ? 'Analizando con IA...' : '🤖 Ordenar por prioridad con IA'}
             </button>
+            </div>
           </div>
+          {verPublicacionFacebook && <PublicacionFacebook anuncios={anuncios} rubroLabel={rubroLabelAnuncio} />}
           {errorPriorizarAnunciosIA && (
             <div className="font-body text-xs text-maroon bg-maroon/10 border border-maroon rounded-md px-3 py-2 mb-3">{errorPriorizarAnunciosIA}</div>
           )}
