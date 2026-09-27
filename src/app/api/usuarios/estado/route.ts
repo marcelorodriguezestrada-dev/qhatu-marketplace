@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest, getAuthAdmin } from '@/lib/firebaseAdmin'
+import { sincronizarDatosCuenta } from '@/lib/datosCuentaServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,18 @@ export async function GET(req: NextRequest) {
     // (que no depende de ninguna otra escritura nuestra) saca esa
     // carrera de en medio.
     const registro = await getAuthAdmin().getUser(usuario.uid)
+    // Si cambió su email desde "Mi cuenta" (se confirma con un link al
+    // correo nuevo), lo copiamos a su tienda y productos la primera vez
+    // que entra con el email nuevo.
+    if (usuario.email) {
+      try {
+        const v = await getDb().collection('vendedores').doc(usuario.uid).get()
+        const anterior = v.data()?.email
+        if (v.exists && anterior && anterior !== usuario.email) await sincronizarDatosCuenta(usuario.uid, { email: usuario.email })
+      } catch (err) {
+        console.error('sincronizar email', err)
+      }
+    }
     // Cuenta de prueba (Admin → Usuarios): sin restricciones de horario.
     const esPrueba = registro.customClaims?.esPrueba === true
     const creadaAntesDelSistema = new Date(registro.metadata.creationTime) < VERIFICACION_DESDE

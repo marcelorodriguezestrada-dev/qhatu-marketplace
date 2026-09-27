@@ -613,6 +613,46 @@ export default function AdminPage() {
   }
 
   const [vendedorParaCargar, setVendedorParaCargar] = useState('')
+  const [edicionUsuario, setEdicionUsuario] = useState<{ uid: string; email: string; nombre: string; whatsapp: string; nombreNegocio: string; tieneTienda: boolean } | null>(null)
+  const [guardandoUsuario, setGuardandoUsuario] = useState(false)
+  const [errorEdicionUsuario, setErrorEdicionUsuario] = useState('')
+
+  function abrirEdicionUsuario(u: any) {
+    const vendedor = vendedoresAdmin.find((v) => v.id === u.uid)
+    const w = String(u.whatsapp || vendedor?.whatsapp || '')
+    setErrorEdicionUsuario('')
+    setEdicionUsuario({
+      uid: u.uid,
+      email: u.email || '',
+      nombre: u.nombre || '',
+      whatsapp: w.startsWith('591') ? w.slice(3) : w,
+      nombreNegocio: vendedor?.nombreNegocio || '',
+      tieneTienda: !!vendedor,
+    })
+  }
+
+  async function guardarEdicionUsuario(e: React.FormEvent) {
+    e.preventDefault()
+    if (!edicionUsuario) return
+    setGuardandoUsuario(true)
+    setErrorEdicionUsuario('')
+    try {
+      const { uid, tieneTienda, ...datos } = edicionUsuario
+      const d = await fetch(`/api/admin/usuarios/${uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'editar', ...datos }),
+      }).then((r) => r.json())
+      if (d.error) throw new Error(d.error)
+      setEdicionUsuario(null)
+      cargarUsuarios()
+      cargarVendedoresAdmin()
+    } catch (err: any) {
+      setErrorEdicionUsuario(err?.message || 'No se pudo guardar.')
+    } finally {
+      setGuardandoUsuario(false)
+    }
+  }
   async function cargarProductosComo(uid: string) {
     if (!uid) return
     if (!confirm('Vas a entrar a la cuenta de este vendedor en esta pestaña para cargarle la tienda y los productos (quedan marcados como "cargado por admin"). Si tenías tu propia sesión abierta en el sitio, se cierra. ¿Seguir?')) return
@@ -3255,6 +3295,13 @@ export default function AdminPage() {
                       >
                         🛍️ Cargar productos
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => (edicionUsuario?.uid === u.uid ? setEdicionUsuario(null) : abrirEdicionUsuario(u))}
+                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
+                      >
+                        ✏️ Editar
+                      </button>
                       {u.email && (
                         <button
                           type="button"
@@ -3289,6 +3336,38 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
+
+                  {edicionUsuario?.uid === u.uid && (
+                    <form onSubmit={guardarEdicionUsuario} className="mt-3 pt-3 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {[
+                        { k: 'email', label: 'Email', type: 'email', ph: 'vendedor@gmail.com' },
+                        { k: 'nombre', label: 'Nombre', type: 'text', ph: 'Nombre' },
+                        { k: 'whatsapp', label: 'WhatsApp', type: 'tel', ph: '71234567' },
+                        { k: 'nombreNegocio', label: edicionUsuario?.tieneTienda ? 'Nombre de la tienda' : 'Nombre de la tienda (la crea)', type: 'text', ph: 'Sin tienda' },
+                      ].map((c) => (
+                        <label key={c.k} className="font-body text-[11px] text-ink">
+                          <span className="block font-semibold mb-1">{c.label}</span>
+                          <input
+                            type={c.type}
+                            value={(edicionUsuario as any)?.[c.k] ?? ''}
+                            onChange={(e) => { const v = e.target.value; setEdicionUsuario((prev) => (prev ? { ...prev, [c.k]: v } : prev)) }}
+                            placeholder={c.ph}
+                            className="w-full px-2.5 py-1.5 rounded-md border border-line bg-panel font-body text-xs"
+                          />
+                        </label>
+                      ))}
+                      <div className="sm:col-span-2 font-body text-[10px] text-inksoft">
+                        Si cambiás el email, la persona entra con el nuevo (misma contraseña) y se actualiza en sus productos y anuncios. QR, dirección y horarios de la tienda se editan con 🛍️ Cargar productos → Mi tienda.
+                      </div>
+                      {errorEdicionUsuario && <div className="sm:col-span-2 font-body text-xs text-maroon">{errorEdicionUsuario}</div>}
+                      <div className="sm:col-span-2 flex gap-2">
+                        <button type="submit" disabled={guardandoUsuario} className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-60">
+                          {guardandoUsuario ? 'Guardando...' : 'Guardar cambios'}
+                        </button>
+                        <button type="button" onClick={() => setEdicionUsuario(null)} className="px-3 py-1.5 rounded-md border border-line font-body text-xs">Cancelar</button>
+                      </div>
+                    </form>
+                  )}
 
                   {expandido && (
                     <div className="mt-3 pt-3 border-t border-line grid gap-2">

@@ -25,12 +25,12 @@ export async function GET(req: NextRequest) {
     const [productosSnap, profesionalesSnap, creadosSnap] = await Promise.all([
       db.collection('productos').select('vendedorId').get(),
       db.collection('profesionales').select('solicitanteUid').get(),
-      db.collection('usuarios').where('creadoPorAdmin', '==', true).select('whatsapp').get(),
+      db.collection('usuarios').select('whatsapp', 'creadoPorAdmin').get(),
     ])
-    // Cuentas creadas desde el admin: guardamos su WhatsApp para poder
-    // mandarle el link de acceso.
-    const creadosPorAdmin = new Map<string, string>()
-    creadosSnap.docs.forEach((doc) => creadosPorAdmin.set(doc.id, doc.data().whatsapp || ''))
+    // WhatsApp (para mandar el link de acceso / editar sus datos) y si la
+    // cuenta la creó el admin.
+    const datosUsuario = new Map<string, { whatsapp: string; creadoPorAdmin: boolean }>()
+    creadosSnap.docs.forEach((doc) => datosUsuario.set(doc.id, { whatsapp: doc.data().whatsapp || '', creadoPorAdmin: doc.data().creadoPorAdmin === true }))
 
     const conteoProductos = new Map<string, number>()
     productosSnap.docs.forEach((doc) => {
@@ -53,8 +53,8 @@ export async function GET(req: NextRequest) {
       ultimoLogin: u.metadata.lastSignInTime || null,
       productosCount: conteoProductos.get(u.uid) || 0,
       profesionalesCount: conteoProfesionales.get(u.uid) || 0,
-      creadoPorAdmin: creadosPorAdmin.has(u.uid),
-      whatsapp: creadosPorAdmin.get(u.uid) || null,
+      creadoPorAdmin: datosUsuario.get(u.uid)?.creadoPorAdmin === true,
+      whatsapp: datosUsuario.get(u.uid)?.whatsapp || null,
     }))
 
     // Los más recientes primero.
