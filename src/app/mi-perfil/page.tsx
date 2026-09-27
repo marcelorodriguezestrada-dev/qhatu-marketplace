@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import MiCuenta from '@/components/MiCuenta'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
@@ -541,6 +542,7 @@ export default function MiPerfilPage() {
         <NotificacionesBell />
       </div>
       <div className="mb-5" />
+      <MiCuenta className="mb-5" />
 
       {error && (
         <div className="bg-maroon/10 border border-maroon rounded-lg p-3 mb-5 font-body text-xs text-maroon">{error}</div>

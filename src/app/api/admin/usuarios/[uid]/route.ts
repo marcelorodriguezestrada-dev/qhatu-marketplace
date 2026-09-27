@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthAdmin } from '@/lib/firebaseAdmin'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
+import { getDb } from '@/lib/firebaseAdmin'
+import { sincronizarDatosCuenta } from '@/lib/datosCuentaServer'
+import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +23,59 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
     const authAdmin = getAuthAdmin()
     // Link nuevo para que elija/cambie su contraseña (vence a la hora,
     // por eso se genera recién al momento de mandarlo).
+    // Editar los datos de la cuenta: email (queda verificado, lo cambia
+    // el admin), nombre, WhatsApp y nombre de la tienda.
+    if (body.accion === 'editar') {
+      const u = await authAdmin.getUser(params.uid)
+      const db = getDb()
+      const email = String(body.email ?? u.email ?? '').trim().toLowerCase()
+      const nombre = String(body.nombre ?? '').trim().slice(0, 80)
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return NextResponse.json({ error: 'Poné un email válido.' }, { status: 400 })
+      }
+      let whatsapp: string | undefined
+      if (typeof body.whatsapp === 'string') {
+        const w = body.whatsapp.trim()
+        if (w) {
+          const v = validarWhatsappBoliviano(w)
+          if (!v.valido) return NextResponse.json({ error: v.motivo }, { status: 400 })
+          whatsapp = numeroLocalABolivia(w)
+        } else whatsapp = ''
+      }
+      const emailCambio = email !== (u.email || '').toLowerCase()
+      try {
+        await authAdmin.updateUser(params.uid, {
+          ...(emailCambio ? { email, emailVerified: true } : {}),
+          displayName: nombre || null,
+        })
+      } catch (err: any) {
+        if (err?.code === 'auth/email-already-exists') {
+          return NextResponse.json({ error: 'Ese email ya lo usa otra cuenta.' }, { status: 409 })
+        }
+        throw err
+      }
+      await db.collection('usuarios').doc(params.uid).set(
+        { nombre, ...(whatsapp !== undefined ? { whatsapp } : {}), updatedAt: new Date().toISOString() },
+        { merge: true }
+      )
+      const vRef = db.collection('vendedores').doc(params.uid)
+      const vDoc = await vRef.get()
+      const tiendaNombre = typeof body.nombreNegocio === 'string' ? body.nombreNegocio.trim().slice(0, 80) : undefined
+      const cambiosTienda: Record<string, any> = {}
+      if (tiendaNombre !== undefined && tiendaNombre !== (vDoc.data()?.nombreNegocio || '')) cambiosTienda.nombreNegocio = tiendaNombre
+      if (whatsapp !== undefined && whatsapp !== (vDoc.data()?.whatsapp || '')) {
+        cambiosTienda.whatsapp = whatsapp
+        cambiosTienda.whatsappPais = whatsapp ? 'BO' : ''
+      }
+      if (Object.keys(cambiosTienda).length && (vDoc.exists || cambiosTienda.nombreNegocio)) {
+        await vRef.set({ ...cambiosTienda, email, updatedAt: new Date().toISOString() }, { merge: true })
+      }
+      await sincronizarDatosCuenta(params.uid, {
+        email: emailCambio ? email : null,
+        ...(cambiosTienda.nombreNegocio !== undefined ? { tiendaNombre: cambiosTienda.nombreNegocio } : {}),
+      })
+      return NextResponse.json({ ok: true, email })
+    }
     if (body.accion === 'link') {
       const u = await authAdmin.getUser(params.uid)
       if (!u.email) return NextResponse.json({ error: 'Ese usuario no tiene email.' }, { status: 400 })

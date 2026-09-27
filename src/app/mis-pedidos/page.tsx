@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import MiCuenta from '@/components/MiCuenta'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
@@ -106,6 +107,7 @@ export default function MisPedidosPage() {
         </div>
         <Link href="/" className="font-body text-sm text-maroon underline">Volver</Link>
       </div>
+      <MiCuenta className="mb-5" />
 
       {pedidos.length === 0 && (
         <div className="bg-panel border border-line rounded-xl p-5 font-body text-sm text-inksoft">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import MiCuenta from '@/components/MiCuenta'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -729,7 +730,8 @@ export default function VenderPage() {
   return (
     <div className="max-w-[640px] mx-auto px-5 py-8">
       <div className="font-display text-xl font-bold text-ink mb-1">Vender en Clasi Click</div>
-      <div className="font-body text-[13px] text-inksoft mb-6">Publicando como {usuario.email}</div>
+      <div className="font-body text-[13px] text-inksoft mb-4">Publicando como {usuario.email}</div>
+      <MiCuenta className="mb-6" />
       {editingId && (
         <div className="mb-4 p-3 rounded-lg bg-ochre/10 border border-ochre text-ink font-body text-sm">
           Estás editando el producto <strong>{editingId}</strong>. Hacé los cambios y presioná "Actualizar producto" o "Cancelar".
