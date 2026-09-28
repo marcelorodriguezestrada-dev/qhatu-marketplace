@@ -11,11 +11,32 @@ import { entrarComoUsuario } from '@/lib/modoAdmin'
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
 
-export function mensajeAcceso(d: { nombre?: string | null; negocio?: string | null; email: string; link: string | null }) {
+// Contraseña fácil de dictar/copiar: sin letras que se confunden (l, 1, O, 0).
+export function generarPassword() {
+  const letras = 'abcdefghjkmnpqrstuvwxyz'
+  const numeros = '23456789'
+  const r = (t: string) => t[Math.floor(Math.random() * t.length)]
+  let p = ''
+  for (let i = 0; i < 5; i++) p += r(letras)
+  for (let i = 0; i < 3; i++) p += r(numeros)
+  return p.charAt(0).toUpperCase() + p.slice(1)
+}
+
+export function mensajeAcceso(d: { nombre?: string | null; negocio?: string | null; email: string; link: string | null; password?: string | null; cambio?: boolean }) {
   const hola = d.nombre ? `¡Hola ${d.nombre}! 👋` : '¡Hola! 👋'
   const tienda = d.negocio ? `tu tienda *${d.negocio}*` : 'tu cuenta'
+  const intro = d.cambio ? `Te actualizamos la contraseña de ${tienda} en *Clasi Click* 🔑` : `Ya creamos ${tienda} en *Clasi Click* 🛍️`
+  if (d.password) {
+    return (
+      `${hola}\n\n${intro}\n\n` +
+      `Tu usuario es: ${d.email}\n` +
+      `Tu contraseña es: ${d.password}\n\n` +
+      `Entrá en ${SITE}/login\n` +
+      `(Después podés cambiarla en "Mi cuenta")`
+    )
+  }
   return (
-    `${hola}\n\nYa creamos ${tienda} en *Clasi Click* 🛍️\n\n` +
+    `${hola}\n\n${intro}\n\n` +
     (d.link ? `Para entrar, elegí tu contraseña acá 👉 ${d.link}\n\n` : '') +
     `Tu usuario es: ${d.email}\n` +
     `Después entrás en ${SITE}/login\n\n` +
@@ -29,7 +50,7 @@ export function abrirWhatsapp(numero: string | null | undefined, texto: string) 
   window.open(url, '_blank')
 }
 
-type Creado = { uid: string; email: string; whatsapp: string; link: string | null; nombre: string; negocio: string }
+type Creado = { uid: string; email: string; whatsapp: string; link: string | null; nombre: string; negocio: string; password: string }
 
 export default function CrearUsuario({ password, onCreado }: { password: string; onCreado: () => void }) {
   const [abierto, setAbierto] = useState(false)
@@ -37,6 +58,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
   const [nombre, setNombre] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [negocio, setNegocio] = useState('')
+  const [passwordNueva, setPasswordNueva] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [creado, setCreado] = useState<Creado | null>(null)
@@ -51,12 +73,12 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
       const res = await fetch('/api/admin/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ email, nombre, whatsapp, nombreNegocio: negocio }),
+        body: JSON.stringify({ email, nombre, whatsapp, nombreNegocio: negocio, password: passwordNueva }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'No se pudo crear el usuario.')
-      setCreado({ uid: d.uid, email: d.email, whatsapp: d.whatsapp, link: d.link, nombre, negocio })
-      setEmail(''); setNombre(''); setWhatsapp(''); setNegocio('')
+      setCreado({ uid: d.uid, email: d.email, whatsapp: d.whatsapp, link: d.link, nombre, negocio, password: passwordNueva })
+      setEmail(''); setNombre(''); setWhatsapp(''); setNegocio(''); setPasswordNueva('')
       onCreado()
     } catch (err: any) {
       setError(err?.message || 'No se pudo crear el usuario.')
@@ -99,7 +121,10 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
       {creado ? (
         <div className="bg-tealsoft border border-teal rounded-lg p-3">
           <div className="font-body text-sm font-semibold text-teal mb-1">✓ Cuenta creada: {creado.email}</div>
-          {!creado.link && (
+          {creado.password && (
+            <div className="font-body text-xs text-ink mb-1">Contraseña: <b className="font-mono">{creado.password}</b></div>
+          )}
+          {!creado.link && !creado.password && (
             <div className="font-body text-xs text-maroon mb-2">No se pudo generar el link de contraseña. Decile que entre a /login y toque “¿Olvidaste tu contraseña?”.</div>
           )}
           <div className="flex flex-wrap gap-2 mt-2">
@@ -108,7 +133,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
             </button>
             <button
               type="button"
-              onClick={() => abrirWhatsapp(creado.whatsapp, mensajeAcceso({ nombre: creado.nombre, negocio: creado.negocio, email: creado.email, link: creado.link }))}
+              onClick={() => abrirWhatsapp(creado.whatsapp, mensajeAcceso({ nombre: creado.nombre, negocio: creado.negocio, email: creado.email, link: creado.link, password: creado.password }))}
               className="px-3 py-2 rounded-lg border-none bg-[#25D366] text-white font-body text-xs font-semibold"
             >
               💬 Enviar acceso por WhatsApp
@@ -145,6 +170,13 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
           <label className="font-body text-xs text-ink">
             <span className="block font-semibold mb-1">Nombre de la tienda (opcional)</span>
             <input value={negocio} onChange={(e) => setNegocio(e.target.value)} placeholder="Zapatería Doña Rosa" className={input} />
+          </label>
+          <label className="font-body text-xs text-ink sm:col-span-2">
+            <span className="block font-semibold mb-1">Contraseña (opcional — si la dejás vacía, la elige la persona con un link)</span>
+            <div className="flex gap-2">
+              <input value={passwordNueva} onChange={(e) => setPasswordNueva(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete="new-password" className={input + ' font-mono'} />
+              <button type="button" onClick={() => setPasswordNueva(generarPassword())} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink whitespace-nowrap">🎲 Generar</button>
+            </div>
           </label>
           {error && <div className="sm:col-span-2 font-body text-xs text-maroon">{error}</div>}
           <div className="sm:col-span-2">
