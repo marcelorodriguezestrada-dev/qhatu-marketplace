@@ -26,8 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
     // Editar los datos de la cuenta: email (queda verificado, lo cambia
     // el admin), nombre, WhatsApp y nombre de la tienda.
     // Poner / cambiar la contraseña de cualquier usuario (por ejemplo, a
-    // alguien que no recibe el mail de recuperación). Firebase cierra
-    // sus sesiones abiertas: tiene que volver a entrar con la nueva.
+    // alguien que no recibe el mail de recuperación). La anterior deja
+    // de servir en el momento.
     if (body.accion === 'password') {
       const nueva = String(body.password || '')
       if (nueva.length < 6) return NextResponse.json({ error: 'La contraseña tiene que tener al menos 6 caracteres.' }, { status: 400 })

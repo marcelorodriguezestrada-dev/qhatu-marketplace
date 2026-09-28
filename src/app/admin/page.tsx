@@ -3369,7 +3369,7 @@ export default function AdminPage() {
                       {passwordUsuario!.guardada ? (
                         <div className="font-body text-xs text-ink">
                           <div className="text-teal font-semibold mb-1.5">✓ Contraseña cambiada: <span className="font-mono">{passwordUsuario!.valor}</span></div>
-                          <div className="text-[11px] text-inksoft mb-2">Si tenía la sesión abierta, tiene que volver a entrar con la nueva.</div>
+                          <div className="text-[11px] text-inksoft mb-2">Desde ahora entra con esta contraseña (la anterior ya no sirve).</div>
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
