@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Poné un email válido.' }, { status: 400 })
     }
+    const passwordInicial = String(body.password || '')
+    if (passwordInicial && passwordInicial.length < 6) {
+      return NextResponse.json({ error: 'La contraseña tiene que tener al menos 6 caracteres.' }, { status: 400 })
+    }
     let whatsapp = ''
     if (whatsappLocal) {
       const v = validarWhatsappBoliviano(whatsappLocal)
@@ -97,7 +101,7 @@ export async function POST(req: NextRequest) {
     try {
       // emailVerified: lo da de alta el admin, que ya habló con la
       // persona — no le pedimos el código de verificación.
-      const creado = await authAdmin.createUser({ email, emailVerified: true, ...(nombre ? { displayName: nombre } : {}) })
+      const creado = await authAdmin.createUser({ email, emailVerified: true, ...(nombre ? { displayName: nombre } : {}), ...(passwordInicial ? { password: passwordInicial.slice(0, 100) } : {}) })
       uid = creado.uid
     } catch (err: any) {
       if (err?.code === 'auth/email-already-exists') {
@@ -119,7 +123,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const link = await linkParaElegirContrasena(email)
+    // Si el admin ya le puso contraseña, no hace falta el link.
+    const link = passwordInicial ? null : await linkParaElegirContrasena(email)
     return NextResponse.json({ uid, email, whatsapp, link })
   } catch (err) {
     console.error('POST /api/admin/usuarios', err)

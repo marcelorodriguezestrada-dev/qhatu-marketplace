@@ -19,7 +19,7 @@ import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
-import CrearUsuario, { mensajeAcceso, abrirWhatsapp } from '@/components/admin/CrearUsuario'
+import CrearUsuario, { mensajeAcceso, abrirWhatsapp, generarPassword } from '@/components/admin/CrearUsuario'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
@@ -615,6 +615,26 @@ export default function AdminPage() {
   const [vendedorParaCargar, setVendedorParaCargar] = useState('')
   const [edicionUsuario, setEdicionUsuario] = useState<{ uid: string; email: string; nombre: string; whatsapp: string; nombreNegocio: string; tieneTienda: boolean } | null>(null)
   const [guardandoUsuario, setGuardandoUsuario] = useState(false)
+  // Poner / cambiar contraseña de un usuario desde el admin.
+  const [passwordUsuario, setPasswordUsuario] = useState<{ uid: string; valor: string; guardada: boolean; error: string; guardando: boolean } | null>(null)
+
+  async function guardarPasswordUsuario() {
+    if (!passwordUsuario) return
+    const { uid, valor } = passwordUsuario
+    if (valor.length < 6) { setPasswordUsuario({ ...passwordUsuario, error: 'Mínimo 6 caracteres.' }); return }
+    setPasswordUsuario({ ...passwordUsuario, guardando: true, error: '' })
+    try {
+      const d = await fetch(`/api/admin/usuarios/${uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ accion: 'password', password: valor }),
+      }).then((r) => r.json())
+      if (d.error) throw new Error(d.error)
+      setPasswordUsuario((p) => (p ? { ...p, guardada: true, guardando: false } : p))
+    } catch (err: any) {
+      setPasswordUsuario((p) => (p ? { ...p, guardando: false, error: err?.message || 'No se pudo cambiar.' } : p))
+    }
+  }
   const [errorEdicionUsuario, setErrorEdicionUsuario] = useState('')
 
   function abrirEdicionUsuario(u: any) {
@@ -3302,6 +3322,13 @@ export default function AdminPage() {
                       >
                         ✏️ Editar
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setPasswordUsuario(passwordUsuario?.uid === u.uid ? null : { uid: u.uid, valor: '', guardada: false, error: '', guardando: false })}
+                        className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
+                      >
+                        🔒 Contraseña
+                      </button>
                       {u.email && (
                         <button
                           type="button"
@@ -3336,6 +3363,49 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </div>
+
+                  {passwordUsuario?.uid === u.uid && (
+                    <div className="mt-3 pt-3 border-t border-line">
+                      {passwordUsuario!.guardada ? (
+                        <div className="font-body text-xs text-ink">
+                          <div className="text-teal font-semibold mb-1.5">✓ Contraseña cambiada: <span className="font-mono">{passwordUsuario!.valor}</span></div>
+                          <div className="text-[11px] text-inksoft mb-2">Desde ahora entra con esta contraseña (la anterior ya no sirve).</div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const vendedor = vendedoresAdmin.find((v) => v.id === u.uid)
+                                abrirWhatsapp(u.whatsapp || vendedor?.whatsapp, mensajeAcceso({ nombre: u.nombre, negocio: vendedor?.nombreNegocio, email: u.email, link: null, password: passwordUsuario!.valor, cambio: true }))
+                              }}
+                              className="px-3 py-1.5 rounded-md border-none bg-[#25D366] text-white font-body text-xs font-semibold"
+                            >
+                              💬 Enviar por WhatsApp
+                            </button>
+                            <button type="button" onClick={() => navigator.clipboard?.writeText(passwordUsuario!.valor).catch(() => {})} className="px-3 py-1.5 rounded-md border border-line font-body text-xs">📋 Copiar</button>
+                            <button type="button" onClick={() => setPasswordUsuario(null)} className="px-3 py-1.5 rounded-md border border-line font-body text-xs">Listo</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="font-body text-xs text-ink">
+                          <div className="font-semibold mb-1.5">Nueva contraseña para {u.email || 'este usuario'}</div>
+                          <div className="flex flex-wrap gap-2">
+                            <input
+                              value={passwordUsuario!.valor}
+                              onChange={(e) => { const v = e.target.value; setPasswordUsuario((p) => (p ? { ...p, valor: v, error: '' } : p)) }}
+                              placeholder="Mínimo 6 caracteres"
+                              autoComplete="new-password"
+                              className="flex-1 min-w-[160px] px-2.5 py-1.5 rounded-md border border-line bg-panel font-mono text-xs"
+                            />
+                            <button type="button" onClick={() => setPasswordUsuario((p) => (p ? { ...p, valor: generarPassword(), error: '' } : p))} className="px-3 py-1.5 rounded-md border border-line text-xs">🎲 Generar</button>
+                            <button type="button" onClick={guardarPasswordUsuario} disabled={passwordUsuario!.guardando} className="px-3.5 py-1.5 rounded-md border-none bg-teal text-white text-xs font-semibold disabled:opacity-60">
+                              {passwordUsuario!.guardando ? 'Guardando...' : 'Guardar contraseña'}
+                            </button>
+                          </div>
+                          {passwordUsuario!.error && <div className="text-maroon mt-1.5">{passwordUsuario!.error}</div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {edicionUsuario?.uid === u.uid && (
                     <form onSubmit={guardarEdicionUsuario} className="mt-3 pt-3 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-2.5">

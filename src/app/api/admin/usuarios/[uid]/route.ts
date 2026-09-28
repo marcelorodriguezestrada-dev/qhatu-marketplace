@@ -25,6 +25,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
     // por eso se genera recién al momento de mandarlo).
     // Editar los datos de la cuenta: email (queda verificado, lo cambia
     // el admin), nombre, WhatsApp y nombre de la tienda.
+    // Poner / cambiar la contraseña de cualquier usuario (por ejemplo, a
+    // alguien que no recibe el mail de recuperación). La anterior deja
+    // de servir en el momento.
+    if (body.accion === 'password') {
+      const nueva = String(body.password || '')
+      if (nueva.length < 6) return NextResponse.json({ error: 'La contraseña tiene que tener al menos 6 caracteres.' }, { status: 400 })
+      if (nueva.length > 100) return NextResponse.json({ error: 'La contraseña es demasiado larga.' }, { status: 400 })
+      await authAdmin.updateUser(params.uid, { password: nueva })
+      return NextResponse.json({ ok: true })
+    }
     if (body.accion === 'editar') {
       const u = await authAdmin.getUser(params.uid)
       const db = getDb()
