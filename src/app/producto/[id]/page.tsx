@@ -6,6 +6,7 @@ import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { agotado, ultimasUnidades } from '@/lib/stock'
 import ResenasProducto, { Estrellas } from '@/components/ResenasProducto'
+import PreguntasProducto from '@/components/PreguntasProducto'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { expandirTalles } from '@/data/productos'
@@ -607,6 +608,8 @@ export default function ProductoDetallePage() {
           )}
         </div>
       )}
+
+      <PreguntasProducto productoId={String(id)} vendedorId={producto.vendedorId} />
 
       <ResenasProducto productoId={String(id)} />
 
