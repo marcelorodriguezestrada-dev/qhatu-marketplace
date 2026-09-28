@@ -571,3 +571,52 @@ export function textoEspera(invitadoEn?: string | null, invitaciones?: number | 
   const dias = Math.max(0, Math.floor((Date.now() - Date.parse(invitadoEn)) / 86400_000))
   return `invitado hace ${dias === 0 ? 'menos de 1 día' : `${dias} día${dias === 1 ? '' : 's'}`}, ${invitaciones || 1} ${(invitaciones || 1) === 1 ? 'vez' : 'veces'}, sin respuesta`
 }
+
+// Preguntas sobre un producto (estilo Mercado Libre): la IA responde al
+// instante SOLO con los datos publicados del producto y la tienda. Si la
+// respuesta no está en esos datos, lo dice y sugiere preguntarle al
+// vendedor (seguro: false). Devuelve null si no hay IA disponible.
+export async function responderPreguntaProductoIA(
+  datosProducto: string,
+  pregunta: string
+): Promise<{ respuesta: string; seguro: boolean } | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        max_completion_tokens: 500,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Sos el asistente de Clasi Click, un marketplace de Potosí, Bolivia. Un comprador pregunta sobre un producto. ' +
+              'Respondé en español boliviano, amable y breve (máximo 2 oraciones), usando ÚNICAMENTE los datos del producto y la tienda que te paso. ' +
+              'Nunca inventes talles, colores, stock, medidas, materiales, precios ni plazos que no estén en los datos. ' +
+              'Si la respuesta no está en los datos (o depende del vendedor: descuentos, reservas, fotos extra, medidas exactas), decilo con honestidad y sugerí preguntarle al vendedor. ' +
+              'Si la pregunta no tiene que ver con el producto o es ofensiva, respondé cortésmente que solo podés ayudar con este producto. ' +
+              'Respondé SOLO JSON: {"respuesta": "texto", "seguro": true si la respuesta sale claramente de los datos, false si no}',
+          },
+          { role: 'user', content: `DATOS:\n${datosProducto}\n\nPREGUNTA: ${pregunta}` },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('responderPreguntaProductoIA: Groq respondió', res.status)
+      return null
+    }
+    const data = await res.json()
+    const parsed = JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+    const respuesta = String(parsed.respuesta || '').trim().slice(0, 600)
+    if (!respuesta) return null
+    return { respuesta, seguro: parsed.seguro === true }
+  } catch (err) {
+    console.error('responderPreguntaProductoIA', err)
+    return null
+  }
+}
