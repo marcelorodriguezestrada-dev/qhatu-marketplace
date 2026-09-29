@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ciudadDe, sanearCiudad } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 
@@ -95,12 +96,16 @@ export async function POST(req: NextRequest) {
     // tienda, queda vacío y el catálogo cae al email como respaldo.
     let tiendaNombre = ''
     let tiendaLogoUrl = ''
+    // El producto hereda la ciudad de la tienda (Potosí si no cargó).
+    // Si todavía no guardó su tienda, vale la ciudad que manda el formulario.
+    let ciudad = sanearCiudad(body.ciudad)
     try {
       const vendedorDoc = await db.collection('vendedores').doc(usuario.uid).get()
       if (vendedorDoc.exists) {
         const vd = vendedorDoc.data() as any
         tiendaNombre = vd.nombreNegocio || ''
         tiendaLogoUrl = vd.logoUrl || ''
+        if (vd.ciudad) ciudad = ciudadDe(vd)
       }
     } catch {
       // si falla, no bloqueamos la publicación por esto
@@ -132,6 +137,7 @@ export async function POST(req: NextRequest) {
       ...(usuario.cargaAdmin ? { cargadoPorAdmin: true } : {}),
       tiendaNombre,
       tiendaLogoUrl,
+      ciudad,
       plan: planValido,
       estado: 'activo',
       moderacionIA,

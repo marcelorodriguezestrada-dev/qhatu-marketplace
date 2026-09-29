@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanearCiudad, sanearViajaA } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, dondeTrabaja, educacion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, dondeTrabaja, educacion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios, ciudad, atiendePresencial, atiendeOnline, viajaA } = body
+    const ciudadFinal = sanearCiudad(ciudad)
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, WhatsApp).' }, { status: 400 })
     }
@@ -127,6 +129,12 @@ export async function POST(req: NextRequest) {
       educacion: (educacion || '').trim().slice(0, 300),
       servicios: serviciosLimpios,
       zona: zonaFinal,
+      // Ciudad y forma de atención (ver src/data/ciudades.ts): presencial
+      // en su ciudad, online (aparece en todas) y ciudades a las que viaja.
+      ciudad: ciudadFinal,
+      atiendePresencial: atiendePresencial !== false,
+      atiendeOnline: atiendeOnline === true,
+      viajaA: sanearViajaA(viajaA, ciudadFinal),
       direccion: direccion || '',
       lat: lat != null ? Number(lat) : null,
       lng: lng != null ? Number(lng) : null,

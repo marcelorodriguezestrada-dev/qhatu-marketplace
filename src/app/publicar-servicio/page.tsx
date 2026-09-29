@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ZONAS_POTOSI } from '@/data/zonasPotosi'
+import { CIUDADES, zonasDeCiudad, type CiudadId } from '@/data/ciudades'
+import { useCiudad } from '@/lib/ciudad'
+import { CampoCiudad } from '@/components/SelectorCiudad'
 import { useAuth } from '@/lib/auth'
 import { useCategorias, agruparRubros } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -35,6 +38,15 @@ export default function PublicarServicioPage() {
   const [zona, setZona] = useState(ZONAS_POTOSI[0])
   const [zonaPersonalizada, setZonaPersonalizada] = useState('')
   const [zonasExtra, setZonasExtra] = useState<string[]>([])
+  // Ciudad y forma de atención: presencial en su ciudad, online (aparece
+  // en todas las ciudades) y otras ciudades a las que viaja.
+  const { ciudadId: ciudadElegida, multiciudad } = useCiudad()
+  const [ciudadPro, setCiudadPro] = useState<CiudadId | null>(null)
+  const ciudadFinal: CiudadId = ciudadPro || ciudadElegida
+  const [atiendePresencial, setAtiendePresencial] = useState(true)
+  const [atiendeOnline, setAtiendeOnline] = useState(false)
+  const [viajaA, setViajaA] = useState<CiudadId[]>([])
+  const zonasCiudad = ciudadFinal === 'potosi' ? [...ZONAS_POTOSI, ...zonasExtra] : zonasDeCiudad(ciudadFinal)
   const [direccion, setDireccion] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [whatsappPais, setWhatsappPais] = useState(PAIS_FALLBACK_ID)
@@ -190,6 +202,10 @@ export default function PublicarServicioPage() {
       setError('Escribí el nombre de tu profesión u oficio.')
       return
     }
+    if (!atiendePresencial && !atiendeOnline) {
+      setError('Marcá cómo atendés: presencial, online o las dos.')
+      return
+    }
     if (zona === 'otra' && !zonaPersonalizada.trim()) {
       setError('Escribí el nombre de tu zona.')
       return
@@ -216,6 +232,7 @@ export default function PublicarServicioPage() {
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
           especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
+          ciudad: ciudadFinal, atiendePresencial, atiendeOnline, viajaA,
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),
@@ -378,15 +395,47 @@ export default function PublicarServicioPage() {
           )}
         </div>
 
+        <CampoCiudad
+          value={ciudadFinal}
+          onChange={(c) => { setCiudadPro(c); setZona(c === 'potosi' ? ZONAS_POTOSI[0] : zonasDeCiudad(c)[0]); setViajaA((v) => v.filter((x) => x !== c)) }}
+          etiqueta="📍 ¿En qué ciudad atendés?"
+          className="mb-3"
+        />
+        <div className="bg-panelalt border border-line rounded-lg p-3 mb-3">
+          <div className="font-body text-xs font-semibold text-ink mb-2">¿Cómo atendés?</div>
+          <label className="flex items-center gap-2 font-body text-sm text-ink mb-1.5 cursor-pointer">
+            <input type="checkbox" checked={atiendePresencial} onChange={(e) => setAtiendePresencial(e.target.checked)} className="accent-teal" />
+            🏢 Presencial (en mi local, consultorio o a domicilio)
+          </label>
+          <label className="flex items-center gap-2 font-body text-sm text-ink cursor-pointer">
+            <input type="checkbox" checked={atiendeOnline} onChange={(e) => setAtiendeOnline(e.target.checked)} className="accent-teal" />
+            💻 Online / videollamada <span className="text-inksoft text-xs">(te encuentran desde cualquier ciudad)</span>
+          </label>
+          {multiciudad && (
+            <div className="mt-2">
+              <div className="font-body text-xs text-inksoft mb-1">🚗 También viajo a atender a:</div>
+              <div className="flex flex-wrap gap-2">
+                {CIUDADES.filter((c) => c.id !== ciudadFinal).map((c) => (
+                  <label key={c.id} className="flex items-center gap-1.5 font-body text-sm text-ink cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={viajaA.includes(c.id)}
+                      onChange={(e) => setViajaA((v) => (e.target.checked ? [...v, c.id] : v.filter((x) => x !== c.id)))}
+                      className="accent-teal"
+                    />
+                    {c.nombre}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <select
           value={zona}
           onChange={(e) => setZona(e.target.value)}
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3 bg-panel"
         >
-          {ZONAS_POTOSI.map((z) => (
-            <option key={z} value={z}>{z}</option>
-          ))}
-          {zonasExtra.map((z) => (
+          {zonasCiudad.map((z) => (
             <option key={z} value={z}>{z}</option>
           ))}
           <option value="otra">Otra zona (especificar)</option>

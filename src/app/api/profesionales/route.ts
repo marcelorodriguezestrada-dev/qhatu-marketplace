@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanearCiudad, sanearViajaA } from '@/data/ciudades'
 import { getDb } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas, cvPublico } = body
+    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA } = body
+    const ciudadFinal = sanearCiudad(ciudad)
     if (!nombre || !rubro || !whatsapp) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (nombre, rubro, whatsapp).' }, { status: 400 })
     }
@@ -81,6 +83,10 @@ export async function POST(req: NextRequest) {
       // Si el CV descargable se muestra en el perfil público (por defecto sí).
       cvPublico: cvPublico !== false,
       zona: zona || '',
+      ciudad: ciudadFinal,
+      atiendePresencial: atiendePresencial !== false,
+      atiendeOnline: atiendeOnline === true,
+      viajaA: sanearViajaA(viajaA, ciudadFinal),
       // Dirección puntual (calle/número), distinta de "zona" (el
       // barrio). Las dos son opcionales y se muestran juntas en el
       // perfil cuando están cargadas.

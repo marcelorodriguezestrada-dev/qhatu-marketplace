@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
+import { CampoCiudad } from '@/components/SelectorCiudad'
+import type { CiudadId } from '@/data/ciudades'
 
 // Admin → Usuarios → "➕ Crear usuario": da de alta una cuenta (sin
 // contraseña), le arma la tienda si se completa, y devuelve un link para
@@ -58,6 +60,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
   const [nombre, setNombre] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [negocio, setNegocio] = useState('')
+  const [ciudad, setCiudad] = useState<CiudadId>('potosi')
   const [passwordNueva, setPasswordNueva] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -73,7 +76,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
       const res = await fetch('/api/admin/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ email, nombre, whatsapp, nombreNegocio: negocio, password: passwordNueva }),
+        body: JSON.stringify({ email, nombre, whatsapp, nombreNegocio: negocio, password: passwordNueva, ciudad }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'No se pudo crear el usuario.')
@@ -171,6 +174,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
             <span className="block font-semibold mb-1">Nombre de la tienda (opcional)</span>
             <input value={negocio} onChange={(e) => setNegocio(e.target.value)} placeholder="Zapatería Doña Rosa" className={input} />
           </label>
+          <CampoCiudad value={ciudad} onChange={setCiudad} todas etiqueta="Ciudad de la tienda" />
           <label className="font-body text-xs text-ink sm:col-span-2">
             <span className="block font-semibold mb-1">Contraseña (opcional — si la dejás vacía, la elige la persona con un link)</span>
             <div className="flex gap-2">

@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import MiCuenta from '@/components/MiCuenta'
+import { CampoCiudad } from '@/components/SelectorCiudad'
+import { useCiudad } from '@/lib/ciudad'
+import type { CiudadId } from '@/data/ciudades'
 import PreguntasVendedor from '@/components/PreguntasVendedor'
 import MarketingVendedor from '@/components/vender/MarketingVendedor'
 import { useSeccionVendedor, claseSeccion, SidebarVendedor, MenuVendedorCelular, VolverCelular, type SeccionVendedor } from '@/components/vender/NavVendedor'
@@ -95,6 +98,8 @@ export default function VenderPage() {
   const [cobroQrUrl, setCobroQrUrl] = useState('')
   const [cobroCbu, setCobroCbu] = useState('')
   const [cobroNegocio, setCobroNegocio] = useState('')
+  const { ciudadId: ciudadComprador } = useCiudad()
+  const [tiendaCiudad, setTiendaCiudad] = useState<CiudadId | null>(null)
   const [cobroWhatsapp, setCobroWhatsapp] = useState('')
   const [cobroWhatsappPais, setCobroWhatsappPais] = useState(PAIS_FALLBACK_ID)
   const [subiendoQrCobro, setSubiendoQrCobro] = useState(false)
@@ -159,6 +164,7 @@ export default function VenderPage() {
       setCobroQrUrl(data.qrImageUrl || '')
       setCobroCbu(data.cbu || '')
       setCobroNegocio(data.nombreNegocio || '')
+      setTiendaCiudad(data.ciudad || null)
       {
         const paisId = data.whatsappPais || PAIS_FALLBACK_ID
         const codigo = buscarPais(paisId).codigo
@@ -278,6 +284,7 @@ export default function VenderPage() {
           qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio, whatsapp: cobroWhatsapp, whatsappPais: cobroWhatsappPais,
           direccion: tiendaDireccion, lat: tiendaLat, lng: tiendaLng,
           horarios: tiendaHorarios, logoUrl: tiendaLogoUrl, tiposVenta,
+          ciudad: tiendaCiudad || ciudadComprador,
         }),
       })
       setCobroGuardado(true)
@@ -656,6 +663,7 @@ export default function VenderPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
+            ciudad: tiendaCiudad || ciudadComprador,
             nombre,
             rubro,
             publico,
@@ -1375,6 +1383,12 @@ export default function VenderPage() {
           onChange={(e) => setCobroNegocio(e.target.value)}
           placeholder="Nombre de tu negocio (opcional)"
           className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <CampoCiudad
+          value={tiendaCiudad || ciudadComprador}
+          onChange={setTiendaCiudad}
+          etiqueta="📍 Ciudad de tu tienda (tus productos aparecen en esta ciudad)"
+          className="mb-3"
         />
 
         <div className="flex gap-2 items-center mb-1">
