@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import MiCuenta from '@/components/MiCuenta'
 import PreguntasVendedor from '@/components/PreguntasVendedor'
+import MarketingVendedor from '@/components/vender/MarketingVendedor'
 import { useSeccionVendedor, claseSeccion, SidebarVendedor, MenuVendedorCelular, VolverCelular, type SeccionVendedor } from '@/components/vender/NavVendedor'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
@@ -801,6 +802,7 @@ export default function VenderPage() {
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => irA('publicar')} className="px-4 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold">➕ Publicar producto</button>
               <button type="button" onClick={() => { setMostrarMasivo(true); irA('publicar') }} className="px-4 py-2.5 rounded-lg border border-teal bg-tealsoft text-teal font-body text-sm font-semibold">📊 Publicar con Excel</button>
+              <button type="button" onClick={() => irA('marketing')} className="px-4 py-2.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-body text-sm font-semibold">📣 Crear publicación para redes</button>
               <Link href={`/tienda/${usuario.uid}`} className="px-4 py-2.5 rounded-lg border border-line bg-panel text-ink font-body text-sm">🛍️ Ver mi tienda</Link>
             </div>
           </section>
@@ -1298,6 +1300,9 @@ export default function VenderPage() {
           </section>
           <section className={claseSeccion('preguntas', seccion)}>
       <PreguntasVendedor onPendientes={setPreguntasPendientes} />
+          </section>
+          <section className={claseSeccion('marketing', seccion)}>
+            <MarketingVendedor misProductos={misProductos} tienda={cobroNegocio} irA={irA} />
           </section>
           <section className={claseSeccion('ventas', seccion)}>
       <div className="bg-panel border border-line rounded-xl p-4 mb-8">
