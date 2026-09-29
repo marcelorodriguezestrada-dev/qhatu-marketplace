@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ciudadDe } from '@/data/ciudades'
+import { ciudadDe, sanearEnvioPropio } from '@/data/ciudades'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       tiposVenta: data.tiposVenta || {},
       logoUrl: data.logoUrl || '',
       ciudad: ciudadDe(data),
+      envioPropio: sanearEnvioPropio(data.envioPropio, !!data.tiposVenta?.haceEnvios),
       verificado: !!data.verificado,
       plan: data.plan === 'premium' ? 'premium' : 'basico',
       planVigenciaHasta: data.planVigenciaHasta || null,

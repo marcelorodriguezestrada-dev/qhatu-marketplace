@@ -130,3 +130,24 @@ export function sanearViajaA(v: unknown, propia: CiudadId): CiudadId[] {
 export function zonasDeCiudad(id: CiudadId): string[] {
   return buscarCiudad(id).zonas.map((z) => z.nombre)
 }
+
+// Envío propio del vendedor ("Hago envíos yo mismo", en Mi tienda). El
+// comprador le paga a él (como en retiro) y él coordina la entrega.
+// costo null = "a coordinar". alcance: solo su ciudad o todo Bolivia.
+export type EnvioPropio = { activo: boolean; costo: number | null; alcance: 'ciudad' | 'bolivia'; detalle: string }
+
+export function sanearEnvioPropio(v: any, haceEnvios?: boolean): EnvioPropio {
+  const costo = v?.costo === '' || v?.costo === null || v?.costo === undefined ? null : Number(v.costo)
+  return {
+    activo: haceEnvios ?? v?.activo === true,
+    costo: costo !== null && Number.isFinite(costo) && costo >= 0 ? Math.round(costo) : null,
+    alcance: v?.alcance === 'bolivia' ? 'bolivia' : 'ciudad',
+    detalle: String(v?.detalle || '').trim().slice(0, 120),
+  }
+}
+
+// ¿Este vendedor le puede enviar a un comprador de `ciudadComprador`?
+export function envioPropioLlegaA(envio: EnvioPropio | null | undefined, ciudadVendedor: CiudadId, ciudadComprador: CiudadId): boolean {
+  if (!envio?.activo) return false
+  return envio.alcance === 'bolivia' || ciudadVendedor === ciudadComprador
+}

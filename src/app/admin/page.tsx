@@ -1618,7 +1618,7 @@ export default function AdminPage() {
                       {p.createdAt && ` · ${new Date(p.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' })}`}
                     </div>
                     <div className="font-body text-[11px] text-inksoft mt-1">
-                      {p.zonaEntrega || 'Sin zona'} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
+                      {p.metodoEntrega === 'retiro' ? '🏬 Retiro en tienda' : p.metodoEntrega === 'vendedor' ? '🚚 Envío del vendedor' : `🛵 ${p.zonaEntrega || 'Sin zona'}`} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
                       {p.entreCalles && ` (${p.entreCalles})`}
                       {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
                     </div>

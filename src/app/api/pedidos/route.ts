@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
         subtotal: Number(cupon.subtotalCarrito) || 0,
         costoEnvio: Number(cupon.costoEnvioCarrito) || 0,
         extraExpress: Number(cupon.extraExpressCarrito) || 0,
-        metodoEntrega: metodoEntrega === 'retiro' ? 'retiro' : 'envio',
+        metodoEntrega: metodoEntrega === 'envio' ? 'envio' : 'retiro',
       })
       if (!resultado.ok) return NextResponse.json({ error: `Cupón ${c.codigo}: ${resultado.error}` }, { status: 400 })
       const descuentoProductos = Math.max(0, Number(cupon.descuentoProductos) || 0)
@@ -162,7 +162,8 @@ export async function POST(req: NextRequest) {
       // vendedor para que sepan que este pedido en particular es
       // urgente, no para el reparto de mañana.
       envioExpress: !!envioExpress,
-      metodoEntrega: metodoEntrega || 'delivery',
+      // 'envio' (Clasi Click), 'vendedor' (envío propio del vendedor) o 'retiro'.
+      metodoEntrega: ['envio', 'vendedor', 'retiro'].includes(metodoEntrega) ? metodoEntrega : 'envio',
       // 'qr' (default, pago por transferencia/QR) o 'efectivo' — solo
       // tiene sentido con retiro en tienda. Le sirve al vendedor para
       // saber si tiene que esperar una transferencia o cobrar en mano.
