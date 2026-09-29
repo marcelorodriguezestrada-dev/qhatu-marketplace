@@ -187,18 +187,20 @@ export default function CatalogoPage() {
 
       <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-panel border-2 border-maroon rounded-xl p-4 sm:p-5 text-center">
+          {/* Estás en Productos: ese botón va en verde (seleccionado) y
+              Servicios en blanco. */}
+          <div className="bg-teal border-2 border-teal rounded-xl p-4 sm:p-5 text-center" aria-current="page">
             <div className="text-2xl mb-1">🛍️</div>
-            <div className="font-display text-sm sm:text-base font-bold text-ink">Productos</div>
-            <div className="font-body text-[11px] sm:text-xs text-inksoft">Comprá acá abajo</div>
+            <div className="font-display text-sm sm:text-base font-bold text-white">Productos</div>
+            <div className="font-body text-[11px] sm:text-xs text-white/80">Comprá acá abajo</div>
           </div>
           <Link
             href="/servicios"
-            className="bg-teal border-2 border-teal rounded-xl p-4 sm:p-5 text-center"
+            className="bg-panel border-2 border-line hover:border-teal rounded-xl p-4 sm:p-5 text-center"
           >
             <div className="text-2xl mb-1">🧑‍🔧</div>
-            <div className="font-display text-sm sm:text-base font-bold text-white">Servicios</div>
-            <div className="font-body text-[11px] sm:text-xs text-white/80">Profesionales</div>
+            <div className="font-display text-sm sm:text-base font-bold text-ink">Servicios</div>
+            <div className="font-body text-[11px] sm:text-xs text-inksoft">Profesionales</div>
           </Link>
         </div>
 
