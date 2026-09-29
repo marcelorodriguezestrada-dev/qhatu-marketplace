@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import MiCuenta from '@/components/MiCuenta'
 import PreguntasVendedor from '@/components/PreguntasVendedor'
+import { useSeccionVendedor, claseSeccion, SidebarVendedor, MenuVendedorCelular, VolverCelular, type SeccionVendedor } from '@/components/vender/NavVendedor'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -131,6 +132,8 @@ export default function VenderPage() {
   const [publicadoOk, setPublicadoOk] = useState<{ id: string; nombre: string; editado: boolean } | null>(null)
   const avisoPublicadoRef = useRef<HTMLDivElement | null>(null)
   const [mostrarMasivo, setMostrarMasivo] = useState(false)
+  const { seccion, activa, irA, volver } = useSeccionVendedor()
+  const [preguntasPendientes, setPreguntasPendientes] = useState(0)
   const [subiendoExtra, setSubiendoExtra] = useState(0)
 
   useEffect(() => {
@@ -728,230 +731,87 @@ export default function VenderPage() {
     return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
   }
 
+  const preguntasBadge = preguntasPendientes || undefined
+  const ventasPendientes = misPedidos.filter((p) => ['pendiente_pago', 'informado_pago', 'pagado', 'en_preparacion', 'en_entrega'].includes(p.estado)).length
+  const sinStock = misProductos.filter((p) => typeof p.stock === 'number' && p.stock <= 0).length
+  const badges = { preguntas: preguntasBadge, ventas: ventasPendientes || undefined, publicaciones: sinStock ? `${sinStock} sin stock` : undefined, tienda: !cobroQrUrl || !cobroWhatsapp ? '!' : undefined }
+  const tareas = [
+    preguntasPendientes > 0 && { s: 'preguntas' as SeccionVendedor, t: `💬 ${preguntasPendientes} pregunta${preguntasPendientes === 1 ? '' : 's'} sin responder`, d: 'Responder rápido ayuda a vender.' },
+    ventasPendientes > 0 && { s: 'ventas' as SeccionVendedor, t: `🧾 ${ventasPendientes} venta${ventasPendientes === 1 ? '' : 's'} en curso`, d: 'Confirmá pagos y avanzá las entregas.' },
+    sinStock > 0 && { s: 'publicaciones' as SeccionVendedor, t: `📦 ${sinStock} producto${sinStock === 1 ? '' : 's'} sin stock`, d: 'Cargá unidades para volver a vender.' },
+    !cobroQrUrl && { s: 'tienda' as SeccionVendedor, t: '🏪 Te falta subir tu QR de cobro', d: 'Sin QR, el comprador no sabe cómo pagarte.' },
+    !cobroWhatsapp && { s: 'tienda' as SeccionVendedor, t: '📱 Cargá el WhatsApp de tu tienda', d: 'Así los compradores te pueden consultar.' },
+    misProductos.length === 0 && { s: 'publicar' as SeccionVendedor, t: '➕ Publicá tu primer producto', d: 'Con foto, precio y talles.' },
+  ].filter(Boolean) as { s: SeccionVendedor; t: string; d: string }[]
+
   return (
-    <div className="max-w-[640px] mx-auto px-5 py-8">
-      <div className="font-display text-xl font-bold text-ink mb-1">Vender en Clasi Click</div>
-      <div className="font-body text-[13px] text-inksoft mb-4">Publicando como {usuario.email}</div>
-      <MiCuenta className="mb-6" />
-      <PreguntasVendedor />
+    <div className="max-w-6xl mx-auto px-5 py-6">
+      <div className="hidden md:flex items-center justify-between gap-4 mb-5 pb-4 border-b border-line">
+        <div>
+          <div className="font-display text-xl font-bold text-ink">Central de vendedores</div>
+          <div className="font-body text-[13px] text-inksoft">{cobroNegocio || 'Mi tienda'} · {usuario.email}</div>
+        </div>
+        <div className="flex items-center gap-4 font-body text-sm">
+          <Link href={`/tienda/${usuario.uid}`} className="text-teal underline">Ver mi tienda</Link>
+          <Link href="/" className="text-inksoft underline">Ir a comprar</Link>
+          <button type="button" onClick={() => irA('publicar')} className="px-4 py-2 rounded-lg border-none bg-maroon text-white font-semibold">➕ Publicar</button>
+        </div>
+      </div>
+
+      <MenuVendedorCelular visible={!seccion} irA={irA} badges={badges} tienda={cobroNegocio} email={usuario.email || ''} />
+
+      <div className="md:flex md:gap-6 md:items-start">
+        <SidebarVendedor activa={activa} irA={irA} badges={badges} />
+        <main className="flex-1 min-w-0 max-w-[760px]">
+          <VolverCelular seccion={seccion} volver={volver} />
+
+          <section className={claseSeccion('resumen', seccion)}>
+            <div className="font-display text-lg font-bold text-ink mb-3">Hola 👋 {cobroNegocio ? `así va ${cobroNegocio}` : 'así va tu tienda'}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              {[
+                { s: 'publicaciones' as SeccionVendedor, n: misProductos.length, l: 'Publicaciones' },
+                { s: 'ventas' as SeccionVendedor, n: ventasPendientes, l: 'Ventas en curso' },
+                { s: 'preguntas' as SeccionVendedor, n: preguntasPendientes, l: 'Preguntas sin responder' },
+                { s: 'publicaciones' as SeccionVendedor, n: sinStock, l: 'Sin stock' },
+              ].map((c) => (
+                <button key={c.l} type="button" onClick={() => irA(c.s)} className="bg-panel border border-line rounded-xl p-3.5 text-left hover:border-maroon">
+                  <div className={`font-display text-2xl font-bold ${c.n > 0 && c.l !== 'Publicaciones' ? 'text-maroon' : 'text-ink'}`}>{c.n}</div>
+                  <div className="font-body text-[11px] text-inksoft">{c.l}</div>
+                </button>
+              ))}
+            </div>
+            <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+              <div className="font-body text-sm font-semibold text-ink mb-2">Para hacer</div>
+              {tareas.length === 0 ? (
+                <div className="font-body text-sm text-teal">✓ Todo al día. ¡Buen trabajo!</div>
+              ) : (
+                <div className="grid gap-2">
+                  {tareas.map((t) => (
+                    <button key={t.t} type="button" onClick={() => irA(t.s)} className="flex items-center gap-3 text-left px-3 py-2.5 rounded-lg bg-panelalt hover:bg-ochre/10">
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-body text-sm text-ink font-medium">{t.t}</span>
+                        <span className="block font-body text-[11px] text-inksoft">{t.d}</span>
+                      </span>
+                      <span className="text-inksoft">›</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => irA('publicar')} className="px-4 py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold">➕ Publicar producto</button>
+              <button type="button" onClick={() => { setMostrarMasivo(true); irA('publicar') }} className="px-4 py-2.5 rounded-lg border border-teal bg-tealsoft text-teal font-body text-sm font-semibold">📊 Publicar con Excel</button>
+              <Link href={`/tienda/${usuario.uid}`} className="px-4 py-2.5 rounded-lg border border-line bg-panel text-ink font-body text-sm">🛍️ Ver mi tienda</Link>
+            </div>
+          </section>
+
+          <section className={claseSeccion('publicar', seccion)}>
       {editingId && (
         <div className="mb-4 p-3 rounded-lg bg-ochre/10 border border-ochre text-ink font-body text-sm">
           Estás editando el producto <strong>{editingId}</strong>. Hacé los cambios y presioná "Actualizar producto" o "Cancelar".
         </div>
       )}
 
-
-      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-body text-sm font-semibold text-ink">Membresía Premium de tu tienda</div>
-          {premiumVendedorVigente && (
-            <span className="font-body text-[10px] font-bold text-white bg-ochre px-2 py-0.5 rounded-full">PREMIUM</span>
-          )}
-        </div>
-        <p className="font-body text-[12px] text-inksoft mb-3">
-          Con Premium, cada uno de tus productos puede tener hasta 4 fotos extra en su galería (además de la principal).
-        </p>
-
-        {premiumVendedorVigente ? (
-          <div className="font-body text-xs text-teal">
-            Vigente hasta {planVigenciaVendedor ? new Date(planVigenciaVendedor).toLocaleDateString('es-BO') : '—'}.
-          </div>
-        ) : planEstadoPagoVendedor === 'informado_pago' ? (
-          <div className="font-body text-xs text-ochre bg-ochresoft rounded-md px-3 py-2">
-            Avisaste que ya pagaste — estamos confirmando tu pago, se activa solo en cuanto lo revisemos.
-          </div>
-        ) : pagandoPremium ? (
-          <div className="text-center pt-2">
-            {QR_PLATAFORMA ? (
-              <img src={QR_PLATAFORMA} alt="Código QR de pago" className="mx-auto w-44 rounded-lg border border-line mb-3" />
-            ) : (
-              <div className="text-left bg-panelalt border border-line rounded-lg p-3 font-body text-xs text-ink mb-3">
-                {BANK_ACCOUNT_NUMBER ? <div><strong>Cuenta / CBU:</strong> {BANK_ACCOUNT_NUMBER}</div> : null}
-                {BANK_NAME && <div><strong>Banco:</strong> {BANK_NAME}</div>}
-                {BANK_ACCOUNT_NAME && <div><strong>Titular:</strong> {BANK_ACCOUNT_NAME}</div>}
-              </div>
-            )}
-            <div className="font-display text-xl font-bold text-ink mb-3">Bs {PRECIO_PREMIUM_BS}</div>
-            <button
-              onClick={avisarPagoPremium}
-              disabled={avisandoPago}
-              className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
-            >
-              {avisandoPago ? 'Avisando...' : 'Ya pagué'}
-            </button>
-            <button
-              onClick={() => setPagandoPremium(false)}
-              className="w-full mt-2 py-2 rounded-lg border border-line font-body text-xs text-inksoft"
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setPagandoPremium(true)}
-            className="w-full py-2.5 rounded-lg border-none bg-ochre text-white font-body text-sm font-semibold"
-          >
-            Hacerme Premium — Bs {PRECIO_PREMIUM_BS}/mes
-          </button>
-        )}
-      </div>
-
-      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
-        <div className="font-body text-sm font-semibold text-ink mb-1">Mi tienda</div>
-        <p className="font-body text-[12px] text-inksoft mb-3">
-          Esto se muestra en la pestaña "Info. Tienda" de cada producto tuyo, y define a qué cuenta te paga directo quien te compre.
-        </p>
-        <input
-          value={cobroNegocio}
-          onChange={(e) => setCobroNegocio(e.target.value)}
-          placeholder="Nombre de tu negocio (opcional)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
-
-        <div className="flex gap-2 items-center mb-1">
-          <select
-            value={cobroWhatsappPais}
-            onChange={(e) => setCobroWhatsappPais(e.target.value)}
-            className="px-3 py-2.5 rounded-lg border border-line font-body text-sm bg-panel shrink-0"
-            title="País del número"
-          >
-            {PAISES.map((p) => (
-              <option key={p.id} value={p.id}>{p.bandera} {p.nombre} (+{p.codigo})</option>
-            ))}
-          </select>
-          <input
-            value={cobroWhatsapp}
-            onChange={(e) => setCobroWhatsapp(e.target.value)}
-            placeholder="Tu WhatsApp para que te contacten (opcional, ej: 71234567)"
-            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
-          />
-        </div>
-        <p className="font-body text-[11px] text-inksoft mb-3">
-          Si lo cargás, en cada producto tuyo va a aparecer un botón "Contactar" que abre WhatsApp directo con vos.
-        </p>
-
-        <div className="mb-3">
-          <div className="font-body text-xs text-inksoft mb-1.5">Logo de tu negocio (opcional)</div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {tiendaLogoUrl && (
-              <img src={tiendaLogoUrl} alt="Tu logo" loading="lazy" decoding="async" className="w-14 h-14 object-cover rounded-lg border border-line" />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => subirLogoTienda(e.target.files?.[0] || null)}
-              disabled={subiendoLogo}
-              className="font-body text-xs"
-            />
-          </div>
-          {subiendoLogo && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
-        </div>
-
-        <div className="relative mb-2">
-          <input
-            value={tiendaDireccion}
-            onChange={(e) => {
-              const v = e.target.value
-              setTiendaDireccion(v)
-              setMercadosSugeridos(buscarMercados(v))
-            }}
-            onBlur={() => setTimeout(() => setMercadosSugeridos([]), 150)}
-            placeholder="Dirección de tu local (ej: Calle Bolívar 123, o el mercado donde tenés tu puesto)"
-            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
-          />
-          {mercadosSugeridos.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-panel border border-line rounded-lg shadow-lg z-10 overflow-hidden">
-              {mercadosSugeridos.map((m) => (
-                <button
-                  key={m.nombre}
-                  type="button"
-                  onClick={() => {
-                    setTiendaDireccion(m.nombre)
-                    setTiendaLat(m.lat)
-                    setTiendaLng(m.lng)
-                    setMercadosSugeridos([])
-                  }}
-                  className="w-full text-left px-3.5 py-2.5 font-body text-sm text-ink hover:bg-panelalt border-b border-line last:border-b-0"
-                >
-                  📍 {m.nombre} <span className="text-inksoft text-xs">— ubicación exacta confirmada</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={usarMiUbicacionTienda}
-          disabled={buscandoUbicacionTienda}
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt mb-3"
-        >
-          📍 {buscandoUbicacionTienda ? 'Buscando tu ubicación...' : tiendaLat != null ? 'Ubicación capturada ✓' : 'Usar mi ubicación actual'}
-        </button>
-
-        <input
-          value={tiendaHorarios}
-          onChange={(e) => setTiendaHorarios(e.target.value)}
-          placeholder="Horarios (ej: Lunes a sábado, 9:00 a 18:00)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
-
-        <div className="mb-3">
-          <div className="font-body text-xs text-inksoft mb-2">Tipo de ventas</div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              ['mayorista', 'Mayorista'],
-              ['minorista', 'Minorista'],
-              ['haceEnvios', 'Hace envíos'],
-              ['aceptaCambios', 'Acepta cambios'],
-              ['permiteProbar', 'Permite probar'],
-              ['pagoQr', 'Pago con QR'],
-              ['videollamada', 'Hace videollamada'],
-              ['pagoTarjeta', 'Pago con tarjeta'],
-            ].map(([clave, label]) => (
-              <label key={clave} className="flex items-center gap-2 font-body text-xs text-ink">
-                <input
-                  type="checkbox"
-                  checked={!!tiposVenta[clave]}
-                  onChange={(e) => setTiposVenta((prev) => ({ ...prev, [clave]: e.target.checked }))}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="font-body text-xs text-inksoft mb-1.5 mt-4">Foto de tu QR de cobro</div>
-        <div className="mb-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            {cobroQrUrl && (
-              <img src={cobroQrUrl} alt="Tu QR" loading="lazy" decoding="async" className="w-16 h-16 object-cover rounded-lg border border-line" />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => subirQrCobro(e.target.files?.[0] || null)}
-              disabled={subiendoQrCobro}
-              className="font-body text-xs"
-            />
-          </div>
-          {subiendoQrCobro && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
-        </div>
-        <input
-          value={cobroCbu}
-          onChange={(e) => setCobroCbu(e.target.value)}
-          placeholder="CBU / número de cuenta (opcional, alternativa al QR)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
-        <button
-          type="button"
-          onClick={guardarCobro}
-          disabled={guardandoCobro || subiendoQrCobro || subiendoLogo}
-          className="px-4 py-2 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-60"
-        >
-          {guardandoCobro ? 'Guardando...' : 'Guardar datos de mi tienda'}
-        </button>
-        {cobroGuardado && <span className="font-body text-xs text-teal ml-3">Guardado ✓</span>}
-      </div>
 
       {publicadoOk && (
         <div ref={avisoPublicadoRef} className="bg-tealsoft border-2 border-teal rounded-xl p-5 mb-4">
@@ -1361,7 +1221,85 @@ export default function VenderPage() {
           )}
         </div>
       </form>
-
+          </section>
+          <section className={claseSeccion('publicaciones', seccion)}>
+      <div className="font-body text-sm font-semibold text-ink mb-3">Mis productos ({misProductos.length})</div>
+      {misProductos.length === 0 && (
+        <div className="font-body text-sm text-inksoft">Todavía no publicaste ningún producto.</div>
+      )}
+      {misProductos.map((p) => (
+        <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+            {(p.thumbUrl || p.imagenUrl) ? (
+              <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            ) : (
+              <ProductIcon kind={p.icono} size={20} />
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
+            <div className="font-body text-xs text-inksoft">
+              {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
+                <>
+                  <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
+                </>
+              ) : (
+                bs(p.precio)
+              )}
+            </div>
+            {typeof p.stock === 'number' && (
+              <div className={`font-body text-[11px] font-semibold mt-0.5 ${p.stock <= 0 ? 'text-maroon' : p.stock <= 3 ? 'text-ochre' : 'text-teal'}`}>
+                {p.stock <= 0 ? 'Agotado — cargá más stock para volver a venderlo' : `Stock: ${p.stock} unidad${p.stock === 1 ? '' : 'es'}`}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                // Prefill form for editing
+                setEditingId(p.id)
+                setNombre(p.nombre || '')
+                {
+                  const info = buscarRubroProducto(p.rubro)
+                  setCategoriaProductoSel(info?.categoriaId || categoriasProductos[0]?.id || '')
+                  setRubro(p.rubro || categoriasProductos[0]?.rubros[0]?.id || '')
+                  setPublico(p.publico || PUBLICO_PRODUCTO_FALLBACK)
+                }
+                setPrecio(String(p.precio || ''))
+                setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
+                setIcono(p.icono || ICONOS[0])
+                setImagenUrl(p.imagenUrl || '')
+                setImagenViewerUrl(p.imagenViewerUrl || '')
+                setDescripcionCorta(p.descripcionCorta || '')
+                setDescripcionLarga(p.descripcionLarga || '')
+                setTallesTexto((p.talles || []).join(', '))
+                setColoresTexto((p.colores || []).join(', '))
+                setMateriales(p.materiales || '')
+                setCompraMinima(String(p.compraMinima || 1))
+                setStock(typeof p.stock === 'number' ? String(p.stock) : '')
+                setFotosExtra(Array.isArray(p.fotosAdicionales) ? p.fotosAdicionales : [])
+                setPlan(p.plan || 'basico')
+                irA('publicar')
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="font-body text-xs text-ink underline"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => borrar(p.id)}
+              className="font-body text-xs text-maroon underline shrink-0"
+            >
+              Borrar
+            </button>
+          </div>
+        </div>
+      ))}
+          </section>
+          <section className={claseSeccion('preguntas', seccion)}>
+      <PreguntasVendedor onPendientes={setPreguntasPendientes} />
+          </section>
+          <section className={claseSeccion('ventas', seccion)}>
       <div className="bg-panel border border-line rounded-xl p-4 mb-8">
         <div className="font-body text-sm font-semibold text-ink mb-3">Mis pedidos ({misPedidos.length})</div>
         {misPedidos.length === 0 && (
@@ -1420,77 +1358,228 @@ export default function VenderPage() {
         })}
       </div>
 
-      <div className="font-body text-sm font-semibold text-ink mb-3">Mis productos ({misProductos.length})</div>
-      {misProductos.length === 0 && (
-        <div className="font-body text-sm text-inksoft">Todavía no publicaste ningún producto.</div>
-      )}
-      {misProductos.map((p) => (
-        <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
-            {(p.thumbUrl || p.imagenUrl) ? (
-              <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-            ) : (
-              <ProductIcon kind={p.icono} size={20} />
+          </section>
+          <section className={claseSeccion('tienda', seccion)}>
+      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+        <div className="font-body text-sm font-semibold text-ink mb-1">Mi tienda</div>
+        <p className="font-body text-[12px] text-inksoft mb-3">
+          Esto se muestra en la pestaña "Info. Tienda" de cada producto tuyo, y define a qué cuenta te paga directo quien te compre.
+        </p>
+        <input
+          value={cobroNegocio}
+          onChange={(e) => setCobroNegocio(e.target.value)}
+          placeholder="Nombre de tu negocio (opcional)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+
+        <div className="flex gap-2 items-center mb-1">
+          <select
+            value={cobroWhatsappPais}
+            onChange={(e) => setCobroWhatsappPais(e.target.value)}
+            className="px-3 py-2.5 rounded-lg border border-line font-body text-sm bg-panel shrink-0"
+            title="País del número"
+          >
+            {PAISES.map((p) => (
+              <option key={p.id} value={p.id}>{p.bandera} {p.nombre} (+{p.codigo})</option>
+            ))}
+          </select>
+          <input
+            value={cobroWhatsapp}
+            onChange={(e) => setCobroWhatsapp(e.target.value)}
+            placeholder="Tu WhatsApp para que te contacten (opcional, ej: 71234567)"
+            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+        </div>
+        <p className="font-body text-[11px] text-inksoft mb-3">
+          Si lo cargás, en cada producto tuyo va a aparecer un botón "Contactar" que abre WhatsApp directo con vos.
+        </p>
+
+        <div className="mb-3">
+          <div className="font-body text-xs text-inksoft mb-1.5">Logo de tu negocio (opcional)</div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {tiendaLogoUrl && (
+              <img src={tiendaLogoUrl} alt="Tu logo" loading="lazy" decoding="async" className="w-14 h-14 object-cover rounded-lg border border-line" />
             )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirLogoTienda(e.target.files?.[0] || null)}
+              disabled={subiendoLogo}
+              className="font-body text-xs"
+            />
           </div>
-          <div className="flex-1">
-            <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
-            <div className="font-body text-xs text-inksoft">
-              {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
-                <>
-                  <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
-                </>
-              ) : (
-                bs(p.precio)
-              )}
+          {subiendoLogo && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
+        </div>
+
+        <div className="relative mb-2">
+          <input
+            value={tiendaDireccion}
+            onChange={(e) => {
+              const v = e.target.value
+              setTiendaDireccion(v)
+              setMercadosSugeridos(buscarMercados(v))
+            }}
+            onBlur={() => setTimeout(() => setMercadosSugeridos([]), 150)}
+            placeholder="Dirección de tu local (ej: Calle Bolívar 123, o el mercado donde tenés tu puesto)"
+            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+          />
+          {mercadosSugeridos.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-panel border border-line rounded-lg shadow-lg z-10 overflow-hidden">
+              {mercadosSugeridos.map((m) => (
+                <button
+                  key={m.nombre}
+                  type="button"
+                  onClick={() => {
+                    setTiendaDireccion(m.nombre)
+                    setTiendaLat(m.lat)
+                    setTiendaLng(m.lng)
+                    setMercadosSugeridos([])
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 font-body text-sm text-ink hover:bg-panelalt border-b border-line last:border-b-0"
+                >
+                  📍 {m.nombre} <span className="text-inksoft text-xs">— ubicación exacta confirmada</span>
+                </button>
+              ))}
             </div>
-            {typeof p.stock === 'number' && (
-              <div className={`font-body text-[11px] font-semibold mt-0.5 ${p.stock <= 0 ? 'text-maroon' : p.stock <= 3 ? 'text-ochre' : 'text-teal'}`}>
-                {p.stock <= 0 ? 'Agotado — cargá más stock para volver a venderlo' : `Stock: ${p.stock} unidad${p.stock === 1 ? '' : 'es'}`}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                // Prefill form for editing
-                setEditingId(p.id)
-                setNombre(p.nombre || '')
-                {
-                  const info = buscarRubroProducto(p.rubro)
-                  setCategoriaProductoSel(info?.categoriaId || categoriasProductos[0]?.id || '')
-                  setRubro(p.rubro || categoriasProductos[0]?.rubros[0]?.id || '')
-                  setPublico(p.publico || PUBLICO_PRODUCTO_FALLBACK)
-                }
-                setPrecio(String(p.precio || ''))
-                setPrecioOriginal(p.precioOriginal ? String(p.precioOriginal) : '')
-                setIcono(p.icono || ICONOS[0])
-                setImagenUrl(p.imagenUrl || '')
-                setImagenViewerUrl(p.imagenViewerUrl || '')
-                setDescripcionCorta(p.descripcionCorta || '')
-                setDescripcionLarga(p.descripcionLarga || '')
-                setTallesTexto((p.talles || []).join(', '))
-                setColoresTexto((p.colores || []).join(', '))
-                setMateriales(p.materiales || '')
-                setCompraMinima(String(p.compraMinima || 1))
-                setStock(typeof p.stock === 'number' ? String(p.stock) : '')
-                setFotosExtra(Array.isArray(p.fotosAdicionales) ? p.fotosAdicionales : [])
-                setPlan(p.plan || 'basico')
-                window.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              className="font-body text-xs text-ink underline"
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => borrar(p.id)}
-              className="font-body text-xs text-maroon underline shrink-0"
-            >
-              Borrar
-            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={usarMiUbicacionTienda}
+          disabled={buscandoUbicacionTienda}
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm text-ink bg-panelalt mb-3"
+        >
+          📍 {buscandoUbicacionTienda ? 'Buscando tu ubicación...' : tiendaLat != null ? 'Ubicación capturada ✓' : 'Usar mi ubicación actual'}
+        </button>
+
+        <input
+          value={tiendaHorarios}
+          onChange={(e) => setTiendaHorarios(e.target.value)}
+          placeholder="Horarios (ej: Lunes a sábado, 9:00 a 18:00)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+
+        <div className="mb-3">
+          <div className="font-body text-xs text-inksoft mb-2">Tipo de ventas</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['mayorista', 'Mayorista'],
+              ['minorista', 'Minorista'],
+              ['haceEnvios', 'Hace envíos'],
+              ['aceptaCambios', 'Acepta cambios'],
+              ['permiteProbar', 'Permite probar'],
+              ['pagoQr', 'Pago con QR'],
+              ['videollamada', 'Hace videollamada'],
+              ['pagoTarjeta', 'Pago con tarjeta'],
+            ].map(([clave, label]) => (
+              <label key={clave} className="flex items-center gap-2 font-body text-xs text-ink">
+                <input
+                  type="checkbox"
+                  checked={!!tiposVenta[clave]}
+                  onChange={(e) => setTiposVenta((prev) => ({ ...prev, [clave]: e.target.checked }))}
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
-      ))}
+
+        <div className="font-body text-xs text-inksoft mb-1.5 mt-4">Foto de tu QR de cobro</div>
+        <div className="mb-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {cobroQrUrl && (
+              <img src={cobroQrUrl} alt="Tu QR" loading="lazy" decoding="async" className="w-16 h-16 object-cover rounded-lg border border-line" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => subirQrCobro(e.target.files?.[0] || null)}
+              disabled={subiendoQrCobro}
+              className="font-body text-xs"
+            />
+          </div>
+          {subiendoQrCobro && <div className="font-body text-xs text-maroon mt-1">Subiendo...</div>}
+        </div>
+        <input
+          value={cobroCbu}
+          onChange={(e) => setCobroCbu(e.target.value)}
+          placeholder="CBU / número de cuenta (opcional, alternativa al QR)"
+          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
+        />
+        <button
+          type="button"
+          onClick={guardarCobro}
+          disabled={guardandoCobro || subiendoQrCobro || subiendoLogo}
+          className="px-4 py-2 rounded-lg border-none bg-ink text-white font-body text-sm font-semibold disabled:opacity-60"
+        >
+          {guardandoCobro ? 'Guardando...' : 'Guardar datos de mi tienda'}
+        </button>
+        {cobroGuardado && <span className="font-body text-xs text-teal ml-3">Guardado ✓</span>}
+      </div>
+
+          </section>
+          <section className={claseSeccion('premium', seccion)}>
+      <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-body text-sm font-semibold text-ink">Membresía Premium de tu tienda</div>
+          {premiumVendedorVigente && (
+            <span className="font-body text-[10px] font-bold text-white bg-ochre px-2 py-0.5 rounded-full">PREMIUM</span>
+          )}
+        </div>
+        <p className="font-body text-[12px] text-inksoft mb-3">
+          Con Premium, cada uno de tus productos puede tener hasta 4 fotos extra en su galería (además de la principal).
+        </p>
+
+        {premiumVendedorVigente ? (
+          <div className="font-body text-xs text-teal">
+            Vigente hasta {planVigenciaVendedor ? new Date(planVigenciaVendedor).toLocaleDateString('es-BO') : '—'}.
+          </div>
+        ) : planEstadoPagoVendedor === 'informado_pago' ? (
+          <div className="font-body text-xs text-ochre bg-ochresoft rounded-md px-3 py-2">
+            Avisaste que ya pagaste — estamos confirmando tu pago, se activa solo en cuanto lo revisemos.
+          </div>
+        ) : pagandoPremium ? (
+          <div className="text-center pt-2">
+            {QR_PLATAFORMA ? (
+              <img src={QR_PLATAFORMA} alt="Código QR de pago" className="mx-auto w-44 rounded-lg border border-line mb-3" />
+            ) : (
+              <div className="text-left bg-panelalt border border-line rounded-lg p-3 font-body text-xs text-ink mb-3">
+                {BANK_ACCOUNT_NUMBER ? <div><strong>Cuenta / CBU:</strong> {BANK_ACCOUNT_NUMBER}</div> : null}
+                {BANK_NAME && <div><strong>Banco:</strong> {BANK_NAME}</div>}
+                {BANK_ACCOUNT_NAME && <div><strong>Titular:</strong> {BANK_ACCOUNT_NAME}</div>}
+              </div>
+            )}
+            <div className="font-display text-xl font-bold text-ink mb-3">Bs {PRECIO_PREMIUM_BS}</div>
+            <button
+              onClick={avisarPagoPremium}
+              disabled={avisandoPago}
+              className="w-full py-2.5 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
+            >
+              {avisandoPago ? 'Avisando...' : 'Ya pagué'}
+            </button>
+            <button
+              onClick={() => setPagandoPremium(false)}
+              className="w-full mt-2 py-2 rounded-lg border border-line font-body text-xs text-inksoft"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setPagandoPremium(true)}
+            className="w-full py-2.5 rounded-lg border-none bg-ochre text-white font-body text-sm font-semibold"
+          >
+            Hacerme Premium — Bs {PRECIO_PREMIUM_BS}/mes
+          </button>
+        )}
+      </div>
+
+          </section>
+          <section className={claseSeccion('cuenta', seccion)}>
+      <MiCuenta abiertoInicial />
+          </section>
+        </main>
+      </div>
     </div>
   )
 }
