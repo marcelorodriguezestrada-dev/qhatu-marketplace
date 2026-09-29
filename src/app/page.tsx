@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import MenuCategorias from '@/components/MenuCategorias'
+import { SelectorCiudad, BannerCiudad } from '@/components/SelectorCiudad'
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
@@ -151,6 +152,7 @@ export default function CatalogoPage() {
             conteo={conteoCategorias}
           />
           <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
+            <SelectorCiudad />
             <button type="button" onClick={() => setMenuCategorias((v) => !v)} className="border-none bg-transparent text-white font-body text-[13px] font-semibold shrink-0 whitespace-nowrap">
               Categorías ▾
             </button>
@@ -186,6 +188,7 @@ export default function CatalogoPage() {
       </div>
 
       <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
+        <BannerCiudad />
         <div className="grid grid-cols-2 gap-3 mb-6">
           {/* Estás en Productos: ese botón va en verde (seleccionado) y
               Servicios en blanco. */}
