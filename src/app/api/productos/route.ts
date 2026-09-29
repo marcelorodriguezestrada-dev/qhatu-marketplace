@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     // El producto hereda la ciudad de la tienda (Potosí si no cargó).
     // Si todavía no guardó su tienda, vale la ciudad que manda el formulario.
     let ciudad = sanearCiudad(body.ciudad)
+    let enviaATodoBolivia = false
     try {
       const vendedorDoc = await db.collection('vendedores').doc(usuario.uid).get()
       if (vendedorDoc.exists) {
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
         tiendaNombre = vd.nombreNegocio || ''
         tiendaLogoUrl = vd.logoUrl || ''
         if (vd.ciudad) ciudad = ciudadDe(vd)
+        enviaATodoBolivia = !!vd.tiposVenta?.haceEnvios && vd.envioPropio?.alcance === 'bolivia'
       }
     } catch {
       // si falla, no bloqueamos la publicación por esto
@@ -138,6 +140,7 @@ export async function POST(req: NextRequest) {
       tiendaNombre,
       tiendaLogoUrl,
       ciudad,
+      enviaATodoBolivia,
       plan: planValido,
       estado: 'activo',
       moderacionIA,

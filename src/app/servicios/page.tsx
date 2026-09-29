@@ -7,6 +7,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { useCategorias } from '@/lib/useCategorias'
 import { esPremiumVigente } from '@/lib/planPremium'
+import { ChipsCiudad, useFiltroCiudad } from '@/components/SelectorCiudad'
+import { buscarCiudad, ciudadDe, ciudadEnTexto, profesionalEnCiudad } from '@/data/ciudades'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -30,6 +32,10 @@ type Profesional = {
   precio?: number | null
   experiencia?: string
   servicios?: string[]
+  ciudad?: string
+  atiendeOnline?: boolean
+  atiendePresencial?: boolean
+  viajaA?: string[]
   plan: string
   ratingPromedio: number
   cantidadResenas: number
@@ -153,7 +159,27 @@ export default function ServiciosPage() {
     : rubrosDeCategoria.filter((r) => r.grupo?.id === grupoSel)
   const rubroIdsDeGrupo = rubrosVisibles.map((r) => r.id)
 
+  // Ciudad: el filtro "📍 Buscar en" (o la ciudad escrita en la
+  // búsqueda: "abogado en La Paz").
+  const { valor: ciudadFiltro, cambiar: cambiarCiudadFiltro, multiciudad } = useFiltroCiudad()
+  const { ciudad: ciudadDelTexto, resto: textoBusqueda } = ciudadEnTexto(busqueda)
+  const ciudadBuscada = ciudadDelTexto || ciudadFiltro
+  const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const q = sinAcentos(textoBusqueda.trim())
+
+  const coincideBusqueda = (p: Profesional) => {
+    let matchRubro = true
+    if (rubro !== 'Todo') matchRubro = p.rubro === rubro
+    else if (grupoSel !== 'Todo') matchRubro = rubroIdsDeGrupo.includes(p.rubro)
+    else if (categoriaSel !== 'Todo') matchRubro = rubroIdsDeCategoria.includes(p.rubro)
+    const texto = sinAcentos([p.nombre, p.zona, p.especialidad, p.rubro, buscarRubro(p.rubro)?.label].filter(Boolean).join(' '))
+    return matchRubro && (!q || texto.includes(q))
+  }
+  // Para el aviso "no hay en tu ciudad, pero hay N en otras".
+  const enOtrasCiudades = ciudadBuscada === 'todas' ? 0 : profesionales.filter((p) => coincideBusqueda(p) && !profesionalEnCiudad(p, ciudadBuscada)).length
+
   let filtrados = profesionales.filter((p) => {
+    if (!profesionalEnCiudad(p, ciudadBuscada)) return false
     if (soloPotosi) {
       const zonaRaw = (p.zona || '').toLowerCase()
           const zonaNormalized = zonaRaw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -179,10 +205,8 @@ export default function ServiciosPage() {
       matchRubro = rubroIdsDeCategoria.includes(p.rubro)
     }
 
-    const matchBusqueda =
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (p.zona || '').toLowerCase().includes(busqueda.toLowerCase())
-    return matchRubro && matchBusqueda
+    const texto = sinAcentos([p.nombre, p.zona, p.especialidad, p.rubro, buscarRubro(p.rubro)?.label].filter(Boolean).join(' '))
+    return matchRubro && (!q || texto.includes(q))
   })
 
   if (orden === 'cercania' && ubicacion) {
@@ -235,7 +259,7 @@ export default function ServiciosPage() {
                 router.push(`${pathname}${q ? `?q=${q}` : ''}`)
               }
             }}
-            placeholder="Buscar por nombre o zona"
+            placeholder={multiciudad ? 'Buscar (ej: abogado en La Paz)' : 'Buscar por nombre, rubro o zona'}
             className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
           <button
@@ -250,6 +274,11 @@ export default function ServiciosPage() {
             🔍
           </button>
         </div>
+
+        <ChipsCiudad valor={ciudadDelTexto || ciudadFiltro} onChange={cambiarCiudadFiltro} className="mb-4 -mt-1" />
+        {ciudadDelTexto && ciudadDelTexto !== ciudadFiltro && multiciudad && (
+          <div className="font-body text-[12px] text-teal -mt-2 mb-3">Buscando en {buscarCiudad(ciudadDelTexto).nombre} (lo escribiste en la búsqueda)</div>
+        )}
 
         {/* Un solo nivel de botones a la vez — categoría, o grupo, o
             especialidad — nunca los tres juntos. Las migas de pan de
@@ -467,7 +496,19 @@ export default function ServiciosPage() {
                   {p.precio ? (
                     <div className="font-body text-sm font-bold text-ink mb-1">{bs(p.precio)}</div>
                   ) : null}
-                  {p.zona && <div className="font-body text-xs text-inksoft mb-1">Zona: {p.zona}</div>}
+                  {(p.zona || multiciudad) && (
+                    <div className="font-body text-xs text-inksoft mb-1">
+                      {multiciudad ? `📍 ${buscarCiudad(ciudadDe(p)).nombre}${p.zona ? ` · ${p.zona}` : ''}` : `Zona: ${p.zona}`}
+                    </div>
+                  )}
+                  {(p.atiendeOnline || (multiciudad && p.viajaA && p.viajaA.length > 0)) && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {p.atiendeOnline && <span className="bg-indigo-50 text-indigo-700 font-body text-[10px] font-semibold px-1.5 py-0.5 rounded-full">💻 Atiende online</span>}
+                      {multiciudad && p.viajaA && p.viajaA.length > 0 && (
+                        <span className="bg-tealsoft text-teal font-body text-[10px] font-semibold px-1.5 py-0.5 rounded-full">🚗 Viaja a {p.viajaA.map((c) => buscarCiudad(c).nombre).join(', ')}</span>
+                      )}
+                    </div>
+                  )}
                   {p.servicios && p.servicios.length > 0 && (
                     <div className="font-body text-[11px] text-inksoft mb-1 truncate">
                       {p.servicios.slice(0, 2).join(' · ')}
@@ -489,7 +530,14 @@ export default function ServiciosPage() {
 
         {vista === 'lista' && filtrados.length === 0 && (
           <div className="text-center py-14 text-inksoft font-body text-sm">
-            No hay profesionales publicados en esta categoría todavía.
+            {ciudadBuscada !== 'todas' && multiciudad ? `No encontramos profesionales en ${buscarCiudad(ciudadBuscada).nombre} para esta búsqueda.` : 'No hay profesionales publicados en esta categoría todavía.'}
+            {enOtrasCiudades > 0 && multiciudad && (
+              <div className="mt-3">
+                <button type="button" onClick={() => { cambiarCiudadFiltro('todas'); if (ciudadDelTexto) setBusqueda(textoBusqueda) }} className="px-4 py-2 rounded-lg border border-teal bg-tealsoft text-teal font-semibold">
+                  👉 Hay {enOtrasCiudades} en otras ciudades — Ver
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

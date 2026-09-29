@@ -1,5 +1,6 @@
 'use client'
 
+import { CIUDADES, buscarCiudad, ciudadDe, type CiudadId } from '@/data/ciudades'
 import { useEffect, useMemo, useState } from 'react'
 
 // Admin → Anuncios → "📣 Armar publicación para Facebook": junta lo que la
@@ -12,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
 const CLAVE = 'clasiclick_publicados_facebook'
 
-type Anuncio = { id: string; titulo?: string; descripcion?: string; tipo?: string; estado?: string; rubro?: string; createdAt?: string }
+type Anuncio = { id: string; titulo?: string; descripcion?: string; tipo?: string; estado?: string; rubro?: string; createdAt?: string; ciudad?: string }
 
 // Saca teléfonos, emails, links y "llamar al…" — en Facebook solo va QUÉ
 // se necesita, nunca quién lo pide.
@@ -38,6 +39,9 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
   const [texto, setTexto] = useState('')
   const [editado, setEditado] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  // Una publicación por ciudad: "Se necesita en Potosí" / "en La Paz".
+  const [ciudad, setCiudad] = useState<CiudadId>('potosi')
+  const nombreCiudad = buscarCiudad(ciudad).nombre
 
   useEffect(() => {
     try { setPublicados(JSON.parse(localStorage.getItem(CLAVE) || '{}')) } catch {}
@@ -47,13 +51,14 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
     const desde = Date.now() - dias * 86400_000
     return anuncios
       .filter((a) => a.tipo === 'busqueda')
+      .filter((a) => ciudadDe(a) === ciudad)
       .filter((a) => ['pendiente_revision', 'info_solicitada'].includes(a.estado || '') || (incluirAprobados && a.estado === 'aprobado'))
       .filter((a) => (Date.parse(a.createdAt || '') || 0) >= desde)
       .filter((a) => !soloNuevos || !publicados[a.id])
       .map((a) => ({ ...a, pedido: limpiarPedido(a.titulo || a.descripcion || ''), grupo: rubroLabel(a.rubro) || 'Otros pedidos' }))
       .filter((a) => a.pedido.length >= 3)
       .sort((x, y) => x.grupo.localeCompare(y.grupo) || (y.createdAt || '').localeCompare(x.createdAt || ''))
-  }, [anuncios, dias, incluirAprobados, soloNuevos, publicados, rubroLabel])
+  }, [anuncios, dias, incluirAprobados, soloNuevos, publicados, rubroLabel, ciudad])
 
   const elegidos = candidatos.filter((a) => !excluidos.has(a.id))
 
@@ -71,13 +76,13 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
         : entradas.map(([g, ps]) => `🔹 ${g}\n${ps.map((p) => `   • ${p}`).join('\n')}`).join('\n\n')
     const cuando = dias <= 7 ? 'Esta semana' : dias <= 14 ? 'Estos días' : 'Este mes'
     return (
-      `📢 ¡SE NECESITA EN POTOSÍ! 📢\n\n` +
-      `${cuando} vecinos de Potosí están buscando:\n\n${cuerpo}\n\n` +
+      `📢 ¡SE NECESITA EN ${nombreCiudad.toUpperCase()}! 📢\n\n` +
+      `${cuando} vecinos de ${nombreCiudad} están buscando:\n\n${cuerpo}\n\n` +
       `🙋 ¿Ofrecés alguno de estos servicios o productos?\n` +
       `Sumate GRATIS a Clasi Click y te conectamos directo con quien lo necesita 🤝\n\n` +
       `👉 Profesionales y oficios: ${SITE}/publicar-servicio\n` +
       `👉 Vendedores y tiendas: ${SITE}/vender\n\n` +
-      `Clasi Click — emprendimiento 100% potosino que conecta a quien busca con quien ofrece. 🇧🇴`
+      (ciudad === 'potosi' ? `Clasi Click — emprendimiento 100% potosino que conecta a quien busca con quien ofrece. 🇧🇴` : `Clasi Click — el marketplace boliviano que conecta a quien busca con quien ofrece. 🇧🇴`)
     )
   }
 
@@ -85,7 +90,7 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
   useEffect(() => {
     if (!editado) setTexto(elegidos.length ? armarTexto() : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidatos, excluidos, editado])
+  }, [candidatos, excluidos, editado, ciudad])
 
   async function copiar() {
     try {
@@ -106,12 +111,18 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
 
   return (
     <div className="bg-panel border border-indigo-200 rounded-xl p-4 mb-6">
-      <div className="font-body text-sm font-semibold text-ink mb-1">📣 Publicación para Facebook: “Se necesita en Potosí”</div>
+      <div className="font-body text-sm font-semibold text-ink mb-1">📣 Publicación para Facebook: “Se necesita en {nombreCiudad}”</div>
       <div className="font-body text-[11px] text-inksoft mb-3">
         Junta los anuncios “Busco…” agrupados por rubro, sin nombres ni teléfonos, e invita a quien lo ofrezca a sumarse a Clasi Click. Copiá el texto y pegalo en tus grupos de Facebook.
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-3 font-body text-xs text-ink">
+        <label className="flex items-center gap-1.5">
+          Ciudad
+          <select value={ciudad} onChange={(e) => { setCiudad(e.target.value as CiudadId); setEditado(false) }} className="px-2 py-1 rounded-lg border border-line bg-panel">
+            {CIUDADES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </label>
         <label className="flex items-center gap-1.5">
           De los últimos
           <select value={dias} onChange={(e) => setDias(Number(e.target.value))} className="px-2 py-1 rounded-lg border border-line bg-panel">

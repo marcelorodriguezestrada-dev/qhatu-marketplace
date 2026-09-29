@@ -1,5 +1,6 @@
 'use client'
 
+import { buscarCiudad, ciudadDe, type CiudadId } from '@/data/ciudades'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -26,7 +27,9 @@ function CorazonIcon({ relleno }: { relleno: boolean }) {
   )
 }
 
-export function ProductCard({ p }: { p: Producto }) {
+// ciudadComprador: si el producto es de otra ciudad (tienda que envía a
+// todo Bolivia), muestra "🚚 Envía desde …".
+export function ProductCard({ p, ciudadComprador }: { p: Producto; ciudadComprador?: CiudadId }) {
   const { agregar } = useCarrito()
   const { esFavorito, toggleFavorito } = useFavoritos()
   const { usuario } = useAuth()
@@ -132,6 +135,9 @@ export function ProductCard({ p }: { p: Producto }) {
         <Link href={`/producto/${p.id}`} className="font-body text-[13px] sm:text-[14px] font-medium text-ink mb-1.5 sm:mb-2 flex-1 leading-snug hover:underline">
           {p.nombre}
         </Link>
+        {ciudadComprador && ciudadDe(p as any) !== ciudadComprador && (
+          <div className="font-body text-[10px] sm:text-[11px] text-teal font-semibold mb-1.5">🚚 Envía desde {buscarCiudad(ciudadDe(p as any)).nombre}</div>
+        )}
 
         {p.descripcionCorta && (
           <div className="font-body text-[12px] text-inksoft mb-2 truncate">{p.descripcionCorta}</div>

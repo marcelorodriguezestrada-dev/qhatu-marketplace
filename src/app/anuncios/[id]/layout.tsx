@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { leerAnuncioPublico, SITE_URL } from '@/lib/anuncioPublico'
 
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const titulo = `${precio}${anuncio.titulo}`
   const descripcion =
     String(anuncio.descripcion || '').replace(/\s+/g, ' ').trim().slice(0, 160) ||
-    `${labelTipoAnuncio(anuncio.tipo)} en Clasi Click, Potosí.`
+    `${labelTipoAnuncio(anuncio.tipo)} en Clasi Click, ${buscarCiudad(ciudadDe(anuncio)).nombre}.`
   const url = `${SITE_URL}/anuncios/${params.id}`
   const imagen = anuncio.imagenUrl || `${SITE_URL}/anuncios/${params.id}/og`
 

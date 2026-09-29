@@ -1318,7 +1318,7 @@ export default function VenderPage() {
       <PreguntasVendedor onPendientes={setPreguntasPendientes} />
           </section>
           <section className={claseSeccion('marketing', seccion)}>
-            <MarketingVendedor misProductos={misProductos} tienda={cobroNegocio} irA={irA} />
+            <MarketingVendedor misProductos={misProductos} tienda={cobroNegocio} irA={irA} ciudadTienda={tiendaCiudad || ciudadComprador} />
           </section>
           <section className={claseSeccion('ventas', seccion)}>
       <div className="bg-panel border border-line rounded-xl p-4 mb-8">

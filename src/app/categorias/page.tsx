@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
+import { useCiudad } from '@/lib/ciudad'
+import { productoEnCiudad } from '@/data/ciudades'
 
 // "Categorías para comprar y vender" (estilo Mercado Libre): todas las
 // categorías con sus rubros en columnas. Cada link abre el catálogo
@@ -11,17 +13,17 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 
 export default function CategoriasPage() {
   const { categorias, cargando } = useCategoriasProductos()
-  const [conteo, setConteo] = useState<Record<string, number>>({})
+  const [productos, setProductos] = useState<any[]>([])
+  const { ciudadId } = useCiudad()
+  // Cantidades de la ciudad del comprador (igual que el catálogo).
+  const conteo: Record<string, number> = {}
+  for (const p of productos) if (p.rubro && productoEnCiudad(p, ciudadId)) conteo[p.rubro] = (conteo[p.rubro] || 0) + 1
   const [filtro, setFiltro] = useState('')
 
   useEffect(() => {
     fetch('/api/productos')
       .then((r) => r.json())
-      .then((d) => {
-        const c: Record<string, number> = {}
-        for (const p of d.productos || []) if (p.rubro) c[p.rubro] = (c[p.rubro] || 0) + 1
-        setConteo(c)
-      })
+      .then((d) => setProductos(d.productos || []))
       .catch(() => {})
   }, [])
 

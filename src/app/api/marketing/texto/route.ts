@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { textoMarketingIA } from '@/lib/moderacionIA'
 import { SITE_URL } from '@/lib/anuncioPublico'
@@ -31,10 +32,11 @@ export async function POST(req: NextRequest) {
 
     const tiendaDoc = await db.collection('vendedores').doc(usuario.uid).get()
     const tienda = (tiendaDoc.data() as any)?.nombreNegocio || ''
-    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL)
+    const ciudad = buscarCiudad(ciudadDe(tiendaDoc.data() as any)).nombre
+    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL, ciudad)
 
     const datos = [
-      `Tienda: ${tienda || 'sin nombre'}`,
+      `Tienda: ${tienda || 'sin nombre'} (${ciudad})`,
       ...productos.map((p) => {
         const d = pctDescuento(p)
         return [
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
           `  Link: ${linkProducto(SITE_URL, p.id, red)}`,
         ].filter(Boolean).join('\n')
       }),
-      'Se compra en Clasi Click y se paga con QR; hay envío a domicilio en Potosí.',
+      `Se compra en Clasi Click y se paga con QR. La tienda está en ${ciudad}: usá hashtags de ${ciudad}.`,
     ].join('\n')
 
     const ia = await textoMarketingIA(datos, red, tono)

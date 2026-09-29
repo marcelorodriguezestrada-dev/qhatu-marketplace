@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
       }
       whatsappCompleto = numeroConCodigoPais(whatsapp, buscarPais(paisId).codigo)
     }
+    const envioTienda = sanearEnvioPropio(envioPropio, !!(tiposVenta && tiposVenta.haceEnvios))
+    // Copiado a cada producto: así el catálogo de otras ciudades lo muestra.
+    const enviaATodoBolivia = envioTienda.activo && envioTienda.alcance === 'bolivia'
     const db = getDb()
     await db.collection('vendedores').doc(usuario.uid).set(
       {
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
         // Ciudad de la tienda: sus productos la heredan (ver abajo).
         ciudad: ciudadTienda,
         // "Hago envíos yo mismo": se prende con el tilde "Hace envíos".
-        envioPropio: sanearEnvioPropio(envioPropio, !!(tiposVenta && tiposVenta.haceEnvios)),
+        envioPropio: envioTienda,
         email: usuario.email,
         updatedAt: new Date().toISOString(),
       },
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest) {
     if (!productosDelVendedor.empty) {
       const batch = db.batch()
       productosDelVendedor.docs.forEach((doc) => {
-        batch.update(doc.ref, { tiendaNombre: nombreNegocio || '', tiendaLogoUrl: logoUrl || '', ciudad: ciudadTienda })
+        batch.update(doc.ref, { tiendaNombre: nombreNegocio || '', tiendaLogoUrl: logoUrl || '', ciudad: ciudadTienda, enviaATodoBolivia })
       })
       await batch.commit()
     }

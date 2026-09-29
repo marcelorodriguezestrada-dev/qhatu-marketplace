@@ -151,3 +151,33 @@ export function envioPropioLlegaA(envio: EnvioPropio | null | undefined, ciudadV
   if (!envio?.activo) return false
   return envio.alcance === 'bolivia' || ciudadVendedor === ciudadComprador
 }
+
+// Filtro de ciudad de listados: una ciudad o 'todas'.
+export type FiltroCiudadValor = CiudadId | 'todas'
+
+// Profesional visible al buscar en `sel`: es de esa ciudad, atiende
+// online (aparece en todas) o viaja a esa ciudad.
+export function profesionalEnCiudad(p: { ciudad?: unknown; atiendeOnline?: boolean; viajaA?: unknown }, sel: FiltroCiudadValor): boolean {
+  if (sel === 'todas') return true
+  if (ciudadDe(p) === sel) return true
+  if (p.atiendeOnline === true) return true
+  return Array.isArray(p.viajaA) && p.viajaA.includes(sel)
+}
+
+// Producto visible para un comprador de `ciudad`: es de su ciudad o el
+// vendedor envía a todo Bolivia (enviaATodoBolivia se copia de la tienda).
+export function productoEnCiudad(p: { ciudad?: unknown; enviaATodoBolivia?: boolean }, ciudad: CiudadId): boolean {
+  return ciudadDe(p) === ciudad || p.enviaATodoBolivia === true
+}
+
+// "abogado en La Paz" → { ciudad: 'la-paz', resto: 'abogado' }.
+const FRASES_CIUDAD: { re: RegExp; id: CiudadId }[] = [
+  { re: /\b(en\s+|de\s+)?(la\s+paz|el\s+alto)\b/i, id: 'la-paz' },
+  { re: /\b(en\s+|de\s+)?potos[ií]\b/i, id: 'potosi' },
+]
+export function ciudadEnTexto(texto: string): { ciudad: CiudadId | null; resto: string } {
+  for (const f of FRASES_CIUDAD) {
+    if (f.re.test(texto)) return { ciudad: f.id, resto: texto.replace(f.re, ' ').replace(/\s+/g, ' ').trim() }
+  }
+  return { ciudad: null, resto: texto }
+}

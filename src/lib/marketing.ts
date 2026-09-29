@@ -35,7 +35,7 @@ export function pctDescuento(p: ProductoMarketing) {
 
 const bs = (n: number) => `Bs ${Number(n).toLocaleString('es-BO')}`
 
-export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string): string {
+export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string, ciudad = 'Potosí'): string {
   const lineas = productos.map((p) => {
     const d = pctDescuento(p)
     const precio = d ? `${bs(p.precio)} (antes ${bs(p.precioOriginal!)}, -${d}%)` : bs(p.precio)
@@ -44,7 +44,7 @@ export function textoPlantilla(productos: ProductoMarketing[], red: string, tien
   })
   const cabeza = productos.length === 1 ? `✨ ¡Nuevo en ${tienda || 'nuestra tienda'}!` : `✨ Mirá lo que tenemos en ${tienda || 'nuestra tienda'}:`
   const cierre = '📦 Pedilo en Clasi Click y pagá con QR. ¡Te lo llevamos!'
-  const tags = red === 'instagram' || red === 'tiktok' ? '\n\n#Potosí #Bolivia #ClasiClick #ComprasOnline #HechoEnBolivia' : ''
+  const tags = red === 'instagram' || red === 'tiktok' ? `\n\n#${ciudad.replace(/\s+/g, '')} #Bolivia #ClasiClick #ComprasOnline #HechoEnBolivia` : ''
   if (red === 'whatsapp') return `${cabeza}\n${lineas.join('\n')}\n${cierre}`
   return `${cabeza}\n\n${lineas.join('\n\n')}\n\n${cierre}${tags}`
 }
