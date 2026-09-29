@@ -20,7 +20,7 @@ export type ZonaPotosi = {
   costoEnvio: number
 }
 
-const CENTRO_POTOSI = { lat: -19.5893, lng: -65.7535 } // Plaza 10 de Noviembre
+export const CENTRO_POTOSI = { lat: -19.5893, lng: -65.7535 } // Plaza 10 de Noviembre
 
 export function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371
@@ -37,8 +37,10 @@ export function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: numb
 // km, Bs 10; más de 2 km, Bs 15. Da una franja verde chica y compacta
 // en el centro, un anillo naranja mediano, y rojo en los barrios más
 // alejados — el patrón concéntrico que se ve en un mapa de reparto real.
-function costoPorDistancia(lat: number, lng: number): number {
-  const d = distanciaKm(CENTRO_POTOSI.lat, CENTRO_POTOSI.lng, lat, lng)
+// El centro va como parámetro (ver src/data/ciudades.ts): cada ciudad
+// arma sus anillos desde su propio centro. Potosí usa el de siempre.
+export function costoPorDistancia(lat: number, lng: number, centro: { lat: number; lng: number } = CENTRO_POTOSI): number {
+  const d = distanciaKm(centro.lat, centro.lng, lat, lng)
   if (d <= 1) return 5
   if (d <= 2) return 10
   return 15

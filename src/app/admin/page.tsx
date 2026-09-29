@@ -15,6 +15,7 @@ import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/components/EditorCV'
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
+import AdminCiudades from '@/components/admin/AdminCiudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
@@ -1503,6 +1504,7 @@ export default function AdminPage() {
 
       {tab === 'inicio' && (
         <div>
+          <AdminCiudades password={password} />
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-panel border border-line rounded-xl p-3.5">
           <div className="font-body text-[11px] text-inksoft">Pedidos</div>
