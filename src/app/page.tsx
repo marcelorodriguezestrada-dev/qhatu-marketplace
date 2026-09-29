@@ -14,12 +14,16 @@ import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
+import MenuCategorias from '@/components/MenuCategorias'
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
   const [productos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
   const [publico, setPublico] = useState('Todo')
   const [categoria, setCategoria] = useState('Todo')
+  // Rubro elegido desde el menú "Categorías" o /categorias (?rubro=).
+  const [rubroSel, setRubroSel] = useState<string | null>(null)
+  const [menuCategorias, setMenuCategorias] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
@@ -39,7 +43,7 @@ export default function CatalogoPage() {
 
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
-    const matchCat = categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
+    const matchCat = rubroSel ? p.rubro === rubroSel : categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
     const matchBusqueda =
       p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.vendedor.toLowerCase().includes(busqueda.toLowerCase())
@@ -60,7 +64,38 @@ export default function CatalogoPage() {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q') || ''
     if (q) setBusqueda(q)
+    const cat = params.get('categoria')
+    const rub = params.get('rubro')
+    if (cat) setCategoria(cat)
+    if (rub) setRubroSel(rub)
   }, [])
+
+  // Cuántos productos hay por rubro y por categoría (para el menú y los chips).
+  const conteoCategorias: Record<string, number> = {}
+  for (const p of productos) {
+    if (!p.rubro) continue
+    conteoCategorias[p.rubro] = (conteoCategorias[p.rubro] || 0) + 1
+    const cid = buscarRubroProducto(p.rubro)?.categoriaId
+    if (cid) conteoCategorias[cid] = (conteoCategorias[cid] || 0) + 1
+  }
+  const categoriaActual = categoriasProductos.find((c) => c.id === (rubroSel ? buscarRubroProducto(rubroSel)?.categoriaId : categoria))
+  const rubroActual = rubroSel ? buscarRubroProducto(rubroSel) : undefined
+
+  function elegirCategoria(catId: string, rubroId: string | null) {
+    setMenuCategorias(false)
+    setCategoria(catId)
+    setRubroSel(rubroId)
+    const params = new URLSearchParams()
+    params.set(rubroId ? 'rubro' : 'categoria', rubroId || catId)
+    window.history.replaceState(null, '', `/?${params.toString()}`)
+    setTimeout(() => document.getElementById('grilla-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+
+  function quitarFiltroCategoria() {
+    setCategoria('Todo')
+    setRubroSel(null)
+    window.history.replaceState(null, '', '/')
+  }
 
   return (
     <div className="min-h-screen">
@@ -107,7 +142,18 @@ export default function CatalogoPage() {
             </button>
           </div>
 
+          <div className="relative">
+          <MenuCategorias
+            categorias={categoriasProductos}
+            abierto={menuCategorias}
+            onCerrar={() => setMenuCategorias(false)}
+            onElegir={elegirCategoria}
+            conteo={conteoCategorias}
+          />
           <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
+            <button type="button" onClick={() => setMenuCategorias((v) => !v)} className="border-none bg-transparent text-white font-body text-[13px] font-semibold shrink-0 whitespace-nowrap">
+              Categorías ▾
+            </button>
             <Link href="/servicios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
               Servicios
             </Link>
@@ -134,6 +180,7 @@ export default function CatalogoPage() {
                 Iniciar sesión
               </Link>
             )}
+          </div>
           </div>
         </div>
       </div>
@@ -173,7 +220,7 @@ export default function CatalogoPage() {
 
         <div className="flex gap-2 mb-3 flex-wrap items-center">
           <button
-            onClick={() => { setPublico('Todo'); setCategoria('Todo') }}
+            onClick={() => { setPublico('Todo'); quitarFiltroCategoria() }}
             aria-label="Ver todo"
             title="Ver todo"
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 ${
@@ -209,10 +256,11 @@ export default function CatalogoPage() {
             >
               Todo
             </button>
-            {categoriasProductos.map((c) => (
+            {categoriasProductos.filter((c) => conteoCategorias[c.id]).map((c) => (
               <button
                 key={c.id}
                 onClick={() => {
+                  setRubroSel(null)
                   setCategoria(c.id)
                   fetch('/api/analitica/categoria', {
                     method: 'POST',
@@ -230,7 +278,22 @@ export default function CatalogoPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        {(rubroSel || categoria !== 'Todo') && categoriaActual && (
+          <div className="flex flex-wrap items-center gap-2 mb-4 font-body text-sm">
+            <Link href="/categorias" className="text-inksoft hover:text-teal">Categorías</Link>
+            <span className="text-inksoft">›</span>
+            <button type="button" onClick={() => elegirCategoria(categoriaActual.id, null)} className={rubroActual ? 'text-inksoft hover:text-teal' : 'text-ink font-semibold'}>{categoriaActual.label}</button>
+            {rubroActual && (
+              <>
+                <span className="text-inksoft">›</span>
+                <span className="text-ink font-semibold">{rubroActual.label}</span>
+              </>
+            )}
+            <button type="button" onClick={quitarFiltroCategoria} className="ml-1 px-2.5 py-0.5 rounded-full border border-line bg-panel text-inksoft text-xs">✕ Quitar filtro</button>
+          </div>
+        )}
+
+        <div id="grilla-productos" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 scroll-mt-4">
           {filtrados.map((p) => (
             <ProductCard key={p.id} p={p} />
           ))}
