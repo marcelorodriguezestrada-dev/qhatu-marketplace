@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useCiudad } from '@/lib/ciudad'
+import { CIUDADES, buscarCiudad, type CiudadId } from '@/data/ciudades'
 
 // "📍 Potosí ▾" (como el "Enviar a…" de Mercado Libre): cambia la ciudad
 // del comprador. No aparece mientras haya una sola ciudad abierta.
@@ -86,5 +87,38 @@ export function BannerCiudad() {
         ))}
       </div>
     </div>
+  )
+}
+
+// Campo "Ciudad" de formularios (tienda, profesional, anuncio). Muestra
+// las ciudades abiertas; `todas` las muestra todas (lo usa el admin para
+// preparar tiendas de una ciudad antes de abrirla). Con una sola ciudad
+// abierta no se muestra (queda la que tenga, Potosí por defecto).
+export function CampoCiudad({
+  value,
+  onChange,
+  todas = false,
+  className = '',
+  etiqueta = '📍 Ciudad',
+}: {
+  value: CiudadId
+  onChange: (c: CiudadId) => void
+  todas?: boolean
+  className?: string
+  etiqueta?: string
+}) {
+  const { abiertas, multiciudad } = useCiudad()
+  if (!todas && !multiciudad) return null
+  const opciones = todas ? CIUDADES.map((c) => ({ id: c.id, nombre: c.nombre })) : abiertas
+  const lista = opciones.some((c) => c.id === value) ? opciones : [...opciones, { id: value, nombre: buscarCiudad(value).nombre }]
+  return (
+    <label className={`block font-body text-xs text-ink ${className}`}>
+      <span className="block font-semibold mb-1">{etiqueta}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value as CiudadId)} className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel">
+        {lista.map((c) => (
+          <option key={c.id} value={c.id}>{c.nombre}</option>
+        ))}
+      </select>
+    </label>
   )
 }

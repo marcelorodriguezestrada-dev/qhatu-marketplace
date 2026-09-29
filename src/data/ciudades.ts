@@ -107,3 +107,26 @@ export function ciudadDesdeGeoIP(pais: string | null, region: string | null, ciu
   const porRegion = r ? CIUDADES.find((x) => x.regionesIP.includes(r)) : null
   return porRegion ? porRegion.id : null
 }
+
+// Lo que viene de un formulario → una ciudad válida (Potosí si no).
+export function sanearCiudad(v: unknown): CiudadId {
+  return esCiudadId(v) ? v : CIUDAD_POR_DEFECTO
+}
+
+// Ciudad de un documento guardado (producto, tienda, anuncio,
+// profesional). Los de antes no tienen ciudad: son de Potosí.
+export function ciudadDe(doc: { ciudad?: unknown } | null | undefined): CiudadId {
+  return sanearCiudad(doc?.ciudad)
+}
+
+// Profesionales: otras ciudades a las que viaja a atender (sin repetir
+// la propia).
+export function sanearViajaA(v: unknown, propia: CiudadId): CiudadId[] {
+  if (!Array.isArray(v)) return []
+  return Array.from(new Set(v.filter(esCiudadId))).filter((c) => c !== propia)
+}
+
+// Nombres de zonas de una ciudad para los selectores de zona/barrio.
+export function zonasDeCiudad(id: CiudadId): string[] {
+  return buscarCiudad(id).zonas.map((z) => z.nombre)
+}

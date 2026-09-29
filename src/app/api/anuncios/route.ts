@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanearCiudad } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA, categorizarAnuncio } from '@/lib/moderacionIA'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
       whatsappPais: paisId,
       precio: precio ? Number(precio) : null,
       imagenUrl: imagenUrl || '',
+      ciudad: sanearCiudad(body.ciudad),
       autorUid: usuario.uid,
       autorEmail: usuario.email,
       estado: 'pendiente_revision',

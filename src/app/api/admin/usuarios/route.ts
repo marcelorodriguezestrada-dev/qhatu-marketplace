@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
+import { sanearCiudad } from '@/data/ciudades'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
     const nombre = String(body.nombre || '').trim().slice(0, 80)
     const nombreNegocio = String(body.nombreNegocio || '').trim().slice(0, 80)
     const whatsappLocal = String(body.whatsapp || '').trim()
+    const ciudad = sanearCiudad(body.ciudad)
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Poné un email válido.' }, { status: 400 })
     }
@@ -113,12 +115,12 @@ export async function POST(req: NextRequest) {
     const db = getDb()
     const ahora = new Date().toISOString()
     await db.collection('usuarios').doc(uid).set(
-      { email, nombre, whatsapp, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora },
+      { email, nombre, whatsapp, ciudad, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora },
       { merge: true }
     )
-    if (nombreNegocio || whatsapp) {
+    if (nombreNegocio || whatsapp || ciudad !== 'potosi') {
       await db.collection('vendedores').doc(uid).set(
-        { nombreNegocio, whatsapp, whatsappPais: whatsapp ? 'BO' : '', email, creadoPorAdmin: true, updatedAt: ahora },
+        { nombreNegocio, whatsapp, whatsappPais: whatsapp ? 'BO' : '', ciudad, email, creadoPorAdmin: true, updatedAt: ahora },
         { merge: true }
       )
     }

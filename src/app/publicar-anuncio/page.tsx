@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth'
 import { TIPOS_ANUNCIO } from '@/data/anuncios'
 import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
 import { useCategorias } from '@/lib/useCategorias'
+import { useCiudad } from '@/lib/ciudad'
+import { CampoCiudad } from '@/components/SelectorCiudad'
+import type { CiudadId } from '@/data/ciudades'
 
 export default function PublicarAnuncioPage() {
   const { usuario, cargando, obtenerToken } = useAuth()
@@ -23,6 +26,8 @@ export default function PublicarAnuncioPage() {
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
   const [enviado, setEnviado] = useState(false)
+  const { ciudadId } = useCiudad()
+  const [ciudadAnuncio, setCiudadAnuncio] = useState<CiudadId | null>(null)
 
   async function subirImagen(file: File | null) {
     if (!file) return
@@ -51,7 +56,7 @@ export default function PublicarAnuncioPage() {
       const res = await fetch('/api/anuncios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl, rubro: tipo === 'busqueda' ? rubro : undefined }),
+        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl, rubro: tipo === 'busqueda' ? rubro : undefined, ciudad: ciudadAnuncio || ciudadId }),
       })
       const data = await res.json()
       if (data.error) {
@@ -104,6 +109,7 @@ export default function PublicarAnuncioPage() {
       </div>
 
       <form onSubmit={publicar} className="bg-panel border border-line rounded-xl p-5">
+        <CampoCiudad value={ciudadAnuncio || ciudadId} onChange={setCiudadAnuncio} etiqueta="📍 Ciudad del anuncio" className="mb-3" />
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as any)}

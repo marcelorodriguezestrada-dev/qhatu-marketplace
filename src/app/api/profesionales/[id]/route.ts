@@ -5,6 +5,7 @@ import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { validarHorario } from '@/data/turnos'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
+import { sanearCiudad, sanearViajaA, ciudadDe } from '@/data/ciudades'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas', 'cvPublico'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas', 'cvPublico', 'ciudad', 'zona', 'atiendePresencial', 'atiendeOnline', 'viajaA'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -104,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA } = bodyPermitido
     const cambios: Record<string, unknown> = {}
     // Invitación por WhatsApp desde /admin: queda registrado cuándo (y
     // cuántas veces) se le escribió, para no invitar dos veces sin querer.
@@ -161,6 +162,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (historialLaboral !== undefined) cambios.historialLaboral = sanearHistorialLaboral(historialLaboral)
     if (idiomas !== undefined) cambios.idiomas = sanearIdiomas(idiomas)
     if (cvPublico !== undefined) cambios.cvPublico = cvPublico !== false
+    // Ciudad y forma de atención (lo edita el dueño desde Mi perfil o el admin).
+    if (ciudad !== undefined) cambios.ciudad = sanearCiudad(ciudad)
+    if (atiendePresencial !== undefined) cambios.atiendePresencial = atiendePresencial !== false
+    if (atiendeOnline !== undefined) cambios.atiendeOnline = atiendeOnline === true
+    if (viajaA !== undefined || ciudad !== undefined) {
+      const propia = (cambios.ciudad as any) || ciudadDe((await db.collection('profesionales').doc(params.id).get()).data() as any)
+      const lista = viajaA !== undefined ? viajaA : ((await db.collection('profesionales').doc(params.id).get()).data() as any)?.viajaA
+      cambios.viajaA = sanearViajaA(lista, propia)
+    }
     // El admin puede cargar/corregir la agenda de turnos de un
     // profesional (mismo campo que el self-service de
     // /api/profesionales/[id]/horarios, pero sin exigirle Premium —

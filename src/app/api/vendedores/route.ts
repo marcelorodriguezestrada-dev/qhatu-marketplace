@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanearCiudad } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
@@ -16,7 +17,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais } = body
+    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais, ciudad } = body
+    const ciudadTienda = sanearCiudad(ciudad)
     // El whatsapp es opcional (no todos quieren que les escriban antes
     // de comprar), pero si lo cargan, lo validamos según el país
     // elegido y lo guardamos con su código de país adelante (ver
@@ -44,6 +46,8 @@ export async function POST(req: NextRequest) {
         horarios: horarios || '',
         tiposVenta: tiposVenta && typeof tiposVenta === 'object' ? tiposVenta : {},
         logoUrl: logoUrl || '',
+        // Ciudad de la tienda: sus productos la heredan (ver abajo).
+        ciudad: ciudadTienda,
         email: usuario.email,
         updatedAt: new Date().toISOString(),
       },
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (!productosDelVendedor.empty) {
       const batch = db.batch()
       productosDelVendedor.docs.forEach((doc) => {
-        batch.update(doc.ref, { tiendaNombre: nombreNegocio || '', tiendaLogoUrl: logoUrl || '' })
+        batch.update(doc.ref, { tiendaNombre: nombreNegocio || '', tiendaLogoUrl: logoUrl || '', ciudad: ciudadTienda })
       })
       await batch.commit()
     }
