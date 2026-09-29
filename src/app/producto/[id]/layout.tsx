@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/anuncioPublico'
 
@@ -27,7 +28,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const titulo = `${p.nombre}${precio ? ` — ${precio}${off}` : ''}`
   const descripcion =
     String(p.descripcionCorta || p.descripcionLarga || '').replace(/\s+/g, ' ').trim().slice(0, 160) ||
-    `${p.vendedor ? `${p.vendedor} · ` : ''}Comprá en Clasi Click, Potosí.`
+    `${p.vendedor ? `${p.vendedor} · ` : ''}Comprá en Clasi Click, ${buscarCiudad(ciudadDe(p)).nombre}.`
   const url = `${SITE_URL}/producto/${params.id}`
   const imagen = p.imagenUrl || `${SITE_URL}/producto/${params.id}/og`
 

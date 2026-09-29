@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useCiudad } from '@/lib/ciudad'
-import { CIUDADES, buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { CIUDADES, buscarCiudad, esCiudadId, type CiudadId, type FiltroCiudadValor } from '@/data/ciudades'
 
 // "📍 Potosí ▾" (como el "Enviar a…" de Mercado Libre): cambia la ciudad
 // del comprador. No aparece mientras haya una sola ciudad abierta.
@@ -120,5 +120,46 @@ export function CampoCiudad({
         ))}
       </select>
     </label>
+  )
+}
+
+// Chips "📍 Buscar en: Potosí · La Paz · Todas" para listados (servicios,
+// anuncios). Es un filtro de ESA búsqueda: no cambia la ciudad del
+// comprador. Arranca en ?ciudad= del link o en la ciudad del comprador.
+export function useFiltroCiudad() {
+  const { ciudadId, multiciudad } = useCiudad()
+  const [manual, setManual] = useState<FiltroCiudadValor | null>(null)
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('ciudad')
+    if (v === 'todas' || esCiudadId(v)) setManual(v as FiltroCiudadValor)
+  }, [])
+  const valor: FiltroCiudadValor = manual || ciudadId
+  function cambiar(v: FiltroCiudadValor) {
+    setManual(v)
+    const url = new URL(window.location.href)
+    url.searchParams.set('ciudad', v)
+    window.history.replaceState(null, '', url.toString())
+  }
+  return { valor, cambiar, multiciudad }
+}
+
+export function ChipsCiudad({ valor, onChange, className = '' }: { valor: FiltroCiudadValor; onChange: (v: FiltroCiudadValor) => void; className?: string }) {
+  const { abiertas, multiciudad } = useCiudad()
+  if (!multiciudad) return null
+  const opciones: { id: FiltroCiudadValor; nombre: string }[] = [...abiertas.map((c) => ({ id: c.id as FiltroCiudadValor, nombre: c.nombre })), { id: 'todas', nombre: 'Todas' }]
+  return (
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      <span className="font-body text-xs text-inksoft">📍 Buscar en:</span>
+      {opciones.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={`px-3.5 py-1 rounded-full border font-body text-[13px] ${valor === o.id ? 'border-teal bg-tealsoft text-teal font-semibold' : 'border-line bg-panel text-inksoft'}`}
+        >
+          {o.nombre}
+        </button>
+      ))}
+    </div>
   )
 }

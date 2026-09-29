@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { responderPreguntaProductoIA } from '@/lib/moderacionIA'
 import { MAX_PREGUNTA } from '@/lib/preguntas'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { tieneControlStock, agotado } from '@/lib/stock'
 
 export const dynamic = 'force-dynamic'
@@ -65,7 +66,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       t.direccion && `Dirección de la tienda: ${t.direccion}`,
       t.horarios && `Horarios: ${t.horarios}`,
       t.tiposVenta && `La tienda: ${Object.entries(t.tiposVenta).filter(([, v]) => v).map(([k]) => TIPOS_VENTA[k] || k).join(', ') || 'sin datos'}`,
-      'Clasi Click: se compra desde la página y se paga por QR interbancario; hay envío a domicilio en Potosí (el costo se ve al elegir la dirección en el checkout) y envío express los días hábiles pidiendo antes de las 17 hs.',
+      `Ciudad del producto: ${buscarCiudad(ciudadDe(p)).nombre}.`,
+      ciudadDe(p) === 'potosi'
+        ? 'Clasi Click: se compra desde la página y se paga por QR interbancario; hay envío a domicilio en Potosí (el costo se ve al elegir la dirección en el checkout) y envío express los días hábiles pidiendo antes de las 17 hs.'
+        : 'Clasi Click: se compra desde la página y se paga por QR interbancario; se puede retirar en la tienda.',
+      t.tiposVenta?.haceEnvios && `La tienda hace envíos propios${t.envioPropio?.alcance === 'bolivia' ? ' a todo Bolivia' : ' dentro de su ciudad'}${t.envioPropio?.costo != null ? ` (Bs ${t.envioPropio.costo})` : ' (costo a coordinar)'}${t.envioPropio?.detalle ? `: ${t.envioPropio.detalle}` : ''}.`,
       qa && `Preguntas que ya respondió el vendedor:\n${qa}`,
     ].filter(Boolean)
 

@@ -16,10 +16,16 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import MenuCategorias from '@/components/MenuCategorias'
 import { SelectorCiudad, BannerCiudad } from '@/components/SelectorCiudad'
+import { useCiudad } from '@/lib/ciudad'
+import { productoEnCiudad } from '@/data/ciudades'
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
-  const [productos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
+  const [todosLosProductos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
+  // Productos de la ciudad del comprador + los de tiendas que envían a
+  // todo Bolivia (llevan "🚚 Envía desde …").
+  const { ciudadId } = useCiudad()
+  const productos = todosLosProductos.filter((p) => productoEnCiudad(p as any, ciudadId))
   const [publico, setPublico] = useState('Todo')
   const [categoria, setCategoria] = useState('Todo')
   // Rubro elegido desde el menú "Categorías" o /categorias (?rubro=).
@@ -216,7 +222,7 @@ export default function CatalogoPage() {
             <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
               {ofertas.map((p) => (
                 <div key={p.id} className="w-40 sm:w-44 shrink-0">
-                  <ProductCard p={p} />
+                  <ProductCard p={p} ciudadComprador={ciudadId} />
                 </div>
               ))}
             </div>
@@ -300,13 +306,15 @@ export default function CatalogoPage() {
 
         <div id="grilla-productos" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 scroll-mt-4">
           {filtrados.map((p) => (
-            <ProductCard key={p.id} p={p} />
+            <ProductCard key={p.id} p={p} ciudadComprador={ciudadId} />
           ))}
         </div>
 
         {filtrados.length === 0 && (
           <div className="text-center py-14 text-inksoft font-body text-sm">
-            No encontramos productos para esa búsqueda.
+            {todosLosProductos.length > 0 && productos.length === 0
+              ? <>Todavía no hay productos en tu ciudad. ¿Vendés algo? <Link href="/vender" className="text-teal underline">Publicalo gratis</Link></>
+              : 'No encontramos productos para esa búsqueda.'}
           </div>
         )}
       </div>

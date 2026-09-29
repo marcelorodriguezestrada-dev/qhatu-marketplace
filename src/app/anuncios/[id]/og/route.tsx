@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { leerAnuncioPublico } from '@/lib/anuncioPublico'
 
@@ -27,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 30, color: '#5B5F73' }}>
           <div style={{ display: 'flex', fontSize: 40, fontWeight: 800, color: '#A23B2E' }}>Clasi Click</div>
-          <div style={{ display: 'flex' }}>Anuncios en Potosí</div>
+          <div style={{ display: 'flex' }}>Anuncios en {buscarCiudad(ciudadDe(anuncio)).nombre}</div>
         </div>
       </div>
     ),

@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
+import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
@@ -1907,7 +1908,7 @@ export default function AdminPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft">{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
+                <div className="font-body text-xs text-inksoft">{ciudadDe(p) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(p)).nombre} · `}{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
                 <div className="font-body text-[11px] text-inksoft mt-1">
                   Estado: {p.estado || 'activo'}
                   {p.cargadoPorAdmin && <span className="ml-2 inline-block bg-tealsoft text-teal border border-teal text-[10px] font-bold px-1.5 py-0.5 rounded-full">🛠️ Cargado por admin</span>}
@@ -2464,7 +2465,7 @@ export default function AdminPage() {
                 <div key={p.id} className="bg-panel border border-ochre rounded-lg p-4 mb-3">
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   <div className="font-body text-xs text-inksoft mb-1">
-                    {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {ciudadDe(p) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(p)).nombre} · `}{p.atiendeOnline && '💻 Online · '}{buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
                   {(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)]) && (
@@ -2570,7 +2571,7 @@ export default function AdminPage() {
                   <div className="font-body text-sm font-medium text-ink mb-1">{p.nombre}</div>
                   {p.prioridadInvitacionIA && <BadgePrioridad pr={p.prioridadInvitacionIA} />}
                   <div className="font-body text-xs text-inksoft mb-1">
-                    {buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
+                    {ciudadDe(p) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(p)).nombre} · `}{p.atiendeOnline && '💻 Online · '}{buscarRubro(p.rubro)?.label} · {p.zona || 'sin zona'} · WhatsApp: {p.whatsapp}
                     {p.email && <> · Email: {p.email}</>}
                   </div>
                   {(p.invitadoEn || invitadosLocal[soloNumero(p.whatsapp)]) && (
@@ -3038,7 +3039,7 @@ export default function AdminPage() {
                       </div>
                     )}
                     <div className="font-body text-[11px] text-inksoft mt-1.5">
-                      {a.autorEmail || (a.creadoPorAdmin ? 'Importado (sin cuenta)' : '')} · {a.whatsapp || a.telefonoOriginal || 'sin contacto'} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
+                      {ciudadDe(a) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(a)).nombre} · `}{a.autorEmail || (a.creadoPorAdmin ? 'Importado (sin cuenta)' : '')} · {a.whatsapp || a.telefonoOriginal || 'sin contacto'} {a.precio ? `· Bs ${Number(a.precio).toLocaleString('es-BO')}` : ''}
                       {a.createdAt && ` · ${new Date(a.createdAt).toLocaleDateString('es-BO')}`}
                     </div>
                     {(a.invitadoEn || invitadosLocal[soloNumero(a.whatsapp || a.telefonoOriginal)]) && (

@@ -595,7 +595,7 @@ export async function responderPreguntaProductoIA(
           {
             role: 'system',
             content:
-              'Sos el asistente de Clasi Click, un marketplace de Potosí, Bolivia. Un comprador pregunta sobre un producto. ' +
+              'Sos el asistente de Clasi Click, un marketplace de Bolivia (Potosí, La Paz). Un comprador pregunta sobre un producto. ' +
               'Respondé en español boliviano, amable y breve (máximo 2 oraciones), usando ÚNICAMENTE los datos del producto y la tienda que te paso. ' +
               'Nunca inventes talles, colores, stock, medidas, materiales, precios ni plazos que no estén en los datos. ' +
               'Si la respuesta no está en los datos (o depende del vendedor: descuentos, reservas, fotos extra, medidas exactas), decilo con honestidad y sugerí preguntarle al vendedor. ' +
@@ -646,7 +646,7 @@ export async function textoMarketingIA(datos: string, red: string, tono: string)
           {
             role: 'system',
             content:
-              'Sos community manager de pequeños negocios de Bolivia que venden en Clasi Click (marketplace de Potosí). ' +
+              'Sos community manager de pequeños negocios de Bolivia que venden en Clasi Click (marketplace boliviano). ' +
               'Escribí UNA publicación en español boliviano (tuteo o voseo neutro, cercano). ' +
               `${guia[red] || guia.facebook} Tono: ${tono}. ` +
               'Usá SOLO los datos que te paso: no inventes descuentos, stock, talles, colores ni envíos que no estén. ' +

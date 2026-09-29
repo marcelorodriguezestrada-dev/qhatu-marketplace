@@ -1,5 +1,7 @@
 'use client'
 
+import { useCiudad } from '@/lib/ciudad'
+import { buscarCiudad, type CiudadId } from '@/data/ciudades'
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
@@ -11,8 +13,10 @@ import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlan
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
 const MAX_PRODUCTOS = 5
 
-export default function MarketingVendedor({ misProductos, tienda, irA }: { misProductos: any[]; tienda: string; irA: (s: any) => void }) {
+export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTienda }: { misProductos: any[]; tienda: string; irA: (s: any) => void; ciudadTienda?: CiudadId }) {
   const { usuario, obtenerToken } = useAuth()
+  const { ciudadId } = useCiudad()
+  const ciudad = buscarCiudad(ciudadTienda || ciudadId)
   const activos = useMemo(() => misProductos.filter((p) => !p.estado || p.estado === 'activo'), [misProductos])
   const [elegidos, setElegidos] = useState<string[]>([])
   const [red, setRed] = useState<string>('facebook')
@@ -59,7 +63,7 @@ export default function MarketingVendedor({ misProductos, tienda, irA }: { misPr
       setConIA(!!d.conIA)
     } catch (err: any) {
       // Sin conexión con el servidor: al menos la plantilla.
-      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE))
+      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE, ciudad.nombre))
       setConIA(false)
       setError(err?.message || '')
     } finally {

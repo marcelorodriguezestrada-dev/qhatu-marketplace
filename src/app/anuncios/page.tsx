@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { TIPOS_ANUNCIO, labelTipoAnuncio } from '@/data/anuncios'
 import { useCategorias } from '@/lib/useCategorias'
+import { ChipsCiudad, useFiltroCiudad } from '@/components/SelectorCiudad'
+import { buscarCiudad, ciudadDe, ciudadEnTexto } from '@/data/ciudades'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -52,13 +54,18 @@ export default function AnunciosPage() {
       .finally(() => setCargando(false))
   }, [])
 
-  const filtrados = anuncios
-    .filter((a) => tipoFiltro === 'Todos' || a.tipo === tipoFiltro)
-    .filter((a) => {
-      const q = busqueda.trim().toLowerCase()
-      if (!q) return true
-      return (a.titulo || '').toLowerCase().includes(q) || (a.descripcion || '').toLowerCase().includes(q)
-    })
+  // Ciudad: el filtro "📍 Buscar en" o la ciudad escrita en la búsqueda.
+  const { valor: ciudadFiltro, cambiar: cambiarCiudadFiltro, multiciudad } = useFiltroCiudad()
+  const { ciudad: ciudadDelTexto, resto } = ciudadEnTexto(busqueda)
+  const ciudadBuscada = ciudadDelTexto || ciudadFiltro
+  const coincide = (a: any) => {
+    if (tipoFiltro !== 'Todos' && a.tipo !== tipoFiltro) return false
+    const q = resto.trim().toLowerCase()
+    if (!q) return true
+    return (a.titulo || '').toLowerCase().includes(q) || (a.descripcion || '').toLowerCase().includes(q)
+  }
+  const filtrados = anuncios.filter((a) => coincide(a) && (ciudadBuscada === 'todas' || ciudadDe(a) === ciudadBuscada))
+  const enOtrasCiudades = ciudadBuscada === 'todas' ? 0 : anuncios.filter((a) => coincide(a) && ciudadDe(a) !== ciudadBuscada).length
 
   return (
     <div>
@@ -91,6 +98,7 @@ export default function AnunciosPage() {
           placeholder="Buscar en anuncios..."
           className="w-full px-3.5 py-2.5 rounded-lg border border-line bg-panel font-body text-sm mb-4"
         />
+        <ChipsCiudad valor={ciudadBuscada} onChange={cambiarCiudadFiltro} className="mb-4" />
         <div className="flex gap-2 mb-5 flex-wrap">
           <button
             onClick={() => setTipoFiltro('Todos')}
@@ -116,7 +124,14 @@ export default function AnunciosPage() {
         {cargando && <div className="font-body text-sm text-inksoft">Cargando anuncios...</div>}
         {!cargando && filtrados.length === 0 && (
           <div className="bg-panel border border-line rounded-xl p-6 text-center font-body text-sm text-inksoft">
-            {busqueda.trim() ? `No encontramos nada para "${busqueda}".` : `No hay anuncios ${tipoFiltro !== 'Todos' ? 'de este tipo' : ''} todavía.`}
+            {busqueda.trim() ? `No encontramos nada para "${busqueda}".` : `No hay anuncios ${tipoFiltro !== 'Todos' ? 'de este tipo' : ''}${multiciudad && ciudadBuscada !== 'todas' ? ` en ${buscarCiudad(ciudadBuscada).nombre}` : ''} todavía.`}
+            {multiciudad && enOtrasCiudades > 0 && (
+              <div className="mt-3">
+                <button type="button" onClick={() => cambiarCiudadFiltro('todas')} className="px-4 py-2 rounded-lg border border-teal bg-tealsoft text-teal font-semibold">
+                  👉 Hay {enOtrasCiudades} en otras ciudades — Ver
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -125,7 +140,7 @@ export default function AnunciosPage() {
             {filtrados.map((a) => {
               const estilo = ESTILO_TIPO[a.tipo] || ESTILO_TIPO.otro
               const rubroLabel = a.rubro ? buscarRubro(a.rubro)?.label : ''
-              const meta = [haceCuanto(a.createdAt), a.zona].filter(Boolean).join(' · ')
+              const meta = [haceCuanto(a.createdAt), multiciudad && ciudadBuscada === 'todas' ? `📍 ${buscarCiudad(ciudadDe(a)).nombre}` : '', a.zona].filter(Boolean).join(' · ')
               const whatsapp = (a.whatsapp || '').replace(/\D/g, '')
               const conFoto = !!a.imagenUrl && !fotosRotas.has(a.id)
               return (
