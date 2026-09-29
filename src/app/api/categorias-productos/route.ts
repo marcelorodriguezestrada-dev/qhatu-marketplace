@@ -31,7 +31,8 @@ export async function GET() {
     return NextResponse.json(arbol)
   } catch (err) {
     console.error('GET /api/categorias-productos', err)
-    return NextResponse.json({ categorias: CATEGORIAS_PRODUCTOS_BASE, rubrosFlat: [] })
+    const rubrosFlat = CATEGORIAS_PRODUCTOS_BASE.flatMap((c) => c.rubros.map((r) => ({ id: r.id, label: r.label, categoriaId: c.id, categoriaLabel: c.label })))
+    return NextResponse.json({ categorias: CATEGORIAS_PRODUCTOS_BASE, rubrosFlat })
   }
 }
 

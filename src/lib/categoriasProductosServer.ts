@@ -1,5 +1,7 @@
 import { getDb } from '@/lib/firebaseAdmin'
-import { CATEGORIAS_PRODUCTOS_BASE, CATEGORIA_PRODUCTO_FALLBACK_ID, type CategoriaProducto } from '@/data/categoriasProductos'
+import { CATEGORIAS_PRODUCTOS_BASE, CATEGORIA_PRODUCTO_FALLBACK_ID, CATEGORIA_PRODUCTO_ALIAS, type CategoriaProducto } from '@/data/categoriasProductos'
+
+const alias = (id: string) => CATEGORIA_PRODUCTO_ALIAS[id] || id
 
 // Arma el árbol final Categoría > Rubro de PRODUCTOS combinando:
 // 1. La base fija del código (src/data/categoriasProductos.ts)
@@ -27,13 +29,13 @@ export async function construirArbolCategoriasProductos() {
     mapa.set(c.id, { id: c.id, label: personalizadas.get(c.id) || c.label, rubros: [...c.rubros] })
   }
   for (const [id, label] of personalizadas) {
-    if (mapa.has(id)) continue
+    if (mapa.has(id) || CATEGORIA_PRODUCTO_ALIAS[id]) continue
     mapa.set(id, { id, label: label || id, rubros: [] })
   }
 
   const overrides = new Map<string, string>()
   for (const doc of overridesSnap.docs) {
-    overrides.set(doc.id, (doc.data() as any).categoriaId)
+    overrides.set(doc.id, alias((doc.data() as any).categoriaId))
   }
   if (overrides.size > 0) {
     for (const cat of mapa.values()) {
@@ -50,7 +52,7 @@ export async function construirArbolCategoriasProductos() {
     const data = doc.data() as any
     const yaExiste = [...mapa.values()].some((c) => c.rubros.some((r) => r.id === doc.id))
     if (yaExiste) continue
-    const categoriaId = overrides.get(doc.id) || data.categoriaId || CATEGORIA_PRODUCTO_FALLBACK_ID
+    const categoriaId = overrides.get(doc.id) || alias(data.categoriaId || '') || CATEGORIA_PRODUCTO_FALLBACK_ID
     const destino = mapa.has(categoriaId) ? categoriaId : CATEGORIA_PRODUCTO_FALLBACK_ID
     mapa.get(destino)!.rubros.push({ id: doc.id, label: data.label || doc.id })
   }
