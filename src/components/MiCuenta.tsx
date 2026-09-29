@@ -10,9 +10,9 @@ import { leerModoAdmin } from '@/lib/modoAdmin'
 // confirma con un link que Firebase manda a ese correo; recién ahí se
 // cambia (y lo copiamos a su tienda/productos al volver a entrar — ver
 // /api/usuarios/estado).
-export default function MiCuenta({ className = '' }: { className?: string }) {
+export default function MiCuenta({ className = '', abiertoInicial = false }: { className?: string; abiertoInicial?: boolean }) {
   const { usuario, obtenerToken, recuperarPassword } = useAuth()
-  const [abierto, setAbierto] = useState(false)
+  const [abierto, setAbierto] = useState(abiertoInicial)
   const [nombre, setNombre] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [cargado, setCargado] = useState(false)

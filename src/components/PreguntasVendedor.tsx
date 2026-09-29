@@ -11,7 +11,7 @@ import { MAX_RESPUESTA } from '@/lib/preguntas'
 
 type Pregunta = { id: string; productoId: string; productoNombre: string; autorNombre: string; texto: string; respuesta: string | null; createdAt: string }
 
-export default function PreguntasVendedor() {
+export default function PreguntasVendedor({ onPendientes }: { onPendientes?: (n: number) => void } = {}) {
   const { usuario, obtenerToken } = useAuth()
   const [preguntas, setPreguntas] = useState<Pregunta[] | null>(null)
   const [borradores, setBorradores] = useState<Record<string, string>>({})
@@ -24,6 +24,7 @@ export default function PreguntasVendedor() {
     const token = await obtenerToken()
     const d = await fetch('/api/preguntas', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({}))
     setPreguntas(d.preguntas || [])
+    onPendientes?.((d.preguntas || []).filter((q: any) => !q.respuesta).length)
   }
 
   useEffect(() => {
