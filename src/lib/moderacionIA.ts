@@ -620,3 +620,53 @@ export async function responderPreguntaProductoIA(
     return null
   }
 }
+
+// Marketing del vendedor (/vender → Marketing): texto listo para pegar
+// en una red social a partir de sus productos. Solo usa los datos
+// publicados (no inventa descuentos ni stock). null si no hay IA.
+export async function textoMarketingIA(datos: string, red: string, tono: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  const guia: Record<string, string> = {
+    facebook: 'Publicación para Facebook o grupos de compra-venta: 4 a 7 líneas, emojis moderados, precio bien visible, termina con llamado a la acción y el link.',
+    instagram: 'Caption de Instagram: gancho corto en la primera línea, 3 a 5 líneas, emojis, termina con "Link en la bio o acá 👉 (link)" y 8 a 12 hashtags locales y del rubro al final.',
+    whatsapp: 'Estado o mensaje de WhatsApp: muy corto (2 a 4 líneas), directo, con precio y link. Sin hashtags.',
+    tiktok: 'Descripción de TikTok: 1 o 2 líneas con gancho, precio y 5 a 8 hashtags (incluí #fyp y locales).',
+  }
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        max_completion_tokens: 900,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Sos community manager de pequeños negocios de Bolivia que venden en Clasi Click (marketplace de Potosí). ' +
+              'Escribí UNA publicación en español boliviano (tuteo o voseo neutro, cercano). ' +
+              `${guia[red] || guia.facebook} Tono: ${tono}. ` +
+              'Usá SOLO los datos que te paso: no inventes descuentos, stock, talles, colores ni envíos que no estén. ' +
+              'Incluí cada link exactamente como viene. Si son varios productos, listalos con precio y link cada uno. ' +
+              'Respondé SOLO JSON: {"texto": "..."}',
+          },
+          { role: 'user', content: datos },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('textoMarketingIA: Groq respondió', res.status)
+      return null
+    }
+    const data = await res.json()
+    const parsed = JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+    const texto = String(parsed.texto || '').trim()
+    return texto ? texto.slice(0, 2500) : null
+  } catch (err) {
+    console.error('textoMarketingIA', err)
+    return null
+  }
+}
