@@ -211,7 +211,9 @@ export default function SeguimientoPedidoPage() {
             ? `Envío: ${pedido.zonaEntrega || 'Sin zona'} · ${pedido.direccion || 'Sin dirección'}${
                 pedido.entreCalles ? ` (${pedido.entreCalles})` : ''
               }${pedido.referenciaAdicional ? ` — ${pedido.referenciaAdicional}` : ''}`
-            : 'Retiro en tienda'}
+            : pedido.metodoEntrega === 'vendedor'
+              ? `🚚 Envío del vendedor · ${pedido.direccion || 'Sin dirección'}${pedido.referenciaAdicional ? ` — ${pedido.referenciaAdicional}` : ''}`
+              : 'Retiro en tienda'}
         </div>
       </div>
     </div>

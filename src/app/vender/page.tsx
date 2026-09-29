@@ -117,6 +117,10 @@ export default function VenderPage() {
   const [tiendaLogoUrl, setTiendaLogoUrl] = useState('')
   const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [tiposVenta, setTiposVenta] = useState<Record<string, boolean>>({})
+  // Envío propio ("Hace envíos"): costo (vacío = a coordinar), alcance y detalle.
+  const [envioCosto, setEnvioCosto] = useState('')
+  const [envioAlcance, setEnvioAlcance] = useState<'ciudad' | 'bolivia'>('ciudad')
+  const [envioDetalle, setEnvioDetalle] = useState('')
 
   // Membresía Premium de la tienda (paga, la confirma el admin) — a
   // diferencia de todo lo de arriba, esto no lo puede tocar el vendedor
@@ -178,6 +182,9 @@ export default function VenderPage() {
       setTiendaHorarios(data.horarios || '')
       setTiendaLogoUrl(data.logoUrl || '')
       setTiposVenta(data.tiposVenta || {})
+      setEnvioCosto(data.envioPropio?.costo != null ? String(data.envioPropio.costo) : '')
+      setEnvioAlcance(data.envioPropio?.alcance === 'bolivia' ? 'bolivia' : 'ciudad')
+      setEnvioDetalle(data.envioPropio?.detalle || '')
       setPlanVendedor(data.plan || 'basico')
       setPlanVigenciaVendedor(data.planVigenciaHasta || null)
       setPlanEstadoPagoVendedor(data.planEstadoPago || 'ninguno')
@@ -284,6 +291,7 @@ export default function VenderPage() {
           qrImageUrl: cobroQrUrl, cbu: cobroCbu, nombreNegocio: cobroNegocio, whatsapp: cobroWhatsapp, whatsappPais: cobroWhatsappPais,
           direccion: tiendaDireccion, lat: tiendaLat, lng: tiendaLng,
           horarios: tiendaHorarios, logoUrl: tiendaLogoUrl, tiposVenta,
+          envioPropio: { costo: envioCosto, alcance: envioAlcance, detalle: envioDetalle },
           ciudad: tiendaCiudad || ciudadComprador,
         }),
       })
@@ -1337,6 +1345,12 @@ export default function VenderPage() {
               </div>
               <div className="font-body text-xs font-semibold text-ink">👤 {p.nombreComprador || 'Sin nombre cargado'}</div>
               <div className="font-body text-[11px] text-inksoft mb-2">{p.comprador || 'Sin email'}</div>
+              {p.metodoEntrega === 'vendedor' && (
+                <div className="font-body text-[11px] text-ink bg-tealsoft border border-teal rounded-md px-2 py-1.5 mb-2">
+                  🚚 Lo enviás vos a: {p.direccion || 'sin dirección'}{p.referenciaAdicional ? ` (${p.referenciaAdicional})` : ''}{p.whatsappComprador ? ` · WhatsApp ${p.whatsappComprador}` : ''}
+                </div>
+              )}
+              {p.metodoEntrega === 'retiro' && <div className="font-body text-[11px] text-inksoft mb-2">🏬 Retira en tu tienda</div>}
 
               <div className="flex flex-col gap-2 mb-2">
                 {itemsVendidos.map((it: any, i: number) => (
@@ -1501,6 +1515,39 @@ export default function VenderPage() {
               </label>
             ))}
           </div>
+          {tiposVenta.haceEnvios && (
+            <div className="mt-3 bg-panelalt border border-line rounded-lg p-3">
+              <div className="font-body text-xs font-semibold text-ink mb-1">🚚 Tus envíos</div>
+              <div className="font-body text-[11px] text-inksoft mb-2">
+                En el checkout le aparece al comprador “Envío del vendedor”: te paga a vos (tu QR o como acuerden) y vos coordinás la entrega.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="font-body text-[11px] text-inksoft">
+                  Costo del envío (Bs)
+                  <input
+                    value={envioCosto}
+                    onChange={(e) => setEnvioCosto(e.target.value.replace(/[^\d]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="Vacío = a coordinar"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel"
+                  />
+                </label>
+                <label className="font-body text-[11px] text-inksoft">
+                  ¿A dónde enviás?
+                  <select value={envioAlcance} onChange={(e) => setEnvioAlcance(e.target.value as 'ciudad' | 'bolivia')} className="w-full mt-1 px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel">
+                    <option value="ciudad">Solo dentro de mi ciudad</option>
+                    <option value="bolivia">A todo Bolivia</option>
+                  </select>
+                </label>
+              </div>
+              <input
+                value={envioDetalle}
+                onChange={(e) => setEnvioDetalle(e.target.value.slice(0, 120))}
+                placeholder="Detalle (opcional): ej. entrego en 24 h, envío por flota a otras ciudades"
+                className="w-full mt-2 px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel"
+              />
+            </div>
+          )}
         </div>
 
         <div className="font-body text-xs text-inksoft mb-1.5 mt-4">Foto de tu QR de cobro</div>

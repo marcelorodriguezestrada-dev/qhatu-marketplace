@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sanearCiudad } from '@/data/ciudades'
+import { sanearCiudad, sanearEnvioPropio } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais, ciudad } = body
+    const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais, ciudad, envioPropio } = body
     const ciudadTienda = sanearCiudad(ciudad)
     // El whatsapp es opcional (no todos quieren que les escriban antes
     // de comprar), pero si lo cargan, lo validamos según el país
@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
         logoUrl: logoUrl || '',
         // Ciudad de la tienda: sus productos la heredan (ver abajo).
         ciudad: ciudadTienda,
+        // "Hago envíos yo mismo": se prende con el tilde "Hace envíos".
+        envioPropio: sanearEnvioPropio(envioPropio, !!(tiposVenta && tiposVenta.haceEnvios)),
         email: usuario.email,
         updatedAt: new Date().toISOString(),
       },

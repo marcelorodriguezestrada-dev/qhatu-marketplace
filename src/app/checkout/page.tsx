@@ -1,6 +1,8 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
+import { useCiudad } from '@/lib/ciudad'
+import { ciudadDe, envioPropioLlegaA, type CiudadId, type EnvioPropio } from '@/data/ciudades'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
@@ -45,7 +47,7 @@ function fechaEntregaTexto(fechaElegida?: string): string {
   return esRealmenteManana ? `mañana, ${fechaLegible}` : fechaLegible
 }
 
-function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): string {
+function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string, envio?: { direccion: string; referencia?: string } | null): string {
   // wa.me no permite adjuntar una imagen de verdad — solo texto
   // precargado. Mandamos el link "visor" de ImgBB (imagenViewerUrl,
   // con metadatos Open Graph) en vez del link directo al archivo — es
@@ -59,7 +61,9 @@ function linkWhatsappRetiroEfectivo(s: SubPedido, nombreComprador: string): stri
       return `${it.nombre}, precio ${bs(it.precio)}${foto ? ` — foto: ${foto}` : ''}`
     })
     .join('\n')
-  const texto = `Hola! Soy ${nombreComprador}. Quiero consultar sobre el producto:\n${detalle}`
+  const texto = envio
+    ? `Hola! Soy ${nombreComprador}. Hice un pedido en Clasi Click con envío tuyo:\n${detalle}\n\nDirección: ${envio.direccion}${envio.referencia ? ` (${envio.referencia})` : ''}\n¿Coordinamos el envío y el pago?`
+    : `Hola! Soy ${nombreComprador}. Quiero consultar sobre el producto:\n${detalle}`
   return `https://wa.me/${s.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
 }
 
@@ -169,7 +173,10 @@ function CheckoutContent() {
       })
       .catch(() => {})
   }, [])
-  const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro'>('envio')
+  // 'envio' = envío de Clasi Click (pago al QR de la plataforma);
+  // 'vendedor' = envío propio del vendedor ("Hago envíos yo mismo": se le
+  // paga a él, como en retiro, y él coordina la entrega); 'retiro'.
+  const [metodoEntrega, setMetodoEntrega] = useState<'envio' | 'retiro' | 'vendedor'>('envio')
   // Recién se muestran los campos de dirección/pago DESPUÉS de que el
   // comprador toca uno de los dos botones a propósito — antes, con
   // "envío" precargado por default, esos campos aparecían de entrada
@@ -224,6 +231,7 @@ function CheckoutContent() {
   // coordinar por WhatsApp — antes esto solo se sabía DESPUÉS, al
   // momento de crear el pedido.
   const [vendedoresConQR, setVendedoresConQR] = useState<Record<string, boolean>>({})
+  const [infoEnvioVendedores, setInfoEnvioVendedores] = useState<Record<string, { envioPropio: EnvioPropio | null; ciudad: CiudadId }>>({})
   const [consultandoVendedores, setConsultandoVendedores] = useState(true)
 
   const vendedorIdsCarrito = Array.from(
@@ -243,13 +251,14 @@ function CheckoutContent() {
       vendedorIdsCarrito.map((id) =>
         fetch(`/api/vendedores/${id}`)
           .then((r) => r.json())
-          .then((data) => [id, !!data.aceptaPagoQr] as const)
-          .catch(() => [id, false] as const)
+          .then((data) => [id, !!data.aceptaPagoQr, { envioPropio: data.envioPropio || null, ciudad: ciudadDe(data) }] as const)
+          .catch(() => [id, false, { envioPropio: null, ciudad: ciudadDe(null) }] as const)
       )
     )
       .then((pares) => {
         if (cancelado) return
-        setVendedoresConQR(Object.fromEntries(pares))
+        setVendedoresConQR(Object.fromEntries(pares.map(([id, qr]) => [id, qr])))
+        setInfoEnvioVendedores(Object.fromEntries(pares.map(([id, , info]) => [id, info])))
       })
       .finally(() => {
         if (!cancelado) setConsultandoVendedores(false)
@@ -263,12 +272,39 @@ function CheckoutContent() {
   // por ahí.
   const algunVendedorConQR = vendedorIdsCarrito.some((id) => vendedoresConQR[id])
 
+  // Qué formas de envío hay según la ciudad del comprador:
+  // - Envío Clasi Click: si esa ciudad lo tiene (Admin → Ciudades) y
+  //   todos los productos son de esa misma ciudad.
+  // - Envío del vendedor: si TODOS los vendedores del carrito hacen
+  //   envíos y llegan a la ciudad del comprador.
+  const { ciudadId: ciudadComprador, abiertas: ciudadesAbiertas } = useCiudad()
+  const configCiudad = ciudadesAbiertas.find((c) => c.id === ciudadComprador)
+  const envioClasiCiudad = configCiudad ? configCiudad.envioClasiClick : ciudadComprador === 'potosi'
+  const envioClasiDisponible = envioClasiCiudad && items.every((i) => ciudadDe(i as any) === ciudadComprador)
+  const envioVendedorDisponible =
+    !consultandoVendedores &&
+    items.length > 0 &&
+    items.every((i) => !!i.vendedorId) &&
+    vendedorIdsCarrito.every((id) => envioPropioLlegaA(infoEnvioVendedores[id]?.envioPropio, infoEnvioVendedores[id]?.ciudad || 'potosi', ciudadComprador))
+  const costoEnvioPorVendedor: Record<string, number | null> = Object.fromEntries(
+    vendedorIdsCarrito.map((id) => [id, infoEnvioVendedores[id]?.envioPropio?.costo ?? null])
+  )
+  const envioVendedorTotal = Object.values(costoEnvioPorVendedor).reduce<number>((s, c) => s + (c || 0), 0)
+  const envioVendedorACoordinar = Object.values(costoEnvioPorVendedor).some((c) => c === null)
+  // Si la opción elegida no está disponible (ej: La Paz sin envío Clasi
+  // Click), pasamos a la que sí.
+  useEffect(() => {
+    if (consultandoVendedores) return
+    if (metodoEntrega === 'envio' && !envioClasiDisponible) setMetodoEntrega(envioVendedorDisponible ? 'vendedor' : 'retiro')
+    else if (metodoEntrega === 'vendedor' && !envioVendedorDisponible) setMetodoEntrega(envioClasiDisponible ? 'envio' : 'retiro')
+  }, [consultandoVendedores, metodoEntrega, envioClasiDisponible, envioVendedorDisponible])
+
   // Si ningún vendedor tiene QR, el pago en retiro se coordina sí o sí
   // por WhatsApp — forzamos 'efectivo' para que el flujo posterior
   // (que ya existía) mande al paso de WhatsApp en vez de a una pantalla
   // de QR vacía.
   useEffect(() => {
-    if (metodoEntrega === 'retiro' && !consultandoVendedores && !algunVendedorConQR) {
+    if (metodoEntrega !== 'envio' && !consultandoVendedores && !algunVendedorConQR) {
       setMetodoPago('efectivo')
     }
   }, [metodoEntrega, consultandoVendedores, algunVendedorConQR])
@@ -434,7 +470,7 @@ function CheckoutContent() {
         if (vigente && d.uid === usuario.uid && Array.isArray(d.subPedidos) && d.subPedidos.length > 0) {
           uidCompradorRef.current = d.uid
           setSubPedidos(d.subPedidos)
-          setMetodoEntrega(d.metodoEntrega === 'retiro' ? 'retiro' : 'envio')
+          setMetodoEntrega(d.metodoEntrega === 'retiro' || d.metodoEntrega === 'vendedor' ? d.metodoEntrega : 'envio')
           setMetodoPago(d.metodoPago === 'efectivo' ? 'efectivo' : 'qr')
           setEnvioExpress(!!d.envioExpress)
           setMetodoElegido(true)
@@ -538,11 +574,17 @@ function CheckoutContent() {
   }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
   const costoEnvio =
-    metodoEntrega === 'retiro' ? 0 : (COSTOS_ENVIO[zonaEntrega] ?? 0) + (envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0)
+    metodoEntrega === 'retiro'
+      ? 0
+      : metodoEntrega === 'vendedor'
+        ? envioVendedorTotal
+        : (COSTOS_ENVIO[zonaEntrega] ?? 0) + (envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0)
+  // Los cupones de envío gratis son solo para el envío de Clasi Click.
+  const metodoCupon: 'envio' | 'retiro' = metodoEntrega === 'envio' ? 'envio' : 'retiro'
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
   const extraExpress = metodoEntrega === 'envio' && envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0
   const resultadoCupon = cuponAplicado
-    ? evaluarCupon(cuponAplicado, { subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega })
+    ? evaluarCupon(cuponAplicado, { subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega: metodoCupon })
     : null
   const descuentoCupon = resultadoCupon?.ok ? resultadoCupon.descuentoProductos : 0
   const descuentoEnvioCupon = resultadoCupon?.ok ? resultadoCupon.descuentoEnvio : 0
@@ -560,7 +602,7 @@ function CheckoutContent() {
       const res = await fetch('/api/cupones/validar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ codigo, subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega }),
+        body: JSON.stringify({ codigo, subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega: metodoCupon }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -663,6 +705,10 @@ function CheckoutContent() {
       setError(`El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Lo cambiamos a envío normal — revisá el total y volvé a confirmar.`)
       return
     }
+    if (metodoEntrega === 'vendedor' && !direccion.trim()) {
+      setError('Escribí la dirección donde querés recibirlo.')
+      return
+    }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
       setError('Elegí tu barrio antes de continuar.')
       return
@@ -698,7 +744,7 @@ function CheckoutContent() {
     // esos awaits, el navegador ya no lo reconoce como una acción
     // directa del usuario y la mayoría de los navegadores bloquean el
     // popup silenciosamente — así evitamos ese bloqueo.
-    const abrirWhatsappDirecto = metodoEntrega === 'retiro' && metodoPago === 'efectivo'
+    const abrirWhatsappDirecto = metodoEntrega !== 'envio' && metodoPago === 'efectivo'
     const ventanaWhatsapp = abrirWhatsappDirecto ? window.open('', '_blank') : null
 
     setEtapa('creando')
@@ -731,7 +777,8 @@ function CheckoutContent() {
         const grupoItems = grupos.get(clave)!
         const vendedorId = clave === 'plataforma' ? null : clave
         const subtotal = subtotales[i]
-        const envioGrupo = enviosRepartidos[i]
+        // Envío del vendedor: cada tienda cobra su propio envío.
+        const envioGrupo = metodoEntrega === 'vendedor' ? (vendedorId ? costoEnvioPorVendedor[vendedorId] || 0 : 0) : enviosRepartidos[i]
         const descuentoGrupo = descuentosRepartidos[i]
         const totalGrupo = subtotal - descuentoGrupo + envioGrupo
 
@@ -752,7 +799,7 @@ function CheckoutContent() {
             // vendedor), y recién se le libera la plata una vez
             // confirmada la entrega — así protegemos al comprador si
             // el envío se complica.
-            if (metodoEntrega === 'retiro' && data.configurado) {
+            if (metodoEntrega !== 'envio' && data.configurado) {
               qrImageUrl = data.qrImageUrl || qrPlataforma
               cbu = data.cbu || cbuPlataforma
               cobroPropio = true
@@ -766,7 +813,7 @@ function CheckoutContent() {
           }
         }
 
-        const metodoPagoGrupo = metodoEntrega === 'retiro' ? metodoPago : 'qr'
+        const metodoPagoGrupo = metodoEntrega !== 'envio' ? metodoPago : 'qr'
 
         const resPedido = await fetch('/api/pedidos', {
           method: 'POST',
@@ -857,7 +904,7 @@ function CheckoutContent() {
         // solo hay un subPedido — le llevamos directo a WhatsApp con el
         // detalle del pedido, sin ninguna pantalla intermedia de por
         // medio.
-        const link = nuevos[0] ? linkWhatsappRetiroEfectivo(nuevos[0], nombreComprador) : null
+        const link = nuevos[0] ? linkWhatsappRetiroEfectivo(nuevos[0], nombreComprador, metodoEntrega === 'vendedor' ? { direccion, referencia: referenciaAdicional } : null) : null
         if (link && ventanaWhatsapp) {
           ventanaWhatsapp.location.href = link
         } else if (link) {
@@ -1025,7 +1072,7 @@ function CheckoutContent() {
     // Retiro + efectivo se coordina por WhatsApp, no acá adentro — no
     // hay ningún "pagado" digital que esperar, así que no tiene sentido
     // consultar el servidor cada 4 segundos para nada.
-    if (metodoEntrega === 'retiro' && metodoPago === 'efectivo') return
+    if (metodoEntrega !== 'envio' && metodoPago === 'efectivo') return
 
     let cancelado = false
 
@@ -1177,6 +1224,11 @@ function CheckoutContent() {
             {descuentoCupon > 0 && (
               <div className="font-body text-[12px] text-teal font-semibold mb-0.5">Cupón {cuponAplicado?.codigo}: −{bs(descuentoCupon)}</div>
             )}
+            {metodoEntrega === 'vendedor' && (
+              <div className="font-body text-[12px] text-inksoft mb-1">
+                Envío del vendedor: {envioVendedorTotal > 0 ? bs(envioVendedorTotal) : ''}{envioVendedorACoordinar ? `${envioVendedorTotal > 0 ? ' + ' : ''}a coordinar con el vendedor` : ''}
+              </div>
+            )}
             {metodoEntrega === 'envio' && zonaEntrega && (
               <div className="font-body text-[12px] text-inksoft mb-1">
                 {envioExpress ? 'Envío express' : 'Envío'}:{' '}
@@ -1261,15 +1313,28 @@ function CheckoutContent() {
           <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo quieres recibir tu pedido?</div>
 
           <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
-            <button
-              type="button"
-              onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true) }}
-              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                metodoElegido && metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
-              }`}
-            >
-              🛵 Envío
-            </button>
+            {envioClasiDisponible && (
+              <button
+                type="button"
+                onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true) }}
+                className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                  metodoElegido && metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                }`}
+              >
+                🛵 Envío{envioVendedorDisponible ? ' Clasi Click' : ''}
+              </button>
+            )}
+            {envioVendedorDisponible && (
+              <button
+                type="button"
+                onClick={() => { setMetodoEntrega('vendedor'); setMetodoElegido(true) }}
+                className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
+                  metodoElegido && metodoEntrega === 'vendedor' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
+                }`}
+              >
+                🚚 Envío del vendedor
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setMetodoEntrega('retiro'); setMetodoElegido(true) }}
@@ -1277,9 +1342,14 @@ function CheckoutContent() {
                 metodoElegido && metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
               }`}
             >
-              🏬 Retiro en tienda
+              🏬 Retiro{envioClasiDisponible && envioVendedorDisponible ? '' : ' en tienda'}
             </button>
           </div>
+          {!envioClasiDisponible && !envioVendedorDisponible && !consultandoVendedores && (
+            <div className="font-body text-[12px] text-inksoft mb-3 -mt-2">
+              {envioClasiCiudad ? 'Algunos productos son de otra ciudad: coordiná el retiro o el envío con el vendedor.' : 'En tu ciudad todavía no hay envío de Clasi Click y este vendedor no hace envíos: podés retirarlo en la tienda.'}
+            </div>
+          )}
 
           {!metodoElegido && (
             <div className="font-body text-[12px] text-inksoft mb-2">Elegí una opción para seguir.</div>
@@ -1444,6 +1514,40 @@ function CheckoutContent() {
             </>
           ) : (
             <>
+              {metodoEntrega === 'vendedor' && (
+                <>
+                  <div className="font-body text-[12px] text-ink mb-3 bg-tealsoft border border-teal rounded-lg p-3">
+                    🚚 El envío lo hace el vendedor: le pagás a él y coordinan la entrega por WhatsApp.
+                    {vendedorIdsCarrito.map((id) => {
+                      const e = infoEnvioVendedores[id]?.envioPropio
+                      const nombre = items.find((i) => i.vendedorId === id)?.vendedor || 'Vendedor'
+                      return (
+                        <div key={id} className="mt-1 text-inksoft">
+                          · {nombre}: {e?.costo != null ? bs(e.costo) : 'costo a coordinar'}{e?.detalle ? ` — ${e.detalle}` : ''}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <label className="block text-left mb-3">
+                    <span className="font-body text-[11px] text-inksoft block mb-1">Dirección de entrega *</span>
+                    <input
+                      value={direccion}
+                      onChange={(e) => setDireccion(e.target.value)}
+                      placeholder="Calle, número y zona"
+                      className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                    />
+                  </label>
+                  <label className="block text-left mb-4">
+                    <span className="font-body text-[11px] text-inksoft block mb-1">Referencia (opcional)</span>
+                    <input
+                      value={referenciaAdicional}
+                      onChange={(e) => setReferenciaAdicional(e.target.value)}
+                      placeholder="Ej: portón verde, al lado de la farmacia"
+                      className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                    />
+                  </label>
+                </>
+              )}
               {consultandoVendedores ? (
                 <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
                   Verificando cómo podés pagarle a cada vendedor...
@@ -1451,7 +1555,7 @@ function CheckoutContent() {
               ) : algunVendedorConQR ? (
                 <>
                   <div className="font-body text-[12px] text-inksoft mb-4 bg-panelalt border border-line rounded-lg p-3">
-                    Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.
+                    {metodoEntrega === 'vendedor' ? 'Coordinás la entrega con cada vendedor por WhatsApp una vez que confirmes el pago.' : 'Coordinás el retiro directo con cada vendedor por WhatsApp una vez que confirmes el pago.'}
                   </div>
                   <label className="block text-left mb-4">
                     <span className="font-body text-[11px] text-inksoft block mb-1.5">¿Cómo pagás?</span>
@@ -1496,7 +1600,7 @@ function CheckoutContent() {
             disabled={authCargando}
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
           >
-            {metodoEntrega === 'retiro' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
+            {metodoEntrega !== 'envio' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
           </button>
           </>
           )}
@@ -1766,17 +1870,17 @@ function CheckoutContent() {
         </div>
       )}
 
-      {etapa === 'resumen' && metodoEntrega === 'retiro' && metodoPago === 'efectivo' && (
+      {etapa === 'resumen' && metodoEntrega !== 'envio' && metodoPago === 'efectivo' && (
         <div className="bg-tealsoft border border-teal rounded-xl p-7 text-center">
           <div className="w-11 h-11 rounded-full bg-teal text-white flex items-center justify-center mx-auto mb-3.5 text-xl">✓</div>
           <div className="font-display text-lg font-bold text-ink mb-1.5">Pedido registrado</div>
           <div className="font-body text-[13px] text-inksoft">
-            Coordiná el retiro y el pago directo por WhatsApp con el vendedor.
+            {metodoEntrega === 'vendedor' ? 'Coordiná el envío y el pago directo por WhatsApp con el vendedor.' : 'Coordiná el retiro y el pago directo por WhatsApp con el vendedor.'}
           </div>
         </div>
       )}
 
-      {etapa === 'resumen' && !(metodoEntrega === 'retiro' && metodoPago === 'efectivo') && (
+      {etapa === 'resumen' && !(metodoEntrega !== 'envio' && metodoPago === 'efectivo') && (
         <div>
           {/* Una vez que se confirma el día/horario de entrega (ver
               SelectorHorarioEntrega más abajo), este cartel desaparece
