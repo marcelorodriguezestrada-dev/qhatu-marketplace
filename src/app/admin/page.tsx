@@ -21,6 +21,7 @@ import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
 import CrearUsuario, { mensajeAcceso, abrirWhatsapp, generarPassword } from '@/components/admin/CrearUsuario'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
+import { useSeccionHash, SidebarSecciones, MenuCelularSecciones, VolverCelularSecciones, type ItemSeccion } from '@/components/NavSecciones'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
 function bs(n: number) {
@@ -86,6 +87,25 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica'
+
+const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
+  { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
+  { id: 'pedidos', icono: '🧾', label: 'Pedidos', ayuda: 'Pagos, preparación y entregas', grupo: 'Ventas' },
+  { id: 'reparto', icono: '🛵', label: 'Reparto', ayuda: 'Entregas del día por zona', grupo: 'Ventas' },
+  { id: 'cupones', icono: '🎟️', label: 'Cupones', ayuda: 'Promos y campañas', grupo: 'Ventas' },
+  { id: 'productos', icono: '📦', label: 'Productos', ayuda: 'Moderación y vendedores', grupo: 'Contenido' },
+  { id: 'servicios', icono: '🧑‍🔧', label: 'Servicios profesionales', ayuda: 'Solicitudes e invitaciones', grupo: 'Contenido' },
+  { id: 'anuncios', icono: '📢', label: 'Anuncios', ayuda: 'Clasificados, importar y Facebook', grupo: 'Contenido' },
+  { id: 'banners', icono: '🖼️', label: 'Banners', ayuda: 'Portada del sitio', grupo: 'Contenido' },
+  { id: 'usuarios', icono: '👥', label: 'Usuarios', ayuda: 'Crear, editar, contraseñas', grupo: 'Personas' },
+  { id: 'categorias', icono: '🗂️', label: 'Categorías', ayuda: 'Rubros de servicios', grupo: 'Configuración' },
+  { id: 'categorias-productos', icono: '🏷️', label: 'Categorías de productos', ayuda: 'Rubros de productos', grupo: 'Configuración' },
+  { id: 'metricas', icono: '📊', label: 'Métricas', ayuda: 'Números del sitio', grupo: 'Números' },
+  { id: 'analitica', icono: '📈', label: 'Analítica', ayuda: 'Eventos y recuperación de compras', grupo: 'Números' },
+]
+const IDS_ADMIN = SECCIONES_ADMIN.map((s) => s.id)
+
 export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [autenticado, setAutenticado] = useState(false)
@@ -93,7 +113,11 @@ export default function AdminPage() {
   const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [tab, setTab] = useState<'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica'>('pedidos')
+  // Sección del panel (va en el hash: /admin#usuarios). Sin sección, en
+  // computadora se ve "Inicio" y en el celular el menú de opciones.
+  const { seccion: seccionAdmin, irA: irASeccionAdmin, volver: volverAdmin } = useSeccionHash(IDS_ADMIN)
+  const tab: TabAdmin = seccionAdmin ?? 'inicio'
+  const setTab = (t: TabAdmin) => irASeccionAdmin(t)
   const { categorias, buscarRubro, recargar: recargarCategorias } = useCategorias()
   const { categorias: categoriasProductos, buscarRubroProducto, recargar: recargarCategoriasProductos } = useCategoriasProductos()
 
@@ -1373,6 +1397,16 @@ export default function AdminPage() {
     }).then(() => cargarVendedoresAdmin())
   }
 
+  // Al abrir una sección, cargar lo que necesita (antes lo hacía el
+  // botón de la pestaña).
+  useEffect(() => {
+    if (!autenticado) return
+    if ((tab === 'productos' || tab === 'usuarios') && vendedoresAdmin.length === 0) cargarVendedoresAdmin()
+    if (tab === 'usuarios' && usuarios.length === 0) cargarUsuarios()
+    if (tab === 'metricas' && !metricas) cargarMetricas()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, autenticado])
+
   if (!autenticado) {
     return (
       <div className="max-w-[360px] mx-auto px-5 py-20">
@@ -1419,8 +1453,56 @@ export default function AdminPage() {
   }
 
 
+  const pedidosPorRevisar = pedidos.filter((p) => p.estado === 'informado_pago').length
+  const badgesAdmin: Record<string, number | undefined> = {
+    pedidos: pedidosPorRevisar || undefined,
+    servicios: profesionales.filter((p) => p.estado === 'pendiente_revision').length || undefined,
+    anuncios: anuncios.filter((a) => a.estado === 'pendiente_revision').length || undefined,
+  }
+
   return (
-    <div className="max-w-[640px] mx-auto px-5 py-8">
+    <div className="max-w-7xl mx-auto px-5 py-6">
+      <div className="hidden md:flex items-center justify-between gap-4 mb-5 pb-4 border-b border-line">
+        <div>
+          <div className="font-display text-xl font-bold text-ink">Panel de administración</div>
+          <div className="font-body text-[13px] text-inksoft">Clasi Click</div>
+        </div>
+        <a href="/" className="font-body text-sm text-inksoft underline">Ir al sitio</a>
+      </div>
+
+      <AlarmaPedidos
+        password={password}
+        pedidosIniciales={pedidos}
+        onCambios={(cambiados) =>
+          setPedidos((prev) => {
+            const porId = new Map(prev.map((p: any) => [p.id, p]))
+            for (const c of cambiados) porId.set(c.id, { ...(porId.get(c.id) || {}), ...c })
+            return Array.from(porId.values()).sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+          })
+        }
+      />
+
+
+      <MenuCelularSecciones
+        items={SECCIONES_ADMIN}
+        visible={!seccionAdmin}
+        irA={irASeccionAdmin}
+        badges={badgesAdmin}
+        encabezado={
+          <div className="bg-maroon text-white px-5 py-5 mb-1">
+            <div className="font-display text-lg font-bold">Panel de administración</div>
+            <div className="font-body text-sm text-white/80">Clasi Click · elegí una sección</div>
+          </div>
+        }
+      />
+
+      <div className="md:flex md:gap-6 md:items-start">
+        <SidebarSecciones items={SECCIONES_ADMIN} activa={tab} irA={irASeccionAdmin} badges={badgesAdmin} />
+        <main className={`flex-1 min-w-0 max-w-[900px] ${seccionAdmin ? '' : 'hidden md:block'}`}>
+          <VolverCelularSecciones items={SECCIONES_ADMIN} seccion={seccionAdmin} volver={volverAdmin} />
+
+      {tab === 'inicio' && (
+        <div>
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-panel border border-line rounded-xl p-3.5">
           <div className="font-body text-[11px] text-inksoft">Pedidos</div>
@@ -1503,102 +1585,9 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <AlarmaPedidos
-        password={password}
-        pedidosIniciales={pedidos}
-        onCambios={(cambiados) =>
-          setPedidos((prev) => {
-            const porId = new Map(prev.map((p: any) => [p.id, p]))
-            for (const c of cambiados) porId.set(c.id, { ...(porId.get(c.id) || {}), ...c })
-            return Array.from(porId.values()).sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-          })
-        }
-      />
+        </div>
+      )}
 
-      <div className="flex gap-2 mb-6 border-b border-line flex-wrap">
-        <button
-          onClick={() => setTab('pedidos')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'pedidos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Pedidos
-        </button>
-        <button
-          onClick={() => { setTab('productos'); if (vendedoresAdmin.length === 0) cargarVendedoresAdmin() }}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'productos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Productos
-        </button>
-        <button
-          onClick={() => setTab('servicios')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'servicios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Servicios profesionales
-          {profesionales.filter((p) => p.estado === 'pendiente_revision').length > 0 && (
-            <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {profesionales.filter((p) => p.estado === 'pendiente_revision').length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setTab('anuncios')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'anuncios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Anuncios
-          {anuncios.filter((a) => a.estado === 'pendiente_revision').length > 0 && (
-            <span className="ml-1.5 inline-block bg-ochre text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {anuncios.filter((a) => a.estado === 'pendiente_revision').length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setTab('reparto')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'reparto' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Reparto
-        </button>
-        <button
-          onClick={() => setTab('banners')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'banners' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Banners
-        </button>
-        <button
-          onClick={() => { setTab('usuarios'); if (usuarios.length === 0) cargarUsuarios(); if (vendedoresAdmin.length === 0) cargarVendedoresAdmin() }}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'usuarios' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Usuarios
-        </button>
-        <button
-          onClick={() => setTab('categorias')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'categorias' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Categorías
-        </button>
-        <button
-          onClick={() => setTab('categorias-productos')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'categorias-productos' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Categorías de productos
-        </button>
-        <button
-          onClick={() => { setTab('metricas'); if (!metricas) cargarMetricas() }}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'metricas' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Métricas
-        </button>
-        <button
-          onClick={() => setTab('cupones')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'cupones' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Cupones
-        </button>
-        <button
-          onClick={() => setTab('analitica')}
-          className={`px-4 py-2.5 font-body text-sm font-semibold border-b-2 ${tab === 'analitica' ? 'border-maroon text-ink' : 'border-transparent text-inksoft'}`}
-        >
-          Analítica
-        </button>
-      </div>
 
       {tab === 'cupones' && <AdminCupones password={password} />}
       {tab === 'analitica' && (
@@ -3989,6 +3978,8 @@ export default function AdminPage() {
           )}
         </div>
       )}
+        </main>
+      </div>
     </div>
   )
 }
