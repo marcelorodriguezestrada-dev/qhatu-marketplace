@@ -13,6 +13,7 @@ import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { usePortada } from '@/lib/portada'
 import BuscadorProductos, { guardarReciente } from '@/components/BuscadorProductos'
 import { coincide, textoBuscable } from '@/lib/busqueda'
+import ListadoResultados from '@/components/ListadoResultados'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -36,6 +37,8 @@ export default function CatalogoPage() {
   const [menuCategorias, setMenuCategorias] = useState(false)
   const portada = usePortada()
   const [busqueda, setBusqueda] = useState('')
+  // Búsqueda confirmada (Enter / lupa / sugerencia) — muestra el listado.
+  const [consulta, setConsulta] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
   const { usuario, logout } = useAuth()
@@ -55,8 +58,7 @@ export default function CatalogoPage() {
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
     const matchCat = rubroSel ? p.rubro === rubroSel : categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
-    const matchBusqueda = !busqueda.trim() || coincide(textoBuscable(p, buscarRubroProducto(p.rubro)), busqueda)
-    return matchPublico && matchCat && matchBusqueda
+    return matchPublico && matchCat
   })
 
   // Solo entran acá los descuentos reales (precioOriginal cargado por
@@ -68,15 +70,35 @@ export default function CatalogoPage() {
   const router = useRouter()
   const pathname = usePathname()
 
+  const resultadosBusqueda = consulta.trim() ? productos.filter((p) => coincide(textoBuscable(p, buscarRubroProducto(p.rubro)), consulta)) : []
+  function buscar(texto: string) {
+    const t = texto.trim()
+    setConsulta(t)
+    if (t) guardarReciente(t)
+    router.push(`${pathname}${t ? `?q=${encodeURIComponent(t)}` : ''}`)
+    window.scrollTo({ top: 0 })
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q') || ''
-    if (q) setBusqueda(q)
+    if (q) { setBusqueda(q); setConsulta(q) }
     const cat = params.get('categoria')
     const rub = params.get('rubro')
     if (cat) setCategoria(cat)
     if (rub) setRubroSel(rub)
+  }, [])
+
+  // Atrás/adelante del navegador: seguir la búsqueda de la URL.
+  useEffect(() => {
+    const alVolver = () => {
+      const q = new URLSearchParams(window.location.search).get('q') || ''
+      setBusqueda(q)
+      setConsulta(q)
+    }
+    window.addEventListener('popstate', alVolver)
+    return () => window.removeEventListener('popstate', alVolver)
   }, [])
 
   // Cuántos productos hay por rubro y por categoría (para el menú y los chips).
@@ -136,20 +158,13 @@ export default function CatalogoPage() {
             <BuscadorProductos
               valor={busqueda}
               onCambiar={setBusqueda}
-              onBuscar={(texto) => {
-                const q = encodeURIComponent(texto || '')
-                router.push(`${pathname}${q ? `?q=${q}` : ''}`)
-              }}
+              onBuscar={buscar}
               productos={productos}
               rubroDe={buscarRubroProducto}
             />
             <button
               type="button"
-              onClick={() => {
-                guardarReciente(busqueda)
-                const q = encodeURIComponent(busqueda || '')
-                router.push(`${pathname}${q ? `?q=${q}` : ''}`)
-              }}
+              onClick={() => buscar(busqueda)}
               className="px-3 py-2 rounded-lg bg-white/20 text-white text-sm shrink-0"
               aria-label="Buscar"
             >
@@ -203,6 +218,17 @@ export default function CatalogoPage() {
 
       <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
         <BannerCiudad />
+        {consulta.trim() ? (
+          <ListadoResultados
+            consulta={consulta}
+            resultados={resultadosBusqueda}
+            rubroDe={buscarRubroProducto}
+            ciudadId={ciudadId}
+            onBuscar={buscar}
+            onLimpiarBusqueda={() => { setBusqueda(''); buscar('') }}
+          />
+        ) : (
+        <>
         {portada?.accesos !== false && (
         <div className="grid grid-cols-2 gap-3 mb-6">
           {/* Estás en Productos: ese botón va en verde (seleccionado) y
@@ -330,6 +356,8 @@ export default function CatalogoPage() {
               ? <>Todavía no hay productos en tu ciudad. ¿Vendés algo? <Link href="/vender" className="text-teal underline">Publicalo gratis</Link></>
               : 'No encontramos productos para esa búsqueda.'}
           </div>
+        )}
+        </>
         )}
       </div>
 
