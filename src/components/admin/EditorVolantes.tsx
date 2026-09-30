@@ -35,6 +35,7 @@ export default function EditorVolantes({ password, campanas }: { password: strin
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
   const [plantillaId, setPlantillaId] = useState<string | null>(null)
   const [nombrePlantilla, setNombrePlantilla] = useState('')
+  const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [bajando, setBajando] = useState(false)
   const [copiado, setCopiado] = useState(false)
@@ -94,14 +95,22 @@ export default function EditorVolantes({ password, campanas }: { password: strin
     }
   }
 
-  async function guardarPlantilla() {
+  async function guardarPlantilla(comoNueva = false) {
     const nombre = nombrePlantilla.trim()
     if (nombre.length < 2) { setMensaje('Poné un nombre a la plantilla.'); return }
-    const d = await fetch('/api/admin/volantes', { method: 'POST', headers, body: JSON.stringify({ id: plantillaId, nombre, config }) }).then((r) => r.json())
-    if (d.error) { setMensaje(d.error); return }
-    setPlantillaId(d.id)
-    setMensaje('Plantilla guardada ✓')
-    cargarPlantillas()
+    setGuardando(true)
+    setMensaje('')
+    try {
+      const d = await fetch('/api/admin/volantes', { method: 'POST', headers, body: JSON.stringify({ id: comoNueva ? null : plantillaId, nombre, config }) })
+        .then((r) => r.json())
+        .catch(() => ({ error: 'No se pudo guardar la plantilla. Probá de nuevo.' }))
+      if (d.error) { setMensaje(d.error); return }
+      setPlantillaId(d.id)
+      setMensaje(`Plantilla “${nombre}” guardada ✓ — la tenés arriba en “Mis plantillas”.`)
+      cargarPlantillas()
+    } finally {
+      setGuardando(false)
+    }
   }
 
   async function borrarPlantilla(p: Plantilla) {
@@ -149,9 +158,11 @@ export default function EditorVolantes({ password, campanas }: { password: strin
           <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => subirImagen(e.target.files?.[0] || null, 'fondo')} />
         </label>
       </div>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="font-body text-[11px] text-inksoft">Mis plantillas:</span>
+        {plantillas.length === 0 && <span className="font-body text-[11px] text-inksoft italic">todavía no guardaste ninguna — armá un volante y tocá “💾 Guardar como plantilla”.</span>}
       {plantillas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span className="font-body text-[11px] text-inksoft">Mis plantillas:</span>
+        <>
           {plantillas.map((p) => (
             <span key={p.id} className={`${chip(plantillaId === p.id)} inline-flex items-center gap-1.5`}>
               <button type="button" onClick={() => { setConfig(p.config); setPlantillaId(p.id); setNombrePlantilla(p.nombre) }}>
@@ -160,8 +171,9 @@ export default function EditorVolantes({ password, campanas }: { password: strin
               <button type="button" onClick={() => borrarPlantilla(p)} className="text-inksoft hover:text-maroon" aria-label={`Borrar ${p.nombre}`}>✕</button>
             </span>
           ))}
-        </div>
+        </>
       )}
+      </div>
 
       <div className="grid md:grid-cols-[1fr_300px] gap-4">
         <div className="grid gap-3 content-start">
@@ -291,9 +303,14 @@ export default function EditorVolantes({ password, campanas }: { password: strin
               {copiado ? '✓ Copiado' : '🔗 Copiar link de la imagen'}
             </button>
             <input value={nombrePlantilla} onChange={(e) => setNombrePlantilla(e.target.value)} placeholder="Nombre para guardarla" className="px-2.5 py-2 rounded-lg border border-line font-body text-xs w-44" />
-            <button type="button" onClick={guardarPlantilla} className="px-3 py-2 rounded-lg border border-teal bg-tealsoft text-teal font-body text-xs font-semibold">
-              💾 {plantillaId ? 'Actualizar plantilla' : 'Guardar como plantilla'}
+            <button type="button" onClick={() => guardarPlantilla()} disabled={guardando} className="px-3 py-2 rounded-lg border border-teal bg-tealsoft text-teal font-body text-xs font-semibold disabled:opacity-60">
+              💾 {guardando ? 'Guardando...' : plantillaId ? 'Actualizar plantilla' : 'Guardar como plantilla'}
             </button>
+            {plantillaId && (
+              <button type="button" onClick={() => guardarPlantilla(true)} disabled={guardando} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink disabled:opacity-60">
+                Guardar como nueva
+              </button>
+            )}
           </div>
           {mensaje && <div className="font-body text-xs text-ink">{mensaje}</div>}
           {!campana && <div className="font-body text-[10px] text-ochre">Sin campaña elegida: el QR funciona, pero no vas a poder medir cuánta gente entró por este volante.</div>}

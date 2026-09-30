@@ -30,14 +30,26 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const nombre = String(body.nombre || '').trim().slice(0, 50)
   if (nombre.length < 2) return NextResponse.json({ error: 'Poné un nombre a la plantilla.' }, { status: 400 })
-  const datos = { nombre, config: sanearConfigVolante(body.config), updatedAt: new Date().toISOString() }
-  const col = getDb().collection('volantes_plantillas')
-  if (typeof body.id === 'string' && body.id) {
-    await col.doc(body.id).set(datos, { merge: true })
-    return NextResponse.json({ id: body.id })
+  // JSON ida y vuelta: Firestore no acepta campos `undefined` (logoUrl,
+  // fondoUrl vacíos) y antes el guardado fallaba sin avisar.
+  const config = JSON.parse(JSON.stringify(sanearConfigVolante(body.config)))
+  const datos = { nombre, config, updatedAt: new Date().toISOString() }
+  try {
+    const col = getDb().collection('volantes_plantillas')
+    if (typeof body.id === 'string' && body.id) {
+      const ref = col.doc(body.id)
+      // update() reemplaza `config` entero (si sacaste el logo, se va).
+      if ((await ref.get()).exists) {
+        await ref.update(datos)
+        return NextResponse.json({ id: body.id })
+      }
+    }
+    const ref = await col.add({ ...datos, createdAt: datos.updatedAt })
+    return NextResponse.json({ id: ref.id })
+  } catch (err) {
+    console.error('POST /api/admin/volantes', err)
+    return NextResponse.json({ error: 'No se pudo guardar la plantilla. Probá de nuevo.' }, { status: 500 })
   }
-  const ref = await col.add({ ...datos, createdAt: datos.updatedAt })
-  return NextResponse.json({ id: ref.id })
 }
 
 export async function DELETE(req: NextRequest) {
