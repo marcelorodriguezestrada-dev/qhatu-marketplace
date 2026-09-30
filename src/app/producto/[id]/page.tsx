@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
+import { usePortada } from '@/lib/portada'
 import { agotado, ultimasUnidades } from '@/lib/stock'
 import ResenasProducto, { Estrellas } from '@/components/ResenasProducto'
 import PreguntasProducto from '@/components/PreguntasProducto'
@@ -63,6 +64,7 @@ export default function ProductoDetallePage() {
   const [producto, setProducto] = useState<any>(null)
   const [tienda, setTienda] = useState<any>(null)
   const [relacionados, setRelacionados] = useState<any[]>([])
+  const portada = usePortada()
   const [cargando, setCargando] = useState(true)
   const [cantidad, setCantidad] = useState(1)
   const [imagenRota, setImagenRota] = useState(false)
@@ -251,7 +253,7 @@ export default function ProductoDetallePage() {
         </div>
       </div>
 
-      <BannerCuponPromo />
+      {portada?.cupon && <BannerCuponPromo />}
 
       {/* Pestañas */}
       <div className="flex gap-1 mb-6 border-b border-line">
