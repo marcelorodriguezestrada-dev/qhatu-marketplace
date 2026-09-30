@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sumarCampana } from '@/lib/campanasServer'
 import { ciudadDe, sanearCiudad } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
       // si falla, no bloqueamos la publicación por esto
     }
 
+    const esPrimerProducto = (await db.collection('productos').where('vendedorId', '==', usuario.uid).limit(1).get()).empty
     const ref = await db.collection('productos').add({
       nombre,
       rubro,
@@ -147,6 +149,8 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
+    // Vendedor nuevo (primer producto) que llegó por una campaña.
+    if (esPrimerProducto && body.campana) await sumarCampana(body.campana, { vendedores: 1 })
     return NextResponse.json({ id: ref.id })
   } catch (err) {
     console.error('POST /api/productos', err)

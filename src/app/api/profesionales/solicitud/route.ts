@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sumarCampana } from '@/lib/campanasServer'
 import { sanearCiudad, sanearViajaA } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA } from '@/lib/moderacionIA'
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
       clicsWhatsapp: 0,
       createdAt: new Date().toISOString(),
     })
+    if (body.campana) await sumarCampana(body.campana, { profesionales: 1 })
     return NextResponse.json({ id: ref.id })
   } catch (err) {
     console.error('POST /api/profesionales/solicitud', err)

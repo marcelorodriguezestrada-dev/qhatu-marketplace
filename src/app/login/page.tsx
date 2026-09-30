@@ -1,5 +1,6 @@
 'use client'
 
+import { leerCampana } from '@/lib/campana'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -131,7 +132,7 @@ export default function LoginPage() {
         const resRegistrar = await fetch('/api/usuarios/registrar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ celular }),
+          body: JSON.stringify({ celular, campana: leerCampana() }),
         })
         if (!resRegistrar.ok) {
           const dataRegistrar = await resRegistrar.json().catch(() => ({}))

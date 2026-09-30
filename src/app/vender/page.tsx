@@ -1,5 +1,6 @@
 'use client'
 
+import { leerCampana } from '@/lib/campana'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -672,6 +673,7 @@ export default function VenderPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             ciudad: tiendaCiudad || ciudadComprador,
+            campana: leerCampana(),
             nombre,
             rubro,
             publico,

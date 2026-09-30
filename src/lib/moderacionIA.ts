@@ -670,3 +670,41 @@ export async function textoMarketingIA(datos: string, red: string, tono: string)
     return null
   }
 }
+
+// Admin → Marketing: reescribe un texto de marketing (mensaje directo o
+// post) manteniendo los datos y el link. null si no hay IA.
+export async function reescribirMarketingIA(base: string, red: string, tono: string, ciudad: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        max_completion_tokens: 900,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              `Sos el community manager de Clasi Click, un marketplace de ${ciudad}, Bolivia (gratis para vendedores y profesionales). ` +
+              `Reescribí el texto que te paso para ${red}, con tono ${tono}, en español boliviano cercano, con emojis moderados. ` +
+              'Mantené el sentido, NO inventes precios, descuentos, premios ni datos que no estén, y conservá cada link EXACTAMENTE igual. ' +
+              'Si es un mensaje directo, que sea corto y personal (máx. 5 líneas). Respondé SOLO JSON: {"texto": "..."}',
+          },
+          { role: 'user', content: base },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const parsed = JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+    const texto = String(parsed.texto || '').trim()
+    return texto ? texto.slice(0, 2000) : null
+  } catch (err) {
+    console.error('reescribirMarketingIA', err)
+    return null
+  }
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sumarCampana } from '@/lib/campanasServer'
 import { sanearCiudad } from '@/data/ciudades'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA, categorizarAnuncio } from '@/lib/moderacionIA'
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     })
 
+    if (body.campana) await sumarCampana(body.campana, { anuncios: 1 })
     return NextResponse.json({ id: ref.id }, { status: 201 })
   } catch (err) {
     console.error('POST /api/anuncios', err)
