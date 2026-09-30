@@ -708,3 +708,42 @@ export async function reescribirMarketingIA(base: string, red: string, tono: str
     return null
   }
 }
+
+// Admin → Marketing → Volantes: a partir de una idea, los textos del
+// volante (título, subtítulo, dos columnas con 3 puntos, llamado a la
+// acción y pie) + un tema de colores sugerido. null si no hay IA.
+export async function textosVolanteIA(idea: string, ciudad: string, temas: string[]): Promise<any | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        max_completion_tokens: 1200,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              `Sos diseñador publicitario de Clasi Click, marketplace gratuito de ${ciudad}, Bolivia (productos, servicios profesionales y anuncios; pago con QR; envío o retiro; matcheo automático entre quien busca y quien ofrece). ` +
+              'Armá los textos de UN volante a partir de la idea del usuario, en español boliviano, cortos y con gancho. ' +
+              'No inventes precios, premios, sorteos ni descuentos que la idea no mencione. ' +
+              `Respondé SOLO JSON con esta forma exacta: {"titulo": "máx 28 caracteres, en mayúsculas", "subtitulo": "máx 70 caracteres, usá | para cortar en 2 líneas", "bajada": "máx 70, usá | para 2 líneas", ` +
+              '"cajas": [{"titulo": "máx 24, mayúsculas", "bajada": "máx 40", "items": ["máx 32", "máx 32", "máx 32"]}, {…igual…}], "cta": "máx 55", "pie": "máx 60", ' +
+              `"tema": uno de ${JSON.stringify(temas)}, "destino": "/" | "/vender" | "/publicar-servicio"}`,
+          },
+          { role: 'user', content: idea.slice(0, 600) },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+  } catch (err) {
+    console.error('textosVolanteIA', err)
+    return null
+  }
+}
