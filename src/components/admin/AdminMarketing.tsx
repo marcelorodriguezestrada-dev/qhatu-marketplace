@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, linkCampana } from '@/lib/campanas'
 import { TEXTOS_ADMIN, gentilicioDe } from '@/lib/marketingAdmin'
 import { CIUDADES, buscarCiudad, type CiudadId } from '@/data/ciudades'
+import EditorVolantes from './EditorVolantes'
 
 // Admin → "📣 Marketing": campañas con link rastreable (?c=) y sus
 // números, mensajes para invitar vendedores/profesionales, posts para
@@ -55,14 +56,6 @@ export default function AdminMarketing({ password }: { password: string }) {
   const [reescribiendo, setReescribiendo] = useState(false)
   const [errorTexto, setErrorTexto] = useState('')
 
-  // Volantes
-  const [tipoVolante, setTipoVolante] = useState<'general' | 'vendedores' | 'profesionales'>('general')
-  const [formato, setFormato] = useState<'post' | 'cuadrado' | 'historia'>('post')
-  const [ciudadVolante, setCiudadVolante] = useState<CiudadId>('potosi')
-  const [campanaVolante, setCampanaVolante] = useState('')
-  const [tituloVolante, setTituloVolante] = useState('')
-  const [subtituloVolante, setSubtituloVolante] = useState('')
-  const [bajando, setBajando] = useState(false)
 
   async function cargar() {
     const d = await fetch('/api/admin/campanas', { headers }).then((r) => r.json()).catch(() => ({}))
@@ -92,7 +85,6 @@ export default function AdminMarketing({ password }: { password: string }) {
       await cargar()
       // La dejamos elegida para los textos y el volante.
       setCampanaTexto(d.id)
-      setCampanaVolante(d.id)
     } catch (err: any) {
       setErrorCampana(err?.message || 'No se pudo crear.')
     } finally {
@@ -134,26 +126,6 @@ export default function AdminMarketing({ password }: { password: string }) {
       setErrorTexto(err?.message || 'No se pudo reescribir.')
     } finally {
       setReescribiendo(false)
-    }
-  }
-
-  const paramsVolante = new URLSearchParams({ tipo: tipoVolante, formato, ciudad: ciudadVolante })
-  if (campanaVolante) paramsVolante.set('c', campanaVolante)
-  if (tituloVolante.trim()) paramsVolante.set('t', tituloVolante.trim())
-  if (subtituloVolante.trim()) paramsVolante.set('s', subtituloVolante.trim())
-  const urlVolante = `/api/marketing/volante?${paramsVolante.toString()}`
-
-  async function descargarVolante() {
-    setBajando(true)
-    try {
-      const blob = await (await fetch(urlVolante)).blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `clasiclick-volante-${tipoVolante}-${ciudadVolante}-${formato}.png`
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000)
-    } finally {
-      setBajando(false)
     }
   }
 
@@ -291,42 +263,7 @@ export default function AdminMarketing({ password }: { password: string }) {
       </div>
 
       {/* 3. Volantes */}
-      <div className="bg-panel border border-line rounded-xl p-4">
-        <div className="font-body text-sm font-semibold text-ink mb-1">🖼️ Volantes e imágenes</div>
-        <div className="font-body text-[11px] text-inksoft mb-3">Con QR al link de la campaña: sirve para imprimir (mercados, ferias, locales) y para publicar en redes.</div>
-        <div className="grid md:grid-cols-[1fr_300px] gap-4">
-          <div className="grid gap-2 content-start">
-            <div className="flex flex-wrap gap-2">
-              <select value={tipoVolante} onChange={(e) => setTipoVolante(e.target.value as any)} className={sel} aria-label="Tipo de volante">
-                <option value="general">General (comprar y vender)</option>
-                <option value="vendedores">Para vendedores</option>
-                <option value="profesionales">Para profesionales</option>
-              </select>
-              <select value={formato} onChange={(e) => setFormato(e.target.value as any)} className={sel} aria-label="Formato">
-                <option value="post">Post / volante (4:5)</option>
-                <option value="cuadrado">Cuadrado (1:1)</option>
-                <option value="historia">Historia / estado (9:16)</option>
-              </select>
-              {selectCiudad(ciudadVolante, setCiudadVolante)}
-              {selectCampana(campanaVolante, setCampanaVolante)}
-            </div>
-            <input value={tituloVolante} onChange={(e) => setTituloVolante(e.target.value.slice(0, 40))} placeholder="Título (opcional, ej: ¡ATENCIÓN VECINOS!)" className="px-3 py-2 rounded-lg border border-line font-body text-xs" />
-            <input value={subtituloVolante} onChange={(e) => setSubtituloVolante(e.target.value.slice(0, 90))} placeholder="Subtítulo (opcional; usá | para cortar la línea)" className="px-3 py-2 rounded-lg border border-line font-body text-xs" />
-            <div className="flex flex-wrap gap-2 mt-1">
-              <button type="button" onClick={descargarVolante} disabled={bajando} className="px-4 py-2 rounded-lg border-none bg-maroon text-white font-body text-xs font-semibold disabled:opacity-60">
-                {bajando ? 'Preparando...' : '⬇️ Descargar imagen'}
-              </button>
-              <button type="button" onClick={() => copiar(`${SITE}${urlVolante}`, 'vol')} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink">
-                {copiado === 'vol' ? '✓ Copiado' : '🔗 Copiar link de la imagen'}
-              </button>
-            </div>
-            {!campanaVolante && <div className="font-body text-[10px] text-ochre">Sin campaña elegida: el QR funciona, pero no vas a poder medir cuánta gente entró por este volante.</div>}
-          </div>
-          <div className={`bg-panelalt rounded-lg overflow-hidden border border-line ${formato === 'historia' ? 'aspect-[9/16] max-h-[520px]' : formato === 'cuadrado' ? 'aspect-square' : 'aspect-[4/5]'}`}>
-            <img key={urlVolante} src={urlVolante} alt="Vista previa del volante" className="w-full h-full object-contain" />
-          </div>
-        </div>
-      </div>
+      <EditorVolantes password={password} campanas={campanas || []} />
     </div>
   )
 }
