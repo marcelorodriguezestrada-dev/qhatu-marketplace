@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
+import AdminMarketing from '@/components/admin/AdminMarketing'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
@@ -89,13 +90,14 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
-type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica'
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing'
 
 const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
   { id: 'pedidos', icono: '🧾', label: 'Pedidos', ayuda: 'Pagos, preparación y entregas', grupo: 'Ventas' },
   { id: 'reparto', icono: '🛵', label: 'Reparto', ayuda: 'Entregas del día por zona', grupo: 'Ventas' },
   { id: 'cupones', icono: '🎟️', label: 'Cupones', ayuda: 'Promos y campañas', grupo: 'Ventas' },
+  { id: 'marketing', icono: '📣', label: 'Marketing', ayuda: 'Campañas, mensajes y volantes', grupo: 'Ventas' },
   { id: 'productos', icono: '📦', label: 'Productos', ayuda: 'Moderación y vendedores', grupo: 'Contenido' },
   { id: 'servicios', icono: '🧑‍🔧', label: 'Servicios profesionales', ayuda: 'Solicitudes e invitaciones', grupo: 'Contenido' },
   { id: 'anuncios', icono: '📢', label: 'Anuncios', ayuda: 'Clasificados, importar y Facebook', grupo: 'Contenido' },
@@ -1593,6 +1595,7 @@ export default function AdminPage() {
 
 
       {tab === 'cupones' && <AdminCupones password={password} />}
+      {tab === 'marketing' && <AdminMarketing password={password} />}
       {tab === 'analitica' && (
         <>
           <AdminRecuperacion password={password} />

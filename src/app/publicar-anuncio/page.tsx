@@ -1,5 +1,6 @@
 'use client'
 
+import { leerCampana } from '@/lib/campana'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
@@ -56,7 +57,7 @@ export default function PublicarAnuncioPage() {
       const res = await fetch('/api/anuncios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl, rubro: tipo === 'busqueda' ? rubro : undefined, ciudad: ciudadAnuncio || ciudadId }),
+        body: JSON.stringify({ titulo, descripcion, tipo, precio, whatsapp, whatsappPais, imagenUrl, rubro: tipo === 'busqueda' ? rubro : undefined, ciudad: ciudadAnuncio || ciudadId, campana: leerCampana() }),
       })
       const data = await res.json()
       if (data.error) {

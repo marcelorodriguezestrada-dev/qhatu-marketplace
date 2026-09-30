@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sumarCampana } from '@/lib/campanasServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 
@@ -15,22 +16,26 @@ export async function POST(req: NextRequest) {
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
 
   try {
-    const { celular } = await req.json()
+    const { celular, campana } = await req.json()
     const chequeo = validarWhatsappBoliviano(celular || '')
     if (!chequeo.valido) {
       return NextResponse.json({ error: chequeo.motivo }, { status: 400 })
     }
 
     const db = getDb()
+    const yaExistia = (await db.collection('usuarios').doc(usuario.uid).get()).exists
     await db.collection('usuarios').doc(usuario.uid).set(
       {
         celular: (celular || '').replace(/\D/g, ''),
         email: usuario.email,
         emailVerificado: false,
         createdAt: new Date().toISOString(),
+        ...(campana ? { campana: String(campana).slice(0, 40) } : {}),
       },
       { merge: true }
     )
+    // Cuenta nueva que llegó por una campaña de marketing.
+    if (!yaExistia && campana) await sumarCampana(campana, { registros: 1 })
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('POST /api/usuarios/registrar', err)

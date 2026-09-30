@@ -1,5 +1,6 @@
 'use client'
 
+import { leerCampana } from '@/lib/campana'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -232,7 +233,7 @@ export default function PublicarServicioPage() {
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
           especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
-          ciudad: ciudadFinal, atiendePresencial, atiendeOnline, viajaA,
+          ciudad: ciudadFinal, atiendePresencial, atiendeOnline, viajaA, campana: leerCampana(),
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
         }),

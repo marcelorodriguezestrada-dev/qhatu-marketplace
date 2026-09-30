@@ -1,5 +1,6 @@
 'use client'
 
+import { leerCampana } from '@/lib/campana'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useCiudad } from '@/lib/ciudad'
 import { ciudadDe, envioPropioLlegaA, type CiudadId, type EnvioPropio } from '@/data/ciudades'
@@ -837,6 +838,7 @@ function CheckoutContent() {
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
             envioExpress: metodoEntrega === 'envio' ? envioExpress : false,
+            campana: leerCampana(),
             cupon: cuponVigente
               ? {
                   codigo: cuponVigente.codigo,

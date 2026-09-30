@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sumarCampana } from '@/lib/campanasServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
@@ -221,6 +222,8 @@ export async function POST(req: NextRequest) {
         console.error('métrica recuperación', err)
       }
     }
+    // Compra que llegó por una campaña de marketing (no cuentan las de prueba).
+    if (body.campana && !esPrueba) await sumarCampana(body.campana, { pedidos: 1, ventasBs: Number(total) || 0 })
     return NextResponse.json({ id: ref.id })
   } catch (err) {
     console.error('POST /api/pedidos', err)
