@@ -70,6 +70,11 @@ export default function VenderPage() {
   const [thumbUrl, setThumbUrl] = useState('')
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [subiendoImagen, setSubiendoImagen] = useState(false)
+  // Detección de categoría por la foto (IA con visión). Si el vendedor
+  // ya eligió la categoría a mano, no se la pisamos.
+  const [categoriaTocada, setCategoriaTocada] = useState(false)
+  const [detectandoCategoria, setDetectandoCategoria] = useState(false)
+  const [categoriaDetectada, setCategoriaDetectada] = useState('')
   const [publicando, setPublicando] = useState(false)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -442,11 +447,36 @@ export default function VenderPage() {
       setImagenUrl(data.url)
       setImagenViewerUrl(data.urlViewer || '')
       setThumbUrl(data.thumbUrl || '')
+      detectarCategoria(data.url)
     } catch (e) {
       // @ts-ignore
       setError('Error subiendo la imagen: ' + (e?.message || e))
     } finally {
       setSubiendoImagen(false)
+    }
+  }
+
+  async function detectarCategoria(url: string) {
+    if (editingId || categoriaTocada || !url) return
+    setDetectandoCategoria(true)
+    setCategoriaDetectada('')
+    try {
+      const token = await obtenerToken()
+      const d = await fetch('/api/productos/detectar-categoria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ imagenUrl: url }),
+      }).then((r) => r.json())
+      if (!d.rubroId) return
+      setCategoriaProductoSel(d.categoriaId)
+      setRubro(d.rubroId)
+      const info = buscarRubroProducto(d.rubroId)
+      setCategoriaDetectada(info ? `${info.categoriaLabel} › ${info.label}` : d.rubroId)
+      if (d.nombre) setNombre((n) => n || d.nombre)
+    } catch {
+      // Opcional: si falla, el vendedor elige a mano.
+    } finally {
+      setDetectandoCategoria(false)
     }
   }
 
@@ -702,6 +732,8 @@ export default function VenderPage() {
         idPublicado = data.id
       }
       setPublicadoOk({ id: idPublicado, nombre: nombrePublicado, editado: fueEdicion })
+      setCategoriaTocada(false)
+      setCategoriaDetectada('')
       setTimeout(() => avisoPublicadoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
       setNombre('')
       setPrecio('')
@@ -947,6 +979,8 @@ export default function VenderPage() {
             onChange={(e) => {
               const catId = e.target.value
               setCategoriaProductoSel(catId)
+              setCategoriaTocada(true)
+              setCategoriaDetectada('')
               const cat = categoriasProductos.find((c) => c.id === catId)
               setRubro(cat?.rubros[0]?.id || '')
             }}
@@ -958,7 +992,7 @@ export default function VenderPage() {
           </select>
           <select
             value={rubro}
-            onChange={(e) => setRubro(e.target.value)}
+            onChange={(e) => { setRubro(e.target.value); setCategoriaTocada(true); setCategoriaDetectada('') }}
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
           >
             {rubrosDeCategoriaSel.map((r) => (
@@ -966,6 +1000,11 @@ export default function VenderPage() {
             ))}
           </select>
         </div>
+        {(detectandoCategoria || categoriaDetectada) && (
+          <div className="font-body text-[12px] -mt-1.5 mb-3 text-teal">
+            {detectandoCategoria ? '🔎 Mirando la foto para elegir la categoría...' : `✨ Categoría detectada por la foto: ${categoriaDetectada}. Si no es, cambiala arriba.`}
+          </div>
+        )}
         <div className="mb-3">
           <input
             type="number"
@@ -1102,6 +1141,8 @@ export default function VenderPage() {
                 className="font-body text-xs"
               />
               {subiendoImagen && <div className="font-body text-xs text-maroon mt-1">Subiendo imagen...</div>}
+              {detectandoCategoria && <div className="font-body text-xs text-teal mt-1">🔎 Detectando la categoría por la foto...</div>}
+              {!detectandoCategoria && categoriaDetectada && <div className="font-body text-xs text-teal mt-1">✨ Categoría elegida: {categoriaDetectada} (podés cambiarla arriba)</div>}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1222,6 +1263,8 @@ export default function VenderPage() {
               type="button"
               onClick={() => {
                 setEditingId(null)
+                setCategoriaTocada(false)
+                setCategoriaDetectada('')
                 setFotosExtra([])
                 setNombre('')
                 setCategoriaProductoSel(categoriasProductos[0]?.id || '')
