@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
+import AdminPortada from '@/components/admin/AdminPortada'
 import AdminMarketing from '@/components/admin/AdminMarketing'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
@@ -101,7 +102,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'productos', icono: '📦', label: 'Productos', ayuda: 'Moderación y vendedores', grupo: 'Contenido' },
   { id: 'servicios', icono: '🧑‍🔧', label: 'Servicios profesionales', ayuda: 'Solicitudes e invitaciones', grupo: 'Contenido' },
   { id: 'anuncios', icono: '📢', label: 'Anuncios', ayuda: 'Clasificados, importar y Facebook', grupo: 'Contenido' },
-  { id: 'banners', icono: '🖼️', label: 'Banners', ayuda: 'Portada del sitio', grupo: 'Contenido' },
+  { id: 'banners', icono: '🖼️', label: 'Banners y portada', ayuda: 'Qué se ve en la portada', grupo: 'Contenido' },
   { id: 'usuarios', icono: '👥', label: 'Usuarios', ayuda: 'Crear, editar, contraseñas', grupo: 'Personas' },
   { id: 'categorias', icono: '🗂️', label: 'Categorías', ayuda: 'Rubros de servicios', grupo: 'Configuración' },
   { id: 'categorias-productos', icono: '🏷️', label: 'Categorías de productos', ayuda: 'Rubros de productos', grupo: 'Configuración' },
@@ -3190,6 +3191,7 @@ export default function AdminPage() {
 
       {tab === 'banners' && (
         <div>
+          <AdminPortada password={password} />
           <div className="font-body text-sm font-semibold text-ink mb-3">
             Banners promocionales de la home
           </div>

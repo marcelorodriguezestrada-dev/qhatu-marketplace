@@ -10,6 +10,7 @@ import { CartDrawer } from '@/components/CartDrawer'
 import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { BannerCarousel } from '@/components/BannerCarousel'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
+import { usePortada } from '@/lib/portada'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -31,6 +32,7 @@ export default function CatalogoPage() {
   // Rubro elegido desde el menú "Categorías" o /categorias (?rubro=).
   const [rubroSel, setRubroSel] = useState<string | null>(null)
   const [menuCategorias, setMenuCategorias] = useState(false)
+  const portada = usePortada()
   const [busqueda, setBusqueda] = useState('')
   const [carritoAbierto, setCarritoAbierto] = useState(false)
   const { items } = useCarrito()
@@ -202,6 +204,7 @@ export default function CatalogoPage() {
 
       <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
         <BannerCiudad />
+        {portada?.accesos !== false && (
         <div className="grid grid-cols-2 gap-3 mb-6">
           {/* Estás en Productos: ese botón va en verde (seleccionado) y
               Servicios en blanco. */}
@@ -219,8 +222,9 @@ export default function CatalogoPage() {
             <div className="font-body text-[11px] sm:text-xs text-inksoft">Profesionales</div>
           </Link>
         </div>
+        )}
 
-        {ofertas.length > 0 && (
+        {portada?.ofertas && ofertas.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-lg">🔥</span>
@@ -268,10 +272,10 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        <BannerCuponPromo />
+        {portada?.cupon && <BannerCuponPromo />}
 
         {categoria === 'Todo' && !rubroSel ? (
-          <BannerCarousel />
+          portada?.banners && <BannerCarousel />
         ) : (
           // Fila 2: género como filtro secundario dentro de la categoría —
           // solo los que tienen productos ahí.
