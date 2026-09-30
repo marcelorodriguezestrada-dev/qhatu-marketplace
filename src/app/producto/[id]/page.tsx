@@ -14,7 +14,6 @@ import { expandirTalles } from '@/data/productos'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
-import { labelPublicoProducto } from '@/data/publicoProducto'
 import { CartDrawer } from '@/components/CartDrawer'
 import { track } from '@/lib/tracking'
 import { registrarInteres } from '@/lib/interes'
@@ -202,6 +201,12 @@ export default function ProductoDetallePage() {
     ...(Array.isArray(producto.fotosAdicionales) ? producto.fotosAdicionales.filter((f: unknown) => typeof f === 'string' && f) : []),
   ]
   const tieneDescuento = producto.precioOriginal && producto.precioOriginal > producto.precio
+  const rubroProducto = buscarRubroProducto(producto.rubro)
+  function volverAlListado() {
+    let listado = '/'
+    try { listado = sessionStorage.getItem('clasiclick_listado') || '/' } catch {}
+    router.push(listado)
+  }
   const porcentajeOff = tieneDescuento
     ? Math.round((1 - producto.precio / producto.precioOriginal) * 100)
     : 0
@@ -210,14 +215,19 @@ export default function ProductoDetallePage() {
   return (
     <div className="max-w-[960px] mx-auto px-5 py-8">
       <div className="flex items-start justify-between gap-3 mb-5">
-        <div className="font-body text-[13px] text-inksoft flex flex-wrap items-center gap-1.5">
-          <Link href="/" className="hover:underline">Volver</Link>
-          <span>|</span>
-          <span>{labelPublicoProducto(producto.publico)}</span>
-          <span>›</span>
-          <span>{buscarRubroProducto(producto.rubro)?.categoriaLabel || 'Categoría'}</span>
-          <span>›</span>
-          <span className="text-ink font-medium">{producto.nombre}</span>
+        {/* Compu: como Mercado Libre — "Volver al listado | Categoría › Rubro".
+            Celular: solo la flecha para volver (la ruta ocupa lugar). */}
+        <button type="button" onClick={volverAlListado} className="sm:hidden w-10 h-10 rounded-full border border-line bg-panel flex items-center justify-center text-lg shrink-0" aria-label="Volver">←</button>
+        <div className="hidden sm:flex font-body text-[13px] text-inksoft flex-wrap items-center gap-1.5">
+          <button type="button" onClick={volverAlListado} className="text-teal hover:underline bg-transparent border-none p-0">Volver al listado</button>
+          {rubroProducto && (
+            <>
+              <span className="text-line">|</span>
+              <Link href={`/?categoria=${rubroProducto.categoriaId}`} className="text-teal hover:underline">{rubroProducto.categoriaLabel}</Link>
+              <span>›</span>
+              <Link href={`/?rubro=${producto.rubro}`} className="text-teal hover:underline">{rubroProducto.label}</Link>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0 relative">
           <button
