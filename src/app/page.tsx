@@ -11,6 +11,8 @@ import { NotificacionesBell } from '@/components/NotificacionesBell'
 import { BannerCarousel } from '@/components/BannerCarousel'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { usePortada } from '@/lib/portada'
+import BuscadorProductos, { guardarReciente } from '@/components/BuscadorProductos'
+import { coincide, textoBuscable } from '@/lib/busqueda'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -53,9 +55,7 @@ export default function CatalogoPage() {
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
     const matchCat = rubroSel ? p.rubro === rubroSel : categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
-    const matchBusqueda =
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.vendedor.toLowerCase().includes(busqueda.toLowerCase())
+    const matchBusqueda = !busqueda.trim() || coincide(textoBuscable(p, buscarRubroProducto(p.rubro)), busqueda)
     return matchPublico && matchCat && matchBusqueda
   })
 
@@ -133,21 +133,20 @@ export default function CatalogoPage() {
           </div>
 
           <div className="flex items-center gap-2 mb-2.5">
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const q = encodeURIComponent(busqueda || '')
-                  router.push(`${pathname}${q ? `?q=${q}` : ''}`)
-                }
+            <BuscadorProductos
+              valor={busqueda}
+              onCambiar={setBusqueda}
+              onBuscar={(texto) => {
+                const q = encodeURIComponent(texto || '')
+                router.push(`${pathname}${q ? `?q=${q}` : ''}`)
               }}
-              placeholder="Buscar productos o vendedores"
-              className="flex-1 px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50 min-w-0"
+              productos={productos}
+              rubroDe={buscarRubroProducto}
             />
             <button
               type="button"
               onClick={() => {
+                guardarReciente(busqueda)
                 const q = encodeURIComponent(busqueda || '')
                 router.push(`${pathname}${q ? `?q=${q}` : ''}`)
               }}
