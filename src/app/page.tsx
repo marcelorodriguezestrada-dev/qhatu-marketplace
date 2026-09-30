@@ -88,17 +88,24 @@ export default function CatalogoPage() {
   const categoriaActual = categoriasProductos.find((c) => c.id === (rubroSel ? buscarRubroProducto(rubroSel)?.categoriaId : categoria))
   const rubroActual = rubroSel ? buscarRubroProducto(rubroSel) : undefined
 
-  function elegirCategoria(catId: string, rubroId: string | null) {
+  // Mujer / Hombre / Niños / Otros con productos dentro de la categoría
+  // (o rubro) elegida — el filtro secundario.
+  const enCategoria = productos.filter((p) => (rubroSel ? p.rubro === rubroSel : categoria !== 'Todo' && buscarRubroProducto(p.rubro)?.categoriaId === categoria))
+  const publicosDisponibles = PUBLICOS_PRODUCTO.map((pub) => ({ ...pub, cantidad: enCategoria.filter((p) => (p.publico || 'unisex') === pub.id).length })).filter((pub) => pub.cantidad > 0)
+
+  function elegirCategoria(catId: string, rubroId: string | null, bajar = true) {
     setMenuCategorias(false)
     setCategoria(catId)
     setRubroSel(rubroId)
+    setPublico('Todo')
     const params = new URLSearchParams()
     params.set(rubroId ? 'rubro' : 'categoria', rubroId || catId)
     window.history.replaceState(null, '', `/?${params.toString()}`)
-    setTimeout(() => document.getElementById('grilla-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    if (bajar) setTimeout(() => document.getElementById('grilla-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
   function quitarFiltroCategoria() {
+    setPublico('Todo')
     setCategoria('Todo')
     setRubroSel(null)
     window.history.replaceState(null, '', '/')
@@ -229,64 +236,68 @@ export default function CatalogoPage() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-3 flex-wrap items-center">
+        {/* Fila 1 (como Mercado Libre): tipo de producto. */}
+        <div className="flex gap-2 mb-3 items-center overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none]">
           <button
             onClick={() => { setPublico('Todo'); quitarFiltroCategoria() }}
             aria-label="Ver todo"
             title="Ver todo"
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 ${
-              publico === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              categoria === 'Todo' && !rubroSel ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
             }`}
           >
             🏠
           </button>
-          {PUBLICOS_PRODUCTO.map((pub) => (
+          {categoriasProductos.filter((c) => conteoCategorias[c.id]).map((c) => (
             <button
-              key={pub.id}
-              onClick={() => setPublico(pub.id)}
-              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                publico === pub.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              key={c.id}
+              onClick={() => {
+                elegirCategoria(c.id, null, false)
+                fetch('/api/analitica/categoria', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tipo: 'producto', valor: c.label }),
+                }).catch(() => {})
+              }}
+              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium shrink-0 whitespace-nowrap ${
+                categoriaActual?.id === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
-              {pub.label}
+              {c.label}
             </button>
           ))}
         </div>
 
         <BannerCuponPromo />
 
-        {publico === 'Todo' ? (
+        {categoria === 'Todo' && !rubroSel ? (
           <BannerCarousel />
         ) : (
-          <div className="flex gap-2 mb-5 flex-wrap">
-            <button
-              onClick={() => setCategoria('Todo')}
-              className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                categoria === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
-              }`}
-            >
-              Todo
-            </button>
-            {categoriasProductos.filter((c) => conteoCategorias[c.id]).map((c) => (
+          // Fila 2: género como filtro secundario dentro de la categoría —
+          // solo los que tienen productos ahí.
+          publicosDisponibles.length > 1 && (
+            <div className="flex gap-2 mb-4 flex-wrap items-center">
               <button
-                key={c.id}
-                onClick={() => {
-                  setRubroSel(null)
-                  setCategoria(c.id)
-                  fetch('/api/analitica/categoria', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tipo: 'producto', valor: c.label }),
-                  }).catch(() => {})
-                }}
-                className={`px-4 py-1.5 rounded-full border font-body text-sm font-medium ${
-                  categoria === c.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+                onClick={() => setPublico('Todo')}
+                className={`px-3.5 py-1 rounded-full border font-body text-[13px] ${
+                  publico === 'Todo' ? 'border-teal bg-tealsoft text-teal font-semibold' : 'border-line bg-panel text-inksoft'
                 }`}
               >
-                {c.label}
+                Todos
               </button>
-            ))}
-          </div>
+              {publicosDisponibles.map((pub) => (
+                <button
+                  key={pub.id}
+                  onClick={() => setPublico(pub.id)}
+                  className={`px-3.5 py-1 rounded-full border font-body text-[13px] ${
+                    publico === pub.id ? 'border-teal bg-tealsoft text-teal font-semibold' : 'border-line bg-panel text-inksoft'
+                  }`}
+                >
+                  {pub.label} <span className="text-inksoft font-normal">({pub.cantidad})</span>
+                </button>
+              ))}
+            </div>
+          )
         )}
 
         {(rubroSel || categoria !== 'Todo') && categoriaActual && (
