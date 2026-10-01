@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
+import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminMarketing from '@/components/admin/AdminMarketing'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
@@ -1895,6 +1896,14 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+
+          <EdicionRapidaProductos
+            password={password}
+            productos={productos}
+            categorias={categoriasProductos}
+            rubroLabel={(id) => buscarRubroProducto(id)?.label}
+            onGuardado={() => cargarProductos()}
+          />
 
           <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
           {productos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
