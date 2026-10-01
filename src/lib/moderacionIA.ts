@@ -799,3 +799,70 @@ export async function detectarRubroProductoIA(
     return null
   }
 }
+
+// Palabras de búsqueda ocultas para un producto: sinónimos y cómo lo
+// buscaría la gente en Bolivia ("sandalia" → zapato, calzado, ojota…).
+// Se guardan en `etiquetasBusqueda` al publicar/editar y el buscador las
+// usa para "También te puede interesar". Si falla, devuelve [] y el
+// producto se busca igual por su nombre y rubro.
+export async function generarEtiquetasBusquedaIA(p: {
+  nombre: string
+  rubro?: string
+  categoria?: string
+  publico?: string
+  descripcion?: string
+  colores?: string[]
+  materiales?: string
+}): Promise<string[]> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey || !p.nombre) return []
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 6000)
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        max_completion_tokens: 500,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Generás palabras de búsqueda para un producto de Clasi Click, un marketplace de Bolivia. ' +
+              'Devolvé entre 8 y 15 palabras o frases cortas (1-2 palabras) en español, en minúscula y en singular, con las que un comprador boliviano buscaría este producto: ' +
+              'el tipo de producto genérico (ej. una sandalia también es "zapato" y "calzado"), sinónimos y nombres regionales (chompa, chamarra, polera, ojota), uso u ocasión (verano, fiesta, colegio), material y estilo. ' +
+              'No repitas el nombre tal cual, no inventes marcas ni características que no estén. Respondé SOLO JSON: {"etiquetas": ["...", "..."]}',
+          },
+          {
+            role: 'user',
+            content: [
+              `Producto: ${p.nombre}`,
+              p.categoria && `Categoría: ${p.categoria}${p.rubro ? ` > ${p.rubro}` : ''}`,
+              p.publico && p.publico !== 'unisex' && `Para: ${p.publico}`,
+              p.colores?.length && `Colores: ${p.colores.join(', ')}`,
+              p.materiales && `Material: ${p.materiales}`,
+              p.descripcion && `Descripción: ${p.descripcion.slice(0, 500)}`,
+            ].filter(Boolean).join('\n'),
+          },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('generarEtiquetasBusquedaIA: Groq respondió', res.status)
+      return []
+    }
+    const data = await res.json()
+    const parsed = JSON.parse(String(data.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim())
+    const etiquetas: string[] = Array.isArray(parsed.etiquetas) ? parsed.etiquetas : []
+    return Array.from(new Set(etiquetas.map((e) => String(e).toLowerCase().trim().slice(0, 30)).filter((e) => e.length >= 2))).slice(0, 15)
+  } catch (err) {
+    console.error('generarEtiquetasBusquedaIA', err)
+    return []
+  } finally {
+    clearTimeout(t)
+  }
+}

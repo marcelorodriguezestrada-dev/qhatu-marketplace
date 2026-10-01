@@ -12,7 +12,7 @@ import { BannerCarousel } from '@/components/BannerCarousel'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { usePortada } from '@/lib/portada'
 import BuscadorProductos, { guardarReciente } from '@/components/BuscadorProductos'
-import { coincide, textoBuscable } from '@/lib/busqueda'
+import { puntajeRelacionado, relevancia } from '@/lib/busqueda'
 import ListadoResultados from '@/components/ListadoResultados'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
@@ -70,7 +70,20 @@ export default function CatalogoPage() {
   const router = useRouter()
   const pathname = usePathname()
 
-  const resultadosBusqueda = consulta.trim() ? productos.filter((p) => coincide(textoBuscable(p, buscarRubroProducto(p.rubro)), consulta)) : []
+  // Primero lo que coincide con el texto; después lo que entra por
+  // sinónimos o por las palabras de búsqueda de la IA ("relacionados").
+  const { resultadosBusqueda, relacionadosBusqueda } = (() => {
+    if (!consulta.trim()) return { resultadosBusqueda: [] as Producto[], relacionadosBusqueda: new Set<string>() }
+    const exactos: Producto[] = []
+    const parecidos: Producto[] = []
+    for (const p of productos) {
+      const r = relevancia(p as any, buscarRubroProducto(p.rubro), consulta)
+      if (r === 'exacto') exactos.push(p)
+      else if (r === 'relacionado') parecidos.push(p)
+    }
+    parecidos.sort((a, b) => puntajeRelacionado(b as any, consulta) - puntajeRelacionado(a as any, consulta))
+    return { resultadosBusqueda: [...exactos, ...parecidos], relacionadosBusqueda: new Set(parecidos.map((p) => String(p.id))) }
+  })()
   function buscar(texto: string) {
     const t = texto.trim()
     setConsulta(t)
@@ -222,6 +235,7 @@ export default function CatalogoPage() {
           <ListadoResultados
             consulta={consulta}
             resultados={resultadosBusqueda}
+            relacionados={relacionadosBusqueda}
             rubroDe={buscarRubroProducto}
             ciudadId={ciudadId}
             onBuscar={buscar}

@@ -49,6 +49,9 @@ export type Producto = {
   compraMinima?: number // cantidad mínima por pedido, por defecto 1
   tiendaNombre?: string // nombre del negocio del vendedor, copiado de su perfil de tienda al momento de publicar/actualizar
   tiendaLogoUrl?: string
+  // Palabras de búsqueda ocultas que genera la IA al publicar (sinónimos,
+  // tipo genérico: una sandalia también es "zapato"). Ver src/lib/busqueda.ts.
+  etiquetasBusqueda?: string[]
 }
 
 // El vendedor puede cargar los talles como un rango corto ("34-38") en

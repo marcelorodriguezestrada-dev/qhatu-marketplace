@@ -12,6 +12,7 @@ import { sanearStock } from '@/lib/stock'
 import { PRODUCTOS_SEED } from '@/data/productos'
 import { LEGACY_CATEGORIA_A_RUBRO } from '@/data/categoriasProductos'
 import { evaluarConIA } from '@/lib/moderacionIA'
+import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,10 @@ export async function POST(req: NextRequest) {
       `Producto: ${nombre}\nRubro: ${rubro}\nPrecio: Bs ${precio}${precioOriginalValido ? ` (antes Bs ${precioOriginalValido})` : ''}`
     )
 
+    // Palabras de búsqueda ocultas (IA): arrancan en paralelo y se
+    // guardan apenas estén — si fallan, el producto queda igual.
+    const etiquetasPromesa = etiquetasParaProducto({ nombre, rubro, publico: publicoValido, descripcionCorta, descripcionLarga, colores, materiales }).catch(() => [])
+
     const db = getDb()
 
     // Copiamos el nombre/logo de la tienda del vendedor (si ya la
@@ -149,6 +154,8 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
+    const etiquetasBusqueda = await etiquetasPromesa
+    if (etiquetasBusqueda.length) await ref.update({ etiquetasBusqueda }).catch(() => {})
     // Vendedor nuevo (primer producto) que llegó por una campaña.
     if (esPrimerProducto && body.campana) await sumarCampana(body.campana, { vendedores: 1 })
     return NextResponse.json({ id: ref.id })

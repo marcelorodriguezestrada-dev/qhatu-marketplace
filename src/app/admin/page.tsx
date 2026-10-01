@@ -16,6 +16,7 @@ import EditorCV, { PuestoBorrador, aBorradores, deBorradores } from '@/component
 import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
+import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminMarketing from '@/components/admin/AdminMarketing'
@@ -1896,6 +1897,8 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+
+          <EtiquetasBusquedaIA password={password} />
 
           <EdicionRapidaProductos
             password={password}
