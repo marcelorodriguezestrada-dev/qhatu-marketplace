@@ -1908,6 +1908,9 @@ export default function AdminPage() {
             categorias={categoriasProductos}
             rubroLabel={(id) => nombreRubro(buscarRubroProducto(id)) || undefined}
             onGuardado={() => cargarProductos()}
+            vendedoresCuentas={vendedoresAdmin
+              .map((v) => ({ id: v.id, nombre: v.nombreNegocio ? `${v.nombreNegocio}${v.email ? ` (${v.email})` : ''}` : v.email || v.id }))
+              .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))}
           />
 
           <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
