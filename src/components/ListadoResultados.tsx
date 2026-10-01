@@ -5,6 +5,7 @@ import { ProductCard } from '@/components/ProductCard'
 import { expandirTalles, type Producto } from '@/data/productos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import { normalizar } from '@/lib/busqueda'
+import { nombreRubro } from '@/lib/arbolCategorias'
 
 // Resultados de una búsqueda, como el listado de Mercado Libre:
 // - Compu: a la izquierda el título ("Zapatos mujer", N resultados),
@@ -16,7 +17,7 @@ import { normalizar } from '@/lib/busqueda'
 // Todos los filtros salen de lo que hay en los resultados (con cantidad):
 // nunca se ofrece un filtro que deja la lista vacía.
 
-type Rubro = { label: string; categoriaId: string; categoriaLabel: string }
+type Rubro = { label: string; categoriaId: string; categoriaLabel: string; grupoId?: string; grupo?: string }
 type Filtros = { publico: string | null; rubro: string | null; talle: string | null; precio: string | null; ofertas: boolean }
 const SIN_FILTROS: Filtros = { publico: null, rubro: null, talle: null, precio: null, ofertas: false }
 
@@ -116,7 +117,7 @@ export default function ListadoResultados({
   const cOfertas = resultados.filter((p) => pasa(p, 'ofertas') && tieneOferta(p)).length
 
   const opcionesPublico = PUBLICOS_PRODUCTO.filter((x) => cPublico[x.id]).map((x) => ({ id: x.id, label: x.label, n: cPublico[x.id] }))
-  const opcionesRubro = Object.entries(cRubro).map(([id, n]) => ({ id, label: rubroDe(id)?.label || id, n })).sort((a, b) => b.n - a.n)
+  const opcionesRubro = Object.entries(cRubro).map(([id, n]) => ({ id, label: nombreRubro(rubroDe(id)) || id, n })).sort((a, b) => b.n - a.n)
   const opcionesTalle = Object.entries(cTalle).map(([id, n]) => ({ id, label: id, n })).sort((a, b) => (parseFloat(a.id) || 999) - (parseFloat(b.id) || 999) || a.id.localeCompare(b.id))
   const opcionesPrecio = rangos.filter((r) => cPrecio[r.id]).map((r) => ({ id: r.id, label: r.label, n: cPrecio[r.id] }))
 
@@ -129,11 +130,19 @@ export default function ListadoResultados({
       return top && top[1] / Math.max(1, filtrados.length) >= 0.5 ? top[0] : null
     })()
     const r = id ? rubroDe(id) : undefined
-    if (r) return { categoriaId: r.categoriaId, categoria: r.categoriaLabel, rubroId: id!, rubro: r.label }
+    if (r) return { categoriaId: r.categoriaId, categoria: r.categoriaLabel, grupoId: r.grupoId || null, grupo: r.grupo || null, rubroId: id!, rubro: r.label }
+    // Si no hay un rubro dominante, probamos con la subcategoría (ej: Calzado).
+    const grupos: Record<string, { n: number; r: Rubro }> = {}
+    for (const p of filtrados) { const x = rubroDe(p.rubro); if (x?.grupoId) grupos[x.grupoId] = { n: (grupos[x.grupoId]?.n || 0) + 1, r: x } }
+    const [topGrupo] = Object.entries(grupos).sort((a, b) => b[1].n - a[1].n)
+    if (topGrupo && topGrupo[1].n / Math.max(1, filtrados.length) >= 0.5) {
+      const x = topGrupo[1].r
+      return { categoriaId: x.categoriaId, categoria: x.categoriaLabel, grupoId: topGrupo[0], grupo: x.grupo || null, rubroId: null, rubro: null }
+    }
     const cats: Record<string, { n: number; label: string }> = {}
     for (const p of filtrados) { const x = rubroDe(p.rubro); if (x) cats[x.categoriaId] = { n: (cats[x.categoriaId]?.n || 0) + 1, label: x.categoriaLabel } }
     const [topCat] = Object.entries(cats).sort((a, b) => b[1].n - a[1].n)
-    return topCat && topCat[1].n / Math.max(1, filtrados.length) >= 0.5 ? { categoriaId: topCat[0], categoria: topCat[1].label, rubroId: null, rubro: null } : null
+    return topCat && topCat[1].n / Math.max(1, filtrados.length) >= 0.5 ? { categoriaId: topCat[0], categoria: topCat[1].label, grupoId: null, grupo: null, rubroId: null, rubro: null } : null
   }, [filtrados, f.rubro, rubroDe])
 
   // Búsquedas relacionadas: la consulta + género, y rubros de los resultados.
@@ -142,7 +151,7 @@ export default function ListadoResultados({
     const out: string[] = []
     const yaTiene = /\b(mujer|hombre|nin[oa]s?)\b/.test(normalizar(q))
     if (!yaTiene) for (const x of PUBLICOS_PRODUCTO) if (x.id !== 'unisex' && resultados.some((p) => p.publico === x.id)) out.push(`${q} ${x.label.toLowerCase()}`)
-    for (const o of opcionesRubro.slice(0, 5)) out.push(o.label.toLowerCase())
+    for (const o of opcionesRubro.filter((o) => !/otros/i.test(o.label)).slice(0, 5)) out.push(o.label.toLowerCase())
     return Array.from(new Set(out.map((x) => x.toLowerCase()))).filter((x) => x !== normalizar(q)).slice(0, 7)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consulta, resultados])
@@ -150,7 +159,7 @@ export default function ListadoResultados({
   const aplicados: { k: keyof Filtros; label: string }[] = [
     ...(f.ofertas ? [{ k: 'ofertas' as const, label: 'Ofertas' }] : []),
     ...(f.publico ? [{ k: 'publico' as const, label: PUBLICOS_PRODUCTO.find((x) => x.id === f.publico)?.label || '' }] : []),
-    ...(f.rubro ? [{ k: 'rubro' as const, label: rubroDe(f.rubro)?.label || f.rubro }] : []),
+    ...(f.rubro ? [{ k: 'rubro' as const, label: nombreRubro(rubroDe(f.rubro)) || f.rubro }] : []),
     ...(f.talle ? [{ k: 'talle' as const, label: `Talle ${f.talle}` }] : []),
     ...(f.precio ? [{ k: 'precio' as const, label: rangos.find((r) => r.id === f.precio)?.label || '' }] : []),
   ]
@@ -195,7 +204,8 @@ export default function ListadoResultados({
   const Ruta = ruta && (
     <div className="font-body text-[13px] text-inksoft flex flex-wrap items-center gap-1.5">
       <a href={`/?categoria=${ruta.categoriaId}`} className="hover:text-teal">{ruta.categoria}</a>
-      {ruta.rubro && (<><span>›</span><a href={`/?rubro=${ruta.rubroId}`} className="hover:text-teal">{ruta.rubro}</a></>)}
+      {ruta.grupo && (<><span>›</span><a href={`/?grupo=${ruta.grupoId}`} className="hover:text-teal">{ruta.grupo}</a></>)}
+      {ruta.rubro && ruta.rubroId !== ruta.grupoId && (<><span>›</span><a href={`/?rubro=${ruta.rubroId}`} className="hover:text-teal">{ruta.rubro}</a></>)}
     </div>
   )
 

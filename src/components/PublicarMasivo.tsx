@@ -5,7 +5,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
-import { COLUMNAS_PLANILLA, MAX_FILAS_PLANILLA, leerFilas, normalizarTexto, type FilaLeida } from '@/lib/planillaProductos'
+import { COLUMNAS_PLANILLA, MAX_FILAS_PLANILLA, leerFilas, normalizarTexto, rutaRubro, type FilaLeida } from '@/lib/planillaProductos'
 
 // /vender → "Publicar con Excel": 1) descargar la plantilla (con la hoja
 // de categorías válidas), 2) subirla completa, 3) revisar fila por fila
@@ -35,12 +35,13 @@ export default function PublicarMasivo({ misProductos, alTerminar }: { misProduc
 
   async function descargarPlantilla() {
     const { default: writeXlsxFile } = await import('write-excel-file/browser')
-    const ejemplo = rubrosFlat[0]?.label || 'Botines'
+    const ejemploRubro = rubrosFlat.find((r) => r.id === 'sandalias') || rubrosFlat[0]
+    const ejemplo = ejemploRubro ? rutaRubro(ejemploRubro) : 'Botines'
     const encabezado = COLUMNAS_PLANILLA.map((c) => ({ value: c.titulo, fontWeight: 'bold' as const, backgroundColor: '#DCEBE5' }))
     const filaEjemplo = COLUMNAS_PLANILLA.map((c) => ({ value: c.clave === 'rubro' ? ejemplo : c.ejemplo === '' ? null : c.ejemplo }))
     const categorias = [
-      [{ value: 'Grupo', fontWeight: 'bold' as const }, { value: 'Categoría (copiala tal cual en la columna "Categoría")', fontWeight: 'bold' as const }],
-      ...rubrosFlat.map((r) => [{ value: r.categoriaLabel }, { value: r.label }]),
+      [{ value: 'Copiá esto tal cual en la columna "Categoría"', fontWeight: 'bold' as const }, { value: 'Categoría', fontWeight: 'bold' as const }, { value: 'Subcategoría', fontWeight: 'bold' as const }, { value: 'Rubro', fontWeight: 'bold' as const }],
+      ...rubrosFlat.map((r) => [{ value: rutaRubro(r) }, { value: r.categoriaLabel }, { value: r.grupo || '' }, { value: r.label }]),
     ]
     const instrucciones = [
       [{ value: 'Cómo completar la planilla', fontWeight: 'bold' as const }],
@@ -52,7 +53,7 @@ export default function PublicarMasivo({ misProductos, alTerminar }: { misProduc
     ]
     await writeXlsxFile([
       { data: [encabezado, filaEjemplo], sheet: 'Productos', columns: COLUMNAS_PLANILLA.map((c) => ({ width: c.ancho })) },
-      { data: categorias, sheet: 'Categorías', columns: [{ width: 24 }, { width: 40 }] },
+      { data: categorias, sheet: 'Categorías', columns: [{ width: 60 }, { width: 26 }, { width: 28 }, { width: 30 }] },
       { data: instrucciones, sheet: 'Instrucciones', columns: [{ width: 100 }] },
     ] as any).toFile('plantilla-productos-clasiclick.xlsx')
   }

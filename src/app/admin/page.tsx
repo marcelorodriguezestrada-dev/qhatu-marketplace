@@ -1,5 +1,6 @@
 'use client'
 
+import { nombreRubro } from '@/lib/arbolCategorias'
 import { useEffect, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { GraficoBarras } from '@/components/GraficoBarras'
@@ -131,6 +132,7 @@ export default function AdminPage() {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [subiendoFotoEntregaId, setSubiendoFotoEntregaId] = useState<string | null>(null)
   const [productos, setProductos] = useState<any[]>([])
+  const [categoriaProductoExpandida, setCategoriaProductoExpandida] = useState<string | null>(null)
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [anuncios, setAnuncios] = useState<any[]>([])
@@ -1904,7 +1906,7 @@ export default function AdminPage() {
             password={password}
             productos={productos}
             categorias={categoriasProductos}
-            rubroLabel={(id) => buscarRubroProducto(id)?.label}
+            rubroLabel={(id) => nombreRubro(buscarRubroProducto(id)) || undefined}
             onGuardado={() => cargarProductos()}
           />
 
@@ -1924,7 +1926,7 @@ export default function AdminPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm font-medium text-ink truncate">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft">{ciudadDe(p) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(p)).nombre} · `}{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
+                <div className="font-body text-xs text-inksoft">{ciudadDe(p) !== 'potosi' && `📍 ${buscarCiudad(ciudadDe(p)).nombre} · `}{p.vendedor || 'Vendedor'} · {labelPublicoProducto(p.publico)} · {nombreRubro(buscarRubroProducto(p.rubro)) || p.categoria || 'Sin rubro'} · Bs {Number(p.precio || 0).toLocaleString('es-BO')}</div>
                 <div className="font-body text-[11px] text-inksoft mt-1">
                   Estado: {p.estado || 'activo'}
                   {p.cargadoPorAdmin && <span className="ml-2 inline-block bg-tealsoft text-teal border border-teal text-[10px] font-bold px-1.5 py-0.5 rounded-full">🛠️ Cargado por admin</span>}
@@ -3590,8 +3592,8 @@ export default function AdminPage() {
       {tab === 'categorias-productos' && (
         <div>
           <div className="font-body text-sm text-inksoft mb-4">
-            Acá se arma el árbol Categoría → Rubro que se usa para clasificar los productos (selector en /vender, filtros del catálogo y ficha del producto).
-            Calzado, Ropa, Accesorios y Hogar vienen con rubros de base; podés agregar categorías o rubros nuevos, y mover un rubro si quedó en la categoría que no corresponde.
+            Acá se arma el árbol Categoría › Subcategoría › Rubro que se usa para clasificar los productos (selector en /vender, filtros del catálogo y ficha del producto).
+            Viene con el árbol de Mercado Libre (32 categorías, ~3.200 rubros); podés agregar categorías o rubros nuevos, y mover un rubro si quedó en la categoría que no corresponde. Tocá una categoría para ver sus rubros.
           </div>
 
           <form onSubmit={crearCategoriaProducto} className="bg-panel border border-line rounded-lg p-4 mb-6 flex gap-2 items-center">
@@ -3642,12 +3644,24 @@ export default function AdminPage() {
                 )}
               </div>
 
+              <button
+                type="button"
+                onClick={() => setCategoriaProductoExpandida(categoriaProductoExpandida === cat.id ? null : cat.id)}
+                className="font-body text-xs text-teal underline mb-2"
+              >
+                {categoriaProductoExpandida === cat.id ? '▾ Ocultar rubros' : `▸ Ver rubros (${new Set(cat.rubros.map((r) => r.grupoId).filter(Boolean)).size} subcategorías · ${cat.rubros.length} rubros)`}
+              </button>
+              {categoriaProductoExpandida === cat.id && (
               <div className="flex flex-col gap-1.5 mb-3">
                 {cat.rubros.length === 0 && (
                   <div className="font-body text-xs text-inksoft">Todavía sin rubros.</div>
                 )}
-                {cat.rubros.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-1.5">
+                {cat.rubros.map((r, i) => (
+                  <div key={r.id + i}>
+                  {r.grupoId && r.grupoId !== cat.rubros[i - 1]?.grupoId && (
+                    <div className="font-body text-xs font-semibold text-ink mt-2 mb-1">{r.grupo}</div>
+                  )}
+                  <div className={`flex items-center justify-between gap-2 bg-panelalt rounded-md px-2.5 py-1.5 ${r.grupoId ? 'ml-3' : ''}`}>
                     <span className="font-body text-sm text-ink">{r.label}</span>
                     <select
                       value={cat.id}
@@ -3660,8 +3674,10 @@ export default function AdminPage() {
                       ))}
                     </select>
                   </div>
+                  </div>
                 ))}
               </div>
+              )}
 
               {categoriaProductoAbierta === cat.id ? (
                 <div className="flex gap-2">

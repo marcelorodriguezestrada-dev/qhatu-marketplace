@@ -11,6 +11,7 @@ import PreguntasProducto from '@/components/PreguntasProducto'
 import dynamic from 'next/dynamic'
 import { ProductIcon } from '@/components/ProductIcon'
 import { expandirTalles } from '@/data/productos'
+import { nombreRubro } from '@/lib/arbolCategorias'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
@@ -224,8 +225,18 @@ export default function ProductoDetallePage() {
             <>
               <span className="text-line">|</span>
               <Link href={`/?categoria=${rubroProducto.categoriaId}`} className="text-teal hover:underline">{rubroProducto.categoriaLabel}</Link>
-              <span>›</span>
-              <Link href={`/?rubro=${producto.rubro}`} className="text-teal hover:underline">{rubroProducto.label}</Link>
+              {rubroProducto.grupoId && (
+                <>
+                  <span>›</span>
+                  <Link href={`/?grupo=${rubroProducto.grupoId}`} className="text-teal hover:underline">{rubroProducto.grupo}</Link>
+                </>
+              )}
+              {rubroProducto.id !== rubroProducto.grupoId && (
+                <>
+                  <span>›</span>
+                  <Link href={`/?rubro=${producto.rubro}`} className="text-teal hover:underline">{nombreRubro(rubroProducto)}</Link>
+                </>
+              )}
             </>
           )}
         </div>
@@ -359,7 +370,7 @@ export default function ProductoDetallePage() {
 
             <div>
               <div className="font-body text-xs text-inksoft mb-1 flex items-center gap-1.5 flex-wrap">
-                <span>{buscarRubroProducto(producto.rubro)?.label || producto.categoria || 'Sin rubro'} ·</span>
+                <span>{nombreRubro(buscarRubroProducto(producto.rubro)) || producto.categoria || 'Sin rubro'} ·</span>
                 {producto.vendedorId ? (
                   <Link
                     href={`/tienda/${producto.vendedorId}`}
@@ -546,7 +557,7 @@ export default function ProductoDetallePage() {
               )}
               <div className="py-3 flex items-center gap-3">
                 <span className="text-lg">📋</span>
-                <span className="font-body text-sm text-ink"><strong>Rubro:</strong> {buscarRubroProducto(producto.rubro)?.label || producto.categoria || 'Sin rubro'}</span>
+                <span className="font-body text-sm text-ink"><strong>Rubro:</strong> {nombreRubro(buscarRubroProducto(producto.rubro)) || producto.categoria || 'Sin rubro'}</span>
               </div>
               <div className="py-3 flex items-center gap-3">
                 <span className="text-lg">📅</span>
@@ -562,7 +573,7 @@ export default function ProductoDetallePage() {
           {tienda?.lat != null && tienda?.lng != null && (
             <div className="mb-5">
               <MapaProfesionales
-                profesionales={[{ id: producto.vendedorId, nombre: tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor, rubro: buscarRubroProducto(producto.rubro)?.label || producto.categoria || '', lat: tienda.lat, lng: tienda.lng }]}
+                profesionales={[{ id: producto.vendedorId, nombre: tienda?.nombreNegocio || producto.tiendaNombre || producto.vendedor, rubro: nombreRubro(buscarRubroProducto(producto.rubro)) || producto.categoria || '', lat: tienda.lat, lng: tienda.lng }]}
                 centro={{ lat: tienda.lat, lng: tienda.lng }}
               />
             </div>

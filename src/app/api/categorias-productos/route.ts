@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
+import { compactarCategoria } from '@/lib/arbolCategorias'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,13 +27,15 @@ function esAdmin(req: NextRequest) {
 // /vender, /producto/[id], el catálogo y la pestaña de productos de
 // /admin.
 export async function GET() {
+  // Va compacto (sin repetir la subcategoría en cada rubro): son ~3.200
+  // rubros. El navegador lo expande en useCategoriasProductos.
+  const cache = { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600' }
   try {
     const arbol = await construirArbolCategoriasProductos()
-    return NextResponse.json(arbol)
+    return NextResponse.json({ arbol: arbol.categorias.map(compactarCategoria) }, { headers: cache })
   } catch (err) {
     console.error('GET /api/categorias-productos', err)
-    const rubrosFlat = CATEGORIAS_PRODUCTOS_BASE.flatMap((c) => c.rubros.map((r) => ({ id: r.id, label: r.label, categoriaId: c.id, categoriaLabel: c.label })))
-    return NextResponse.json({ categorias: CATEGORIAS_PRODUCTOS_BASE, rubrosFlat })
+    return NextResponse.json({ arbol: CATEGORIAS_PRODUCTOS_BASE.map(compactarCategoria) })
   }
 }
 
