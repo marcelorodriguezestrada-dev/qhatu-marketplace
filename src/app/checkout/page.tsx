@@ -319,6 +319,11 @@ function CheckoutContent() {
   // selector (el barrio) recién muestra las opciones de ese grupo.
   const [grupoZonaSel, setGrupoZonaSel] = useState(grupoDeBarrio(ZONAS_ENVIO_POTOSI[0].nombre)?.id || ZONAS_AGRUPADAS[0].id)
   const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
+  // De dónde salió el barrio: lo calculamos solos con la dirección (o
+  // con la ubicación del celular), y el comprador solo lo elige a mano
+  // si el mapa no encuentra su dirección o si quiere corregirlo.
+  const [origenBarrio, setOrigenBarrio] = useState<'' | 'direccion' | 'gps' | 'manual' | 'guardado'>('')
+  const [elegirBarrioAMano, setElegirBarrioAMano] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
   // Opcional — un punto de referencia extra (ej: "portón verde",
@@ -345,13 +350,15 @@ function CheckoutContent() {
   // rechazar direcciones válidas que caen cerca del borde, pero corta
   // cuando la dirección escrita claramente corresponde a otro barrio.
   const RADIO_BARRIO_KM = 1.5
+  const direccionMuyCorta = (d: string) => d.trim().length < 5 || !/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(d)
 
-  async function verificarDireccion(): Promise<boolean | 'error' | null> {
+  async function verificarDireccion(): Promise<{ resultado: boolean | 'error' | null; barrio: string }> {
     if (!direccion.trim()) {
       setDireccionVerificada(null)
-      return null
+      return { resultado: null, barrio: '' }
     }
     setVerificandoDireccion(true)
+    let barrioDetectado = ''
     try {
       const res = await fetch('/api/validar-direccion', {
         method: 'POST',
@@ -361,22 +368,24 @@ function CheckoutContent() {
       const data = await res.json()
       let resultado: boolean | 'error' | null = data.encontrada === null ? 'error' : !!data.encontrada
       let motivo = data.motivo || ''
-      // Si la dirección sí se encontró en el mapa, todavía falta
-      // chequear que quede cerca del barrio que el comprador eligió
-      // arriba — Nominatim puede devolver una calle real que queda en
-      // otro barrio de la ciudad, y hasta ahora eso pasaba sin avisar.
-      if (resultado === true && zonaEntrega) {
-        const barrioElegido = ZONAS_ENVIO_POTOSI.find((z) => z.nombre === zonaEntrega)
-        if (barrioElegido) {
-          const distancia = distanciaKm(data.lat, data.lng, barrioElegido.lat, barrioElegido.lng)
-          if (distancia > RADIO_BARRIO_KM) {
-            const cercano = barrioMasCercano(data.lat, data.lng)
-            if (cercano.nombre !== zonaEntrega) {
-              resultado = false
-              motivo = `Esa dirección parece quedar en ${cercano.nombre}, no en ${zonaEntrega}. Revisá el barrio o la dirección.`
-            }
-          }
+      // Con la dirección encontrada sacamos el barrio (y el costo del
+      // envío) solos. Si cae lejos de todos los barrios conocidos, es
+      // que el mapa encontró otra cosa: se lo pedimos a mano.
+      if (resultado === true && typeof data.lat === 'number') {
+        const cercano = barrioMasCercano(data.lat, data.lng)
+        const lejos = distanciaKm(data.lat, data.lng, cercano.lat, cercano.lng) > RADIO_BARRIO_KM * 2
+        if (lejos) {
+          resultado = false
+          motivo = 'No pudimos ubicar bien tu dirección en el mapa.'
+        } else if (origenBarrio !== 'manual' && origenBarrio !== 'gps') {
+          setZonaEntrega(cercano.nombre)
+          setOrigenBarrio('direccion')
+          barrioDetectado = cercano.nombre
         }
+      }
+      if (resultado === false && !direccionMuyCorta(direccion)) {
+        // No la encontró: no frenamos la compra, pedimos el barrio a mano.
+        setElegirBarrioAMano(true)
       }
       setDireccionVerificada(resultado)
       setMotivoDireccion(motivo)
@@ -387,10 +396,11 @@ function CheckoutContent() {
         setLat(data.lat)
         setLng(data.lng)
       }
-      return resultado
+      return { resultado, barrio: barrioDetectado }
     } catch {
       setDireccionVerificada('error')
-      return 'error'
+      setElegirBarrioAMano(true)
+      return { resultado: 'error', barrio: '' }
     } finally {
       setVerificandoDireccion(false)
     }
@@ -508,7 +518,10 @@ function CheckoutContent() {
         if (!d || cancelado) return
         setNombreComprador((prev) => prev || d.nombreComprador || '')
         setWhatsappComprador((prev) => prev || d.whatsappComprador || '')
-        setZonaEntrega((prev) => prev || d.zonaEntrega || '')
+        if (d.zonaEntrega) {
+          setZonaEntrega((prev) => prev || d.zonaEntrega)
+          setOrigenBarrio((prev) => prev || 'guardado')
+        }
         setDireccion((prev) => prev || d.direccion || '')
         setEntreCalles((prev) => prev || d.entreCalles || '')
         setReferenciaAdicional((prev) => prev || d.referenciaAdicional || '')
@@ -672,6 +685,7 @@ function CheckoutContent() {
         // persona los busque a mano en la lista.
         const cercano = barrioMasCercano(pos.coords.latitude, pos.coords.longitude)
         setZonaEntrega(cercano.nombre)
+        setOrigenBarrio('gps')
         const grupo = grupoDeBarrio(cercano.nombre)
         if (grupo) setGrupoZonaSel(grupo.id)
         setBuscandoUbicacion(false)
@@ -710,28 +724,30 @@ function CheckoutContent() {
       setError('Escribí la dirección donde querés recibirlo.')
       return
     }
-    if (metodoEntrega === 'envio' && !zonaEntrega) {
-      setError('Elegí tu barrio antes de continuar.')
-      return
-    }
     if (metodoEntrega === 'envio' && !direccion.trim()) {
       setError('Escribí tu dirección antes de continuar.')
       return
     }
     if (metodoEntrega === 'envio') {
-      // Si todavía no se chequeó (por ejemplo, escribió y tocó
-      // "Continuar" sin salir del campo de dirección), la chequeamos
-      // recién acá — no dejamos pasar una dirección sin verificar.
-      let resultado = direccionVerificada
-      if (resultado === null) {
-        resultado = await verificarDireccion()
-      }
-      if (resultado === false) {
-        setError(motivoDireccion || 'No encontramos esa dirección — revisala antes de continuar.')
+      if (direccionMuyCorta(direccion)) {
+        setError('Escribí la calle y el número, no alcanza con un número solo.')
         return
       }
-      // resultado === true, o 'error' (el servicio de verificación
-      // falló) — en los dos casos se deja continuar.
+      // Si todavía no se chequeó (escribió y tocó "Continuar" sin salir
+      // del campo), la chequeamos acá: de ahí sale el barrio.
+      if (!zonaEntrega && direccionVerificada === null) {
+        const { barrio } = await verificarDireccion()
+        if (barrio) {
+          // Recién ahora sabemos el costo del envío: que lo vea antes de pagar.
+          setError(`Calculamos tu envío para ${barrio}. Revisá el total y tocá “Continuar” de nuevo.`)
+          return
+        }
+      }
+    }
+    if (metodoEntrega === 'envio' && !zonaEntrega) {
+      setElegirBarrioAMano(true)
+      setError('No encontramos tu dirección en el mapa: elegí tu barrio (o usá tu ubicación) para calcular el envío.')
+      return
     }
     if (metodoEntrega === 'envio' && !entreCalles.trim()) {
       setError('Escribí entre qué calles queda tu dirección antes de continuar — ayuda mucho a que la moto no se pierda.')
@@ -1384,27 +1400,75 @@ function CheckoutContent() {
 
           {metodoEntrega === 'envio' ? (
             <>
-              <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Barrio</span>
-                <select
-                  value={zonaEntrega}
+              <label className="block text-left mb-1">
+                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección (calle y número) *</span>
+                <input
+                  value={direccion}
                   onChange={(e) => {
-                    setZonaEntrega(e.target.value)
-                    // Si ya había una dirección validada contra el barrio
-                    // anterior, ese resultado queda viejo apenas cambia el
-                    // barrio — se vuelve a chequear recién al salir del
-                    // campo de dirección (o al tocar "Continuar").
+                    setDireccion(e.target.value)
                     setDireccionVerificada(null)
                     setMotivoDireccion('')
+                    if (origenBarrio === 'direccion' || origenBarrio === 'guardado') setOrigenBarrio('')
                   }}
+                  onBlur={verificarDireccion}
+                  placeholder="Ej: Av. Universitaria 123"
                   className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-                >
-                  <option value="">Elegí tu barrio</option>
-                  {ZONAS_ENVIO_POTOSI.map((z) => (
-                    <option key={z.nombre} value={z.nombre}>{z.nombre}</option>
-                  ))}
-                </select>
+                />
               </label>
+              <div className="mb-3 min-h-[16px]">
+                {verificandoDireccion && (
+                  <span className="font-body text-[11px] text-inksoft">Verificando dirección...</span>
+                )}
+                {!verificandoDireccion && direccionVerificada === false && (
+                  <span className="font-body text-[11px] text-maroon">
+                    ⚠ {direccionMuyCorta(direccion) ? 'Escribí la calle y el número, no alcanza con un número solo.' : `${motivoDireccion && !motivoDireccion.startsWith('No encontramos') ? motivoDireccion + ' ' : 'No encontramos esa dirección en el mapa. '}Elegí tu barrio abajo para calcular el envío.`}
+                  </span>
+                )}
+                {!verificandoDireccion && direccionVerificada === 'error' && (
+                  <span className="font-body text-[11px] text-ochre">
+                    No pudimos buscarla en el mapa ahora — elegí tu barrio abajo.
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={usarMiUbicacion}
+                disabled={buscandoUbicacion}
+                className="font-body text-[12px] text-teal font-semibold underline mb-3 disabled:opacity-60"
+              >
+                {buscandoUbicacion ? 'Buscando tu ubicación...' : lat != null && origenBarrio === 'gps' ? '✓ Usamos tu ubicación' : '📍 Estoy en el lugar de entrega: usar mi ubicación'}
+              </button>
+
+              {/* Barrio y costo: salen solos de la dirección (o la ubicación). */}
+              {zonaEntrega && !elegirBarrioAMano && (
+                <div className="flex items-center justify-between gap-3 bg-tealsoft border border-teal rounded-lg px-3 py-2.5 mb-3">
+                  <div className="font-body text-sm text-ink">
+                    📍 <strong>{zonaEntrega}</strong>
+                    {grupoDeBarrio(zonaEntrega) && <span className="text-inksoft"> · {grupoDeBarrio(zonaEntrega)!.label}</span>}
+                    <span className="text-inksoft"> · Envío {bs(COSTOS_ENVIO[zonaEntrega] ?? 0)}</span>
+                  </div>
+                  <button type="button" onClick={() => setElegirBarrioAMano(true)} className="font-body text-[11px] text-teal underline shrink-0">¿No es tu barrio?</button>
+                </div>
+              )}
+              {elegirBarrioAMano && (
+                <label className="block text-left mb-3">
+                  <span className="font-body text-[11px] text-inksoft block mb-1">Barrio *</span>
+                  <select
+                    value={zonaEntrega}
+                    onChange={(e) => {
+                      setZonaEntrega(e.target.value)
+                      setOrigenBarrio(e.target.value ? 'manual' : '')
+                      setError('')
+                    }}
+                    className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                  >
+                    <option value="">Elegí tu barrio</option>
+                    {ZONAS_ENVIO_POTOSI.map((z) => (
+                      <option key={z.nombre} value={z.nombre}>{z.nombre} — envío {bs(COSTOS_ENVIO[z.nombre] ?? 0)}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <div className="flex flex-col gap-2.5 mb-3">
                 <button
@@ -1463,38 +1527,6 @@ function CheckoutContent() {
                 )}
               </div>
 
-              <label className="block text-left mb-1">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección (calle y número) *</span>
-                <input
-                  value={direccion}
-                  onChange={(e) => {
-                    setDireccion(e.target.value)
-                    setDireccionVerificada(null)
-                    setMotivoDireccion('')
-                  }}
-                  onBlur={verificarDireccion}
-                  placeholder="Calle, número, barrio"
-                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-                />
-              </label>
-              <div className="mb-3 min-h-[16px]">
-                {verificandoDireccion && (
-                  <span className="font-body text-[11px] text-inksoft">Verificando dirección...</span>
-                )}
-                {!verificandoDireccion && direccionVerificada === true && (
-                  <span className="font-body text-[11px] text-teal">✓ Encontramos esta dirección en el mapa.</span>
-                )}
-                {!verificandoDireccion && direccionVerificada === false && (
-                  <span className="font-body text-[11px] text-maroon">
-                    ⚠ {motivoDireccion || 'No encontramos esa dirección — revisá que esté bien escrita.'}
-                  </span>
-                )}
-                {!verificandoDireccion && direccionVerificada === 'error' && (
-                  <span className="font-body text-[11px] text-ochre">
-                    No pudimos verificarla ahora (problema de conexión) — podés continuar igual.
-                  </span>
-                )}
-              </div>
               <label className="block text-left mb-3">
                 <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles *</span>
                 <input
