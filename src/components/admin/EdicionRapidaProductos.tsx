@@ -12,6 +12,8 @@ import type { CategoriaProducto } from '@/lib/arbolCategorias'
 //   amarillo hasta que tocás "Guardar".
 // - Tildás varios y aplicás en masa: categoría, público, precio (+/- %,
 //   fijo o en oferta), talles y colores (reemplazar o agregar), stock.
+// - ➕ Agregar productos: filas nuevas (en verde) para un vendedor, con
+//   foto opcional; "Duplicar" copia un producto existente como base.
 // - Nada se guarda hasta "💾 Guardar cambios"; "Descartar" vuelve atrás.
 
 type Prod = {
@@ -34,6 +36,43 @@ type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'pr
 type Categoria = CategoriaProducto
 
 const POR_PAGINA = 50
+
+type Nuevo = {
+  key: string
+  nombre: string
+  rubro: string
+  publico: string
+  precio: string
+  precioOriginal: string
+  stock: string
+  talles: string
+  colores: string
+  imagenUrl?: string
+  thumbUrl?: string
+  subiendo?: boolean
+  error?: string
+}
+let contadorNuevos = 0
+const nuevoVacio = (base?: Partial<Nuevo>): Nuevo => ({ key: `n${++contadorNuevos}`, nombre: '', rubro: '', publico: 'mujer', precio: '', precioOriginal: '', stock: '', talles: '', colores: '', ...base })
+
+// Achica la foto antes de subirla (más rápido y liviano).
+async function achicar(file: File, max = 1000): Promise<File> {
+  try {
+    const img = document.createElement('img')
+    img.src = URL.createObjectURL(file)
+    await new Promise((r, rej) => { img.onload = r; img.onerror = rej })
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight))
+    const c = document.createElement('canvas')
+    c.width = Math.round(img.naturalWidth * k)
+    c.height = Math.round(img.naturalHeight * k)
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+    URL.revokeObjectURL(img.src)
+    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.8))
+    return blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file
+  } catch {
+    return file
+  }
+}
 const aLista = (t: string) => t.split(',').map((x) => x.trim()).filter(Boolean)
 const aTexto = (l?: string[]) => (l || []).join(', ')
 const redondear = (n: number) => Math.round(n)
@@ -44,13 +83,18 @@ export default function EdicionRapidaProductos({
   categorias,
   rubroLabel,
   onGuardado,
+  vendedoresCuentas = [],
 }: {
   password: string
   productos: Prod[]
   categorias: Categoria[]
   rubroLabel: (id?: string) => string | undefined
   onGuardado: () => void
+  // Vendedores para los productos nuevos.
+  vendedoresCuentas?: { id: string; nombre: string }[]
 }) {
+  const [nuevos, setNuevos] = useState<Nuevo[]>([])
+  const [vendedorNuevos, setVendedorNuevos] = useState('')
   const [abierto, setAbierto] = useState(false)
   const [ediciones, setEdiciones] = useState<Record<string, Campos>>({})
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -105,7 +149,47 @@ export default function EdicionRapidaProductos({
 
   const visibles = filtrados.slice(0, pagina * POR_PAGINA)
   const todosSel = filtrados.length > 0 && filtrados.every((p) => sel.has(p.id))
-  const cantCambios = Object.keys(ediciones).length
+  const cantEditados = Object.keys(ediciones).length
+  const nuevosConDatos = nuevos.filter((n) => n.nombre.trim() || n.precio || n.imagenUrl)
+  const cantCambios = cantEditados + nuevosConDatos.length
+
+  const setNuevo = (key: string, c: Partial<Nuevo>) => setNuevos((prev) => prev.map((n) => (n.key === key ? { ...n, ...c, error: undefined } : n)))
+  // Las filas nuevas heredan categoría, público y talles de la anterior (cargás varios parecidos seguidos).
+  function agregarFilas(cantidad = 1) {
+    setAbierto(true)
+    setNuevos((prev) => {
+      const ultimo = prev[prev.length - 1]
+      const base = ultimo ? { rubro: ultimo.rubro, publico: ultimo.publico, talles: ultimo.talles } : {}
+      return [...prev, ...Array.from({ length: cantidad }, () => nuevoVacio(base))]
+    })
+  }
+  function duplicar(p: Prod) {
+    setNuevos((prev) => [...prev, nuevoVacio({
+      nombre: valor(p, 'nombre') || '',
+      rubro: valor(p, 'rubro') || '',
+      publico: valor(p, 'publico') || 'unisex',
+      precio: String(valor(p, 'precio') ?? ''),
+      precioOriginal: valor(p, 'precioOriginal') ? String(valor(p, 'precioOriginal')) : '',
+      talles: aTexto(valor(p, 'talles')),
+      colores: aTexto(valor(p, 'colores')),
+    })])
+    if (!vendedorNuevos && p.vendedorId) setVendedorNuevos(p.vendedorId)
+    setMensaje('Copiado como producto nuevo arriba (en verde): cambiá lo que haga falta y guardá.')
+  }
+  async function subirFoto(key: string, file: File | null) {
+    if (!file) return
+    setNuevo(key, { subiendo: true })
+    try {
+      const fd = new FormData()
+      fd.append('image', await achicar(file))
+      fd.append('thumb', await achicar(file, 300))
+      const d = await fetch('/api/upload-image', { method: 'POST', headers: { 'x-admin-password': password }, body: fd }).then((r) => r.json())
+      if (!d.url) throw new Error(d.error || 'No se pudo subir la foto.')
+      setNuevo(key, { imagenUrl: d.url, thumbUrl: d.thumbUrl || d.url, subiendo: false })
+    } catch (err: any) {
+      setNuevos((prev) => prev.map((n) => (n.key === key ? { ...n, subiendo: false, error: err?.message || 'No se pudo subir la foto.' } : n)))
+    }
+  }
 
   function alternarTodos() {
     setSel((prev) => {
@@ -158,20 +242,55 @@ export default function EdicionRapidaProductos({
   async function guardar() {
     setGuardando(true)
     setMensaje('')
+    const partes: string[] = []
     try {
-      const cambios = Object.entries(ediciones).map(([id, c]) => ({ id, ...c, precioActual: productos.find((p) => p.id === id)?.precio }))
-      const d = await fetch('/api/admin/productos/lote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ cambios }),
-      }).then((r) => r.json())
-      if (d.error) throw new Error(d.error)
-      const conError = new Set((d.errores || []).map((e: any) => e.id))
-      setEdiciones((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => conError.has(id))))
-      setMensaje(`✓ ${d.guardados} producto${d.guardados === 1 ? '' : 's'} actualizado${d.guardados === 1 ? '' : 's'}${d.errores?.length ? ` · ${d.errores.length} con error (siguen en amarillo): ${d.errores.map((e: any) => e.error).join(', ')}` : ''}`)
+      // 1) Productos nuevos
+      if (nuevosConDatos.length) {
+        const faltan = nuevosConDatos.map((n) => ({ n, error: !n.nombre.trim() ? 'Falta el nombre' : !n.rubro ? 'Falta la categoría' : !(Number(n.precio) > 0) ? 'Falta el precio' : n.subiendo ? 'Todavía se sube la foto' : '' })).filter((x) => x.error)
+        if (!vendedorNuevos) throw new Error('Elegí de qué vendedor son los productos nuevos.')
+        if (faltan.length) {
+          setNuevos((prev) => prev.map((n) => ({ ...n, error: faltan.find((f) => f.n.key === n.key)?.error })))
+          throw new Error(`Revisá los productos nuevos marcados en rojo (${faltan.length}).`)
+        }
+        const d = await fetch('/api/admin/productos/nuevos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+          body: JSON.stringify({
+            vendedorId: vendedorNuevos,
+            productos: nuevosConDatos.map((n) => ({
+              nombre: n.nombre, rubro: n.rubro, publico: n.publico, precio: Number(n.precio),
+              precioOriginal: n.precioOriginal ? Number(n.precioOriginal) : null,
+              stock: n.stock === '' ? null : Number(n.stock),
+              talles: aLista(n.talles), colores: aLista(n.colores),
+              imagenUrl: n.imagenUrl, thumbUrl: n.thumbUrl,
+            })),
+          }),
+        }).then((r) => r.json())
+        if (d.error) throw new Error(d.error)
+        const conError = new Map<number, string>((d.errores || []).map((e: any) => [e.indice, e.error]))
+        const keysError = new Map(nuevosConDatos.map((n, i) => [n.key, conError.get(i)]))
+        // Quedan solo las que dieron error (las guardadas y las vacías se van).
+        setNuevos((prev) => prev.filter((n) => keysError.get(n.key)).map((n) => ({ ...n, error: keysError.get(n.key) })))
+        partes.push(`✓ ${d.creados.length} producto${d.creados.length === 1 ? '' : 's'} nuevo${d.creados.length === 1 ? '' : 's'}`)
+      }
+      // 2) Cambios a productos existentes
+      if (cantEditados) {
+        const cambios = Object.entries(ediciones).map(([id, c]) => ({ id, ...c, precioActual: productos.find((p) => p.id === id)?.precio }))
+        const d = await fetch('/api/admin/productos/lote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+          body: JSON.stringify({ cambios }),
+        }).then((r) => r.json())
+        if (d.error) throw new Error(d.error)
+        const conError = new Set((d.errores || []).map((e: any) => e.id))
+        setEdiciones((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => conError.has(id))))
+        partes.push(`✓ ${d.guardados} actualizado${d.guardados === 1 ? '' : 's'}${d.errores?.length ? ` · ${d.errores.length} con error (siguen en amarillo): ${d.errores.map((e: any) => e.error).join(', ')}` : ''}`)
+      }
+      setMensaje(partes.join(' · '))
       onGuardado()
     } catch (err: any) {
-      setMensaje(err?.message || 'No se pudo guardar.')
+      setMensaje([...partes, err?.message || 'No se pudo guardar.'].join(' · '))
+      if (partes.length) onGuardado()
     } finally {
       setGuardando(false)
     }
@@ -184,9 +303,12 @@ export default function EdicionRapidaProductos({
       <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
-          <div className="font-body text-[11px] text-inksoft">Una planilla para cambiar categoría, precios, ofertas, talles, colores y stock de muchos productos a la vez.</div>
+          <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos y cambiar categoría, precios, ofertas, talles, colores y stock de muchos a la vez.</div>
         </div>
-        <button type="button" onClick={() => setAbierto(true)} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold">Abrir planilla</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => agregarFilas(3)} className="px-3.5 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-sm font-semibold">➕ Agregar productos</button>
+          <button type="button" onClick={() => setAbierto(true)} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold">Abrir planilla</button>
+        </div>
       </div>
     )
   }
@@ -205,7 +327,7 @@ export default function EdicionRapidaProductos({
     <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
-        <button type="button" onClick={() => { if (!cantCambios || confirm('Hay cambios sin guardar. ¿Cerrar igual?')) { setAbierto(false); setEdiciones({}); setSel(new Set()) } }} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>
+        <button type="button" onClick={() => { if (!cantCambios || confirm('Hay cambios sin guardar. ¿Cerrar igual?')) { setAbierto(false); setEdiciones({}); setNuevos([]); setSel(new Set()) } }} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>
       </div>
 
       {/* Filtros */}
@@ -263,6 +385,19 @@ export default function EdicionRapidaProductos({
         </div>
       </div>
 
+      {/* Productos nuevos */}
+      <div className={`rounded-lg p-3 mb-3 flex flex-wrap items-center gap-2 ${nuevos.length ? 'bg-emerald-50 border border-emerald-300' : 'bg-panelalt border border-line'}`}>
+        <span className="font-body text-xs font-semibold text-ink">{nuevos.length ? `➕ ${nuevos.length} producto${nuevos.length === 1 ? '' : 's'} nuevo${nuevos.length === 1 ? '' : 's'} (arriba, en verde) de:` : '➕ Cargar productos nuevos:'}</span>
+        <select value={vendedorNuevos} onChange={(e) => setVendedorNuevos(e.target.value)} className={`px-2.5 py-2 rounded-lg border bg-panel font-body text-xs max-w-[260px] ${nuevos.length && !vendedorNuevos ? 'border-maroon' : 'border-line'}`} aria-label="Vendedor de los productos nuevos">
+          <option value="">Elegí el vendedor…</option>
+          {vendedoresCuentas.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+        </select>
+        <button type="button" onClick={() => agregarFilas(1)} className="px-3 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-xs font-semibold">+ 1 fila</button>
+        <button type="button" onClick={() => agregarFilas(5)} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs text-ink">+ 5 filas</button>
+        {nuevos.length > 0 && <button type="button" onClick={() => setNuevos([])} className="font-body text-xs text-inksoft underline bg-transparent border-none">Quitar filas nuevas</button>}
+        <span className="font-body text-[11px] text-inksoft">Cada fila nueva copia la categoría y los talles de la anterior. También podés tocar ⧉ en un producto para duplicarlo.</span>
+      </div>
+
       {/* Planilla */}
       <div className="overflow-x-auto border border-line rounded-lg">
         <table className="w-full min-w-[980px] border-collapse">
@@ -280,10 +415,46 @@ export default function EdicionRapidaProductos({
             </tr>
           </thead>
           <tbody>
+            {nuevos.map((n, i) => {
+              const cn = (vacio: boolean) => `w-full px-1.5 py-1 rounded border font-body text-xs bg-white ${vacio && n.error ? 'border-maroon' : 'border-emerald-300'}`
+              return (
+                <tr key={n.key} className="border-t border-emerald-200 align-top bg-emerald-50/70">
+                  <td className="p-2">
+                    <button type="button" onClick={() => setNuevos((prev) => prev.filter((x) => x.key !== n.key))} className="text-inksoft hover:text-maroon bg-transparent border-none text-sm mt-1" aria-label="Quitar fila" title="Quitar fila">✕</button>
+                  </td>
+                  <td className="p-1.5">
+                    <div className="flex gap-2 items-start">
+                      <label className="w-9 h-9 rounded bg-white border border-dashed border-emerald-400 overflow-hidden shrink-0 flex items-center justify-center cursor-pointer text-sm" title="Subir foto">
+                        {n.subiendo ? '⏳' : n.thumbUrl || n.imagenUrl ? <img src={n.thumbUrl || n.imagenUrl} alt="" className="w-full h-full object-cover" /> : '📷'}
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { subirFoto(n.key, e.target.files?.[0] || null); e.target.value = '' }} />
+                      </label>
+                      <div className="flex-1 min-w-0">
+                        <input autoFocus={i === nuevos.length - 1 && !n.nombre} value={n.nombre} onChange={(e) => setNuevo(n.key, { nombre: e.target.value })} placeholder="Nombre del producto *" className={cn(!n.nombre.trim())} aria-label="Nombre nuevo" />
+                        <div className={`font-body text-[10px] px-1.5 ${n.error ? 'text-maroon font-semibold' : 'text-emerald-700'}`}>{n.error || 'NUEVO'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-1.5">
+                    <SelectorRubro categorias={categorias} value={n.rubro} onChange={(v) => setNuevo(n.key, { rubro: v })} vacio="Elegí categoría *" className={cn(!n.rubro)} pista={n.nombre} cerca={nuevos[i - 1]?.rubro} />
+                  </td>
+                  <td className="p-1.5">
+                    <select value={n.publico} onChange={(e) => setNuevo(n.key, { publico: e.target.value })} className={cn(false)}>
+                      {PUBLICOS_PRODUCTO.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+                    </select>
+                  </td>
+                  <td className="p-1.5"><input type="number" min={1} value={n.precio} onChange={(e) => setNuevo(n.key, { precio: e.target.value })} placeholder="*" className={cn(!(Number(n.precio) > 0))} aria-label="Precio nuevo" /></td>
+                  <td className="p-1.5"><input type="number" min={0} value={n.precioOriginal} onChange={(e) => setNuevo(n.key, { precioOriginal: e.target.value })} placeholder="—" className={cn(false)} aria-label="Precio anterior nuevo" /></td>
+                  <td className="p-1.5"><input type="number" min={0} value={n.stock} onChange={(e) => setNuevo(n.key, { stock: e.target.value })} placeholder="∞" className={cn(false)} aria-label="Stock nuevo" /></td>
+                  <td className="p-1.5"><input value={n.talles} onChange={(e) => setNuevo(n.key, { talles: e.target.value })} placeholder="36, 37…" className={cn(false)} aria-label="Talles nuevo" /></td>
+                  <td className="p-1.5"><input value={n.colores} onChange={(e) => setNuevo(n.key, { colores: e.target.value })} placeholder="Negro, …" className={cn(false)} aria-label="Colores nuevo" /></td>
+                </tr>
+              )
+            })}
             {visibles.map((p) => (
               <tr key={p.id} className={`border-t border-line align-top ${sel.has(p.id) ? 'bg-tealsoft/40' : ''}`}>
                 <td className="p-2">
                   <input type="checkbox" checked={sel.has(p.id)} onChange={() => setSel((prev) => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })} className="accent-teal mt-1.5" aria-label={`Seleccionar ${p.nombre}`} />
+                  <button type="button" onClick={() => duplicar(p)} className="block text-inksoft hover:text-teal bg-transparent border-none text-sm mt-1.5 p-0" title="Duplicar como producto nuevo" aria-label={`Duplicar ${p.nombre}`}>⧉</button>
                 </td>
                 <td className="p-1.5">
                   <div className="flex gap-2 items-start">
@@ -334,9 +505,9 @@ export default function EdicionRapidaProductos({
       {/* Guardar */}
       <div className={`sticky bottom-0 mt-3 -mx-3.5 -mb-3.5 px-3.5 py-3 rounded-b-xl border-t flex flex-wrap items-center gap-2 ${cantCambios ? 'bg-amber-50 border-ochre' : 'bg-panel border-line'}`}>
         <button type="button" onClick={guardar} disabled={!cantCambios || guardando} className="px-4 py-2 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-40">
-          {guardando ? 'Guardando...' : `💾 Guardar cambios${cantCambios ? ` (${cantCambios} producto${cantCambios === 1 ? '' : 's'})` : ''}`}
+          {guardando ? 'Guardando...' : `💾 Guardar cambios${cantCambios ? ` (${[nuevosConDatos.length && `${nuevosConDatos.length} nuevo${nuevosConDatos.length === 1 ? '' : 's'}`, cantEditados && `${cantEditados} editado${cantEditados === 1 ? '' : 's'}`].filter(Boolean).join(' + ')})` : ''}`}
         </button>
-        {cantCambios > 0 && <button type="button" onClick={() => { setEdiciones({}); setMensaje('') }} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs text-ink">Descartar</button>}
+        {cantCambios > 0 && <button type="button" onClick={() => { setEdiciones({}); setNuevos([]); setMensaje('') }} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs text-ink">Descartar</button>}
         {mensaje && <span className="font-body text-xs text-ink">{mensaje}</span>}
       </div>
     </div>
