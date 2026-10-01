@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 import { sanearStock } from '@/lib/stock'
@@ -114,6 +115,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     cambios.updatedAt = new Date().toISOString()
+    // Si cambió lo que describe al producto, regeneramos sus palabras de búsqueda.
+    if (['nombre', 'rubro', 'publico', 'descripcionCorta', 'descripcionLarga'].some((k) => k in cambios)) {
+      const etiquetas = await etiquetasParaProducto({ ...doc.data(), ...cambios }).catch(() => [])
+      if (etiquetas.length) cambios.etiquetasBusqueda = etiquetas
+    }
     await ref.update(cambios)
     return NextResponse.json({ ok: true })
   } catch (err) {

@@ -50,6 +50,7 @@ const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 export default function ListadoResultados({
   consulta,
   resultados,
+  relacionados,
   rubroDe,
   ciudadId,
   onBuscar,
@@ -57,6 +58,8 @@ export default function ListadoResultados({
 }: {
   consulta: string
   resultados: Producto[]
+  // Ids que entraron por sinónimo / palabras de la IA (no por el texto exacto).
+  relacionados?: Set<string>
   rubroDe: (id?: string) => Rubro | undefined
   ciudadId: string
   onBuscar: (q: string) => void
@@ -97,6 +100,8 @@ export default function ListadoResultados({
     return lista
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultados, f, orden, rangos])
+  const exactos = relacionados ? filtrados.filter((p) => !relacionados.has(String(p.id))) : filtrados
+  const parecidos = relacionados ? filtrados.filter((p) => relacionados.has(String(p.id))) : []
 
   // Opciones de cada filtro, contadas sin ese mismo filtro (como ML).
   const contar = (sin: keyof Filtros, clave: (p: Producto) => string[]) => {
@@ -268,8 +273,18 @@ export default function ListadoResultados({
             </label>
           </div>
           <div id="grilla-productos" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 scroll-mt-4">
-            {filtrados.map((p) => <ProductCard key={p.id} p={p} ciudadComprador={ciudadId as any} />)}
+            {exactos.map((p) => <ProductCard key={p.id} p={p} ciudadComprador={ciudadId as any} />)}
           </div>
+          {parecidos.length > 0 && (
+            <>
+              <div className={`font-display text-base font-bold text-ink mb-3 ${exactos.length ? 'mt-8 pt-5 border-t border-line' : ''}`}>
+                {exactos.length ? 'También te puede interesar' : `No hay productos que digan “${consulta}”, pero estos se parecen`}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                {parecidos.map((p) => <ProductCard key={p.id} p={p} ciudadComprador={ciudadId as any} />)}
+              </div>
+            </>
+          )}
           {filtrados.length === 0 && (
             <div className="text-center py-14 text-inksoft font-body text-sm">
               No encontramos productos para “{consulta}”{aplicados.length ? ' con esos filtros' : ''}.

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { coincide, labelPublico, normalizar, textoBuscable } from '@/lib/busqueda'
+import { labelPublico, normalizar, relevancia } from '@/lib/busqueda'
 
 // Buscador de la portada con sugerencias como Mercado Libre: al escribir
 // "zapatos" abajo aparecen tus búsquedas recientes (🕘) y opciones
@@ -36,7 +36,7 @@ export default function BuscadorProductos({
   valor: string
   onCambiar: (v: string) => void
   onBuscar: (q: string) => void
-  productos: { nombre: string; vendedor: string; publico?: string; rubro?: string }[]
+  productos: { nombre: string; vendedor: string; publico?: string; rubro?: string; etiquetasBusqueda?: string[] }[]
   rubroDe: (id?: string) => { label: string; categoriaLabel: string } | undefined
 }) {
   const [abierto, setAbierto] = useState(false)
@@ -50,7 +50,7 @@ export default function BuscadorProductos({
     return () => document.removeEventListener('mousedown', cerrar)
   }, [])
 
-  const indexados = useMemo(() => productos.map((p) => ({ p, rubro: rubroDe(p.rubro), texto: textoBuscable(p, rubroDe(p.rubro)) })), [productos, rubroDe])
+  const indexados = useMemo(() => productos.map((p) => ({ p, rubro: rubroDe(p.rubro) })), [productos, rubroDe])
 
   const sugerencias = useMemo<Sug[]>(() => {
     const q = normalizar(valor)
@@ -65,7 +65,10 @@ export default function BuscadorProductos({
     for (const r of recientes) if (!q || normalizar(r).includes(q)) { if (out.filter((s) => s.tipo === 'reciente').length < 3) agregar(r, 'reciente') }
     if (q.length < 2) return out
 
-    const encontrados = indexados.filter((x) => coincide(x.texto, q))
+    const conRelevancia = indexados.map((x) => ({ ...x, r: relevancia(x.p, x.rubro, q) })).filter((x) => x.r)
+    // Nombres sugeridos: solo los exactos (no sugerir "Sandalia" al escribir "zap").
+    const encontrados = conRelevancia
+    const exactos = conRelevancia.filter((x) => x.r === 'exacto')
     if (encontrados.length) {
       agregar(capital(valor.trim()), 'sugerencia')
       // "Zapatos mujer / hombre / niños": solo los públicos que tienen resultados.
@@ -78,7 +81,7 @@ export default function BuscadorProductos({
     }
     // Rubros y nombres de productos que empiezan o contienen lo escrito.
     for (const x of indexados) if (x.rubro && normalizar(x.rubro.label).includes(q)) agregar(x.rubro.label, 'sugerencia')
-    for (const x of encontrados) agregar(x.p.nombre, 'sugerencia')
+    for (const x of exactos) agregar(x.p.nombre, 'sugerencia')
     return out
   }, [valor, recientes, indexados])
 
