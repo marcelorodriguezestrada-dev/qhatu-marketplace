@@ -241,7 +241,7 @@ export default function EdicionRapidaProductos({
             <option value="stock">Stock</option>
           </select>
           {accion === 'rubro' ? (
-            <SelectorRubro categorias={categorias} value={valorAccion} onChange={setValorAccion} vacio="Elegí el rubro…" className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs w-60" />
+            <SelectorRubro categorias={categorias} value={valorAccion} onChange={setValorAccion} vacio="Elegí el rubro…" className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs w-60" cerca={productos.find((p) => sel.has(p.id))?.rubro} pista={productos.find((p) => sel.has(p.id))?.nombre} />
           ) : accion === 'publico' ? (
             <select value={valorAccion} onChange={(e) => setValorAccion(e.target.value)} className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs">
               <option value="">Elegí…</option>
@@ -297,7 +297,7 @@ export default function EdicionRapidaProductos({
                   </div>
                 </td>
                 <td className="p-1.5">
-                  <SelectorRubro categorias={categorias} value={valor(p, 'rubro') || ''} onChange={(v) => editar(p.id, { rubro: v })} vacio="⚠️ Sin rubro" className={celda(editado(p, 'rubro'))} />
+                  <SelectorRubro categorias={categorias} value={valor(p, 'rubro') || ''} onChange={(v) => editar(p.id, { rubro: v })} vacio="⚠️ Sin rubro" className={celda(editado(p, 'rubro'))} pista={valor(p, 'nombre')} />
                 </td>
                 <td className="p-1.5">
                   <select value={valor(p, 'publico') || 'unisex'} onChange={(e) => editar(p.id, { publico: e.target.value })} className={celda(editado(p, 'publico'))}>
