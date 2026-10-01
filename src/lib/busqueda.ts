@@ -11,8 +11,8 @@ const raiz = (w: string) => (w.length > 4 && w.endsWith('es') ? w.slice(0, -2) :
 
 const SINONIMOS_PUBLICO: Record<string, string> = { mujer: 'mujer dama damas femenino', hombre: 'hombre caballero varon masculino', ninos: 'ninos nino nina ninas infantil chicos', unisex: 'otros unisex' }
 
-export function textoBuscable(p: { nombre?: string; vendedor?: string; publico?: string }, rubro?: { label: string; categoriaLabel: string }) {
-  return normalizar([p.nombre, p.vendedor, rubro?.label, rubro?.categoriaLabel, SINONIMOS_PUBLICO[p.publico || 'unisex']].filter(Boolean).join(' '))
+export function textoBuscable(p: { nombre?: string; vendedor?: string; publico?: string }, rubro?: { label: string; categoriaLabel: string; grupo?: string }) {
+  return normalizar([p.nombre, p.vendedor, rubro?.label, rubro?.grupo, rubro?.categoriaLabel, SINONIMOS_PUBLICO[p.publico || 'unisex']].filter(Boolean).join(' '))
 }
 
 export function coincide(texto: string, consulta: string) {
@@ -33,7 +33,8 @@ export const labelPublico = (id: string) => PUBLICOS_PRODUCTO.find((p) => p.id =
 // familia o etiqueta es "relacionado" (se muestra después, aparte).
 
 type Familia = { palabras: string[]; rubros?: string[] }
-const RUBROS_CALZADO = ['botines', 'sandalias', 'zapatos-vestir', 'zapatillas', 'otro-calzado', 'deportes-y-fitness-zapatillas', 'ropa-ropa-y-calzado-para-bebes']
+// Ids de rubro o de subcategoría (ej: 'ropa-calzado' = todo Ropa › Calzado).
+const RUBROS_CALZADO = ['ropa-calzado', 'deportes-y-fitness-zapatillas', 'ropa-ropa-y-calzado-para-bebes-calzados', 'bebes-ropa-y-calzado-para-bebes-calzados', 'mascotas-botas-y-zapatos']
 
 export const FAMILIAS: Familia[] = [
   { palabras: ['zapato', 'calzado', 'sandalia', 'botin', 'bota', 'zapatilla', 'mocasin', 'taco', 'ojota', 'chancleta', 'chinela', 'pantufla', 'tenis', 'sneaker', 'oxford', 'balerina', 'chatita', 'alpargata', 'abarca'], rubros: RUBROS_CALZADO },
@@ -73,7 +74,7 @@ export type ProductoBuscable = { nombre?: string; vendedor?: string; publico?: s
 // 'exacto' | 'relacionado' | null (no aparece).
 export function relevancia(
   p: ProductoBuscable,
-  rubro: { label: string; categoriaLabel: string } | undefined,
+  rubro: { label: string; categoriaLabel: string; grupoId?: string; grupo?: string } | undefined,
   consulta: string
 ): 'exacto' | 'relacionado' | null {
   const palabras = normalizar(consulta).split(' ').filter(Boolean)
@@ -85,7 +86,7 @@ export function relevancia(
     if (oculto.includes(raiz(w))) return true
     const fam = familiaDe(w)
     if (!fam) return false
-    if (fam.rubros && p.rubro && fam.rubros.includes(p.rubro)) return true
+    if (fam.rubros && ((p.rubro && fam.rubros.includes(p.rubro)) || (rubro?.grupoId && fam.rubros.includes(rubro.grupoId)))) return true
     return fam.raices.some((x) => oculto.includes(x))
   })
   return ok ? 'relacionado' : null

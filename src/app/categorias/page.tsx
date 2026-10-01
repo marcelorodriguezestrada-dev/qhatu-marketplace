@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { useCiudad } from '@/lib/ciudad'
 import { productoEnCiudad } from '@/data/ciudades'
+import { gruposDe } from '@/lib/arbolCategorias'
 
 // "Categorías para comprar y vender" (estilo Mercado Libre): todas las
-// categorías con sus rubros en columnas. Cada link abre el catálogo
-// filtrado (/?categoria=… o /?rubro=…). Los que tienen productos
-// muestran cuántos hay.
+// categorías con sus subcategorías en columnas, y en cada una sus
+// rubros. Cada link abre el catálogo filtrado (/?categoria=…, /?grupo=…
+// o /?rubro=…). Los que tienen productos muestran cuántos hay.
 
 export default function CategoriasPage() {
   const { categorias, cargando } = useCategoriasProductos()
@@ -19,6 +20,7 @@ export default function CategoriasPage() {
   const conteo: Record<string, number> = {}
   for (const p of productos) if (p.rubro && productoEnCiudad(p, ciudadId)) conteo[p.rubro] = (conteo[p.rubro] || 0) + 1
   const [filtro, setFiltro] = useState('')
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/productos')
@@ -30,7 +32,7 @@ export default function CategoriasPage() {
   const norm = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const q = norm(filtro.trim())
   const visibles = categorias
-    .map((c) => ({ ...c, rubros: q && !norm(c.label).includes(q) ? c.rubros.filter((r) => norm(r.label).includes(q)) : c.rubros }))
+    .map((c) => ({ ...c, rubros: q && !norm(c.label).includes(q) ? c.rubros.filter((r) => norm(r.label).includes(q) || norm(r.grupo || '').includes(q)) : c.rubros }))
     .filter((c) => !q || norm(c.label).includes(q) || c.rubros.length > 0)
   const totalCat = (c: { rubros: { id: string }[] }) => c.rubros.reduce((s, r) => s + (conteo[r.id] || 0), 0)
 
@@ -64,13 +66,41 @@ export default function CategoriasPage() {
                 {c.label}
                 {totalCat(c) > 0 && <span className="font-body text-sm font-normal text-inksoft"> ({totalCat(c)})</span>}
               </Link>
-              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
-                {c.rubros.map((r) => (
-                  <Link key={r.id} href={`/?rubro=${r.id}`} className="font-body text-sm text-inksoft hover:text-teal hover:underline">
-                    {r.label}
-                    {conteo[r.id] ? <span className="text-teal font-semibold"> ({conteo[r.id]})</span> : null}
-                  </Link>
-                ))}
+              <div className="columns-1 min-[420px]:columns-2 md:columns-4 gap-x-6">
+                {gruposDe(c).map((g) => {
+                  const total = g.rubros.reduce((s, r) => s + (conteo[r.id] || 0), 0)
+                  const todos = !!q || abiertos.has(g.id) || g.rubros.length <= 6
+                  return (
+                    <div key={g.id} className="break-inside-avoid mb-4">
+                      <Link href={`/?grupo=${g.id}`} className="block font-body text-sm font-semibold text-ink hover:text-teal mb-1">
+                        {g.label}
+                        {total > 0 && <span className="text-teal"> ({total})</span>}
+                      </Link>
+                      {(todos ? g.rubros : g.rubros.slice(0, 5)).map((r) => (
+                        <Link key={r.id} href={`/?rubro=${r.id}`} className="block font-body text-[13px] text-inksoft hover:text-teal hover:underline py-0.5">
+                          {r.label}
+                          {conteo[r.id] ? <span className="text-teal font-semibold"> ({conteo[r.id]})</span> : null}
+                        </Link>
+                      ))}
+                      {!todos && (
+                        <button type="button" onClick={() => setAbiertos((x) => new Set(x).add(g.id))} className="font-body text-[13px] text-teal bg-transparent border-none p-0 py-0.5">
+                          Ver {g.rubros.length - 5} más
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+                {c.rubros.filter((r) => !r.grupoId).length > 0 && (
+                  <div className="break-inside-avoid mb-4">
+                    {gruposDe(c).length > 0 && <div className="font-body text-sm font-semibold text-ink mb-1">Más en {c.label}</div>}
+                    {c.rubros.filter((r) => !r.grupoId).map((r) => (
+                      <Link key={r.id} href={`/?rubro=${r.id}`} className="block font-body text-[13px] text-inksoft hover:text-teal hover:underline py-0.5">
+                        {r.label}
+                        {conteo[r.id] ? <span className="text-teal font-semibold"> ({conteo[r.id]})</span> : null}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           ))}

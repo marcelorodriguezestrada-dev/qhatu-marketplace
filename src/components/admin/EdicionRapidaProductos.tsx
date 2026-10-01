@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
+import SelectorRubro from '@/components/admin/SelectorRubro'
+import type { CategoriaProducto } from '@/lib/arbolCategorias'
 
 // Admin → Productos → "⚡ Edición rápida": una planilla con todos los
 // productos para cambiar muchos de una sin entrar a cada uno.
@@ -29,7 +31,7 @@ type Prod = {
   thumbUrl?: string
 }
 type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'precioOriginal' | 'stock' | 'talles' | 'colores'>>
-type Categoria = { id: string; label: string; rubros: { id: string; label: string }[] }
+type Categoria = CategoriaProducto
 
 const POR_PAGINA = 50
 const aLista = (t: string) => t.split(',').map((x) => x.trim()).filter(Boolean)
@@ -175,17 +177,6 @@ export default function EdicionRapidaProductos({
     }
   }
 
-  const SelectRubro = ({ value, onChange, className, vacio }: { value: string; onChange: (v: string) => void; className: string; vacio: string }) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={className}>
-      <option value="">{vacio}</option>
-      {categorias.map((c) => (
-        <optgroup key={c.id} label={c.label}>
-          {c.rubros.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-        </optgroup>
-      ))}
-    </select>
-  )
-
   const celda = (cambiado: boolean) => `w-full px-1.5 py-1 rounded border font-body text-xs ${cambiado ? 'border-ochre bg-amber-50' : 'border-transparent hover:border-line bg-transparent'}`
 
   if (!abierto) {
@@ -250,7 +241,7 @@ export default function EdicionRapidaProductos({
             <option value="stock">Stock</option>
           </select>
           {accion === 'rubro' ? (
-            <SelectRubro value={valorAccion} onChange={setValorAccion} vacio="Elegí el rubro…" className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs max-w-[240px]" />
+            <SelectorRubro categorias={categorias} value={valorAccion} onChange={setValorAccion} vacio="Elegí el rubro…" className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs w-60" />
           ) : accion === 'publico' ? (
             <select value={valorAccion} onChange={(e) => setValorAccion(e.target.value)} className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs">
               <option value="">Elegí…</option>
@@ -306,7 +297,7 @@ export default function EdicionRapidaProductos({
                   </div>
                 </td>
                 <td className="p-1.5">
-                  <SelectRubro value={valor(p, 'rubro') || ''} onChange={(v) => editar(p.id, { rubro: v })} vacio="⚠️ Sin rubro" className={celda(editado(p, 'rubro'))} />
+                  <SelectorRubro categorias={categorias} value={valor(p, 'rubro') || ''} onChange={(v) => editar(p.id, { rubro: v })} vacio="⚠️ Sin rubro" className={celda(editado(p, 'rubro'))} />
                 </td>
                 <td className="p-1.5">
                   <select value={valor(p, 'publico') || 'unisex'} onChange={(e) => editar(p.id, { publico: e.target.value })} className={celda(editado(p, 'publico'))}>

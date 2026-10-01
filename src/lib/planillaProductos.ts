@@ -21,7 +21,7 @@ export const COLUMNAS_PLANILLA = [
 
 export const MAX_FILAS_PLANILLA = 100
 
-type Rubro = { id: string; label: string; categoriaLabel: string }
+type Rubro = { id: string; label: string; categoriaLabel: string; grupo?: string }
 
 export type FilaLeida = {
   fila: number // número de fila en Excel (la 1 es el encabezado)
@@ -49,14 +49,24 @@ function lista(v: unknown): string[] {
   return String(v ?? '').split(/[,;/]/).map((x) => x.trim()).filter(Boolean).slice(0, 30)
 }
 
+// Ruta completa para escribir en la planilla: "Ropa y Accesorios > Calzado > Sandalias y Ojotas".
+export const rutaRubro = (r: Rubro) => [r.categoriaLabel, r.grupo, r.label].filter(Boolean).join(' > ')
+
+// Acepta la ruta completa (lo que trae la hoja "Categorías"), "Subcategoría
+// > Rubro", "Categoría > Rubro", el id o solo el nombre del rubro.
 export function buscarRubroPorTexto(texto: unknown, rubros: Rubro[]): Rubro | null {
-  const t = normalizarTexto(texto)
+  const t = normalizarTexto(texto).replace(/\s*>\s*/g, ' > ')
   if (!t) return null
   const parte = t.includes('>') ? t.split('>').pop()!.trim() : t
+  const porNombre = rubros.filter((r) => normalizarTexto(r.label) === parte)
   return (
     rubros.find((r) => normalizarTexto(r.id) === t) ||
-    rubros.find((r) => normalizarTexto(r.label) === parte) ||
+    rubros.find((r) => normalizarTexto(rutaRubro(r)) === t) ||
+    rubros.find((r) => r.grupo && normalizarTexto(`${r.grupo} > ${r.label}`) === t) ||
     rubros.find((r) => normalizarTexto(`${r.categoriaLabel} > ${r.label}`) === t) ||
+    // Solo el nombre: si hay varios iguales ("Otros", "Calzas"), el que no es "Otros".
+    porNombre.find((r) => !r.grupo) ||
+    porNombre[0] ||
     rubros.find((r) => normalizarTexto(r.label).startsWith(parte)) ||
     null
   )

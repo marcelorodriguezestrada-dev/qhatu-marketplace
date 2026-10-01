@@ -3,12 +3,17 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { CategoriaProducto } from '@/lib/useCategoriasProductos'
+import { gruposDe } from '@/lib/arbolCategorias'
 
-// Menú "Categorías ▾" del catálogo, estilo Mercado Libre: en
-// computadora, lista oscura de categorías y al pasar el mouse se ven sus
-// rubros al costado; en el celular, lista a pantalla completa donde
-// cada categoría se despliega. Al final, "Ver todas las categorías"
-// (/categorias).
+// Menú "Categorías ▾" del catálogo, estilo Mercado Libre (3 niveles:
+// Categoría › Subcategoría › Rubro):
+// - Computadora: lista oscura de categorías; al pasar el mouse se ven al
+//   costado sus subcategorías en columnas, cada una con sus rubros.
+// - Celular: lista a pantalla completa; la categoría se despliega en sus
+//   subcategorías, y cada subcategoría en sus rubros.
+// Al final, "Ver todas las categorías" (/categorias).
+
+const MAX_RUBROS = 6
 
 export default function MenuCategorias({
   categorias,
@@ -20,10 +25,12 @@ export default function MenuCategorias({
   categorias: CategoriaProducto[]
   abierto: boolean
   onCerrar: () => void
-  onElegir: (categoriaId: string, rubroId: string | null) => void
+  onElegir: (categoriaId: string, rubroId: string | null, grupoId?: string | null) => void
+  // Cantidades por categoría, rubro y subcategoría (esta con prefijo "g:").
   conteo?: Record<string, number>
 }) {
   const [activa, setActiva] = useState<string | null>(null)
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null)
 
   useEffect(() => {
     if (!abierto) return
@@ -35,6 +42,7 @@ export default function MenuCategorias({
   if (!abierto) return null
   const cat = categorias.find((c) => c.id === activa) || null
   const n = (id: string) => (conteo?.[id] ? ` (${conteo[id]})` : '')
+  const sueltos = (c: CategoriaProducto) => c.rubros.filter((r) => !r.grupoId)
 
   return (
     <>
@@ -42,7 +50,7 @@ export default function MenuCategorias({
 
       {/* Computadora */}
       <div className="hidden md:flex absolute left-0 top-full mt-1 z-50 shadow-2xl rounded-lg overflow-hidden" onMouseLeave={() => setActiva(null)}>
-        <div className="w-64 bg-[#333] py-2 max-h-[70vh] overflow-y-auto">
+        <div className="w-64 bg-[#333] py-2 max-h-[75vh] overflow-y-auto">
           {categorias.map((c) => (
             <button
               key={c.id}
@@ -60,16 +68,36 @@ export default function MenuCategorias({
           </Link>
         </div>
         {cat && (
-          <div className="w-[420px] bg-panel p-5 max-h-[70vh] overflow-y-auto">
-            <button type="button" onClick={() => onElegir(cat.id, null)} className="font-display text-base font-bold text-ink mb-3 hover:text-teal text-left">
+          <div className="w-[640px] bg-panel p-5 max-h-[75vh] overflow-y-auto">
+            <button type="button" onClick={() => onElegir(cat.id, null)} className="font-display text-base font-bold text-ink mb-4 hover:text-teal text-left">
               {cat.label}
             </button>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-1.5">
-              {cat.rubros.map((r) => (
-                <button key={r.id} type="button" onClick={() => onElegir(cat.id, r.id)} className="font-body text-[13px] text-inksoft hover:text-teal text-left">
-                  {r.label}{n(r.id)}
-                </button>
+            <div className="columns-3 gap-6">
+              {gruposDe(cat).map((g) => (
+                <div key={g.id} className="break-inside-avoid mb-4">
+                  <button type="button" onClick={() => onElegir(cat.id, null, g.id)} className="block font-body text-[13px] font-semibold text-ink hover:text-teal text-left mb-1">
+                    {g.label}{n(`g:${g.id}`)}
+                  </button>
+                  {g.rubros.slice(0, MAX_RUBROS).map((r) => (
+                    <button key={r.id} type="button" onClick={() => onElegir(cat.id, r.id)} className="block font-body text-[12px] text-inksoft hover:text-teal text-left py-0.5">
+                      {r.label}{n(r.id)}
+                    </button>
+                  ))}
+                  {g.rubros.length > MAX_RUBROS && (
+                    <button type="button" onClick={() => onElegir(cat.id, null, g.id)} className="block font-body text-[12px] text-teal text-left py-0.5">Ver todo ›</button>
+                  )}
+                </div>
               ))}
+              {sueltos(cat).length > 0 && (
+                <div className="break-inside-avoid mb-4">
+                  {gruposDe(cat).length > 0 && <div className="font-body text-[13px] font-semibold text-ink mb-1">Más en {cat.label}</div>}
+                  {sueltos(cat).map((r) => (
+                    <button key={r.id} type="button" onClick={() => onElegir(cat.id, r.id)} className="block font-body text-[12px] text-inksoft hover:text-teal text-left py-0.5">
+                      {r.label}{n(r.id)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -77,23 +105,43 @@ export default function MenuCategorias({
 
       {/* Celular */}
       <div className="md:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-panel overflow-y-auto">
-        <div className="sticky top-0 bg-ink text-white flex items-center justify-between px-4 py-3.5">
+        <div className="sticky top-0 bg-ink text-white flex items-center justify-between px-4 py-3.5 z-10">
           <span className="font-display text-base font-bold">Categorías</span>
           <button type="button" onClick={onCerrar} className="text-white text-xl px-2" aria-label="Cerrar">✕</button>
         </div>
         {categorias.map((c) => (
           <div key={c.id} className="border-b border-line">
-            <button type="button" onClick={() => setActiva(activa === c.id ? null : c.id)} className="w-full flex items-center justify-between px-4 py-3.5 text-left">
+            <button type="button" onClick={() => { setActiva(activa === c.id ? null : c.id); setGrupoAbierto(null) }} className="w-full flex items-center justify-between px-4 py-3.5 text-left">
               <span className="font-body text-[15px] text-ink">{c.label}{n(c.id)}</span>
               <span className="text-inksoft">{activa === c.id ? '▾' : '›'}</span>
             </button>
             {activa === c.id && (
-              <div className="bg-panelalt px-4 pb-3">
-                <button type="button" onClick={() => onElegir(c.id, null)} className="block w-full text-left py-2 font-body text-sm text-teal font-semibold">
+              <div className="bg-panelalt pb-2">
+                <button type="button" onClick={() => onElegir(c.id, null)} className="block w-full text-left px-4 py-2.5 font-body text-sm text-teal font-semibold">
                   Ver todo en {c.label}
                 </button>
-                {c.rubros.map((r) => (
-                  <button key={r.id} type="button" onClick={() => onElegir(c.id, r.id)} className="block w-full text-left py-2 font-body text-sm text-ink border-t border-line/60">
+                {gruposDe(c).map((g) => (
+                  <div key={g.id} className="border-t border-line/60">
+                    <button type="button" onClick={() => setGrupoAbierto(grupoAbierto === g.id ? null : g.id)} className="w-full flex items-center justify-between px-4 py-2.5 text-left">
+                      <span className="font-body text-sm text-ink">{g.label}{n(`g:${g.id}`)}</span>
+                      <span className="text-inksoft text-sm">{grupoAbierto === g.id ? '▾' : '›'}</span>
+                    </button>
+                    {grupoAbierto === g.id && (
+                      <div className="pl-7 pr-4 pb-2">
+                        <button type="button" onClick={() => onElegir(c.id, null, g.id)} className="block w-full text-left py-2 font-body text-[13px] text-teal font-semibold">
+                          Ver todo en {g.label}
+                        </button>
+                        {g.rubros.map((r) => (
+                          <button key={r.id} type="button" onClick={() => onElegir(c.id, r.id)} className="block w-full text-left py-2 font-body text-[13px] text-ink border-t border-line/40">
+                            {r.label}{n(r.id)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {sueltos(c).map((r) => (
+                  <button key={r.id} type="button" onClick={() => onElegir(c.id, r.id)} className="block w-full text-left px-4 py-2.5 font-body text-sm text-ink border-t border-line/60">
                     {r.label}{n(r.id)}
                   </button>
                 ))}

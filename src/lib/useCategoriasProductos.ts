@@ -1,39 +1,55 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-export type RubroProducto = { id: string; label: string }
-export type CategoriaProducto = { id: string; label: string; rubros: RubroProducto[] }
-export type RubroProductoFlat = { id: string; label: string; categoriaId: string; categoriaLabel: string }
+import { expandirCategoria, type CategoriaCompacta, type CategoriaProducto, type RubroProductoFlat } from '@/lib/arbolCategorias'
+
+export type { RubroProducto, CategoriaProducto, RubroProductoFlat } from '@/lib/arbolCategorias'
 
 // Igual que useCategorias.ts pero para el árbol de PRODUCTOS. Un solo
 // lugar para que /vender, /producto/[id], el catálogo y /admin
 // siempre muestren exactamente la misma clasificación.
-export function useCategoriasProductos() {
-  const [categorias, setCategorias] = useState<CategoriaProducto[]>([])
-  const [rubrosFlat, setRubrosFlat] = useState<RubroProductoFlat[]>([])
-  const [cargando, setCargando] = useState(true)
+type Arbol = { categorias: CategoriaProducto[]; rubrosFlat: RubroProductoFlat[] }
 
-  function recargar() {
-    setCargando(true)
-    fetch('/api/categorias-productos')
+// Una sola descarga por visita (el árbol tiene ~3.200 rubros): todas las
+// partes de la página que usan el hook comparten la misma respuesta.
+let enCurso: Promise<Arbol> | null = null
+function bajarArbol(forzar = false): Promise<Arbol> {
+  if (!enCurso || forzar) {
+    // Al recargar (admin) salteamos el caché del CDN con ?t=.
+    enCurso = fetch(forzar ? `/api/categorias-productos?t=${Date.now()}` : '/api/categorias-productos', forzar ? { cache: 'no-store' } : undefined)
       .then((r) => r.json())
       .then((data) => {
-        setCategorias(data.categorias || [])
-        setRubrosFlat(data.rubrosFlat || [])
+        const categorias: CategoriaProducto[] = (data.arbol || []).map((c: CategoriaCompacta) => expandirCategoria(c))
+        return { categorias, rubrosFlat: categorias.flatMap((c) => c.rubros.map((r) => ({ ...r, categoriaId: c.id, categoriaLabel: c.label }))) }
       })
+      .catch((err) => {
+        enCurso = null
+        throw err
+      })
+  }
+  return enCurso
+}
+
+export function useCategoriasProductos() {
+  const [arbol, setArbol] = useState<Arbol>({ categorias: [], rubrosFlat: [] })
+  const [cargando, setCargando] = useState(true)
+
+  function recargar(forzar = true) {
+    setCargando(true)
+    bajarArbol(forzar)
+      .then(setArbol)
+      .catch(() => {})
       .finally(() => setCargando(false))
   }
 
   useEffect(() => {
-    recargar()
+    recargar(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function buscarRubroProducto(rubroId: string | undefined): RubroProductoFlat | undefined {
-    if (!rubroId) return undefined
-    return rubrosFlat.find((r) => r.id === rubroId)
-  }
+  const porId = useMemo(() => new Map(arbol.rubrosFlat.map((r) => [r.id, r])), [arbol])
+  const buscarRubroProducto = useCallback((rubroId: string | undefined): RubroProductoFlat | undefined => (rubroId ? porId.get(rubroId) : undefined), [porId])
 
-  return { categorias, rubrosFlat, cargando, recargar, buscarRubroProducto }
+  return { categorias: arbol.categorias, rubrosFlat: arbol.rubrosFlat, cargando, recargar, buscarRubroProducto }
 }

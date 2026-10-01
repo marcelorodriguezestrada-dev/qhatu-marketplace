@@ -24,7 +24,7 @@ import { useCiudad } from '@/lib/ciudad'
 import { productoEnCiudad } from '@/data/ciudades'
 
 export default function CatalogoPage() {
-  const { categorias: categoriasProductos, buscarRubroProducto } = useCategoriasProductos()
+  const { categorias: categoriasProductos, rubrosFlat, buscarRubroProducto } = useCategoriasProductos()
   const [todosLosProductos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
   // Productos de la ciudad del comprador + los de tiendas que envían a
   // todo Bolivia (llevan "🚚 Envía desde …").
@@ -34,6 +34,8 @@ export default function CatalogoPage() {
   const [categoria, setCategoria] = useState('Todo')
   // Rubro elegido desde el menú "Categorías" o /categorias (?rubro=).
   const [rubroSel, setRubroSel] = useState<string | null>(null)
+  // Subcategoría elegida (nivel del medio: Ropa › Calzado › …).
+  const [grupoSel, setGrupoSel] = useState<string | null>(null)
   const [menuCategorias, setMenuCategorias] = useState(false)
   const portada = usePortada()
   const [busqueda, setBusqueda] = useState('')
@@ -55,9 +57,15 @@ export default function CatalogoPage() {
       })
   }, [])
 
+  // ¿El producto está dentro de lo elegido (rubro, subcategoría o categoría)?
+  const enSeleccion = (p: Producto) => {
+    if (rubroSel) return p.rubro === rubroSel
+    if (grupoSel) return buscarRubroProducto(p.rubro)?.grupoId === grupoSel
+    return categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
+  }
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
-    const matchCat = rubroSel ? p.rubro === rubroSel : categoria === 'Todo' || buscarRubroProducto(p.rubro)?.categoriaId === categoria
+    const matchCat = enSeleccion(p)
     return matchPublico && matchCat
   })
 
@@ -99,8 +107,10 @@ export default function CatalogoPage() {
     if (q) { setBusqueda(q); setConsulta(q) }
     const cat = params.get('categoria')
     const rub = params.get('rubro')
+    const gru = params.get('grupo')
     if (cat) setCategoria(cat)
     if (rub) setRubroSel(rub)
+    if (gru) setGrupoSel(gru)
   }, [])
 
   // Atrás/adelante del navegador: seguir la búsqueda de la URL.
@@ -119,24 +129,45 @@ export default function CatalogoPage() {
   for (const p of productos) {
     if (!p.rubro) continue
     conteoCategorias[p.rubro] = (conteoCategorias[p.rubro] || 0) + 1
-    const cid = buscarRubroProducto(p.rubro)?.categoriaId
-    if (cid) conteoCategorias[cid] = (conteoCategorias[cid] || 0) + 1
+    const info = buscarRubroProducto(p.rubro)
+    if (info) conteoCategorias[info.categoriaId] = (conteoCategorias[info.categoriaId] || 0) + 1
+    // Subcategorías con prefijo "g:" (su id puede ser el mismo que el de su rubro "Otros").
+    if (info?.grupoId) conteoCategorias[`g:${info.grupoId}`] = (conteoCategorias[`g:${info.grupoId}`] || 0) + 1
   }
-  const categoriaActual = categoriasProductos.find((c) => c.id === (rubroSel ? buscarRubroProducto(rubroSel)?.categoriaId : categoria))
   const rubroActual = rubroSel ? buscarRubroProducto(rubroSel) : undefined
+  // La subcategoría (elegida, o la del rubro elegido) y su categoría.
+  const grupoActualId = grupoSel || rubroActual?.grupoId || null
+  const hojaDeGrupo = grupoActualId ? rubrosFlat.find((r) => r.grupoId === grupoActualId) : undefined
+  const grupoActual = hojaDeGrupo ? { id: grupoActualId!, label: hojaDeGrupo.grupo || '', categoriaId: hojaDeGrupo.categoriaId } : undefined
+  const categoriaActual = categoriasProductos.find((c) => c.id === (rubroActual?.categoriaId || grupoActual?.categoriaId || categoria))
+  // Atajos de un nivel más abajo, solo con lo que tiene productos: en una
+  // categoría, sus subcategorías (y rubros sueltos); en una subcategoría, sus rubros.
+  const atajos: { id: string; label: string; tipo: 'grupo' | 'rubro' }[] = (() => {
+    if (rubroSel || !categoriaActual) return []
+    if (grupoSel) return categoriaActual.rubros.filter((r) => r.grupoId === grupoSel && conteoCategorias[r.id]).map((r) => ({ id: r.id, label: r.label, tipo: 'rubro' as const }))
+    const out: { id: string; label: string; tipo: 'grupo' | 'rubro' }[] = []
+    for (const r of categoriaActual.rubros) {
+      if (r.grupoId) { if (!out.some((x) => x.id === r.grupoId) && conteoCategorias[`g:${r.grupoId}`]) out.push({ id: r.grupoId, label: r.grupo || '', tipo: 'grupo' }) }
+      else if (conteoCategorias[r.id]) out.push({ id: r.id, label: r.label, tipo: 'rubro' })
+    }
+    return out
+  })()
 
   // Mujer / Hombre / Niños / Otros con productos dentro de la categoría
   // (o rubro) elegida — el filtro secundario.
-  const enCategoria = productos.filter((p) => (rubroSel ? p.rubro === rubroSel : categoria !== 'Todo' && buscarRubroProducto(p.rubro)?.categoriaId === categoria))
+  const enCategoria = productos.filter((p) => (rubroSel || grupoSel || categoria !== 'Todo') && enSeleccion(p))
   const publicosDisponibles = PUBLICOS_PRODUCTO.map((pub) => ({ ...pub, cantidad: enCategoria.filter((p) => (p.publico || 'unisex') === pub.id).length })).filter((pub) => pub.cantidad > 0)
 
-  function elegirCategoria(catId: string, rubroId: string | null, bajar = true) {
+  function elegirCategoria(catId: string, rubroId: string | null, grupoId: string | null = null, bajar = true) {
     setMenuCategorias(false)
     setCategoria(catId)
     setRubroSel(rubroId)
+    setGrupoSel(rubroId ? null : grupoId)
     setPublico('Todo')
     const params = new URLSearchParams()
-    params.set(rubroId ? 'rubro' : 'categoria', rubroId || catId)
+    if (rubroId) params.set('rubro', rubroId)
+    else if (grupoId) params.set('grupo', grupoId)
+    else params.set('categoria', catId)
     window.history.replaceState(null, '', `/?${params.toString()}`)
     if (bajar) setTimeout(() => document.getElementById('grilla-productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
@@ -145,6 +176,7 @@ export default function CatalogoPage() {
     setPublico('Todo')
     setCategoria('Todo')
     setRubroSel(null)
+    setGrupoSel(null)
     window.history.replaceState(null, '', '/')
   }
 
@@ -286,7 +318,7 @@ export default function CatalogoPage() {
             aria-label="Ver todo"
             title="Ver todo"
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 ${
-              categoria === 'Todo' && !rubroSel ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
+              categoria === 'Todo' && !rubroSel && !grupoSel ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
             }`}
           >
             🏠
@@ -295,7 +327,7 @@ export default function CatalogoPage() {
             <button
               key={c.id}
               onClick={() => {
-                elegirCategoria(c.id, null, false)
+                elegirCategoria(c.id, null, null, false)
                 fetch('/api/analitica/categoria', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -313,7 +345,7 @@ export default function CatalogoPage() {
 
         {portada?.cupon && <BannerCuponPromo />}
 
-        {categoria === 'Todo' && !rubroSel ? (
+        {categoria === 'Todo' && !rubroSel && !grupoSel ? (
           portada?.banners && <BannerCarousel />
         ) : (
           // Fila 2: género como filtro secundario dentro de la categoría —
@@ -343,18 +375,39 @@ export default function CatalogoPage() {
           )
         )}
 
-        {(rubroSel || categoria !== 'Todo') && categoriaActual && (
+        {(rubroSel || grupoSel || categoria !== 'Todo') && categoriaActual && (
           <div className="flex flex-wrap items-center gap-2 mb-4 font-body text-sm">
             <Link href="/categorias" className="text-inksoft hover:text-teal">Categorías</Link>
             <span className="text-inksoft">›</span>
-            <button type="button" onClick={() => elegirCategoria(categoriaActual.id, null)} className={rubroActual ? 'text-inksoft hover:text-teal' : 'text-ink font-semibold'}>{categoriaActual.label}</button>
-            {rubroActual && (
+            <button type="button" onClick={() => elegirCategoria(categoriaActual.id, null)} className={rubroActual || grupoActual ? 'text-inksoft hover:text-teal' : 'text-ink font-semibold'}>{categoriaActual.label}</button>
+            {grupoActual && (
+              <>
+                <span className="text-inksoft">›</span>
+                <button type="button" onClick={() => elegirCategoria(categoriaActual.id, null, grupoActual.id)} className={rubroActual && rubroActual.id !== grupoActual.id ? 'text-inksoft hover:text-teal' : 'text-ink font-semibold'}>{grupoActual.label}</button>
+              </>
+            )}
+            {rubroActual && rubroActual.id !== grupoActual?.id && (
               <>
                 <span className="text-inksoft">›</span>
                 <span className="text-ink font-semibold">{rubroActual.label}</span>
               </>
             )}
             <button type="button" onClick={quitarFiltroCategoria} className="ml-1 px-2.5 py-0.5 rounded-full border border-line bg-panel text-inksoft text-xs">✕ Quitar filtro</button>
+          </div>
+        )}
+
+        {atajos.length > 1 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {atajos.map((x) => (
+              <button
+                key={x.tipo + x.id}
+                type="button"
+                onClick={() => (x.tipo === 'grupo' ? elegirCategoria(categoriaActual!.id, null, x.id, false) : elegirCategoria(categoriaActual!.id, x.id, null, false))}
+                className="shrink-0 px-3 py-1 rounded-full border border-line bg-panel font-body text-[13px] text-ink hover:border-teal whitespace-nowrap"
+              >
+                {x.label} <span className="text-inksoft">({conteoCategorias[x.tipo === 'grupo' ? `g:${x.id}` : x.id]})</span>
+              </button>
+            ))}
           </div>
         )}
 

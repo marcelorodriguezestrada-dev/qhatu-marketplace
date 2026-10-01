@@ -14,6 +14,7 @@ import MarketingVendedor from '@/components/vender/MarketingVendedor'
 import { useSeccionVendedor, claseSeccion, SidebarVendedor, MenuVendedorCelular, VolverCelular, type SeccionVendedor } from '@/components/vender/NavVendedor'
 import { ProductIcon } from '@/components/ProductIcon'
 import ModalIASuggestions from '@/components/ModalIASuggestions'
+import { gruposDe, nombreRubro } from '@/lib/arbolCategorias'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO, PUBLICO_PRODUCTO_FALLBACK, labelPublicoProducto } from '@/data/publicoProducto'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -928,7 +929,7 @@ export default function VenderPage() {
                 const res = await fetch('/api/generate-description', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nombre, categoria: buscarRubroProducto(rubro)?.label || rubro, precio, imagenUrl, descripcionLarga, variantes: 3 }),
+                  body: JSON.stringify({ nombre, categoria: nombreRubro(buscarRubroProducto(rubro)) || rubro, precio, imagenUrl, descripcionLarga, variantes: 3 }),
                 })
                 const j = await res.json()
                 if (j.error) throw new Error(j.error)
@@ -995,8 +996,16 @@ export default function VenderPage() {
             onChange={(e) => { setRubro(e.target.value); setCategoriaTocada(true); setCategoriaDetectada('') }}
             className="px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
           >
-            {rubrosDeCategoriaSel.map((r) => (
+            {/* Rubros sueltos de la categoría y, debajo, cada subcategoría con los suyos. */}
+            {rubrosDeCategoriaSel.filter((r) => !r.grupoId).map((r) => (
               <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
+            {gruposDe({ id: '', label: '', rubros: rubrosDeCategoriaSel }).map((g) => (
+              <optgroup key={g.id} label={g.label}>
+                {g.rubros.map((r) => (
+                  <option key={r.id} value={r.id}>{r.label}{r.label === 'Otros' ? ` (${g.label})` : ''}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
@@ -1302,7 +1311,7 @@ export default function VenderPage() {
           <div className="flex-1">
             <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
             <div className="font-body text-xs text-inksoft">
-              {labelPublicoProducto(p.publico)} · {buscarRubroProducto(p.rubro)?.label || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
+              {labelPublicoProducto(p.publico)} · {nombreRubro(buscarRubroProducto(p.rubro)) || p.categoria || 'Sin rubro'} · {p.precioOriginal ? (
                 <>
                   <span className="line-through">{bs(p.precioOriginal)}</span> {bs(p.precio)}
                 </>
