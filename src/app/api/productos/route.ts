@@ -10,7 +10,7 @@ async function vendedorPremium(uid: string): Promise<boolean> {
 }
 import { sanearStock } from '@/lib/stock'
 import { PRODUCTOS_SEED } from '@/data/productos'
-import { LEGACY_CATEGORIA_A_RUBRO } from '@/data/categoriasProductos'
+import { LEGACY_CATEGORIA_A_RUBRO, RUBRO_DE_GRUPO } from '@/data/categoriasProductos'
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     // filtro nuevo; el vendedor puede después editarlos y elegir uno
     // más específico.
     productos = productos.map((p) =>
-      p.rubro ? p : { ...p, rubro: LEGACY_CATEGORIA_A_RUBRO[p.categoria as string] || 'otro-producto' }
+      p.rubro ? (RUBRO_DE_GRUPO[p.rubro] ? { ...p, rubro: RUBRO_DE_GRUPO[p.rubro] } : p) : { ...p, rubro: LEGACY_CATEGORIA_A_RUBRO[p.categoria as string] || 'otro-producto' }
     )
     // Compatibilidad: productos publicados antes del campo `publico`.
     productos = productos.map((p) => (p.publico ? p : { ...p, publico: 'unisex' }))

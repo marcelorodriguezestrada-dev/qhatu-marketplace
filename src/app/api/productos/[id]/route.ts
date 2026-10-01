@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
+import { RUBRO_DE_GRUPO } from '@/data/categoriasProductos'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 import { sanearStock } from '@/lib/stock'
@@ -14,7 +15,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (!doc.exists) {
       return NextResponse.json({ error: 'Producto no encontrado.' }, { status: 404 })
     }
-    return NextResponse.json({ id: doc.id, ...doc.data() })
+    const datos = doc.data() as any
+    if (datos?.rubro && RUBRO_DE_GRUPO[datos.rubro]) datos.rubro = RUBRO_DE_GRUPO[datos.rubro]
+    return NextResponse.json({ id: doc.id, ...datos })
   } catch (err) {
     console.error('GET /api/productos/[id]', err)
     return NextResponse.json({ error: 'No se pudo cargar el producto.' }, { status: 500 })
