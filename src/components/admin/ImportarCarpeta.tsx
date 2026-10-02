@@ -8,6 +8,7 @@ import { buscarRubroPorTexto } from '@/lib/planillaProductos'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 import type { NuevoImportado } from '@/components/admin/EdicionRapidaProductos'
+import ArmarPlanilla from '@/components/admin/ArmarPlanilla'
 
 // Admin → Productos → Edición rápida → "📁 Importar carpeta".
 // 1. Elegís una carpeta (de la compu, o de Google Drive para escritorio)
@@ -19,6 +20,7 @@ import type { NuevoImportado } from '@/components/admin/EdicionRapidaProductos'
 //    público, colores y descripción. Precio/talles/stock salen del
 //    nombre del archivo.
 // 4. Todo cae en la planilla como filas nuevas para revisar y guardar.
+// Sin planilla de Google: "🧾 Armar planilla" la arma desde la carpeta.
 
 type Vendedor = { id: string; nombre: string }
 type Existente = { id: string; nombre: string; vendedorId?: string; claveImportacion?: string; precio?: number; rubro?: string }
@@ -48,7 +50,7 @@ export default function ImportarCarpeta({
 }) {
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
   const [estado, setEstado] = useState<Estado>('elegir')
-  const [modo, setModo] = useState<'carpeta' | 'sheet'>('carpeta')
+  const [modo, setModo] = useState<'carpeta' | 'sheet' | 'armar'>('carpeta')
   const [linkSheet, setLinkSheet] = useState('')
   const [filasSheet, setFilasSheet] = useState<string[][] | null>(null)
   const [leyendoSheet, setLeyendoSheet] = useState(false)
@@ -202,6 +204,8 @@ export default function ImportarCarpeta({
   }
 
   async function subirDesdeLink(url: string) {
+    // Ya subida a ImgBB (planilla armada desde la compu): se usa tal cual.
+    if (/^https:\/\/i\.ibb\.co\//.test(url)) return { url, thumbUrl: url }
     const d = await fetch('/api/admin/foto-desde-link', { method: 'POST', headers, body: JSON.stringify({ url }) }).then((r) => r.json())
     if (!d.url) throw new Error(d.error || 'No se pudo bajar la foto.')
     return d as { url: string; thumbUrl: string }
@@ -295,7 +299,7 @@ export default function ImportarCarpeta({
   return (
     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3.5 mb-3">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="font-body text-sm font-semibold text-ink">{modo === 'sheet' ? '📊 Importar productos desde Google Sheets' : '📁 Importar productos desde una carpeta'}</div>
+        <div className="font-body text-sm font-semibold text-ink">{modo === 'sheet' ? '📊 Importar productos desde Google Sheets' : modo === 'armar' ? '🧾 Armar la planilla desde una carpeta de fotos' : '📁 Importar productos desde una carpeta'}</div>
         {estado !== 'procesando' && <button type="button" onClick={onCerrar} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>}
       </div>
 
@@ -304,8 +308,11 @@ export default function ImportarCarpeta({
           <div className="flex gap-1 mb-3 bg-white rounded-lg p-1 w-fit border border-indigo-100">
             <button type="button" onClick={() => { setModo('carpeta'); setNombreIA(true) }} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'carpeta' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>📁 Carpeta de fotos</button>
             <button type="button" onClick={() => { setModo('sheet'); setNombreIA(false) }} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'sheet' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>📊 Google Sheet</button>
+            <button type="button" onClick={() => setModo('armar')} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'armar' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>🧾 Armar planilla</button>
           </div>
-          {modo === 'carpeta' ? (
+          {modo === 'armar' ? (
+            <ArmarPlanilla password={password} rubros={rubrosFlat} onUsarSheet={() => { setModo('sheet'); setNombreIA(false) }} />
+          ) : modo === 'carpeta' ? (
             <>
           <div className="font-body text-xs text-ink mb-2">
             Elegí la carpeta con <strong>una subcarpeta por tienda</strong> y <strong>una foto por producto</strong>. Si usás <em>Google Drive para escritorio</em>, tus carpetas de Drive aparecen en la compu; si no, descargá la carpeta de Drive (ZIP) y descomprimila.

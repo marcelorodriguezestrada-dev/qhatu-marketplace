@@ -315,7 +315,7 @@ export default function EdicionRapidaProductos({
           <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos (a mano o desde una carpeta de fotos) y cambiar categoría, precios, ofertas, talles, colores y stock de muchos a la vez.</div>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => { setImportando(true); setAbierto(true) }} className="px-3.5 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-sm font-semibold">📁 Importar carpeta</button>
+          <button type="button" onClick={() => { setImportando(true); setAbierto(true) }} className="px-3.5 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-sm font-semibold">📥 Importar (carpeta, Sheet o armar planilla)</button>
           <button type="button" onClick={() => agregarFilas(3)} className="px-3.5 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-sm font-semibold">➕ Agregar productos</button>
           <button type="button" onClick={() => setAbierto(true)} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold">Abrir planilla</button>
         </div>
@@ -421,7 +421,7 @@ export default function EdicionRapidaProductos({
           {vendedoresCuentas.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
         </select>
         <button type="button" onClick={() => agregarFilas(1)} className="px-3 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-xs font-semibold">+ 1 fila</button>
-        {!importando && <button type="button" onClick={() => setImportando(true)} className="px-3 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-xs font-semibold">📁 Importar carpeta</button>}
+        {!importando && <button type="button" onClick={() => setImportando(true)} className="px-3 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-xs font-semibold">📥 Importar (carpeta, Sheet o armar planilla)</button>}
         <button type="button" onClick={() => agregarFilas(5)} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs text-ink">+ 5 filas</button>
         {nuevos.length > 0 && <button type="button" onClick={() => setNuevos([])} className="font-body text-xs text-inksoft underline bg-transparent border-none">Quitar filas nuevas</button>}
         <span className="font-body text-[11px] text-inksoft">Cada fila nueva copia la categoría y los talles de la anterior. También podés tocar ⧉ en un producto para duplicarlo.</span>
