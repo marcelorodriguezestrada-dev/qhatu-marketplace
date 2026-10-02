@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import SelectorRubro from '@/components/admin/SelectorRubro'
+import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
+import ImportarCarpeta from '@/components/admin/ImportarCarpeta'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
 
 // Admin → Productos → "⚡ Edición rápida": una planilla con todos los
@@ -49,30 +51,19 @@ type Nuevo = {
   colores: string
   imagenUrl?: string
   thumbUrl?: string
+  fotosAdicionales?: string[]
+  descripcionCorta?: string
+  // Si viene de "Importar carpeta", cada fila trae su vendedor (tienda).
+  vendedorId?: string
+  // Nombre del archivo original (para reconocerla al revisar).
+  archivo?: string
   subiendo?: boolean
   error?: string
 }
+export type NuevoImportado = Omit<Nuevo, 'key'>
 let contadorNuevos = 0
 const nuevoVacio = (base?: Partial<Nuevo>): Nuevo => ({ key: `n${++contadorNuevos}`, nombre: '', rubro: '', publico: 'mujer', precio: '', precioOriginal: '', stock: '', talles: '', colores: '', ...base })
 
-// Achica la foto antes de subirla (más rápido y liviano).
-async function achicar(file: File, max = 1000): Promise<File> {
-  try {
-    const img = document.createElement('img')
-    img.src = URL.createObjectURL(file)
-    await new Promise((r, rej) => { img.onload = r; img.onerror = rej })
-    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight))
-    const c = document.createElement('canvas')
-    c.width = Math.round(img.naturalWidth * k)
-    c.height = Math.round(img.naturalHeight * k)
-    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
-    URL.revokeObjectURL(img.src)
-    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.8))
-    return blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file
-  } catch {
-    return file
-  }
-}
 const aLista = (t: string) => t.split(',').map((x) => x.trim()).filter(Boolean)
 const aTexto = (l?: string[]) => (l || []).join(', ')
 const redondear = (n: number) => Math.round(n)
@@ -84,6 +75,7 @@ export default function EdicionRapidaProductos({
   rubroLabel,
   onGuardado,
   vendedoresCuentas = [],
+  onVendedorCreado,
 }: {
   password: string
   productos: Prod[]
@@ -92,7 +84,9 @@ export default function EdicionRapidaProductos({
   onGuardado: () => void
   // Vendedores para los productos nuevos.
   vendedoresCuentas?: { id: string; nombre: string }[]
+  onVendedorCreado?: () => void
 }) {
+  const [importando, setImportando] = useState(false)
   const [nuevos, setNuevos] = useState<Nuevo[]>([])
   const [vendedorNuevos, setVendedorNuevos] = useState('')
   const [abierto, setAbierto] = useState(false)
@@ -153,6 +147,7 @@ export default function EdicionRapidaProductos({
   const nuevosConDatos = nuevos.filter((n) => n.nombre.trim() || n.precio || n.imagenUrl)
   const cantCambios = cantEditados + nuevosConDatos.length
 
+  const nombreVendedor = (id: string) => vendedoresCuentas.find((v) => v.id === id)?.nombre.replace(/\s*\(.*\)$/, '')
   const setNuevo = (key: string, c: Partial<Nuevo>) => setNuevos((prev) => prev.map((n) => (n.key === key ? { ...n, ...c, error: undefined } : n)))
   // Las filas nuevas heredan categoría, público y talles de la anterior (cargás varios parecidos seguidos).
   function agregarFilas(cantidad = 1) {
@@ -180,12 +175,8 @@ export default function EdicionRapidaProductos({
     if (!file) return
     setNuevo(key, { subiendo: true })
     try {
-      const fd = new FormData()
-      fd.append('image', await achicar(file))
-      fd.append('thumb', await achicar(file, 300))
-      const d = await fetch('/api/upload-image', { method: 'POST', headers: { 'x-admin-password': password }, body: fd }).then((r) => r.json())
-      if (!d.url) throw new Error(d.error || 'No se pudo subir la foto.')
-      setNuevo(key, { imagenUrl: d.url, thumbUrl: d.thumbUrl || d.url, subiendo: false })
+      const d = await subirFotoAdmin(password, file)
+      setNuevo(key, { imagenUrl: d.url, thumbUrl: d.thumbUrl, subiendo: false })
     } catch (err: any) {
       setNuevos((prev) => prev.map((n) => (n.key === key ? { ...n, subiendo: false, error: err?.message || 'No se pudo subir la foto.' } : n)))
     }
@@ -247,31 +238,46 @@ export default function EdicionRapidaProductos({
       // 1) Productos nuevos
       if (nuevosConDatos.length) {
         const faltan = nuevosConDatos.map((n) => ({ n, error: !n.nombre.trim() ? 'Falta el nombre' : !n.rubro ? 'Falta la categoría' : !(Number(n.precio) > 0) ? 'Falta el precio' : n.subiendo ? 'Todavía se sube la foto' : '' })).filter((x) => x.error)
-        if (!vendedorNuevos) throw new Error('Elegí de qué vendedor son los productos nuevos.')
+        if (nuevosConDatos.some((n) => !n.vendedorId) && !vendedorNuevos) throw new Error('Elegí de qué vendedor son los productos nuevos.')
         if (faltan.length) {
           setNuevos((prev) => prev.map((n) => ({ ...n, error: faltan.find((f) => f.n.key === n.key)?.error })))
           throw new Error(`Revisá los productos nuevos marcados en rojo (${faltan.length}).`)
         }
-        const d = await fetch('/api/admin/productos/nuevos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-          body: JSON.stringify({
-            vendedorId: vendedorNuevos,
-            productos: nuevosConDatos.map((n) => ({
-              nombre: n.nombre, rubro: n.rubro, publico: n.publico, precio: Number(n.precio),
-              precioOriginal: n.precioOriginal ? Number(n.precioOriginal) : null,
-              stock: n.stock === '' ? null : Number(n.stock),
-              talles: aLista(n.talles), colores: aLista(n.colores),
-              imagenUrl: n.imagenUrl, thumbUrl: n.thumbUrl,
-            })),
-          }),
-        }).then((r) => r.json())
-        if (d.error) throw new Error(d.error)
-        const conError = new Map<number, string>((d.errores || []).map((e: any) => [e.indice, e.error]))
-        const keysError = new Map(nuevosConDatos.map((n, i) => [n.key, conError.get(i)]))
+        // Una llamada por vendedor (las filas importadas traen el suyo).
+        const porVendedor = new Map<string, Nuevo[]>()
+        for (const n of nuevosConDatos) {
+          const v = n.vendedorId || vendedorNuevos
+          porVendedor.set(v, [...(porVendedor.get(v) || []), n])
+        }
+        const keysError = new Map<string, string>()
+        let creados = 0
+        for (const [vendedorId, filas] of porVendedor) {
+          const d = await fetch('/api/admin/productos/nuevos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+            body: JSON.stringify({
+              vendedorId,
+              productos: filas.map((n) => ({
+                nombre: n.nombre, rubro: n.rubro, publico: n.publico, precio: Number(n.precio),
+                precioOriginal: n.precioOriginal ? Number(n.precioOriginal) : null,
+                stock: n.stock === '' ? null : Number(n.stock),
+                talles: aLista(n.talles), colores: aLista(n.colores),
+                imagenUrl: n.imagenUrl, thumbUrl: n.thumbUrl,
+                fotosAdicionales: n.fotosAdicionales || [], descripcionCorta: n.descripcionCorta || '',
+              })),
+            }),
+          }).then((r) => r.json())
+          if (d.error) {
+            filas.forEach((n) => keysError.set(n.key, d.error))
+            continue
+          }
+          creados += d.creados.length
+          for (const e of d.errores || []) keysError.set(filas[e.indice].key, e.error)
+        }
         // Quedan solo las que dieron error (las guardadas y las vacías se van).
-        setNuevos((prev) => prev.filter((n) => keysError.get(n.key)).map((n) => ({ ...n, error: keysError.get(n.key) })))
-        partes.push(`✓ ${d.creados.length} producto${d.creados.length === 1 ? '' : 's'} nuevo${d.creados.length === 1 ? '' : 's'}`)
+        setNuevos((prev) => prev.filter((n) => keysError.has(n.key)).map((n) => ({ ...n, error: keysError.get(n.key) })))
+        if (keysError.size && !creados) throw new Error(`No se pudieron guardar ${keysError.size} productos nuevos (ver en rojo).`)
+        partes.push(`✓ ${creados} producto${creados === 1 ? '' : 's'} nuevo${creados === 1 ? '' : 's'}${keysError.size ? ` · ${keysError.size} con error (en rojo)` : ''}`)
       }
       // 2) Cambios a productos existentes
       if (cantEditados) {
@@ -303,9 +309,10 @@ export default function EdicionRapidaProductos({
       <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
-          <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos y cambiar categoría, precios, ofertas, talles, colores y stock de muchos a la vez.</div>
+          <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos (a mano o desde una carpeta de fotos) y cambiar categoría, precios, ofertas, talles, colores y stock de muchos a la vez.</div>
         </div>
         <div className="flex gap-2">
+          <button type="button" onClick={() => { setImportando(true); setAbierto(true) }} className="px-3.5 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-sm font-semibold">📁 Importar carpeta</button>
           <button type="button" onClick={() => agregarFilas(3)} className="px-3.5 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-sm font-semibold">➕ Agregar productos</button>
           <button type="button" onClick={() => setAbierto(true)} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold">Abrir planilla</button>
         </div>
@@ -385,14 +392,28 @@ export default function EdicionRapidaProductos({
         </div>
       </div>
 
+      {importando && (
+        <ImportarCarpeta
+          password={password}
+          vendedores={vendedoresCuentas}
+          onVendedorCreado={() => onVendedorCreado?.()}
+          onCerrar={() => setImportando(false)}
+          onListo={(filas) => {
+            setNuevos((prev) => [...prev.filter((n) => n.nombre.trim() || n.precio || n.imagenUrl), ...filas.map((f) => nuevoVacio(f))])
+            setMensaje(`📁 ${filas.length} productos importados abajo, en verde. Revisá y tocá “Guardar cambios”.`)
+          }}
+        />
+      )}
+
       {/* Productos nuevos */}
       <div className={`rounded-lg p-3 mb-3 flex flex-wrap items-center gap-2 ${nuevos.length ? 'bg-emerald-50 border border-emerald-300' : 'bg-panelalt border border-line'}`}>
-        <span className="font-body text-xs font-semibold text-ink">{nuevos.length ? `➕ ${nuevos.length} producto${nuevos.length === 1 ? '' : 's'} nuevo${nuevos.length === 1 ? '' : 's'} (arriba, en verde) de:` : '➕ Cargar productos nuevos:'}</span>
-        <select value={vendedorNuevos} onChange={(e) => setVendedorNuevos(e.target.value)} className={`px-2.5 py-2 rounded-lg border bg-panel font-body text-xs max-w-[260px] ${nuevos.length && !vendedorNuevos ? 'border-maroon' : 'border-line'}`} aria-label="Vendedor de los productos nuevos">
+        <span className="font-body text-xs font-semibold text-ink">{nuevos.length ? `➕ ${nuevos.length} producto${nuevos.length === 1 ? '' : 's'} nuevo${nuevos.length === 1 ? '' : 's'} (arriba, en verde)${nuevos.every((n) => n.vendedorId) ? ' — cada uno con su tienda · para filas a mano:' : ' de:'}` : '➕ Cargar productos nuevos:'}</span>
+        <select value={vendedorNuevos} onChange={(e) => setVendedorNuevos(e.target.value)} className={`px-2.5 py-2 rounded-lg border bg-panel font-body text-xs max-w-[260px] ${nuevos.some((n) => !n.vendedorId) && !vendedorNuevos ? 'border-maroon' : 'border-line'}`} aria-label="Vendedor de los productos nuevos">
           <option value="">Elegí el vendedor…</option>
           {vendedoresCuentas.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
         </select>
         <button type="button" onClick={() => agregarFilas(1)} className="px-3 py-2 rounded-lg border border-teal bg-panel text-teal font-body text-xs font-semibold">+ 1 fila</button>
+        {!importando && <button type="button" onClick={() => setImportando(true)} className="px-3 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-xs font-semibold">📁 Importar carpeta</button>}
         <button type="button" onClick={() => agregarFilas(5)} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs text-ink">+ 5 filas</button>
         {nuevos.length > 0 && <button type="button" onClick={() => setNuevos([])} className="font-body text-xs text-inksoft underline bg-transparent border-none">Quitar filas nuevas</button>}
         <span className="font-body text-[11px] text-inksoft">Cada fila nueva copia la categoría y los talles de la anterior. También podés tocar ⧉ en un producto para duplicarlo.</span>
@@ -430,7 +451,9 @@ export default function EdicionRapidaProductos({
                       </label>
                       <div className="flex-1 min-w-0">
                         <input autoFocus={i === nuevos.length - 1 && !n.nombre} value={n.nombre} onChange={(e) => setNuevo(n.key, { nombre: e.target.value })} placeholder="Nombre del producto *" className={cn(!n.nombre.trim())} aria-label="Nombre nuevo" />
-                        <div className={`font-body text-[10px] px-1.5 ${n.error ? 'text-maroon font-semibold' : 'text-emerald-700'}`}>{n.error || 'NUEVO'}</div>
+                        <div className={`font-body text-[10px] px-1.5 truncate ${n.error ? 'text-maroon font-semibold' : 'text-emerald-700'}`} title={n.archivo}>
+                          {n.error || ['NUEVO', n.vendedorId && (nombreVendedor(n.vendedorId) || 'tienda'), n.archivo && `📁 ${n.archivo}`].filter(Boolean).join(' · ')}
+                        </div>
                       </div>
                     </div>
                   </td>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { ciudadDe } from '@/data/ciudades'
 import { sanearStock } from '@/lib/stock'
+import { sanearFotosAdicionales } from '@/lib/planPremium'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 
 export const dynamic = 'force-dynamic'
@@ -65,7 +66,8 @@ export async function POST(req: NextRequest) {
       materiales: '',
       compraMinima: 1,
       stock: sanearStock(e.stock),
-      fotosAdicionales: [],
+      // El admin puede cargar fotos extra (importación desde carpetas).
+      fotosAdicionales: sanearFotosAdicionales(e.fotosAdicionales),
       vendedorId,
       vendedor: email,
       cargadoPorAdmin: true,
