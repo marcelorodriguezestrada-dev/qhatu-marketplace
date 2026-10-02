@@ -33,6 +33,7 @@ type Prod = {
   estado?: string
   imagenUrl?: string
   thumbUrl?: string
+  claveImportacion?: string
 }
 type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'precioOriginal' | 'stock' | 'talles' | 'colores'>>
 type Categoria = CategoriaProducto
@@ -57,6 +58,8 @@ type Nuevo = {
   vendedorId?: string
   // Nombre del archivo original (para reconocerla al revisar).
   archivo?: string
+  // Para reconocer el producto al reimportar (tienda::código o nombre).
+  claveImportacion?: string
   subiendo?: boolean
   error?: string
 }
@@ -263,7 +266,7 @@ export default function EdicionRapidaProductos({
                 stock: n.stock === '' ? null : Number(n.stock),
                 talles: aLista(n.talles), colores: aLista(n.colores),
                 imagenUrl: n.imagenUrl, thumbUrl: n.thumbUrl,
-                fotosAdicionales: n.fotosAdicionales || [], descripcionCorta: n.descripcionCorta || '',
+                fotosAdicionales: n.fotosAdicionales || [], descripcionCorta: n.descripcionCorta || '', claveImportacion: n.claveImportacion,
               })),
             }),
           }).then((r) => r.json())
@@ -398,9 +401,14 @@ export default function EdicionRapidaProductos({
           vendedores={vendedoresCuentas}
           onVendedorCreado={() => onVendedorCreado?.()}
           onCerrar={() => setImportando(false)}
-          onListo={(filas) => {
+          categorias={categorias}
+          existentes={productos.map((p) => ({ id: p.id, nombre: p.nombre, vendedorId: p.vendedorId, claveImportacion: p.claveImportacion, precio: p.precio, rubro: p.rubro }))}
+          onListo={(filas, actualizaciones) => {
             setNuevos((prev) => [...prev.filter((n) => n.nombre.trim() || n.precio || n.imagenUrl), ...filas.map((f) => nuevoVacio(f))])
-            setMensaje(`📁 ${filas.length} productos importados abajo, en verde. Revisá y tocá “Guardar cambios”.`)
+            // Los que ya existían: quedan en amarillo como cambios (precio, stock…).
+            for (const a of actualizaciones) editar(a.id, a.cambios)
+            if (actualizaciones.length) setTexto('')
+            setMensaje(`${filas.length} productos nuevos (en verde)${actualizaciones.length ? ` y ${actualizaciones.length} actualizados (en amarillo)` : ''}. Revisá y tocá “Guardar cambios”.`)
           }}
         />
       )}

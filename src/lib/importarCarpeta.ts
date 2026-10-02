@@ -25,7 +25,20 @@ export type ProductoLeido = {
   stock: number | null
   fotos: File[]
   archivo: string // nombre original de la primera foto (pista para la IA)
+  // Solo desde Google Sheets:
+  fotosLink?: string[] // fotos por link (Drive compartido o web)
+  colores?: string[]
+  categoriaTexto?: string // lo que diga la columna "categoría" (se busca el rubro)
+  precioAntes?: number | null
+  descripcion?: string
+  sku?: string // código del producto de la tienda (para reconocerlo al reimportar)
+  fila?: number // fila de la planilla
 }
+
+// Clave estable para reconocer el mismo producto al volver a importar
+// (se guarda en el producto como claveImportacion).
+export const claveImportacion = (p: { tienda: string; sku?: string; nombre: string }) =>
+  `${p.tienda}::${p.sku ? 'sku:' + codigoTienda(p.sku) : codigoTienda(p.nombre)}`.slice(0, 120)
 
 const normalizar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 export const codigoTienda = (t: string) => normalizar(t).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
