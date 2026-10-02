@@ -41,12 +41,21 @@ export const claveImportacion = (p: { tienda: string; sku?: string; nombre: stri
   `${p.tienda}::${p.sku ? 'sku:' + codigoTienda(p.sku) : codigoTienda(p.nombre)}`.slice(0, 120)
 
 const normalizar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-export const codigoTienda = (t: string) => normalizar(t).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+// "T.Luna lunera" y "Luna lunera" son la misma tienda: se saca el "T." / "Tienda".
+export const codigoTienda = (t: string) =>
+  normalizar(t).replace(/^\s*(t|tda|tienda)\s*[.:]\s*|^\s*tienda\s+/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 const PUBLICOS: Record<string, string> = {
   mujer: 'mujer', mujeres: 'mujer', dama: 'mujer', damas: 'mujer', femenino: 'mujer',
   hombre: 'hombre', hombres: 'hombre', varon: 'hombre', varones: 'hombre', caballero: 'hombre', caballeros: 'hombre', masculino: 'hombre',
   nino: 'ninos', ninos: 'ninos', nina: 'ninos', ninas: 'ninos', infantil: 'ninos', kids: 'ninos', bebe: 'ninos', bebes: 'ninos',
   unisex: 'unisex',
+}
+// Público escrito dentro del nombre ("Polera niña", "ajuar RN", "traje caballero").
+export function publicoEnTexto(texto: string): string | null {
+  const palabras = normalizar(texto).split(/[^a-z0-9]+/)
+  for (const w of palabras) if (PUBLICOS[w]) return PUBLICOS[w]
+  if (palabras.some((w) => w === 'rn' || w === 'bb' || w === 'recien')) return 'ninos'
+  return null
 }
 const TALLES_LETRA = new Set(['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'unico', 'u'])
 const EXT_IMAGEN = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i
@@ -77,7 +86,8 @@ export function leerFotos(fotos: FotoArchivo[], opciones: { unaTienda?: boolean 
     let base = archivo.replace(/\.[^.]+$/, '')
     // Fotos extra del mismo producto.
     base = base.replace(/\s*\(\d+\)$/, '').replace(/[_\s-]+foto\s*\d+$/i, '').trim()
-    let tokens = base.split('_').map((t) => t.trim()).filter(Boolean)
+    // Separador tienda/producto: "_" (o ":" si se usó por error, ej "T.Genesis:NN niña").
+    let tokens = base.replace(/^([^_:]+):(?=[^_]*$|[^:]*_)/, '$1_').split('_').map((t) => t.trim()).filter(Boolean)
     // Tienda: la carpeta que contiene la foto (si hay subcarpeta), o el primer pedazo del nombre.
     let tienda = partes.length >= 3 || (opciones.unaTienda && partes.length === 2) ? partes[partes.length - 2] : ''
     if (!tienda) {
@@ -108,6 +118,7 @@ export function leerFotos(fotos: FotoArchivo[], opciones: { unaTienda?: boolean 
     // Lo que no se reconoció se suma al nombre (ej "blusa_flores_rojas").
     nombre = [nombre, ...resto].join(' ').replace(/[-.]+/g, ' ').replace(/\s+/g, ' ').trim()
     if (!nombre) { ignorados.push(ruta); continue }
+    if (!publico) publico = publicoEnTexto(nombre)
     const clave = `${codigoTienda(tienda)}::${normalizar(base)}`
     const g = grupos.get(clave)
     if (g) {
