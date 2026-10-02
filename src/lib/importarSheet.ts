@@ -5,7 +5,7 @@
 // La columna foto puede tener links (Drive compartido o web) o nombres de
 // archivo que se buscan en la carpeta de fotos elegida; varios separados
 // por coma.
-import { codigoTienda, esImagen, type ProductoLeido } from '@/lib/importarCarpeta'
+import { codigoTienda, esImagen, publicoEnTexto, type ProductoLeido } from '@/lib/importarCarpeta'
 
 const normalizar = (t: string) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -24,11 +24,35 @@ const ALIAS: Record<string, string[]> = {
   sku: ['codigo', 'sku', 'cod', 'codigo producto', 'id producto', 'referencia', 'ref'],
 }
 
+// Si el título no es exacto, por palabra clave ("descripcion foto" → foto,
+// "código,legajo" → código, "descripción detallada" → descripción).
+const CLAVES: [string, RegExp][] = [
+  ['foto', /\b(foto|fotos|imagen|imagenes|archivo)\b/],
+  ['precioAntes', /\b(antes|anterior|original|lista)\b/],
+  ['precio', /\bprecio\b/],
+  ['sku', /\b(codigo|sku|legajo|ref|referencia)\b/],
+  ['descripcion', /\bdescripcion\b/],
+  ['talles', /\b(talles?|tallas?)\b/],
+  ['colores', /\bcolor(es)?\b/],
+  ['categoria', /\b(categoria|rubro)\b/],
+  ['tienda', /\b(tienda|vendedor|negocio|empresa)\b/],
+  ['nombre', /\b(producto|nombre|titulo|articulo)\b/],
+  ['publico', /\b(publico|genero)\b/],
+  ['stock', /\b(stock|cantidad|unidades)\b/],
+]
+
 function mapearColumnas(titulos: string[]) {
   const m: Record<string, number> = {}
+  const usadas = new Set<number>()
   titulos.forEach((t, i) => {
     const n = normalizar(t).replace(/ \*$/, '')
-    for (const [campo, alias] of Object.entries(ALIAS)) if (m[campo] === undefined && alias.includes(n)) m[campo] = i
+    for (const [campo, alias] of Object.entries(ALIAS)) if (m[campo] === undefined && alias.includes(n)) { m[campo] = i; usadas.add(i) }
+  })
+  titulos.forEach((t, i) => {
+    if (usadas.has(i)) return
+    const n = normalizar(t)
+    const c = CLAVES.find(([campo, re]) => m[campo] === undefined && re.test(n))
+    if (c) { m[c[0]] = i; usadas.add(i) }
   })
   // "descripcion corta" puede ser el nombre si no hay columna producto.
   return m
@@ -80,7 +104,7 @@ export function leerSheet(
         else avisos.push(`Fila ${fila}: no encontramos la foto “${ref}” en la carpeta`)
       }
     }
-    const publico = PUBLICOS[normalizar(celda(f, 'publico'))] || null
+    const publico = PUBLICOS[normalizar(celda(f, 'publico'))] || publicoEnTexto(nombre)
     const precio = numero(celda(f, 'precio'))
     if (precio == null) avisos.push(`Fila ${fila}: “${nombre}” sin precio`)
     const stockTxt = celda(f, 'stock')
