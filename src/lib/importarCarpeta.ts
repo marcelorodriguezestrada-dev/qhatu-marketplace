@@ -12,9 +12,12 @@
 //  - precio: un número (85, 85.50, 85bs, bs85)
 //  - talles: con guiones (4-6-8, 36-37, s-m-l) o "t38"
 //  - stock: "x5" o "stock5"
-// Varias fotos del mismo producto: mismo nombre + " (2)", " (3)"… o "_foto2".
+// Varias fotos del mismo producto: mismo nombre + " (2)", " (3)"… o "_foto2"
+// (o "niño1", "niño2": el número pegado al final no es parte del nombre).
 
 export type FotoArchivo = { file: File; ruta: string }
+// Una foto de la compu (file) o de una carpeta de Drive (link).
+export type FuenteFoto = { ruta: string; file?: File; link?: string }
 export type ProductoLeido = {
   clave: string
   tienda: string // código, ej "cachitos"
@@ -67,25 +70,31 @@ export function esImagen(nombre: string) {
 }
 
 // ¿Las fotos sueltas en la carpeta elegida son de UNA tienda (la carpeta)?
-// Sí, si no hay subcarpetas y los nombres no empiezan con un código que
-// se repite (cachitos_…, cachitos_…).
-export function pareceUnaTienda(fotos: FotoArchivo[]): boolean {
+// Sí, si no hay subcarpetas y los nombres no traen la tienda adelante:
+// sin "_" ("blusa flores.jpg") o con público/precio/talles después del
+// primer "_" ("blusa_ninos_85.jpg"). "cachitos_blusa.jpg" → varias tiendas.
+const esDato = (tok: string) => {
+  const n = normalizar(tok.trim())
+  return !!PUBLICOS[n] || /^(?:bs\.?)?\d{1,6}(?:[.,]\d{1,2})?(?:bs)?$/.test(n) || /^(?:x|stock)\d{1,4}$/.test(n) || /^t(?:alle)?(\d{1,3}|xs|s|m|l|xl|xxl)$/.test(n) || (n.includes('-') && n.split('-').every((p) => /^\d{1,3}(\.5)?$/.test(p) || TALLES_LETRA.has(p)))
+}
+export function pareceUnaTienda(fotos: FuenteFoto[]): boolean {
   const sueltas = fotos.filter((f) => f.ruta.split('/').filter(Boolean).length === 2 && esImagen(f.ruta))
   if (!sueltas.length || sueltas.length !== fotos.filter((f) => esImagen(f.ruta)).length) return false
-  const prefijos = new Set(sueltas.map((f) => normalizar(f.ruta.split('/').pop()!.split('_')[0])))
-  return prefijos.size > Math.max(2, sueltas.length / 3)
+  const tokens = sueltas.map((f) => f.ruta.split('/').pop()!.replace(/\.[^.]+$/, '').split('_').filter((t) => t.trim()))
+  const sinTienda = tokens.filter((t) => t.length < 2 || esDato(t[1])).length
+  return sinTienda > sueltas.length / 2
 }
 
-export function leerFotos(fotos: FotoArchivo[], opciones: { unaTienda?: boolean } = {}): { productos: ProductoLeido[]; ignorados: string[] } {
+export function leerFotos(fotos: FuenteFoto[], opciones: { unaTienda?: boolean } = {}): { productos: ProductoLeido[]; ignorados: string[] } {
   const grupos = new Map<string, ProductoLeido>()
   const ignorados: string[] = []
-  for (const { file, ruta } of fotos) {
+  for (const { file, link, ruta } of fotos) {
     const partes = ruta.split('/').filter(Boolean)
-    const archivo = partes[partes.length - 1] || file.name
+    const archivo = partes[partes.length - 1] || file?.name || ''
     if (!esImagen(archivo)) { ignorados.push(ruta); continue }
     let base = archivo.replace(/\.[^.]+$/, '')
     // Fotos extra del mismo producto.
-    base = base.replace(/\s*\(\d+\)$/, '').replace(/[_\s-]+foto\s*\d+$/i, '').trim()
+    base = base.replace(/\s*\(\d+\)$/, '').replace(/[_\s-]+foto\s*\d+$/i, '').replace(/([a-zñ])\d$/i, '$1').trim()
     // Separador tienda/producto: "_" (o ":" si se usó por error, ej "T.Genesis:NN niña").
     let tokens = base.replace(/^([^_:]+):(?=[^_]*$|[^:]*_)/, '$1_').split('_').map((t) => t.trim()).filter(Boolean)
     // Tienda: la carpeta que contiene la foto (si hay subcarpeta), o el primer pedazo del nombre.
@@ -122,10 +131,11 @@ export function leerFotos(fotos: FotoArchivo[], opciones: { unaTienda?: boolean 
     const clave = `${codigoTienda(tienda)}::${normalizar(base)}`
     const g = grupos.get(clave)
     if (g) {
-      g.fotos.push(file)
+      if (file) g.fotos.push(file)
+      if (link) g.fotosLink = [...(g.fotosLink || []), link]
       continue
     }
-    grupos.set(clave, { clave, tienda: codigoTienda(tienda), nombre: capital(nombre), publico, precio, talles, stock, fotos: [file], archivo })
+    grupos.set(clave, { clave, tienda: codigoTienda(tienda), nombre: capital(nombre), publico, precio, talles, stock, fotos: file ? [file] : [], ...(link ? { fotosLink: [link] } : {}), archivo })
   }
   const productos = [...grupos.values()]
   return { productos, ignorados }
