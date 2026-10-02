@@ -71,6 +71,8 @@ export async function POST(req: NextRequest) {
       vendedorId,
       vendedor: email,
       cargadoPorAdmin: true,
+      // Para reconocerlo al reimportar la misma carpeta/planilla.
+      ...(typeof e.claveImportacion === 'string' && e.claveImportacion ? { claveImportacion: e.claveImportacion.slice(0, 120) } : {}),
       tiendaNombre: vd.nombreNegocio || '',
       tiendaLogoUrl: vd.logoUrl || '',
       ciudad: ciudadDe(vd),
