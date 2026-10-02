@@ -12,17 +12,18 @@ import { useAuth } from '@/lib/auth'
 // (la home, un link directo, el botón atrás) para quedar "adentro" sin
 // haber puesto nunca el código.
 export default function VerificacionGate() {
-  const { usuario, emailVerificado } = useAuth()
+  const { usuario, emailVerificado, faltaCelular } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
-    if (!usuario || emailVerificado !== false) return
+    // También si entró con Google y le falta dejar el celular.
+    if (!usuario || (emailVerificado !== false && !faltaCelular)) return
     // /login es justamente donde se resuelve la verificación — no lo
     // redirigimos a sí mismo, o quedaría dando vueltas.
     if (pathname === '/login') return
     router.push('/login')
-  }, [usuario, emailVerificado, pathname, router])
+  }, [usuario, emailVerificado, faltaCelular, pathname, router])
 
   return null
 }

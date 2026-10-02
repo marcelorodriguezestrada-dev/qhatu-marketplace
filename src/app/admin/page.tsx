@@ -637,6 +637,16 @@ export default function AdminPage() {
     }).then(() => cargarUsuarios())
   }
 
+  // No le llegó el código de 6 dígitos: se da por verificado desde acá.
+  function verificarUsuario(uid: string, email: string) {
+    if (!confirm(`¿Dar por verificado el email ${email}? Va a poder comprar y vender sin poner el código.`)) return
+    fetch(`/api/admin/usuarios/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ accion: 'verificar' }),
+    }).then(() => cargarUsuarios())
+  }
+
   function marcarUsuarioPrueba(uid: string, esPrueba: boolean) {
     fetch(`/api/admin/usuarios/${uid}`, {
       method: 'PATCH',
@@ -3307,10 +3317,17 @@ export default function AdminPage() {
                         {u.esPrueba && (
                           <span className="inline-block bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Puede comprar sin restricciones de horario">🧪 Prueba</span>
                         )}
+                        {u.verificado === false && (
+                          <span className="inline-block bg-ochresoft text-ochre border border-ochre text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Todavía no puso el código de 6 dígitos que le mandamos por mail">⏳ Sin verificar</span>
+                        )}
+                        {u.conGoogle && (
+                          <span className="inline-block bg-panelalt text-inksoft border border-line text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Entra con su cuenta de Google">G Google</span>
+                        )}
                       </div>
                       <div className="font-body text-[11px] text-inksoft mt-0.5">
                         Registrado: {u.creadoEl ? new Date(u.creadoEl).toLocaleDateString('es-BO') : '—'}
                         {u.ultimoLogin && <> · Último login: {new Date(u.ultimoLogin).toLocaleDateString('es-BO')}</>}
+                        {u.celular && <> · 📱 {u.celular}</>}
                       </div>
                       <button
                         type="button"
@@ -3352,6 +3369,16 @@ export default function AdminPage() {
                           className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
                         >
                           🔑 Enviar acceso
+                        </button>
+                      )}
+                      {u.verificado === false && (
+                        <button
+                          type="button"
+                          onClick={() => verificarUsuario(u.uid, u.email || u.uid)}
+                          title="No le llegó el código de 6 dígitos: darlo por verificado"
+                          className="px-2.5 py-1.5 rounded-md border border-teal bg-tealsoft text-teal font-body text-[11px] font-semibold"
+                        >
+                          ✅ Verificar a mano
                         </button>
                       )}
                       <button

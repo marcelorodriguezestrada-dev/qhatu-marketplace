@@ -7,7 +7,8 @@ import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhat
 
 export const dynamic = 'force-dynamic'
 
-// PATCH { pausado: boolean } o { esPrueba: boolean } — solo admin.
+// PATCH { pausado: boolean }, { esPrueba: boolean } o { accion } — solo admin.
+// accion 'verificar': da por verificado el email (no le llegó el código).
 // esPrueba marca/desmarca la cuenta de prueba (custom claim en Firebase
 // Auth; ver src/lib/cuentasPrueba.ts). Pausar bloquea el login del
 // usuario en Firebase Auth (no puede volver a entrar hasta que se lo
@@ -85,6 +86,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
         ...(cambiosTienda.nombreNegocio !== undefined ? { tiendaNombre: cambiosTienda.nombreNegocio } : {}),
       })
       return NextResponse.json({ ok: true, email })
+    }
+    // Verificar a mano a alguien al que no le llegó el código de 6 dígitos.
+    if (body.accion === 'verificar') {
+      await getDb().collection('usuarios').doc(params.uid).set({ emailVerificado: true, codigoVerificacion: null, codigoExpiraEn: null, verificadoPorAdmin: true }, { merge: true })
+      await authAdmin.updateUser(params.uid, { emailVerified: true }).catch(() => {})
+      return NextResponse.json({ ok: true })
     }
     if (body.accion === 'link') {
       const u = await authAdmin.getUser(params.uid)
