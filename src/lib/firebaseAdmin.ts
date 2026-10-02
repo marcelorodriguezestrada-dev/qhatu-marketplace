@@ -43,7 +43,13 @@ export async function getUsuarioDesdeRequest(req: NextRequest) {
     // cargaAdmin: la sesión la abrió el admin "entrando como" este
     // usuario (Admin → Usuarios → Cargar productos) — ver
     // /api/admin/usuarios/[uid] accion 'ingresar'.
-    return { uid: decoded.uid, email: decoded.email || null, cargaAdmin: decoded.cargaAdmin === true }
+    // conGoogle: entró con "Continuar con Google" (el correo ya viene verificado por Google).
+    return {
+      uid: decoded.uid,
+      email: decoded.email || null,
+      cargaAdmin: decoded.cargaAdmin === true,
+      conGoogle: decoded.firebase?.sign_in_provider === 'google.com' && decoded.email_verified === true,
+    }
   } catch {
     return null
   }

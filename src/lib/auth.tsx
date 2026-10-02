@@ -7,6 +7,9 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
   User,
 } from 'firebase/auth'
 import { auth } from './firebaseClient'
@@ -30,8 +33,14 @@ type AuthContextType = {
   // Cuenta de prueba (Admin → Usuarios): puede comprar sin restricciones
   // de horario. Viene de /api/usuarios/estado al iniciar la sesión.
   esPrueba: boolean
+  // Entró con Google y todavía no dejó su celular (se le pide en /login).
+  faltaCelular: boolean
+  marcarCelularListo: () => void
   login: (email: string, password: string) => Promise<void>
   registrarse: (email: string, password: string) => Promise<void>
+  // "Continuar con Google": sirve para entrar y para crear la cuenta; el
+  // correo ya viene verificado, así que no hace falta el código de 6 dígitos.
+  loginConGoogle: () => Promise<void>
   logout: () => Promise<void>
   recuperarPassword: (email: string) => Promise<void>
   // Devuelve el ID token actual, para mandarlo en el header Authorization
@@ -46,6 +55,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cargando, setCargando] = useState(true)
   const [emailVerificado, setEmailVerificado] = useState<boolean | null>(null)
   const [esPrueba, setEsPrueba] = useState(false)
+  const [faltaCelular, setFaltaCelular] = useState(false)
+
+  // Se chequea una sola vez por sesión iniciada — así CUALQUIER página
+  // que use este contexto (no solo /login) sabe si la cuenta está
+  // verificada, sin tener que pedirlo cada una por su cuenta. Antes esto
+  // solo se consultaba en /login, así que alguien con sesión ya abierta
+  // podía entrar directo a /vender o /checkout sin haber verificado
+  // nunca el código.
+  async function consultarEstado(u: User) {
+    try {
+      const token = await u.getIdToken()
+      const res = await fetch('/api/usuarios/estado', { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      setEmailVerificado(data.emailVerificado !== false)
+      setEsPrueba(data.esPrueba === true)
+      setFaltaCelular(data.faltaCelular === true)
+    } catch {
+      // si falla la consulta, no dejamos a la persona trabada sin poder
+      // usar la cuenta por un error nuestro de red
+      setEmailVerificado(true)
+    }
+  }
 
   useEffect(() => {
     // Si auth es null (todavía no estamos en el navegador, o faltan las
@@ -62,25 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!u) {
         setEmailVerificado(null)
         setEsPrueba(false)
+        setFaltaCelular(false)
         return
       }
-      // Se chequea acá, una sola vez por sesión iniciada — así CUALQUIER
-      // página que use este contexto (no solo /login) sabe si la cuenta
-      // está verificada, sin tener que pedirlo cada una por su cuenta.
-      // Antes esto solo se consultaba en /login, así que alguien con
-      // sesión ya abierta podía entrar directo a /vender o /checkout sin
-      // haber verificado nunca el código.
-      try {
-        const token = await u.getIdToken()
-        const res = await fetch('/api/usuarios/estado', { headers: { Authorization: `Bearer ${token}` } })
-        const data = await res.json()
-        setEmailVerificado(data.emailVerificado !== false)
-        setEsPrueba(data.esPrueba === true)
-      } catch {
-        // si falla la consulta, no dejamos a la persona trabada sin poder
-        // usar la cuenta por un error nuestro de red
-        setEmailVerificado(true)
-      }
+      await consultarEstado(u)
     })
     return () => unsub()
   }, [])
@@ -93,6 +109,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function registrarse(email: string, password: string) {
     if (!auth) throw new Error('Firebase Auth no está configurado (revisá las variables NEXT_PUBLIC_FIREBASE_*).')
     await createUserWithEmailAndPassword(auth, email, password)
+  }
+
+  async function loginConGoogle() {
+    if (!auth) throw new Error('Firebase Auth no está configurado (revisá las variables NEXT_PUBLIC_FIREBASE_*).')
+    const proveedor = new GoogleAuthProvider()
+    proveedor.setCustomParameters({ prompt: 'select_account' })
+    try {
+      const r = await signInWithPopup(auth, proveedor)
+      // Si ya tenía la sesión abierta con la misma cuenta (ej. no le
+      // llegaba el código), el cambio de sesión puede no avisarse: se
+      // vuelve a consultar el estado acá.
+      setUsuario(r.user)
+      await consultarEstado(r.user)
+    } catch (err: any) {
+      // Navegadores que bloquean la ventanita (el de Facebook/Instagram,
+      // algunos celulares): se va a Google y vuelve solo a /login.
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(err?.code)) {
+        await signInWithRedirect(auth, proveedor)
+        return
+      }
+      throw err
+    }
   }
 
   async function logout() {
@@ -114,8 +152,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmailVerificado(true)
   }
 
+  function marcarCelularListo() {
+    setFaltaCelular(false)
+  }
+
   return (
-    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, login, registrarse, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, faltaCelular, marcarCelularListo, login, registrarse, loginConGoogle, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )

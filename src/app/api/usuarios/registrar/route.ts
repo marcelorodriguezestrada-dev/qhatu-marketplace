@@ -23,13 +23,15 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb()
-    const yaExistia = (await db.collection('usuarios').doc(usuario.uid).get()).exists
+    const previo = await db.collection('usuarios').doc(usuario.uid).get()
+    const yaExistia = previo.exists
     await db.collection('usuarios').doc(usuario.uid).set(
       {
         celular: (celular || '').replace(/\D/g, ''),
         email: usuario.email,
-        emailVerificado: false,
-        createdAt: new Date().toISOString(),
+        // Con Google el correo ya viene verificado; si ya estaba verificada, no se pierde.
+        emailVerificado: usuario.conGoogle || previo.data()?.emailVerificado === true,
+        ...(yaExistia && previo.data()?.createdAt ? {} : { createdAt: new Date().toISOString() }),
         ...(campana ? { campana: String(campana).slice(0, 40) } : {}),
       },
       { merge: true }

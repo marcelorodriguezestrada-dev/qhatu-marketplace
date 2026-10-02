@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { estaVerificada } from '@/lib/verificacion'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
@@ -26,12 +27,12 @@ export async function GET(req: NextRequest) {
     const [productosSnap, profesionalesSnap, creadosSnap] = await Promise.all([
       db.collection('productos').select('vendedorId').get(),
       db.collection('profesionales').select('solicitanteUid').get(),
-      db.collection('usuarios').select('whatsapp', 'creadoPorAdmin').get(),
+      db.collection('usuarios').select('whatsapp', 'celular', 'creadoPorAdmin', 'emailVerificado').get(),
     ])
     // WhatsApp (para mandar el link de acceso / editar sus datos) y si la
     // cuenta la creó el admin.
-    const datosUsuario = new Map<string, { whatsapp: string; creadoPorAdmin: boolean }>()
-    creadosSnap.docs.forEach((doc) => datosUsuario.set(doc.id, { whatsapp: doc.data().whatsapp || '', creadoPorAdmin: doc.data().creadoPorAdmin === true }))
+    const datosUsuario = new Map<string, { whatsapp: string; celular: string; creadoPorAdmin: boolean; emailVerificado: boolean }>()
+    creadosSnap.docs.forEach((doc) => datosUsuario.set(doc.id, { whatsapp: doc.data().whatsapp || '', celular: doc.data().celular || '', creadoPorAdmin: doc.data().creadoPorAdmin === true, emailVerificado: doc.data().emailVerificado === true }))
 
     const conteoProductos = new Map<string, number>()
     productosSnap.docs.forEach((doc) => {
@@ -56,6 +57,10 @@ export async function GET(req: NextRequest) {
       profesionalesCount: conteoProfesionales.get(u.uid) || 0,
       creadoPorAdmin: datosUsuario.get(u.uid)?.creadoPorAdmin === true,
       whatsapp: datosUsuario.get(u.uid)?.whatsapp || null,
+      // Celular que dejó al registrarse (para escribirle si no le llega el código).
+      celular: datosUsuario.get(u.uid)?.celular || null,
+      verificado: estaVerificada(u, datosUsuario.get(u.uid)),
+      conGoogle: u.providerData.some((p) => p.providerId === 'google.com'),
     }))
 
     // Los más recientes primero.
