@@ -1911,6 +1911,7 @@ export default function AdminPage() {
             vendedoresCuentas={vendedoresAdmin
               .map((v) => ({ id: v.id, nombre: v.nombreNegocio ? `${v.nombreNegocio}${v.email ? ` (${v.email})` : ''}` : v.email || v.id }))
               .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))}
+            onVendedorCreado={() => { cargarVendedoresAdmin(); cargarUsuarios() }}
           />
 
           <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
