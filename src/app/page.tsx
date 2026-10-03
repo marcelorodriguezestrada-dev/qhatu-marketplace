@@ -12,7 +12,7 @@ import { BannerCarousel } from '@/components/BannerCarousel'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
 import { usePortada } from '@/lib/portada'
 import BuscadorProductos, { guardarReciente } from '@/components/BuscadorProductos'
-import { puntajeRelacionado, relevancia } from '@/lib/busqueda'
+import { buscarProducto, prepararConsulta } from '@/lib/busqueda'
 import ListadoResultados from '@/components/ListadoResultados'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
@@ -82,15 +82,19 @@ export default function CatalogoPage() {
   // sinónimos o por las palabras de búsqueda de la IA ("relacionados").
   const { resultadosBusqueda, relacionadosBusqueda } = (() => {
     if (!consulta.trim()) return { resultadosBusqueda: [] as Producto[], relacionadosBusqueda: new Set<string>() }
-    const exactos: Producto[] = []
-    const parecidos: Producto[] = []
+    // Ordenados por puntaje: primero lo que tiene la palabra en el nombre.
+    const c = prepararConsulta(consulta)
+    const exactos: { p: Producto; n: number }[] = []
+    const parecidos: { p: Producto; n: number }[] = []
     for (const p of productos) {
-      const r = relevancia(p as any, buscarRubroProducto(p.rubro), consulta)
-      if (r === 'exacto') exactos.push(p)
-      else if (r === 'relacionado') parecidos.push(p)
+      const r = buscarProducto(p as any, buscarRubroProducto(p.rubro), c)
+      if (r?.tipo === 'exacto') exactos.push({ p, n: r.puntaje })
+      else if (r) parecidos.push({ p, n: r.puntaje })
     }
-    parecidos.sort((a, b) => puntajeRelacionado(b as any, consulta) - puntajeRelacionado(a as any, consulta))
-    return { resultadosBusqueda: [...exactos, ...parecidos], relacionadosBusqueda: new Set(parecidos.map((p) => String(p.id))) }
+    const orden = (a: { n: number }, b: { n: number }) => b.n - a.n
+    exactos.sort(orden)
+    parecidos.sort(orden)
+    return { resultadosBusqueda: [...exactos, ...parecidos].map((x) => x.p), relacionadosBusqueda: new Set(parecidos.map((x) => String(x.p.id))) }
   })()
   function buscar(texto: string) {
     const t = texto.trim()

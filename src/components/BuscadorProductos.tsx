@@ -65,7 +65,8 @@ export default function BuscadorProductos({
     for (const r of recientes) if (!q || normalizar(r).includes(q)) { if (out.filter((s) => s.tipo === 'reciente').length < 3) agregar(r, 'reciente') }
     if (q.length < 2) return out
 
-    const conRelevancia = indexados.map((x) => ({ ...x, r: relevancia(x.p, x.rubro, q) })).filter((x) => x.r)
+    // parcial: la última palabra todavía se está escribiendo ("panta" → pantalones).
+    const conRelevancia = indexados.map((x) => ({ ...x, r: relevancia(x.p, x.rubro, q, { parcial: !/\s$/.test(valor) }) })).filter((x) => x.r)
     // Nombres sugeridos: solo los exactos (no sugerir "Sandalia" al escribir "zap").
     const encontrados = conRelevancia
     const exactos = conRelevancia.filter((x) => x.r === 'exacto')
