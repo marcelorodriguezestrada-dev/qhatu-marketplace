@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, envioExpress, cupon } = body
+    const { items, total, comprador, nombreComprador, whatsappComprador, zonaEntrega, direccion, entreCalles, referenciaAdicional, costoEnvio, metodoEntrega, metodoPago, vendedorId, vendedorNombre, vendedorWhatsapp, lat, lng, origenUbicacion, envioExpress, cupon } = body
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
@@ -156,6 +156,8 @@ export async function POST(req: NextRequest) {
       // repartir, solo que a mano.
       lat: typeof lat === 'number' ? lat : null,
       lng: typeof lng === 'number' ? lng : null,
+      // De dónde salió el punto: 'mapa' (marcó su casa), 'gps' o 'direccion' (aproximado).
+      origenUbicacion: ['mapa', 'gps', 'direccion'].includes(origenUbicacion) ? origenUbicacion : null,
       costoEnvio: Number(costoEnvio || 0),
       // Envío express: entrega el mismo día en vez del día siguiente, a
       // cambio de un costo fijo en vez del costo por barrio (ver

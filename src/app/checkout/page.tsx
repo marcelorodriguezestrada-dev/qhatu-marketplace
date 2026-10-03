@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano, distanciaKm } from '@/data/zonasPotosi'
 import { buscarZona, validarDireccion, validarEntreCalles, validarZona } from '@/lib/validarEntrega'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
+import { ElegirUbicacion } from '@/components/ElegirUbicacion'
 import { leerComprobante, comprobanteValido, motivoRechazo, MAX_INTENTOS_COMPROBANTE, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { ProductIcon } from '@/components/ProductIcon'
@@ -323,7 +324,13 @@ function CheckoutContent() {
   // De dónde salió el barrio: lo calculamos solos con la dirección (o
   // con la ubicación del celular), y el comprador solo lo elige a mano
   // si el mapa no encuentra su dirección o si quiere corregirlo.
-  const [origenBarrio, setOrigenBarrio] = useState<'' | 'direccion' | 'gps' | 'manual' | 'guardado'>('')
+  const [origenBarrio, setOrigenBarrio] = useState<'' | 'direccion' | 'gps' | 'mapa' | 'manual' | 'guardado'>('')
+  // De dónde salió el punto (lat/lng) de la entrega: la dirección encontrada
+  // en el mapa, la ubicación del celular o la casa marcada en el mapa. Con
+  // el punto se controla que la zona elegida sea la correcta.
+  const [origenPunto, setOrigenPunto] = useState<'' | 'direccion' | 'gps' | 'mapa'>('')
+  const [mapaAbierto, setMapaAbierto] = useState(false)
+  const [puntoMapa, setPuntoMapa] = useState<{ lat: number; lng: number } | null>(null)
   const [elegirBarrioAMano, setElegirBarrioAMano] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
@@ -364,10 +371,10 @@ function CheckoutContent() {
   }, [zonaEntrega])
   const direccionMuyCorta = (d: string) => d.trim().length < 5 || !/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(d)
 
-  async function verificarDireccion(): Promise<{ resultado: boolean | 'error' | null; barrio: string }> {
+  async function verificarDireccion(): Promise<{ resultado: boolean | 'error' | null; barrio: string; punto: { lat: number; lng: number } | null }> {
     if (!direccion.trim()) {
       setDireccionVerificada(null)
-      return { resultado: null, barrio: '' }
+      return { resultado: null, barrio: '', punto: null }
     }
     setVerificandoDireccion(true)
     let barrioDetectado = ''
@@ -389,7 +396,7 @@ function CheckoutContent() {
         if (lejos) {
           resultado = false
           motivo = 'No pudimos ubicar bien tu dirección en el mapa.'
-        } else if (origenBarrio !== 'manual' && origenBarrio !== 'gps') {
+        } else if (origenBarrio !== 'manual' && origenBarrio !== 'gps' && origenBarrio !== 'mapa') {
           setZonaEntrega(cercano.nombre)
           setOrigenBarrio('direccion')
           barrioDetectado = cercano.nombre
@@ -401,18 +408,27 @@ function CheckoutContent() {
       }
       setDireccionVerificada(resultado)
       setMotivoDireccion(motivo)
-      // Si la persona no compartió su ubicación en vivo (más precisa),
-      // usamos el punto que encontró Nominatim como mejor que nada —
-      // ayuda a la moto igual, aunque sea aproximado a la calle.
-      if (data.encontrada && lat == null && lng == null) {
-        setLat(data.lat)
-        setLng(data.lng)
-      }
-      return { resultado, barrio: barrioDetectado }
+      // Si la persona no compartió su ubicación ni marcó su casa (más
+      // precisos), usamos el punto que encontró el mapa: sirve para
+      // controlar la zona y ayuda a la moto, aunque sea aproximado.
+      let punto: { lat: number; lng: number } | null = null
+      if (origenPunto === '' || origenPunto === 'direccion') {
+        if (resultado === true && typeof data.lat === 'number') {
+          punto = { lat: data.lat, lng: data.lng }
+          setLat(data.lat)
+          setLng(data.lng)
+          setOrigenPunto('direccion')
+        } else if (origenPunto === 'direccion') {
+          setLat(null)
+          setLng(null)
+          setOrigenPunto('')
+        }
+      } else if (lat != null && lng != null) punto = { lat, lng }
+      return { resultado, barrio: barrioDetectado, punto }
     } catch {
       setDireccionVerificada('error')
       setElegirBarrioAMano(true)
-      return { resultado: 'error', barrio: '' }
+      return { resultado: 'error', barrio: '', punto: lat != null && lng != null ? { lat, lng } : null }
     } finally {
       setVerificandoDireccion(false)
     }
@@ -430,6 +446,17 @@ function CheckoutContent() {
   // simplemente queda al final de la ruta para confirmar a mano.
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
+  // ¿La zona elegida coincide con el punto de la entrega? La zona de un
+  // punto es la más cercana; si eligió otra que queda claramente más lejos
+  // ("Fortunato Gumiel" no queda en Santa Rosa), no coincide. Margen más
+  // grande para el punto de la dirección (el mapa la ubica aproximada) que
+  // para el GPS o la casa marcada.
+  const zonaDelPunto = lat != null && lng != null ? barrioMasCercano(lat, lng) : null
+  const zonaElegidaInfo = ZONAS_ENVIO_POTOSI.find((z) => z.nombre === zonaEntrega)
+  const zonaNoCoincide =
+    !!zonaDelPunto && !!zonaElegidaInfo && zonaDelPunto.nombre !== zonaElegidaInfo.nombre &&
+    distanciaKm(lat!, lng!, zonaElegidaInfo.lat, zonaElegidaInfo.lng) - distanciaKm(lat!, lng!, zonaDelPunto.lat, zonaDelPunto.lng) > (origenPunto === 'direccion' ? 0.5 : 0.15)
+  const textoPunto = origenPunto === 'mapa' ? 'La casa que marcaste' : origenPunto === 'gps' ? 'Tu ubicación' : 'Tu dirección'
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [subPedidos, setSubPedidos] = useState<SubPedido[]>([])
   const [pasoActual, setPasoActual] = useState(0)
@@ -525,7 +552,7 @@ function CheckoutContent() {
         else if (b.zonaTexto) setZonaTexto(b.zonaTexto)
         if (b.entreCalles) setEntreCalles(b.entreCalles)
         if (b.referenciaAdicional) setReferenciaAdicional(b.referenciaAdicional)
-        if (typeof b.lat === 'number' && typeof b.lng === 'number') { setLat(b.lat); setLng(b.lng) }
+        if (typeof b.lat === 'number' && typeof b.lng === 'number') { setLat(b.lat); setLng(b.lng); setOrigenPunto(b.origenPunto || 'direccion') }
         if (b.codigoCupon) setCodigoCupon(b.codigoCupon)
       }
     } catch {}
@@ -602,11 +629,11 @@ function CheckoutContent() {
       if (etapa !== 'entrega') return
       localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
         uid: usuario.uid, guardadoAt: Date.now(), metodoEntrega, metodoElegido, metodoPago, envioExpress,
-        nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, entreCalles, referenciaAdicional, lat, lng,
+        nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, origenPunto, entreCalles, referenciaAdicional, lat, lng,
         codigoCupon: cuponAplicado?.codigo || codigoCupon,
       }))
     } catch {}
-  }, [restaurando, usuario, etapa, metodoEntrega, metodoElegido, metodoPago, envioExpress, nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, entreCalles, referenciaAdicional, lat, lng, codigoCupon, cuponAplicado])
+  }, [restaurando, usuario, etapa, metodoEntrega, metodoElegido, metodoPago, envioExpress, nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, origenPunto, entreCalles, referenciaAdicional, lat, lng, codigoCupon, cuponAplicado])
 
   function salirDeEspera() {
     try {
@@ -654,7 +681,7 @@ function CheckoutContent() {
   const costoEnvioFinal = costoEnvio - descuentoEnvioCupon
   // El envío y el total recién se muestran cuando eligió cómo recibirlo y,
   // con envío, completó una dirección válida y su zona.
-  const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (!!zonaEntrega && !validarDireccion(direccion)))
+  const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (!!zonaEntrega && !validarDireccion(direccion) && !zonaNoCoincide && (lat != null || direccionVerificada === 'error')))
   const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
 
   async function aplicarCupon(codigoForzado?: string) {
@@ -738,6 +765,8 @@ function CheckoutContent() {
         const cercano = barrioMasCercano(pos.coords.latitude, pos.coords.longitude)
         setZonaEntrega(cercano.nombre)
         setOrigenBarrio('gps')
+        setOrigenPunto('gps')
+        setMapaAbierto(false)
         const grupo = grupoDeBarrio(cercano.nombre)
         if (grupo) setGrupoZonaSel(grupo.id)
         setBuscandoUbicacion(false)
@@ -747,6 +776,38 @@ function CheckoutContent() {
         setBuscandoUbicacion(false)
       }
     )
+  }
+
+  // Dirección cargada (guardada de otra compra o recién escrita) que
+  // todavía no se buscó en el mapa: se busca sola al dejar de escribir.
+  useEffect(() => {
+    if (etapa !== 'entrega' || metodoEntrega !== 'envio' || !metodoElegido) return
+    if (direccionVerificada !== null || verificandoDireccion || lat != null || validarDireccion(direccion)) return
+    const t = setTimeout(() => { verificarDireccion() }, 1200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direccion, direccionVerificada, lat, metodoEntrega, metodoElegido, etapa])
+
+  // "Marcar mi casa en el mapa": la zona sale del punto marcado.
+  function abrirMapa() {
+    const z = ZONAS_ENVIO_POTOSI.find((x) => x.nombre === zonaEntrega)
+    setPuntoMapa(lat != null && lng != null ? { lat, lng } : z ? { lat: z.lat, lng: z.lng } : { lat: -19.5893, lng: -65.7535 })
+    setMapaAbierto(true)
+  }
+  function confirmarMapa() {
+    if (!puntoMapa) return
+    const cercano = barrioMasCercano(puntoMapa.lat, puntoMapa.lng)
+    if (distanciaKm(puntoMapa.lat, puntoMapa.lng, cercano.lat, cercano.lng) > RADIO_BARRIO_KM * 2) {
+      setError('Ese punto queda fuera de las zonas de envío. Si es correcto, elegí “Retiro en tienda” o escribinos.')
+      return
+    }
+    setLat(puntoMapa.lat)
+    setLng(puntoMapa.lng)
+    setOrigenPunto('mapa')
+    setZonaEntrega(cercano.nombre)
+    setOrigenBarrio('mapa')
+    setMapaAbierto(false)
+    setError('')
   }
 
   async function confirmarEntregaYCrearPedidos() {
@@ -786,6 +847,19 @@ function CheckoutContent() {
       }
       // Si todavía no se chequeó (escribió y tocó "Continuar" sin salir
       // del campo), la chequeamos acá: de ahí sale el barrio.
+      let puntoActual = lat != null && lng != null ? { lat, lng } : null
+      if (!puntoActual && direccionVerificada === null) {
+        const v = await verificarDireccion()
+        puntoActual = v.punto
+        if (!puntoActual && v.resultado !== 'error') {
+          setError('No encontramos tu dirección en el mapa: marcá tu casa en el mapa o usá tu ubicación para calcular el envío.')
+          return
+        }
+      }
+      if (!puntoActual && direccionVerificada === false) {
+        setError('No encontramos tu dirección en el mapa: marcá tu casa en el mapa o usá tu ubicación para calcular el envío.')
+        return
+      }
       if (!zonaEntrega && direccionVerificada === null) {
         const { barrio } = await verificarDireccion()
         if (barrio) {
@@ -797,6 +871,10 @@ function CheckoutContent() {
     }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
       setError(validarZona(zonaTexto) || 'Elegí tu zona para calcular el envío.')
+      return
+    }
+    if (metodoEntrega === 'envio' && zonaNoCoincide) {
+      setError(`${textoPunto} queda en la zona ${zonaDelPunto!.nombre}, no en ${zonaEntrega}. Corregí la zona (o marcá tu casa en el mapa) para seguir.`)
       return
     }
     if (metodoEntrega === 'envio' && validarEntreCalles(entreCalles, direccion)) {
@@ -900,6 +978,7 @@ function CheckoutContent() {
             referenciaAdicional: referenciaAdicional || null,
             lat: metodoEntrega === 'envio' ? lat : null,
             lng: metodoEntrega === 'envio' ? lng : null,
+            origenUbicacion: metodoEntrega === 'envio' && lat != null ? origenPunto || null : null,
             costoEnvio: envioGrupo,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
@@ -1467,8 +1546,9 @@ function CheckoutContent() {
                     setDireccionVerificada(null)
                     setMotivoDireccion('')
                     if (origenBarrio === 'direccion' || origenBarrio === 'guardado') setOrigenBarrio('')
+                    if (origenPunto === 'direccion') { setLat(null); setLng(null); setOrigenPunto('') }
                   }}
-                  onBlur={() => { tocar('direccion'); if (!validarDireccion(direccion)) verificarDireccion() }}
+                  onBlur={() => { tocar('direccion'); if (!validarDireccion(direccion) && direccionVerificada === null && !verificandoDireccion) verificarDireccion() }}
                   placeholder="Ej: Av. Universitaria 123"
                   autoComplete="street-address"
                   className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.direccion && validarDireccion(direccion) ? 'border-maroon' : 'border-line'}`}
@@ -1480,21 +1560,45 @@ function CheckoutContent() {
                 ) : verificandoDireccion ? (
                   <span className="text-inksoft">Buscando tu dirección en el mapa...</span>
                 ) : direccionVerificada === false ? (
-                  <span className="text-maroon">⚠ {motivoDireccion && !motivoDireccion.startsWith('No encontramos') ? motivoDireccion + ' ' : 'No encontramos esa dirección en el mapa. '}Elegí tu zona abajo.</span>
+                  <span className="text-maroon">⚠ {motivoDireccion && !motivoDireccion.startsWith('No encontramos') ? motivoDireccion + ' ' : 'No encontramos esa dirección en el mapa. '}{lat == null ? 'Marcá tu casa en el mapa o usá tu ubicación.' : ''}</span>
                 ) : direccionVerificada === 'error' ? (
-                  <span className="text-ochre">No pudimos buscarla en el mapa ahora: elegí tu zona abajo.</span>
+                  <span className="text-ochre">No pudimos buscarla en el mapa ahora: marcá tu casa en el mapa o elegí tu zona abajo.</span>
+                ) : origenPunto === 'direccion' ? (
+                  <span className="text-teal">✓ Encontramos tu dirección en el mapa. ¿No es ahí? Marcá tu casa en el mapa.</span>
                 ) : (
                   <span className="text-inksoft">El nombre de la calle y el número de la casa. Si no tiene número, poné “s/n”.</span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={usarMiUbicacion}
-                disabled={buscandoUbicacion}
-                className="font-body text-[12px] text-teal font-semibold underline mb-3 disabled:opacity-60"
-              >
-                {buscandoUbicacion ? 'Buscando tu ubicación...' : lat != null && origenBarrio === 'gps' ? '✓ Usamos tu ubicación' : '📍 Estoy en el lugar de entrega: usar mi ubicación'}
-              </button>
+              <div className={`flex flex-wrap gap-2 mb-3 ${direccionVerificada === false && lat == null ? 'p-2.5 rounded-lg border border-maroon bg-maroonsoft' : ''}`}>
+                <button
+                  type="button"
+                  onClick={usarMiUbicacion}
+                  disabled={buscandoUbicacion}
+                  className={`flex-1 min-w-[150px] px-3 py-2 rounded-lg border font-body text-[12px] font-semibold disabled:opacity-60 ${origenPunto === 'gps' ? 'border-teal bg-tealsoft text-teal' : 'border-line bg-panel text-ink'}`}
+                >
+                  {buscandoUbicacion ? 'Buscando...' : origenPunto === 'gps' ? '✓ Usamos tu ubicación' : '📍 Estoy ahí: usar mi ubicación'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (mapaAbierto ? setMapaAbierto(false) : abrirMapa())}
+                  className={`flex-1 min-w-[150px] px-3 py-2 rounded-lg border font-body text-[12px] font-semibold ${origenPunto === 'mapa' ? 'border-teal bg-tealsoft text-teal' : 'border-line bg-panel text-ink'}`}
+                >
+                  {origenPunto === 'mapa' && !mapaAbierto ? '✓ Casa marcada (cambiar)' : '🗺️ Marcar mi casa en el mapa'}
+                </button>
+              </div>
+              {mapaAbierto && puntoMapa && (
+                <div className="mb-3">
+                  <div className="font-body text-[11px] text-inksoft mb-1.5">Tocá el mapa o arrastrá el 📍 hasta tu casa.</div>
+                  <ElegirUbicacion inicial={puntoMapa} onCambiar={(a, b) => setPuntoMapa({ lat: a, lng: b })} />
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="flex-1 font-body text-[12px] text-ink">
+                      Zona: <strong>{barrioMasCercano(puntoMapa.lat, puntoMapa.lng).nombre}</strong> · envío {bs(COSTOS_ENVIO[barrioMasCercano(puntoMapa.lat, puntoMapa.lng).nombre] ?? 0)}
+                    </span>
+                    <button type="button" onClick={() => setMapaAbierto(false)} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs">Cancelar</button>
+                    <button type="button" onClick={confirmarMapa} className="px-3 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold">Confirmar</button>
+                  </div>
+                </div>
+              )}
 
               {/* Zona (antes "barrio"): sale sola de la dirección o la ubicación,
                   y se puede escribir; tiene que ser una de la lista. */}
@@ -1542,8 +1646,18 @@ function CheckoutContent() {
                 })()}
               </div>
               <div className="mb-3 min-h-[16px] font-body text-[11px]">
-                {zonaEntrega ? (
-                  <span className="text-teal">✓ Envío a {zonaEntrega}: <strong>{bs(COSTOS_ENVIO[zonaEntrega] ?? 0)}</strong>{origenBarrio === 'direccion' ? ' · la sacamos de tu dirección' : origenBarrio === 'gps' ? ' · la sacamos de tu ubicación' : ''}</span>
+                {zonaEntrega && zonaNoCoincide ? (
+                  <div className="p-2.5 rounded-lg border border-maroon bg-maroonsoft text-ink text-[12px]">
+                    ⚠ {textoPunto} queda en la zona <strong>{zonaDelPunto!.nombre}</strong>, no en {zonaEntrega}.
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button type="button" onClick={() => { setZonaEntrega(zonaDelPunto!.nombre); setZonaTexto(zonaDelPunto!.nombre); setOrigenBarrio(origenPunto === 'mapa' ? 'mapa' : origenPunto === 'gps' ? 'gps' : 'direccion'); setError('') }} className="px-3 py-1.5 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold">
+                        Usar {zonaDelPunto!.nombre} (envío {bs(COSTOS_ENVIO[zonaDelPunto!.nombre] ?? 0)})
+                      </button>
+                      <button type="button" onClick={abrirMapa} className="px-3 py-1.5 rounded-lg border border-line bg-panel font-body text-xs">🗺️ Marcar mi casa en el mapa</button>
+                    </div>
+                  </div>
+                ) : zonaEntrega ? (
+                  <span className="text-teal">✓ Envío a {zonaEntrega}: <strong>{bs(COSTOS_ENVIO[zonaEntrega] ?? 0)}</strong>{origenBarrio === 'direccion' ? ' · la sacamos de tu dirección' : origenBarrio === 'gps' ? ' · la sacamos de tu ubicación' : origenBarrio === 'mapa' ? ' · la sacamos de tu casa en el mapa' : ''}</span>
                 ) : tocados.zona || zonaTexto ? (
                   <span className="text-maroon">⚠ {validarZona(zonaTexto)}</span>
                 ) : (
