@@ -1,6 +1,19 @@
 // Búsqueda de productos tolerante: sin acentos, palabra por palabra, y
 // mirando también rubro, categoría y público — así "zapatos mujer"
 // encuentra un "Zapato de cuero" cargado para Mujer.
+//
+// Cómo se entiende la consulta (ver buscarProducto):
+//  - Las palabras de público ("mujer", "dama", "hombre", "niña"…) no se
+//    buscan como texto: filtran por el público del producto. Un producto
+//    "Otros/unisex" entra como relacionado; uno de otro público, no entra.
+//  - El resto se compara palabra por palabra, admitiendo plural, género y
+//    diminutivo ("pantalón" ≈ "pantalones", "remera" ≈ "remerita") y un
+//    error de tipeo en palabras largas ("pantlon"), pero no otra palabra
+//    que solo empieza igual ("media" ≠ "mediano", "calza" ≠ "calzado").
+//  - En el nombre o la tienda pesa más; en el rubro también es exacto,
+//    salvo rubros que juntan varias cosas ("Saquitos, Sweaters y
+//    Chalecos": un saquito no es un chaleco → relacionado).
+//  - Familias de palabras y etiquetas de IA → relacionado.
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 
 export const normalizar = (t: string) =>
@@ -59,43 +72,140 @@ export const FAMILIAS: Familia[] = [
 ]
 
 const raizFamilias = FAMILIAS.map((f) => ({ ...f, raices: f.palabras.map((p) => raiz(normalizar(p))) }))
+const CONOCIDAS = new Set(raizFamilias.flatMap((f) => f.raices))
+
+// ——— Palabras ———
+const VACIAS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para', 'con', 'y', 'e', 'en', 'un', 'una', 'unos', 'unas', 'por', 'a', 'al', 'o', 'tipo'])
+const PUBLICO_DE: Record<string, string> = {
+  mujer: 'mujer', mujeres: 'mujer', dama: 'mujer', damas: 'mujer', senora: 'mujer', senoras: 'mujer', femenino: 'mujer', femenina: 'mujer',
+  hombre: 'hombre', hombres: 'hombre', caballero: 'hombre', caballeros: 'hombre', varon: 'hombre', varones: 'hombre', masculino: 'hombre', senor: 'hombre', senores: 'hombre',
+  nino: 'ninos', ninos: 'ninos', nina: 'ninos', ninas: 'ninos', infantil: 'ninos', infantiles: 'ninos', kids: 'ninos', nene: 'ninos', nena: 'ninos', nenes: 'ninos', nenas: 'ninos',
+  unisex: 'unisex',
+}
+const palabrasDe = (t: string) => normalizar(t).split(/[^a-z0-9]+/).filter(Boolean)
+
+// Misma palabra salvo plural, género o diminutivo.
+const SUFIJOS = new Set(['', 's', 'es', 'a', 'o', 'as', 'os', 'ita', 'ito', 'itas', 'itos', 'cita', 'cito', 'citas', 'citos'])
+function mismaPalabra(a: string, b: string) {
+  if (a === b) return true
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  return i >= 3 && SUFIJOS.has(a.slice(i)) && SUFIJOS.has(b.slice(i))
+}
+// Un error de tipeo (letra de más, de menos, cambiada o dos invertidas) en palabras de 5+ letras.
+function casiIgual(a: string, b: string) {
+  if (Math.min(a.length, b.length) < 5 || Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  while (i < a.length && a[i] === b[i]) i++
+  const ra = a.slice(i), rb = b.slice(i)
+  return ra.slice(1) === rb.slice(1) || ra.slice(1) === rb || ra === rb.slice(1) || (ra.length > 1 && ra[0] === rb[1] && ra[1] === rb[0] && ra.slice(2) === rb.slice(2))
+}
+// ¿La palabra buscada está en estas palabras? `parcial`: la última palabra
+// se está escribiendo ("panta" ya encuentra pantalones).
+// El error de tipeo solo se tolera en palabras que no conocemos: "chompa"
+// (suéter) existe y no es "chomba" (remera), pero "pantlon" no existe.
+function esta(t: string, palabras: string[], parcial = false) {
+  const rt = raiz(t)
+  const tipeo = !CONOCIDAS.has(rt)
+  return palabras.some((w) => mismaPalabra(t, w) || (tipeo && (casiIgual(t, w) || casiIgual(rt, raiz(w)))) || (parcial && t.length >= 2 && w.startsWith(t)))
+}
+
+// Público del producto; si quedó en "Otros", el que diga el nombre ("Blusa dama").
+function publicoProducto(p: ProductoBuscable) {
+  if (p.publico && p.publico !== 'unisex') return p.publico
+  for (const w of palabrasDe(p.nombre || '')) if (PUBLICO_DE[w] && PUBLICO_DE[w] !== 'unisex') return PUBLICO_DE[w]
+  return 'unisex'
+}
 
 // Las alternativas de una palabra buscada (ella misma + su familia).
 function familiaDe(palabra: string) {
   const r = raiz(palabra)
   return (
-    raizFamilias.find((f) => f.raices.includes(r)) ||
+    raizFamilias.find((f) => f.raices.some((x) => x === r || (!x.includes(' ') && mismaPalabra(x, palabra)))) ||
     (r.length >= 5 ? raizFamilias.find((f) => f.raices.some((x) => x.length >= 5 && (x.startsWith(r) || r.startsWith(x)))) : undefined)
   )
 }
 
 export type ProductoBuscable = { nombre?: string; vendedor?: string; publico?: string; rubro?: string; etiquetasBusqueda?: string[]; descripcionCorta?: string }
+type RubroBuscable = { label: string; categoriaLabel: string; grupoId?: string; grupo?: string }
 
-// 'exacto' | 'relacionado' | null (no aparece).
-export function relevancia(
-  p: ProductoBuscable,
-  rubro: { label: string; categoriaLabel: string; grupoId?: string; grupo?: string } | undefined,
-  consulta: string
-): 'exacto' | 'relacionado' | null {
-  const palabras = normalizar(consulta).split(' ').filter(Boolean)
-  if (!palabras.length) return null
-  const visible = textoBuscable(p, rubro)
-  if (palabras.every((w) => visible.includes(raiz(w)))) return 'exacto'
-  const oculto = `${visible} ${normalizar((p.etiquetasBusqueda || []).join(' '))} ${normalizar(p.descripcionCorta || '')}`
-  const ok = palabras.every((w) => {
-    if (oculto.includes(raiz(w))) return true
-    const fam = familiaDe(w)
-    if (!fam) return false
-    if (fam.rubros && ((p.rubro && fam.rubros.includes(p.rubro)) || (rubro?.grupoId && fam.rubros.includes(rubro.grupoId)))) return true
-    return fam.raices.some((x) => oculto.includes(x))
-  })
-  return ok ? 'relacionado' : null
+// Consulta ya separada (se puede armar una vez y usar para todos los productos).
+export function prepararConsulta(consulta: string) {
+  const todas = palabrasDe(consulta).filter((w) => !VACIAS.has(w))
+  const publicos = new Set(todas.map((w) => PUBLICO_DE[w]).filter(Boolean))
+  const terminos = todas.filter((w) => !PUBLICO_DE[w])
+  return { terminos, publicos, palabrasPublico: todas.filter((w) => PUBLICO_DE[w]) }
 }
 
-// Para ordenar los "relacionados": primero los que tienen la palabra
-// buscada en sus etiquetas de IA / descripción, después los que entran
-// solo por familia o rubro.
-export function puntajeRelacionado(p: ProductoBuscable, consulta: string) {
-  const oculto = normalizar(`${(p.etiquetasBusqueda || []).join(' ')} ${p.descripcionCorta || ''}`)
-  return normalizar(consulta).split(' ').filter(Boolean).filter((w) => oculto.includes(raiz(w))).length
+// Rubro que junta varias cosas: "Saquitos, Sweaters y Chalecos", "Bermudas y Shorts".
+const esLista = (label: string) => /,|\sy\s|\se\s|\//.test(label)
+
+export type ResultadoBusqueda = { tipo: 'exacto' | 'relacionado'; puntaje: number }
+
+export function buscarProducto(
+  p: ProductoBuscable,
+  rubro: RubroBuscable | undefined,
+  consulta: string | ReturnType<typeof prepararConsulta>,
+  opciones: { parcial?: boolean } = {}
+): ResultadoBusqueda | null {
+  const c = typeof consulta === 'string' ? prepararConsulta(consulta) : consulta
+  if (!c.terminos.length && !c.publicos.size) return null
+  let tipo: ResultadoBusqueda['tipo'] = 'exacto'
+  let puntaje = 0
+
+  // Público: filtra (no se busca como texto).
+  if (c.publicos.size) {
+    const pub = publicoProducto(p)
+    if (c.publicos.has(pub)) {
+      puntaje += 3
+      // "niña" pesa más en una "Blusa niña" que en un "Pantalón niño".
+      if (c.palabrasPublico.some((w) => esta(w, palabrasDe(p.nombre || '')))) puntaje += 2
+    } else if (pub === 'unisex' && c.terminos.length && !c.publicos.has('unisex')) tipo = 'relacionado'
+    else return null
+  }
+
+  const nombre = palabrasDe(`${p.nombre || ''} ${p.vendedor || ''}`)
+  const soloNombre = palabrasDe(p.nombre || '')
+  const deRubro = rubro ? palabrasDe(rubro.label) : []
+  const rubroEsLista = rubro ? esLista(rubro.label) : false
+  const deGrupo = rubro ? palabrasDe(`${rubro.grupo || ''} ${rubro.categoriaLabel}`) : []
+  const oculto = palabrasDe(`${(p.etiquetasBusqueda || []).join(' ')} ${p.descripcionCorta || ''}`)
+  const textoOculto = ` ${[...nombre, ...deRubro, ...deGrupo, ...oculto].join(' ')} `
+
+  for (let i = 0; i < c.terminos.length; i++) {
+    const t = c.terminos[i]
+    const parcial = !!opciones.parcial && i === c.terminos.length - 1
+    if (esta(t, nombre, parcial)) {
+      puntaje += 10
+      if (soloNombre[0] && (mismaPalabra(t, soloNombre[0]) || (parcial && soloNombre[0].startsWith(t)))) puntaje += 4 // "Chaleco …" antes que "Saco con chaleco"
+      continue
+    }
+    if (esta(t, deRubro, parcial)) {
+      puntaje += rubroEsLista ? 4 : 7
+      if (rubroEsLista) tipo = 'relacionado'
+      continue
+    }
+    if (esta(t, deGrupo, parcial)) { puntaje += 5; continue }
+    if (esta(t, oculto, parcial)) { puntaje += 3; tipo = 'relacionado'; continue }
+    const fam = familiaDe(t)
+    const enFamilia =
+      fam &&
+      ((fam.rubros && ((p.rubro && fam.rubros.includes(p.rubro)) || (rubro?.grupoId && fam.rubros.includes(rubro.grupoId)))) ||
+        fam.raices.some((x) => (x.includes(' ') ? textoOculto.includes(` ${x} `) : esta(x, [...nombre, ...deRubro, ...oculto]))))
+    if (!enFamilia) return null
+    puntaje += 2
+    tipo = 'relacionado'
+  }
+  return { tipo, puntaje }
+}
+
+// 'exacto' | 'relacionado' | null (no aparece).
+export function relevancia(p: ProductoBuscable, rubro: RubroBuscable | undefined, consulta: string, opciones: { parcial?: boolean } = {}): 'exacto' | 'relacionado' | null {
+  return buscarProducto(p, rubro, consulta, opciones)?.tipo || null
+}
+
+// Para ordenar: más arriba lo que coincide en el nombre, después en el
+// rubro, en las etiquetas de IA y al final lo que entra por familia.
+export function puntajeRelacionado(p: ProductoBuscable, consulta: string, rubro?: RubroBuscable) {
+  return buscarProducto(p, rubro, consulta)?.puntaje || 0
 }
