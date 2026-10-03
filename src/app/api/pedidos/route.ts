@@ -8,6 +8,7 @@ import { esCuentaPruebaServidor } from '@/lib/cuentasPrueba'
 import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 import { descontarStock, unidadesPorProducto, reponerStockDePedido } from '@/lib/stockServer'
 import { sumarMetricaRecuperacion } from '@/lib/recuperacionServer'
+import { registrarZonaSugerida } from '@/lib/zonasEnvioServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -192,6 +193,12 @@ export async function POST(req: NextRequest) {
       return r
     })
     if (!creado.ok) return NextResponse.json({ error: creado.error, sinStock: true }, { status: 409 })
+
+    // Zona escrita a mano (no está en la lista) con la casa marcada: se
+    // suma a "Zonas sugeridas" del admin. No frena el pedido si falla.
+    if (metodoEntrega === 'envio' && zonaEntrega && typeof lat === 'number' && typeof lng === 'number' && (origenUbicacion === 'mapa' || origenUbicacion === 'gps')) {
+      await registrarZonaSugerida(zonaEntrega, lat, lng).catch((err) => console.error('zona sugerida', err))
+    }
 
     if (usoCuponPendiente) {
       const { c, checkoutId, uid, email } = usoCuponPendiente

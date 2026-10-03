@@ -3,7 +3,8 @@
 // inventados ("asdf", "xxx", "prueba", "123", "jajaja"…). La dirección
 // además se busca en el mapa (/api/validar-direccion); esto es lo que se
 // puede saber sin salir del navegador.
-import { ZONAS_ENVIO_POTOSI, type ZonaPotosi } from '@/data/zonasPotosi'
+import { ZONAS_ENVIO_POTOSI } from '@/data/zonasPotosi'
+import { buscarZonaEn, type ZonaEnvio } from '@/lib/zonasEnvio'
 
 const norm = (t: string) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
 
@@ -51,20 +52,22 @@ export function validarEntreCalles(entreCalles: string, direccion = ''): string 
   return null
 }
 
-// La zona tiene que ser una de la lista (de ahí sale el costo del envío).
-export function buscarZona(texto: string): ZonaPotosi | null {
-  const t = norm(texto)
-  if (!t) return null
-  const sinParentesis = (n: string) => norm(n).replace(/\s*\(.*\)\s*/g, ' ').trim()
-  return (
-    ZONAS_ENVIO_POTOSI.find((z) => norm(z.nombre) === t) ||
-    ZONAS_ENVIO_POTOSI.find((z) => sinParentesis(z.nombre) === t || norm(z.nombre.match(/\(([^)]+)\)/)?.[1] || '') === t) ||
-    null
-  )
+// La zona tiene que ser una de la lista (de ahí sale el costo del envío),
+// salvo que la casa esté marcada en el mapa o con el GPS: ahí el punto
+// garantiza dónde es y se puede escribir una zona que no está en la lista.
+export function buscarZona(texto: string, zonas: ZonaEnvio[] = ZONAS_ENVIO_POTOSI): ZonaEnvio | null {
+  return buscarZonaEn(zonas, texto)
 }
 
-export function validarZona(texto: string): string | null {
+// Zona escrita a mano (no está en la lista) que se acepta con la casa marcada.
+export function zonaLibreValida(texto: string): boolean {
+  const t = norm(texto)
+  return t.length >= 3 && /[a-z]{3,}/.test(t) && !pareceInventado(t)
+}
+
+export function validarZona(texto: string, opciones: { zonas?: ZonaEnvio[]; conPunto?: boolean } = {}): string | null {
   if (!norm(texto)) return 'Elegí tu zona de la lista (se completa sola con tu dirección).'
-  if (!buscarZona(texto)) return 'Esa zona no está en la lista: elegí la más cercana (o mirá el mapa de zonas).'
-  return null
+  if (buscarZonaEn(opciones.zonas || ZONAS_ENVIO_POTOSI, texto)) return null
+  if (opciones.conPunto) return zonaLibreValida(texto) ? null : 'Ese nombre de zona no parece real: escribí el nombre de tu zona o barrio.'
+  return 'Esa zona no está en la lista: elegí la más cercana, o marcá tu casa en el mapa y escribí el nombre de tu zona.'
 }

@@ -20,6 +20,7 @@ import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminPortada from '@/components/admin/AdminPortada'
+import AdminZonasEnvio from '@/components/admin/AdminZonasEnvio'
 import AdminMarketing from '@/components/admin/AdminMarketing'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
@@ -94,7 +95,7 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
-type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing'
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas'
 
 const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
@@ -109,6 +110,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'usuarios', icono: '👥', label: 'Usuarios', ayuda: 'Crear, editar, contraseñas', grupo: 'Personas' },
   { id: 'categorias', icono: '🗂️', label: 'Categorías', ayuda: 'Rubros de servicios', grupo: 'Configuración' },
   { id: 'categorias-productos', icono: '🏷️', label: 'Categorías de productos', ayuda: 'Rubros de productos', grupo: 'Configuración' },
+  { id: 'zonas', icono: '📍', label: 'Zonas de envío', ayuda: 'Zonas sugeridas por compradores', grupo: 'Configuración' },
   { id: 'metricas', icono: '📊', label: 'Métricas', ayuda: 'Números del sitio', grupo: 'Números' },
   { id: 'analitica', icono: '📈', label: 'Analítica', ayuda: 'Eventos y recuperación de compras', grupo: 'Números' },
 ]
@@ -3619,6 +3621,8 @@ export default function AdminPage() {
           ))}
         </div>
       )}
+
+      {tab === 'zonas' && <AdminZonasEnvio password={password} />}
 
       {tab === 'categorias-productos' && (
         <div>
