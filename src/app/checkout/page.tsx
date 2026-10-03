@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, barrioMasCercano, distanciaKm } from '@/data/zonasPotosi'
+import { buscarZona, validarDireccion, validarEntreCalles, validarZona } from '@/lib/validarEntrega'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { leerComprobante, comprobanteValido, motivoRechazo, MAX_INTENTOS_COMPROBANTE, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -326,6 +327,13 @@ function CheckoutContent() {
   const [elegirBarrioAMano, setElegirBarrioAMano] = useState(false)
   const [direccion, setDireccion] = useState('')
   const [entreCalles, setEntreCalles] = useState('')
+  // Lo que escribe en "Zona" (antes "barrio"); zonaEntrega es la zona de
+  // la lista que corresponde (de ahí sale el costo del envío).
+  const [zonaTexto, setZonaTexto] = useState('')
+  const [zonaAbierta, setZonaAbierta] = useState(false)
+  // Campos que ya tocó: recién ahí se muestran sus errores.
+  const [tocados, setTocados] = useState<Record<string, boolean>>({})
+  const tocar = (campo: string) => setTocados((t) => (t[campo] ? t : { ...t, [campo]: true }))
   // Opcional — un punto de referencia extra (ej: "portón verde",
   // "al lado de la farmacia"), además de "entre calles". Le sirve a
   // la moto para encontrar direcciones sin numeración clara.
@@ -350,6 +358,10 @@ function CheckoutContent() {
   // rechazar direcciones válidas que caen cerca del borde, pero corta
   // cuando la dirección escrita claramente corresponde a otro barrio.
   const RADIO_BARRIO_KM = 1.5
+  useEffect(() => {
+    if (zonaEntrega && buscarZona(zonaTexto)?.nombre !== zonaEntrega) setZonaTexto(zonaEntrega)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zonaEntrega])
   const direccionMuyCorta = (d: string) => d.trim().length < 5 || !/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(d)
 
   async function verificarDireccion(): Promise<{ resultado: boolean | 'error' | null; barrio: string }> {
@@ -469,6 +481,7 @@ function CheckoutContent() {
   // arranca solo en cuanto la etapa vuelve a ser 'esperando', así que si
   // el admin ya validó el pago mientras tanto, pasa directo al resumen.
   const claveEspera = `clasiclick_checkout_espera_${claveTienda || 'todas'}`
+  const CLAVE_BORRADOR = 'clasiclick_checkout_datos'
   const [restaurando, setRestaurando] = useState(true)
 
   useEffect(() => {
@@ -494,6 +507,28 @@ function CheckoutContent() {
     } catch {
       // JSON corrupto o localStorage bloqueado: se arranca normal.
     }
+    // Lo que ya había completado (si volvió atrás, al carrito o recargó la
+    // página): no se pierde. Solo del mismo usuario y de los últimos 7 días.
+    try {
+      const b = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || 'null')
+      if (b && usuario && b.uid === usuario.uid && Date.now() - (b.guardadoAt || 0) < 7 * 24 * 60 * 60 * 1000) {
+        if (b.metodoElegido) {
+          setMetodoEntrega(b.metodoEntrega === 'retiro' || b.metodoEntrega === 'vendedor' ? b.metodoEntrega : 'envio')
+          setMetodoElegido(true)
+        }
+        if (b.metodoPago === 'efectivo') setMetodoPago('efectivo')
+        setEnvioExpress(!!b.envioExpress)
+        if (b.nombreComprador) setNombreComprador(b.nombreComprador)
+        if (b.whatsappComprador) setWhatsappComprador(b.whatsappComprador)
+        if (b.direccion) setDireccion(b.direccion)
+        if (b.zonaEntrega && buscarZona(b.zonaEntrega)) { setZonaEntrega(b.zonaEntrega); setOrigenBarrio(b.origenBarrio || 'guardado') }
+        else if (b.zonaTexto) setZonaTexto(b.zonaTexto)
+        if (b.entreCalles) setEntreCalles(b.entreCalles)
+        if (b.referenciaAdicional) setReferenciaAdicional(b.referenciaAdicional)
+        if (typeof b.lat === 'number' && typeof b.lng === 'number') { setLat(b.lat); setLng(b.lng) }
+        if (b.codigoCupon) setCodigoCupon(b.codigoCupon)
+      }
+    } catch {}
     setRestaurando(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCargando])
@@ -559,6 +594,20 @@ function CheckoutContent() {
     }
   }, [restaurando, etapa, subPedidos, usuario, metodoEntrega, metodoPago, envioExpress, claveEspera])
 
+  // Borrador de los datos de entrega (ver la restauración más arriba).
+  useEffect(() => {
+    if (restaurando || !usuario) return
+    try {
+      if (etapa === 'resumen') { localStorage.removeItem(CLAVE_BORRADOR); return }
+      if (etapa !== 'entrega') return
+      localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
+        uid: usuario.uid, guardadoAt: Date.now(), metodoEntrega, metodoElegido, metodoPago, envioExpress,
+        nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, entreCalles, referenciaAdicional, lat, lng,
+        codigoCupon: cuponAplicado?.codigo || codigoCupon,
+      }))
+    } catch {}
+  }, [restaurando, usuario, etapa, metodoEntrega, metodoElegido, metodoPago, envioExpress, nombreComprador, whatsappComprador, direccion, zonaEntrega, zonaTexto, origenBarrio, entreCalles, referenciaAdicional, lat, lng, codigoCupon, cuponAplicado])
+
   function salirDeEspera() {
     try {
       localStorage.removeItem(claveEspera)
@@ -603,6 +652,9 @@ function CheckoutContent() {
   const descuentoCupon = resultadoCupon?.ok ? resultadoCupon.descuentoProductos : 0
   const descuentoEnvioCupon = resultadoCupon?.ok ? resultadoCupon.descuentoEnvio : 0
   const costoEnvioFinal = costoEnvio - descuentoEnvioCupon
+  // El envío y el total recién se muestran cuando eligió cómo recibirlo y,
+  // con envío, completó una dirección válida y su zona.
+  const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (!!zonaEntrega && !validarDireccion(direccion)))
   const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
 
   async function aplicarCupon(codigoForzado?: string) {
@@ -720,17 +772,16 @@ function CheckoutContent() {
       setError(`El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Lo cambiamos a envío normal — revisá el total y volvé a confirmar.`)
       return
     }
-    if (metodoEntrega === 'vendedor' && !direccion.trim()) {
-      setError('Escribí la dirección donde querés recibirlo.')
-      return
-    }
-    if (metodoEntrega === 'envio' && !direccion.trim()) {
-      setError('Escribí tu dirección antes de continuar.')
+    if (metodoEntrega === 'vendedor' && validarDireccion(direccion)) {
+      tocar('direccion')
+      setError(validarDireccion(direccion)!)
       return
     }
     if (metodoEntrega === 'envio') {
-      if (direccionMuyCorta(direccion)) {
-        setError('Escribí la calle y el número, no alcanza con un número solo.')
+      setTocados({ direccion: true, zona: true, entre: true })
+      const errDir = validarDireccion(direccion)
+      if (errDir) {
+        setError(errDir)
         return
       }
       // Si todavía no se chequeó (escribió y tocó "Continuar" sin salir
@@ -739,18 +790,17 @@ function CheckoutContent() {
         const { barrio } = await verificarDireccion()
         if (barrio) {
           // Recién ahora sabemos el costo del envío: que lo vea antes de pagar.
-          setError(`Calculamos tu envío para ${barrio}. Revisá el total y tocá “Continuar” de nuevo.`)
+          setError(`Calculamos tu envío para la zona ${barrio}. Revisá el total y tocá “Continuar” de nuevo.`)
           return
         }
       }
     }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
-      setElegirBarrioAMano(true)
-      setError('No encontramos tu dirección en el mapa: elegí tu barrio (o usá tu ubicación) para calcular el envío.')
+      setError(validarZona(zonaTexto) || 'Elegí tu zona para calcular el envío.')
       return
     }
-    if (metodoEntrega === 'envio' && !entreCalles.trim()) {
-      setError('Escribí entre qué calles queda tu dirección antes de continuar — ayuda mucho a que la moto no se pierda.')
+    if (metodoEntrega === 'envio' && validarEntreCalles(entreCalles, direccion)) {
+      setError(validarEntreCalles(entreCalles, direccion)!)
       return
     }
 
@@ -1242,6 +1292,12 @@ function CheckoutContent() {
             {descuentoCupon > 0 && (
               <div className="font-body text-[12px] text-teal font-semibold mb-0.5">Cupón {cuponAplicado?.codigo}: −{bs(descuentoCupon)}</div>
             )}
+            {!entregaLista ? (
+              <div className="font-body text-[12px] text-inksoft mt-1">
+                {!metodoElegido ? 'Elegí cómo recibirlo para ver el envío y el total.' : 'El envío y el total aparecen cuando completes tu dirección y tu zona.'}
+              </div>
+            ) : (
+            <>
             {metodoEntrega === 'vendedor' && (
               <div className="font-body text-[12px] text-inksoft mb-1">
                 Envío del vendedor: {envioVendedorTotal > 0 ? bs(envioVendedorTotal) : ''}{envioVendedorACoordinar ? `${envioVendedorTotal > 0 ? ' + ' : ''}a coordinar con el vendedor` : ''}
@@ -1260,7 +1316,9 @@ function CheckoutContent() {
                 )}
               </div>
             )}
-            <div className="font-display text-xl font-bold text-ink">{bs(totalCarrito)}</div>
+            <div className="font-display text-xl font-bold text-ink">Total {bs(totalCarrito)}</div>
+            </>
+            )}
 
             {/* Cupón de descuento */}
             <div className="mt-3 pt-3 border-t border-line">
@@ -1376,7 +1434,7 @@ function CheckoutContent() {
           {metodoElegido && (
           <>
           <label className="block text-left mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Tu nombre *</span>
+            <span className="font-body text-[12px] font-semibold text-ink block mb-1">Tu nombre *</span>
             <input
               value={nombreComprador}
               onChange={(e) => setNombreComprador(e.target.value)}
@@ -1386,7 +1444,7 @@ function CheckoutContent() {
           </label>
 
           <label className="block text-left mb-4">
-            <span className="font-body text-[11px] text-inksoft block mb-1">Tu WhatsApp *</span>
+            <span className="font-body text-[12px] font-semibold text-ink block mb-1">Tu WhatsApp *</span>
             <input
               value={whatsappComprador}
               onChange={(e) => setWhatsappComprador(e.target.value)}
@@ -1401,7 +1459,7 @@ function CheckoutContent() {
           {metodoEntrega === 'envio' ? (
             <>
               <label className="block text-left mb-1">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Dirección (calle y número) *</span>
+                <span className="font-body text-[12px] font-semibold text-ink block mb-1">Calle y número *</span>
                 <input
                   value={direccion}
                   onChange={(e) => {
@@ -1410,24 +1468,23 @@ function CheckoutContent() {
                     setMotivoDireccion('')
                     if (origenBarrio === 'direccion' || origenBarrio === 'guardado') setOrigenBarrio('')
                   }}
-                  onBlur={verificarDireccion}
+                  onBlur={() => { tocar('direccion'); if (!validarDireccion(direccion)) verificarDireccion() }}
                   placeholder="Ej: Av. Universitaria 123"
-                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                  autoComplete="street-address"
+                  className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.direccion && validarDireccion(direccion) ? 'border-maroon' : 'border-line'}`}
                 />
               </label>
-              <div className="mb-3 min-h-[16px]">
-                {verificandoDireccion && (
-                  <span className="font-body text-[11px] text-inksoft">Verificando dirección...</span>
-                )}
-                {!verificandoDireccion && direccionVerificada === false && (
-                  <span className="font-body text-[11px] text-maroon">
-                    ⚠ {direccionMuyCorta(direccion) ? 'Escribí la calle y el número, no alcanza con un número solo.' : `${motivoDireccion && !motivoDireccion.startsWith('No encontramos') ? motivoDireccion + ' ' : 'No encontramos esa dirección en el mapa. '}Elegí tu barrio abajo para calcular el envío.`}
-                  </span>
-                )}
-                {!verificandoDireccion && direccionVerificada === 'error' && (
-                  <span className="font-body text-[11px] text-ochre">
-                    No pudimos buscarla en el mapa ahora — elegí tu barrio abajo.
-                  </span>
+              <div className="mb-2 min-h-[16px] font-body text-[11px]">
+                {tocados.direccion && validarDireccion(direccion) ? (
+                  <span className="text-maroon">⚠ {validarDireccion(direccion)}</span>
+                ) : verificandoDireccion ? (
+                  <span className="text-inksoft">Buscando tu dirección en el mapa...</span>
+                ) : direccionVerificada === false ? (
+                  <span className="text-maroon">⚠ {motivoDireccion && !motivoDireccion.startsWith('No encontramos') ? motivoDireccion + ' ' : 'No encontramos esa dirección en el mapa. '}Elegí tu zona abajo.</span>
+                ) : direccionVerificada === 'error' ? (
+                  <span className="text-ochre">No pudimos buscarla en el mapa ahora: elegí tu zona abajo.</span>
+                ) : (
+                  <span className="text-inksoft">El nombre de la calle y el número de la casa. Si no tiene número, poné “s/n”.</span>
                 )}
               </div>
               <button
@@ -1439,36 +1496,87 @@ function CheckoutContent() {
                 {buscandoUbicacion ? 'Buscando tu ubicación...' : lat != null && origenBarrio === 'gps' ? '✓ Usamos tu ubicación' : '📍 Estoy en el lugar de entrega: usar mi ubicación'}
               </button>
 
-              {/* Barrio y costo: salen solos de la dirección (o la ubicación). */}
-              {zonaEntrega && !elegirBarrioAMano && (
-                <div className="flex items-center justify-between gap-3 bg-tealsoft border border-teal rounded-lg px-3 py-2.5 mb-3">
-                  <div className="font-body text-sm text-ink">
-                    📍 <strong>{zonaEntrega}</strong>
-                    {grupoDeBarrio(zonaEntrega) && <span className="text-inksoft"> · {grupoDeBarrio(zonaEntrega)!.label}</span>}
-                    <span className="text-inksoft"> · Envío {bs(COSTOS_ENVIO[zonaEntrega] ?? 0)}</span>
-                  </div>
-                  <button type="button" onClick={() => setElegirBarrioAMano(true)} className="font-body text-[11px] text-teal underline shrink-0">¿No es tu barrio?</button>
-                </div>
-              )}
-              {elegirBarrioAMano && (
-                <label className="block text-left mb-3">
-                  <span className="font-body text-[11px] text-inksoft block mb-1">Barrio *</span>
-                  <select
-                    value={zonaEntrega}
+              {/* Zona (antes "barrio"): sale sola de la dirección o la ubicación,
+                  y se puede escribir; tiene que ser una de la lista. */}
+              <div className="relative mb-1">
+                <label className="block text-left">
+                  <span className="font-body text-[12px] font-semibold text-ink block mb-1">Zona *</span>
+                  <input
+                    value={zonaTexto}
                     onChange={(e) => {
-                      setZonaEntrega(e.target.value)
-                      setOrigenBarrio(e.target.value ? 'manual' : '')
+                      const v = e.target.value
+                      setZonaTexto(v)
+                      const z = buscarZona(v)
+                      setZonaEntrega(z?.nombre || '')
+                      setOrigenBarrio(z ? 'manual' : '')
+                      setZonaAbierta(true)
                       setError('')
                     }}
-                    className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-                  >
-                    <option value="">Elegí tu barrio</option>
-                    {ZONAS_ENVIO_POTOSI.map((z) => (
-                      <option key={z.nombre} value={z.nombre}>{z.nombre} — envío {bs(COSTOS_ENVIO[z.nombre] ?? 0)}</option>
-                    ))}
-                  </select>
+                    onFocus={() => setZonaAbierta(true)}
+                    onBlur={() => { tocar('zona'); setTimeout(() => setZonaAbierta(false), 150) }}
+                    placeholder="Escribí o elegí tu zona"
+                    autoComplete="off"
+                    className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.zona && !zonaEntrega ? 'border-maroon' : zonaEntrega ? 'border-teal' : 'border-line'}`}
+                  />
                 </label>
-              )}
+                {zonaAbierta && (() => {
+                  const q = zonaTexto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+                  const opciones = ZONAS_ENVIO_POTOSI.filter((z) => !q || zonaEntrega === z.nombre || z.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q))
+                  if (!opciones.length || (opciones.length === 1 && opciones[0].nombre === zonaEntrega)) return null
+                  return (
+                    <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-white border border-line rounded-lg shadow-lg">
+                      {opciones.map((z) => (
+                        <button
+                          key={z.nombre}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setZonaTexto(z.nombre); setZonaEntrega(z.nombre); setOrigenBarrio('manual'); setZonaAbierta(false); setError('') }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left font-body text-sm hover:bg-panelalt ${z.nombre === zonaEntrega ? 'bg-tealsoft' : ''}`}
+                        >
+                          <span className="text-ink">{z.nombre}</span>
+                          <span className="text-inksoft text-xs shrink-0">envío {bs(COSTOS_ENVIO[z.nombre] ?? 0)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+              <div className="mb-3 min-h-[16px] font-body text-[11px]">
+                {zonaEntrega ? (
+                  <span className="text-teal">✓ Envío a {zonaEntrega}: <strong>{bs(COSTOS_ENVIO[zonaEntrega] ?? 0)}</strong>{origenBarrio === 'direccion' ? ' · la sacamos de tu dirección' : origenBarrio === 'gps' ? ' · la sacamos de tu ubicación' : ''}</span>
+                ) : tocados.zona || zonaTexto ? (
+                  <span className="text-maroon">⚠ {validarZona(zonaTexto)}</span>
+                ) : (
+                  <span className="text-inksoft">Se completa sola con tu dirección; si no es la tuya, cambiala.</span>
+                )}
+              </div>
+
+              <label className="block text-left mb-1">
+                <span className="font-body text-[12px] font-semibold text-ink block mb-1">Entre calles *</span>
+                <input
+                  value={entreCalles}
+                  onChange={(e) => setEntreCalles(e.target.value)}
+                  onBlur={() => tocar('entre')}
+                  placeholder="Ej: Bolívar y Junín"
+                  className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.entre && validarEntreCalles(entreCalles, direccion) ? 'border-maroon' : 'border-line'}`}
+                />
+              </label>
+              <div className="mb-3 min-h-[16px] font-body text-[11px]">
+                {tocados.entre && validarEntreCalles(entreCalles, direccion) ? (
+                  <span className="text-maroon">⚠ {validarEntreCalles(entreCalles, direccion)}</span>
+                ) : (
+                  <span className="text-inksoft">Las dos calles a los costados de tu cuadra.</span>
+                )}
+              </div>
+              <label className="block text-left mb-4">
+                <span className="font-body text-[12px] font-semibold text-ink block mb-1">Referencia <span className="font-normal text-inksoft">(opcional)</span></span>
+                <input
+                  value={referenciaAdicional}
+                  onChange={(e) => setReferenciaAdicional(e.target.value)}
+                  placeholder="Ej: portón verde, al lado de la farmacia"
+                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
+                />
+              </label>
 
               <div className="flex flex-col gap-2.5 mb-3">
                 <button
@@ -1527,24 +1635,6 @@ function CheckoutContent() {
                 )}
               </div>
 
-              <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Entre calles *</span>
-                <input
-                  value={entreCalles}
-                  onChange={(e) => setEntreCalles(e.target.value)}
-                  placeholder="Ej: entre Bolívar y Junín"
-                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-                />
-              </label>
-              <label className="block text-left mb-3">
-                <span className="font-body text-[11px] text-inksoft block mb-1">Otro dato de interés (opcional)</span>
-                <input
-                  value={referenciaAdicional}
-                  onChange={(e) => setReferenciaAdicional(e.target.value)}
-                  placeholder="Ej: portón verde, al lado de la farmacia"
-                  className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
-                />
-              </label>
             </>
           ) : (
             <>
