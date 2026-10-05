@@ -60,6 +60,18 @@ export function publicoEnTexto(texto: string): string | null {
   if (palabras.some((w) => w === 'rn' || w === 'bb' || w === 'recien')) return 'ninos'
   return null
 }
+// Nombre que no dice qué es el producto: el que le pone la cámara, el
+// celular o un generador de imágenes ("Generated Image gr7r8mgr7r",
+// "IMG_2034", "WhatsApp Image 2026-10-05", "DSC0012", "cied4ecied4ecied").
+// Ahí el nombre lo pone la IA mirando la foto.
+export function nombreGenerico(nombre: string): boolean {
+  const t = normalizar(String(nombre || '')).replace(/\.[a-z0-9]{3,4}$/, '').replace(/[_-]+/g, ' ').trim()
+  if (!t) return true
+  if (/\b(generated image|gemini|chatgpt image|dall ?e|midjourney|whatsapp image|screenshot|captura de pantalla|photo|image|imagen|foto|img|dsc|dcim|pxl|mvimg|wp|sin titulo|untitled)\b/.test(t) && !/[a-z]{4,}/.test(t.replace(/\b(generated|image|gemini|chatgpt|whatsapp|screenshot|captura|de|pantalla|photo|imagen|foto|img|dsc|dcim|pxl|mvimg|sin|titulo|untitled|copia|copy)\b/g, '').replace(/\b\w*\d\w*\b/g, ''))) return true
+  // Todo son códigos (letras y números mezclados, sin palabras).
+  return t.split(' ').every((w) => /\d/.test(w) || (w.length >= 8 && !/[aeiou]{1}[^aeiou]{0,2}[aeiou]/.test(w)) || /(.{3,})\1/.test(w))
+}
+
 // Marca de foto al final del nombre: "Banquito a", "Banquito c",
 // "Banquito v" (o "Banquito 1", "2"…) son el MISMO producto con varias
 // fotos. Una sola letra o número suelto al final; S/M/L no, porque
@@ -91,7 +103,8 @@ export function pareceUnaTienda(fotos: FuenteFoto[]): boolean {
   const sueltas = fotos.filter((f) => f.ruta.split('/').filter(Boolean).length === 2 && esImagen(f.ruta))
   if (!sueltas.length || sueltas.length !== fotos.filter((f) => esImagen(f.ruta)).length) return false
   const tokens = sueltas.map((f) => f.ruta.split('/').pop()!.replace(/\.[^.]+$/, '').split('_').filter((t) => t.trim()))
-  const sinTienda = tokens.filter((t) => t.length < 2 || esDato(t[1])).length
+  // Sin tienda adelante: sin "_", con público/precio después, o un nombre de cámara/IA ("Gemini_Generated_Image_x").
+  const sinTienda = tokens.filter((t, i) => t.length < 2 || esDato(t[1]) || nombreGenerico(sueltas[i].ruta.split('/').pop()!)).length
   return sinTienda > sueltas.length / 2
 }
 

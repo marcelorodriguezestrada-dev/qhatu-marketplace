@@ -14,10 +14,24 @@ export async function POST(req: NextRequest) {
   if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'Falta configurar GROQ_API_KEY en el servidor.' }, { status: 503 })
   const { imagenUrl, pista } = await req.json().catch(() => ({}))
   if (typeof imagenUrl !== 'string' || !/^https:\/\//.test(imagenUrl)) return NextResponse.json({ error: 'Imagen inválida.' }, { status: 400 })
+  // Foto de Drive (Armar planilla): la IA no puede abrir el link de Drive,
+  // así que la bajamos acá y se la mandamos como imagen.
+  let url = imagenUrl
+  const idDrive = imagenUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=|thumbnail\?id=)([a-zA-Z0-9_-]{10,})/)?.[1]
+  if (idDrive) {
+    try {
+      const r = await fetch(`https://drive.google.com/thumbnail?id=${idDrive}&sz=w800`, { redirect: 'follow' })
+      const tipo = (r.headers.get('content-type') || '').split(';')[0]
+      if (!r.ok || !tipo.startsWith('image/')) return NextResponse.json({ error: 'La foto de Drive no es pública: compartí la carpeta como “Cualquier persona con el enlace”.' }, { status: 400 })
+      url = `data:${tipo};base64,${Buffer.from(await r.arrayBuffer()).toString('base64')}`
+    } catch {
+      return NextResponse.json({ error: 'No se pudo bajar la foto de Drive.' }, { status: 502 })
+    }
+  }
   let categorias = CATEGORIAS_PRODUCTOS_BASE
   try { categorias = (await construirArbolCategoriasProductos()).categorias } catch {}
   try {
-    const r = await analizarFotoProducto(imagenUrl, categorias, typeof pista === 'string' ? pista.slice(0, 120) : undefined)
+    const r = await analizarFotoProducto(url, categorias, typeof pista === 'string' ? pista.slice(0, 120) : undefined)
     return NextResponse.json(r || { rubroId: null, nombre: '', publico: null, colores: [], descripcion: '' })
   } catch (err) {
     if (err instanceof LimiteIA) return NextResponse.json({ error: 'limite' }, { status: 429 })

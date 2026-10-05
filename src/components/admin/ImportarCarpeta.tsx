@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CIUDADES, type CiudadId } from '@/data/ciudades'
-import { claveImportacion, codigoTienda, leerFotos, pareceUnaTienda, separarMarcaFoto, type FotoArchivo, type ProductoLeido } from '@/lib/importarCarpeta'
+import { claveImportacion, codigoTienda, leerFotos, nombreGenerico, pareceUnaTienda, separarMarcaFoto, type FotoArchivo, type ProductoLeido } from '@/lib/importarCarpeta'
 import { leerSheet } from '@/lib/importarSheet'
 import { buscarRubroPorTexto } from '@/lib/planillaProductos'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
@@ -271,12 +271,15 @@ export default function ImportarCarpeta({
           let ia: any = null
           if (usarIA && foto) {
             setAvance((a) => ({ ...a, etapa: `Analizando “${p.nombre}”…` }))
-            ia = await analizar(foto.url, modo === 'sheet' ? `${p.nombre}${p.categoriaTexto ? ` (${p.categoriaTexto})` : ''}` : p.archivo)
+            // Un nombre de cámara/IA ("Generated Image gr7r8…") no le sirve de pista.
+            const pistaNombre = nombreGenerico(p.nombre) ? '' : modo === 'sheet' ? p.nombre : p.archivo
+            ia = await analizar(foto.url, `${pistaNombre}${p.categoriaTexto ? ` (${p.categoriaTexto})` : ''}`.trim())
           }
           const rubro = (p.categoriaTexto ? rubroPorTexto(p.categoriaTexto, codigos[p.tienda], ia?.rubroId) : null) || ia?.rubroId || ''
           filas[i] = {
             ...base(p),
-            nombre: (nombreIA && ia?.nombre) || p.nombre,
+            // El nombre de la IA si se pidió, o si el de la planilla es de cámara/IA.
+            nombre: ((nombreIA || nombreGenerico(p.nombre)) && ia?.nombre) || p.nombre,
             rubro,
             publico: p.publico || ia?.publico || 'unisex',
             colores: (p.colores?.length ? p.colores : ia?.colores || []).join(', '),
@@ -420,6 +423,11 @@ export default function ImportarCarpeta({
           <div className="flex flex-wrap items-center gap-3 mb-3 font-body text-xs text-ink">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={usarIA} onChange={(e) => setUsarIA(e.target.checked)} className="accent-teal" /> La IA mira cada foto (categoría, colores, descripción)</label>
             {usarIA && <label className="flex items-center gap-1.5"><input type="checkbox" checked={nombreIA} onChange={(e) => setNombreIA(e.target.checked)} className="accent-teal" /> Usar el nombre que propone la IA</label>}
+            {aProcesar.some((p) => nombreGenerico(p.nombre)) && (
+              <span className={`text-[11px] ${usarIA ? 'text-inksoft' : 'text-ochre'}`}>
+                {aProcesar.filter((p) => nombreGenerico(p.nombre)).length} con nombre de foto (ej. “{aProcesar.find((p) => nombreGenerico(p.nombre))!.nombre.slice(0, 30)}”): {usarIA ? 'la IA les pone el nombre mirando la foto.' : 'tildá “La IA mira cada foto” para que les ponga nombre.'}
+              </span>
+            )}
             {existentesEncontrados > 0 && (
               <label className="flex items-center gap-1.5"><input type="checkbox" checked={actualizar} onChange={(e) => setActualizar(e.target.checked)} className="accent-teal" /> {existentesEncontrados} ya están publicados: actualizar su precio, stock y talles (no duplicarlos)</label>
             )}
