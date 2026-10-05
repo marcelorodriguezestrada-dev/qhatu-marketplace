@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CIUDADES, type CiudadId } from '@/data/ciudades'
-import { claveImportacion, codigoTienda, leerFotos, pareceUnaTienda, type FotoArchivo, type ProductoLeido } from '@/lib/importarCarpeta'
+import { claveImportacion, codigoTienda, leerFotos, pareceUnaTienda, separarMarcaFoto, type FotoArchivo, type ProductoLeido } from '@/lib/importarCarpeta'
 import { leerSheet } from '@/lib/importarSheet'
 import { buscarRubroPorTexto } from '@/lib/planillaProductos'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
@@ -126,7 +126,13 @@ export default function ImportarCarpeta({
     const vendedorId = codigos[p.tienda]
     if (!vendedorId) return undefined
     const clave = claveImportacion(p)
-    return existentes.find((e) => e.claveImportacion === clave) || existentes.find((e) => e.vendedorId === vendedorId && codigoTienda(e.nombre) === codigoTienda(p.nombre))
+    const base = (n: string) => codigoTienda(separarMarcaFoto(n).base)
+    return (
+      existentes.find((e) => e.claveImportacion === clave) ||
+      existentes.find((e) => e.vendedorId === vendedorId && codigoTienda(e.nombre) === codigoTienda(p.nombre)) ||
+      // "Banquito" ya cargado antes como "Banquito a", "Banquito c"… (unirlos: aviso 🔗 en Edición rápida)
+      existentes.find((e) => e.vendedorId === vendedorId && base(e.nombre) === base(p.nombre))
+    )
   }
   const tiendas = useMemo(() => {
     const m = new Map<string, ProductoLeido[]>()
