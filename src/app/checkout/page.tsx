@@ -662,6 +662,45 @@ function CheckoutContent() {
   // cambia, y antes esto mandaba a /login — que a su vez rebotaba a la
   // home al ver una cuenta ya logueada. La pantalla de espera no
   // necesita la sesión: el polling a /api/pedidos/[id] es público.
+  // ── Botón "atrás" del celular en el paso de pago ───────────────────
+  // Al llegar al QR sumamos una entrada al historial (misma URL): así el
+  // "atrás" vuelve a "Tu pedido" con todo lo que había completado, en vez
+  // de salir de /checkout a la tienda. Los pedidos sin pagar que se
+  // habían creado se anulan (devuelven el stock) para que al confirmar de
+  // nuevo no queden repetidos; el carrito sigue intacto.
+  const [avisoVolvio, setAvisoVolvio] = useState(false)
+  useEffect(() => {
+    if (etapa !== 'pagando') return
+    if (!window.history.state?.ccPagando) window.history.pushState({ ccPagando: true }, '')
+    const alVolver = () => volverAlPedido()
+    window.addEventListener('popstate', alVolver)
+    return () => window.removeEventListener('popstate', alVolver)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa])
+
+  function volverAlPedido() {
+    const ids = subPedidosRef.current.map((s) => s.pedidoId).filter(Boolean) as string[]
+    setSubPedidos([])
+    setPasoActual(0)
+    setPasosConfirmados(new Set())
+    setComprobanteUrl('')
+    setResultadoOCR(null)
+    setRechazoComprobante(null)
+    setError('')
+    setAvisoVolvio(true)
+    setEtapa('entrega')
+    window.scrollTo({ top: 0 })
+    obtenerToken()
+      .then((token) => Promise.all(ids.map((id) =>
+        fetch(`/api/pedidos/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ compradorVuelve: true }),
+        }).catch(() => null),
+      )))
+      .catch(() => {})
+  }
+
   const pedidoYaCreado =
     etapa === 'pagando' || etapa === 'esperando' || etapa === 'resumen' || subPedidos.some((s) => !!s.pedidoId)
 
@@ -1304,9 +1343,20 @@ function CheckoutContent() {
 
   return (
     <div className="max-w-[420px] mx-auto px-5 py-10">
-      <button onClick={() => router.push('/')} className="border-none bg-transparent text-inksoft font-body text-[13px] mb-5 p-0">
-        ← Volver a la tienda
-      </button>
+      {etapa === 'pagando' ? (
+        <button onClick={() => window.history.back()} className="border-none bg-transparent text-inksoft font-body text-[13px] mb-5 p-0">
+          ← Volver a mi pedido
+        </button>
+      ) : (
+        <button onClick={() => router.push('/')} className="border-none bg-transparent text-inksoft font-body text-[13px] mb-5 p-0">
+          ← Volver a la tienda
+        </button>
+      )}
+      {avisoVolvio && etapa === 'entrega' && (
+        <div className="font-body text-xs text-teal bg-tealsoft border border-teal rounded-lg px-3 py-2 mb-4">
+          Volviste a tu pedido: tus datos siguen cargados. Cambiá lo que necesites y confirmá de nuevo para pagar.
+        </div>
+      )}
 
       {cuentaPrueba && (
         <div className="font-body text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-4">

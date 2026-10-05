@@ -90,6 +90,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ ...resultado, maxIntentos: MAX_INTENTOS_COMPROBANTE })
     }
 
+    // El comprador volvió atrás desde el QR (botón "atrás" del celular)
+    // para cambiar algo del pedido: se anula el que quedó sin pagar, así
+    // al confirmar de nuevo no hay dos. Solo el propio comprador y solo
+    // si todavía no avisó que pagó.
+    if (body.compradorVuelve) {
+      const usuario = await getUsuarioDesdeRequest(req)
+      if (!usuario?.email) return NextResponse.json({ error: 'Iniciá sesión.' }, { status: 401 })
+      const resultado = await db.runTransaction(async (tx) => {
+        const doc = await tx.get(ref)
+        if (!doc.exists) return { error: 'Pedido no encontrado.', status: 404 }
+        const pedido = doc.data() as any
+        if (String(pedido.comprador || '').toLowerCase() !== usuario.email!.toLowerCase()) return { error: 'Este pedido no es tuyo.', status: 401 }
+        if (!['pendiente_pago', 'verificando_stock'].includes(pedido.estado)) return { error: 'Este pedido ya no se puede anular.', status: 400 }
+        const ahora = new Date().toISOString()
+        tx.update(ref, { estado: 'cancelado', canceladoAt: ahora, canceladoMotivo: 'El comprador volvió atrás para cambiar el pedido antes de pagar.', updatedAt: ahora })
+        return { ok: true }
+      })
+      if ('error' in resultado) return NextResponse.json({ error: resultado.error }, { status: resultado.status })
+      await reponerStockDePedido(ref)
+      return NextResponse.json({ ok: true })
+    }
+
     // El comprador elige en qué franja del día prefiere recibir el
     // envío, ya con el pedido pagado y confirmado — es solo una
     // preferencia suya sobre SU pedido (igual que "informado_pago" o
