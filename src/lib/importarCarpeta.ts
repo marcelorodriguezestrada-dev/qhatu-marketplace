@@ -60,6 +60,16 @@ export function publicoEnTexto(texto: string): string | null {
   if (palabras.some((w) => w === 'rn' || w === 'bb' || w === 'recien')) return 'ninos'
   return null
 }
+// Marca de foto al final del nombre: "Banquito a", "Banquito c",
+// "Banquito v" (o "Banquito 1", "2"…) son el MISMO producto con varias
+// fotos. Una sola letra o número suelto al final; S/M/L no, porque
+// suelen ser el talle ("Remera M").
+export function separarMarcaFoto(nombre: string): { base: string; marca: string | null } {
+  const m = String(nombre || '').trim().match(/^(.*[^\s])\s+([a-z0-9])$/i)
+  if (!m || /^[sml]$/i.test(m[2]) || (m[1].match(/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/g) || []).length < 3) return { base: String(nombre || '').trim(), marca: null }
+  return { base: m[1].trim(), marca: m[2] }
+}
+
 const TALLES_LETRA = new Set(['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'unico', 'u'])
 const EXT_IMAGEN = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i
 
@@ -128,7 +138,8 @@ export function leerFotos(fotos: FuenteFoto[], opciones: { unaTienda?: boolean }
     nombre = [nombre, ...resto].join(' ').replace(/[-.]+/g, ' ').replace(/\s+/g, ' ').trim()
     if (!nombre) { ignorados.push(ruta); continue }
     if (!publico) publico = publicoEnTexto(nombre)
-    const clave = `${codigoTienda(tienda)}::${normalizar(base)}`
+    nombre = separarMarcaFoto(nombre).base
+    const clave = `${codigoTienda(tienda)}::${normalizar(nombre)}`
     const g = grupos.get(clave)
     if (g) {
       if (file) g.fotos.push(file)
