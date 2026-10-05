@@ -33,6 +33,13 @@ export type Prospecto = {
   updatedAt?: string
   contactadoAt?: string | null
   registradoAt?: string | null
+  // Seguimiento: 0 = sin contactar, 1 = primer mensaje enviado,
+  // 2 = seguimiento enviado, 3 = cierre enviado. proximoSeguimiento es la
+  // fecha (YYYY-MM-DD) en que toca volver a escribirle.
+  pasoSeguimiento?: number
+  proximoSeguimiento?: string | null
+  historial?: { fecha: string; accion: string }[]
+  telefonoFijo?: boolean
 }
 
 export type Campana = { oferta: string; cupos: number; mensajeBase: string }
@@ -151,4 +158,75 @@ export function estrategiaBase(p: Pick<Prospecto, 'nombre' | 'rubro' | 'ciudad' 
       'Al registrarse: marcarlo "Registrado" acá para asignarle el cupo y compartir su tienda en redes.',
     ],
   }
+}
+
+// ── Seguimiento ────────────────────────────────────────────────────────
+export const PASOS_SEGUIMIENTO = [
+  { paso: 1, label: 'Primer mensaje', dias: 2 },
+  { paso: 2, label: 'Seguimiento', dias: 3 },
+  { paso: 3, label: 'Cierre', dias: 0 },
+]
+export const hoyISO = (d = new Date()) => {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return z.toISOString().slice(0, 10)
+}
+// En el servidor (UTC) la fecha de Bolivia (UTC−4).
+export const hoyBolivia = () => new Date(Date.now() - 4 * 3600_000).toISOString().slice(0, 10)
+export const sumarDias = (dias: number, desde = new Date()) => hoyISO(new Date(desde.getTime() + dias * 86400000))
+
+// Qué mensaje le toca ahora (según el paso en que va).
+export function siguienteMensaje(p: Prospecto, campana: Campana, quedan: number, sitio: string): { paso: number; label: string; texto: string } | null {
+  const paso = (p.pasoSeguimiento || 0) + 1
+  if (paso > 3 || p.estado === 'registrado' || p.estado === 'descartado') return null
+  const e = p.estrategia || estrategiaBase(p, campana, quedan, sitio)
+  const texto = paso === 1 ? e.mensajeInicial : paso === 2 ? e.seguimiento1 : e.seguimiento2
+  return { paso, label: PASOS_SEGUIMIENTO[paso - 1].label, texto }
+}
+
+// ¿Le toca seguimiento hoy (o está atrasado)?
+export const tocaHoy = (p: Prospecto, hoy = hoyISO()) =>
+  !!p.proximoSeguimiento && p.proximoSeguimiento <= hoy && (p.pasoSeguimiento || 0) < 3 && !['registrado', 'descartado'].includes(p.estado)
+
+// Celular boliviano (8 dígitos que empiezan con 6 o 7) → tiene WhatsApp.
+// Un fijo (+591 2 2311910) casi nunca tiene.
+export function esCelular(t: string) {
+  const d = String(t || '').replace(/\D/g, '').replace(/^591/, '')
+  return d.length === 8 && /^[67]/.test(d)
+}
+
+// ── Pegar una lista ───────────────────────────────────────────────────
+// "Negocio  Dirección  Teléfono" copiado de una planilla, de un chat o
+// de la IA: una tienda por renglón, columnas separadas por tab, "|", ";"
+// o 2+ espacios. Lo que va entre paréntesis queda como nota.
+export type FilaPegada = { nombre: string; direccion: string; telefono: string; rubro: string; notas: string }
+
+const ENCABEZADO = /^(negocio|nombre|tienda|empresa)\b/i
+export function leerListaPegada(texto: string): FilaPegada[] {
+  const filas: FilaPegada[] = []
+  for (const linea0 of String(texto || '').split(/\r?\n/)) {
+    const linea = linea0.replace(/^\s*(\d+[.)-]|[-*•])\s+/, '').trim()
+    if (!linea || (ENCABEZADO.test(linea) && /direcci|tel[eé]f|whats|celular/i.test(linea)) || /^[-|:\s]+$/.test(linea)) continue
+    let cols = linea.split(/\t|\s*\|\s*|\s*;\s*|\s{2,}/).map((c) => c.trim()).filter(Boolean)
+    // Sin separadores: "Nombre, Dirección, +591 7..." o "Nombre - Dirección - tel"
+    if (cols.length < 2) cols = linea.split(/\s+[-–]\s+|,\s+(?=[^,]*$)|,\s+/).map((c) => c.trim()).filter(Boolean)
+    const notas: string[] = []
+    const sinNotas = (c: string) => c.replace(/\(([^)]*)\)/g, (_m, n) => { if (n.trim()) notas.push(n.trim()); return '' }).replace(/\s+/g, ' ').trim()
+    let telefono = ''
+    const resto: string[] = []
+    for (const c of cols) {
+      const limpio = sinNotas(c)
+      const tel = limpio.match(/(\+?\s*591[\s-]*)?(\d[\d\s-]{6,}\d)/)
+      if (!telefono && tel && tel[0].replace(/\D/g, '').length >= 7 && limpio.replace(/[\d\s+()-]/g, '').length <= 2) { telefono = tel[0].replace(/\s+/g, ' ').trim(); continue }
+      if (limpio) resto.push(limpio)
+    }
+    if (!telefono) {
+      // teléfono pegado al final del texto
+      const m = resto.length ? resto[resto.length - 1].match(/(\+?591[\s-]*)?([67]\d{7}|2\s?\d{6,7})\s*$/) : null
+      if (m) { telefono = m[0].trim(); resto[resto.length - 1] = resto[resto.length - 1].slice(0, m.index).trim() }
+    }
+    const [nombre = '', direccion = '', ...mas] = resto.filter(Boolean)
+    if (!nombre || nombre.length < 2) continue
+    filas.push({ nombre, direccion: [direccion, ...mas].filter(Boolean).join(', '), telefono, rubro: '', notas: notas.join(' · ') })
+  }
+  return filas
 }
