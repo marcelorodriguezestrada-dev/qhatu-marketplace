@@ -748,58 +748,6 @@ export async function textosVolanteIA(idea: string, ciudad: string, temas: strin
   }
 }
 
-// Mira la foto de un producto y elige su rubro dentro de la lista que
-// YA existe (nunca inventa uno). Usa un modelo de Groq con visión; se
-// puede cambiar con GROQ_VISION_MODEL si Groq lo discontinúa. Si falla,
-// devuelve null y el vendedor elige a mano como siempre.
-export async function detectarRubroProductoIA(
-  imagenUrl: string,
-  rubros: { id: string; label: string; categoriaLabel: string }[]
-): Promise<{ rubroId: string; nombre: string } | null> {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey || !rubros.length) return null
-  const lista = rubros.map((r) => `${r.id} = ${r.categoriaLabel} > ${r.label}`).join('\n')
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: process.env.GROQ_VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
-        max_completion_tokens: 200,
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text:
-                  'Sos el clasificador de productos de Clasi Click, un marketplace boliviano. Mirá la foto del producto y elegí el rubro que mejor le corresponde de esta lista (formato "id = Categoría > Rubro"):\n' +
-                  lista +
-                  '\n\nRespondé SOLO JSON: {"rubroId": "<un id EXACTO de la lista, o null si no se ve un producto>", "nombre": "<nombre corto del producto en español, máximo 6 palabras>"}',
-              },
-              { type: 'image_url', image_url: { url: imagenUrl } },
-            ],
-          },
-        ],
-      }),
-    })
-    if (!res.ok) {
-      console.error('detectarRubroProductoIA: Groq respondió', res.status, (await res.text()).slice(0, 200))
-      return null
-    }
-    const data = await res.json()
-    const parsed = JSON.parse(String(data.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim())
-    const rubro = rubros.find((r) => r.id === parsed.rubroId)
-    if (!rubro) return null
-    return { rubroId: rubro.id, nombre: String(parsed.nombre || '').trim().slice(0, 60) }
-  } catch (err) {
-    console.error('detectarRubroProductoIA', err)
-    return null
-  }
-}
-
 // Palabras de búsqueda ocultas para un producto: sinónimos y cómo lo
 // buscaría la gente en Bolivia ("sandalia" → zapato, calzado, ojota…).
 // Se guardan en `etiquetasBusqueda` al publicar/editar y el buscador las

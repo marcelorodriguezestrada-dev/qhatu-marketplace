@@ -19,6 +19,7 @@ const SINONIMOS: Record<string, string> = {
   palazzo: 'pantalones', palazos: 'pantalones', jogger: 'pantalones', buzo: 'buzos', polera: 'remeras', polo: 'remeras', playera: 'remeras',
   zapas: 'zapatillas', tenis: 'zapatillas', ajuar: 'conjuntos', batita: 'batas', jardinero: 'enteritos', mameluco: 'enteritos', enterizo: 'enteritos',
   sastrero: 'trajes', terno: 'trajes', chompa: 'sweaters', saco: 'sacos', casaca: 'camperas', chamarra: 'camperas', calceta: 'medias', calcetines: 'medias',
+  botin: 'botinetas', botines: 'botinetas', botita: 'botas', banquito: 'banquetas', banquitos: 'banquetas', banco: 'banquetas', taburete: 'banquetas', butaca: 'sillones',
   leggings: 'calzas', leggins: 'calzas', bodies: 'bodys', body: 'bodys', gorro: 'gorros', gorra: 'gorras', chaqueta: 'camperas',
 }
 // "camperita" → "camper", "batitas" → "bat" (diminutivos).
@@ -35,13 +36,20 @@ function mismaPalabra(a: string, b: string) {
 // El rubro que mejor coincide con el nombre del producto (null si no hay
 // nada claro: la categoría queda vacía y la elige la IA al importar).
 export function adivinarRubro(nombre: string, rubros: RubroPlano[], contexto: { bebe?: boolean; usadas?: Set<string>; tienda?: string } = {}): RubroPlano | null {
+  const [mejor] = puntuarRubros(nombre, rubros, contexto)
+  return mejor && mejor.p >= 5 ? mejor.r : null
+}
+
+// Rubros que coinciden con el texto, del más probable al menos (para que
+// la IA elija entre pocos cuando no hay uno claro).
+export function puntuarRubros(nombre: string, rubros: RubroPlano[], contexto: { bebe?: boolean; usadas?: Set<string>; tienda?: string } = {}): { r: RubroPlano; p: number }[] {
   const todas = norm(nombre).split(' ')
   const conTienda = [...todas, ...norm(contexto.tienda || '').split(' ')]
-  const palabras = todas.filter((w) => w.length >= 4 && !RELLENO.has(w) && !COLORES.includes(w))
-  if (!palabras.length) return null
+  const palabras = [...new Set(todas.filter((w) => w.length >= 4 && !RELLENO.has(w) && !COLORES.includes(w)))]
+  if (!palabras.length) return []
   const buscadas = palabras.map((w, i) => ({ r: SINONIMOS[w] || raiz(w), primera: i === 0 }))
   const dice = (re: RegExp) => conTienda.some((w) => re.test(w))
-  let mejor: { r: RubroPlano; p: number } | null = null
+  const out: { r: RubroPlano; p: number }[] = []
   for (const r of rubros) {
     if (/^otros?\b/i.test(r.label)) continue
     const del = norm(r.label).split(' ').filter((x) => x.length >= 3)
@@ -58,9 +66,9 @@ export function adivinarRubro(nombre: string, rubros: RubroPlano[], contexto: { 
     if (/trabajo|uniforme|seguridad/.test(camino) && !dice(/^(trabajo|uniforme|seguridad)/)) p -= 3
     if (contexto.usadas?.has(r.categoriaId)) p += 2
     p -= del.length * 0.1 // a igual coincidencia, el rubro más corto ("Calzas" antes que "Calzas deportivas")
-    if (!mejor || p > mejor.p) mejor = { r, p }
+    out.push({ r, p })
   }
-  return mejor && mejor.p >= 5 ? mejor.r : null
+  return out.sort((a, b) => b.p - a.p)
 }
 
 const esBebe = (t: string) => /\b(bebe|bebes|bb|rn|recien|ajuar|baby)\b/.test(norm(t))
