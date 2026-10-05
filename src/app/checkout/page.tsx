@@ -10,6 +10,7 @@ import { useCarrito, ItemCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, distanciaKm, costoPorDistancia } from '@/data/zonasPotosi'
 import { validarDireccion, validarEntreCalles, validarZona, zonaLibreValida } from '@/lib/validarEntrega'
+import { entreCallesNoCoinciden, type EntreCallesInfo } from '@/lib/entreCalles'
 import { buscarZonaEn, normZona, zonaMasCercana, zonasCercanas } from '@/lib/zonasEnvio'
 import { useZonasEnvio } from '@/lib/useZonasEnvio'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
@@ -458,6 +459,28 @@ function CheckoutContent() {
   // Con la casa marcada en el mapa o el GPS el punto es confiable: se puede
   // escribir una zona que no está en la lista, y el envío sale del punto.
   const puntoFiable = lat != null && lng != null && (origenPunto === 'mapa' || origenPunto === 'gps')
+
+  // Entre calles según el mapa (OpenStreetMap): con la casa marcada (GPS o
+  // mapa) sabemos en qué calle está y sus dos esquinas. Se sugieren y, si
+  // lo escrito no cruza su calle cerca, se avisa (se puede confirmar igual
+  // por si el mapa está incompleto). Con solo la dirección escrita no se
+  // verifica: el punto que da el buscador puede caer en otra cuadra.
+  const [infoEntre, setInfoEntre] = useState<EntreCallesInfo | null>(null)
+  const [entreConfirmado, setEntreConfirmado] = useState(false)
+  useEffect(() => {
+    if (!puntoFiable || metodoEntrega !== 'envio') { setInfoEntre(null); return }
+    let vivo = true
+    const t = setTimeout(() => {
+      fetch('/api/entre-calles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat, lng, calle: direccion }) })
+        .then((r) => r.json())
+        .then((d) => { if (vivo) setInfoEntre(d?.calle ? d : null) })
+        .catch(() => { if (vivo) setInfoEntre(null) })
+    }, 700)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [puntoFiable, metodoEntrega, lat, lng, direccion])
+  const entreMalas = puntoFiable && !validarEntreCalles(entreCalles, direccion) ? entreCallesNoCoinciden(entreCalles, infoEntre) : null
+  const entreNoCoincide = !!entreMalas && !entreConfirmado
+  const sugerenciaEntre = infoEntre && infoEntre.sugeridas.length === 2 ? infoEntre.sugeridas.join(' y ') : ''
   const zonaLibre = !!zonaEntrega && !zonaElegidaInfo
   const costoZona = lat != null && lng != null ? costoPorDistancia(lat, lng) : (zonaElegidaInfo?.costoEnvio ?? 0)
   const zonaNoCoincide =
@@ -929,6 +952,10 @@ function CheckoutContent() {
     }
     if (metodoEntrega === 'envio' && validarEntreCalles(entreCalles, direccion)) {
       setError(validarEntreCalles(entreCalles, direccion)!)
+      return
+    }
+    if (metodoEntrega === 'envio' && entreNoCoincide) {
+      setError(`Revisá "Entre calles": según el mapa ${entreMalas!.join(' y ')} no ${entreMalas!.length > 1 ? 'cruzan' : 'cruza'} la ${infoEntre!.calle} cerca de tu casa.${sugerenciaEntre ? ` Estás entre ${sugerenciaEntre}.` : ''}`)
       return
     }
 
@@ -1741,15 +1768,33 @@ function CheckoutContent() {
                 <span className="font-body text-[12px] font-semibold text-ink block mb-1">Entre calles *</span>
                 <input
                   value={entreCalles}
-                  onChange={(e) => setEntreCalles(e.target.value)}
+                  onChange={(e) => { setEntreCalles(e.target.value); setEntreConfirmado(false) }}
                   onBlur={() => tocar('entre')}
-                  placeholder="Ej: Bolívar y Junín"
-                  className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.entre && validarEntreCalles(entreCalles, direccion) ? 'border-maroon' : 'border-line'}`}
+                  placeholder={sugerenciaEntre ? `Ej: ${sugerenciaEntre}` : 'Ej: Bolívar y Junín'}
+                  className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${(tocados.entre && validarEntreCalles(entreCalles, direccion)) || (tocados.entre && entreNoCoincide) ? 'border-maroon' : 'border-line'}`}
                 />
               </label>
               <div className="mb-3 min-h-[16px] font-body text-[11px]">
-                {tocados.entre && validarEntreCalles(entreCalles, direccion) ? (
+                {tocados.entre && validarEntreCalles(entreCalles, direccion) && !sugerenciaEntre ? (
                   <span className="text-maroon">⚠ {validarEntreCalles(entreCalles, direccion)}</span>
+                ) : entreNoCoincide && tocados.entre ? (
+                  <div className="text-maroon">
+                    ⚠ Según el mapa, {entreMalas!.join(' y ')} no {entreMalas!.length > 1 ? 'cruzan' : 'cruza'} la <b>{infoEntre!.calle}</b> cerca de tu casa.
+                    {sugerenciaEntre && <> Tu cuadra está entre <b>{sugerenciaEntre}</b>.</>}
+                    <div className="flex flex-wrap gap-2 mt-1.5">
+                      {sugerenciaEntre && (
+                        <button type="button" onClick={() => setEntreCalles(sugerenciaEntre)} className="px-2.5 py-1 rounded-md border-none bg-teal text-white font-body text-[11px] font-semibold">Usar “{sugerenciaEntre}”</button>
+                      )}
+                      <button type="button" onClick={() => setEntreConfirmado(true)} className="px-2 py-1 rounded-md border border-line bg-panel text-inksoft font-body text-[11px]">Están bien, dejarlas así</button>
+                    </div>
+                  </div>
+                ) : sugerenciaEntre && (!entreCalles.trim() || validarEntreCalles(entreCalles, direccion)) ? (
+                  <div className="text-inksoft">
+                    📍 Según el mapa, tu casa en la {infoEntre!.calle} está entre <b>{sugerenciaEntre}</b>.{' '}
+                    <button type="button" onClick={() => { setEntreCalles(sugerenciaEntre); tocar('entre') }} className="text-teal underline bg-transparent border-none p-0 font-body text-[11px] font-semibold">Usar estas</button>
+                  </div>
+                ) : !entreMalas && puntoFiable && infoEntre?.cruces.length && entreCalles.trim() && !validarEntreCalles(entreCalles, direccion) ? (
+                  <span className="text-teal">✓ Coincide con el mapa.</span>
                 ) : (
                   <span className="text-inksoft">Las dos calles a los costados de tu cuadra.</span>
                 )}
