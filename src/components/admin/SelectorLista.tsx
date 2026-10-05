@@ -123,7 +123,7 @@ export default function SelectorLista({
         )}
       </button>
       {abierto && typeof document !== 'undefined' && createPortal(
-        <div ref={panelRef} style={{ top: pos.top, left: pos.left }} className="fixed z-50 w-[320px] max-h-[370px] overflow-y-auto bg-panel border border-line rounded-xl shadow-xl p-3">
+        <div ref={panelRef} data-panel-lista style={{ top: pos.top, left: pos.left }} className="fixed z-50 w-[320px] max-h-[370px] overflow-y-auto bg-panel border border-line rounded-xl shadow-xl p-3">
           {tipo === 'talles' ? (
             GRUPOS_TALLES.map((g) => (
               <div key={g.titulo} className="mb-2.5">
