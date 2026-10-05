@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import SelectorRubro from '@/components/admin/SelectorRubro'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
@@ -13,8 +13,10 @@ import type { CategoriaProducto } from '@/lib/arbolCategorias'
 // productos para cambiar muchos de una sin entrar a cada uno.
 // - Cada celda se edita en el lugar (nombre, descripción, categoría,
 //   público, precio, precio anterior, stock, talles, colores, estado).
-//   Talles y colores se tildan de una tabla (o se escribe uno nuevo). Lo cambiado queda en
-//   amarillo hasta que tocás "Guardar".
+//   Talles y colores se tildan de una tabla (o se escribe uno nuevo). Lo
+//   cambiado queda en amarillo hasta que tocás "Guardar".
+// - En la compu se abre a pantalla completa (⛶) para ver todas las
+//   columnas sin scroll de costado; en el celular queda como siempre.
 // - Tildás varios y aplicás en masa: categoría, público, precio (+/- %,
 //   fijo o en oferta), talles y colores (reemplazar o agregar), stock.
 // - ➕ Agregar productos: filas nuevas (en verde) para un vendedor, con
@@ -105,6 +107,23 @@ export default function EdicionRapidaProductos({
   const [nuevos, setNuevos] = useState<Nuevo[]>([])
   const [vendedorNuevos, setVendedorNuevos] = useState('')
   const [abierto, setAbierto] = useState(false)
+  // Pantalla completa en la compu (en el celular no cambia nada). Se recuerda.
+  const [ampliado, setAmpliado] = useState(true)
+  useEffect(() => { try { if (localStorage.getItem('clasiclick_edicion_ampliada') === '0') setAmpliado(false) } catch {} }, [])
+  function cambiarAmpliado(v: boolean) {
+    setAmpliado(v)
+    try { localStorage.setItem('clasiclick_edicion_ampliada', v ? '1' : '0') } catch {}
+  }
+  const pantallaCompleta = abierto && ampliado
+  useEffect(() => {
+    if (!pantallaCompleta) return
+    // Sin el scroll de la página de atrás (solo en pantallas grandes).
+    const antes = document.body.style.overflow
+    if (window.matchMedia('(min-width: 1024px)').matches) document.body.style.overflow = 'hidden'
+    const alTeclado = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[data-panel-lista]')) cambiarAmpliado(false) }
+    window.addEventListener('keydown', alTeclado)
+    return () => { document.body.style.overflow = antes; window.removeEventListener('keydown', alTeclado) }
+  }, [pantallaCompleta])
   const [ediciones, setEdiciones] = useState<Record<string, Campos>>({})
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [texto, setTexto] = useState('')
@@ -326,7 +345,7 @@ export default function EdicionRapidaProductos({
     }
   }
 
-  const celda = (cambiado: boolean) => `w-full px-1.5 py-1 rounded border font-body text-xs ${cambiado ? 'border-ochre bg-amber-50' : 'border-transparent hover:border-line bg-transparent'}`
+  const celda = (cambiado: boolean) => `w-full px-1.5 py-1 rounded border font-body text-xs ${ampliado ? 'lg:text-sm lg:py-1.5' : ''} ${cambiado ? 'border-ochre bg-amber-50' : 'border-transparent hover:border-line bg-transparent'}`
 
   if (!abierto) {
     return (
@@ -360,9 +379,13 @@ export default function EdicionRapidaProductos({
   }
 
   return (
-    <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5">
+    <div className={`bg-panel border border-teal rounded-xl p-3.5 mb-5 ${ampliado ? 'lg:fixed lg:inset-0 lg:z-40 lg:m-0 lg:rounded-none lg:border-0 lg:p-5 lg:overflow-y-auto lg:flex lg:flex-col' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
+        <div className={`font-body text-sm font-semibold text-ink ${ampliado ? 'lg:text-lg' : ''}`}>⚡ Edición rápida de productos</div>
+        <span className="flex-1" />
+        <button type="button" onClick={() => cambiarAmpliado(!ampliado)} className="hidden lg:inline-flex px-3 py-1.5 rounded-lg border border-line bg-panel font-body text-xs text-ink" title={ampliado ? 'Volver al panel (Esc)' : 'Usar toda la pantalla'}>
+          {ampliado ? '🗗 Achicar' : '⛶ Pantalla completa'}
+        </button>
         <button type="button" onClick={() => { if (!cantCambios || confirm('Hay cambios sin guardar. ¿Cerrar igual?')) { setAbierto(false); setEdiciones({}); setNuevos([]); setSel(new Set()) } }} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>
       </div>
 
@@ -465,9 +488,9 @@ export default function EdicionRapidaProductos({
       </div>
 
       {/* Planilla */}
-      <div className="overflow-x-auto border border-line rounded-lg">
-        <table className="w-full min-w-[1200px] border-collapse">
-          <thead className="bg-panelalt">
+      <div className={`overflow-x-auto border border-line rounded-lg ${ampliado ? 'lg:overflow-auto lg:flex-1 lg:min-h-[60vh]' : ''}`}>
+        <table className={`w-full min-w-[1200px] border-collapse`}>
+          <thead className={`bg-panelalt ${ampliado ? 'lg:sticky lg:top-0 lg:z-10 lg:text-xs' : ''}`}>
             <tr className="font-body text-[11px] text-inksoft text-left">
               <th className="p-2 w-8"><input type="checkbox" checked={todosSel} onChange={alternarTodos} className="accent-teal" aria-label="Seleccionar todos" /></th>
               <th className="p-2 w-[17%]">Producto</th>
@@ -568,7 +591,7 @@ export default function EdicionRapidaProductos({
                   <SelectorLista tipo="colores" value={valor(p, 'colores') || []} onChange={(l) => editar(p.id, { colores: l })} extras={usados.colores} placeholder="Elegir colores" className={celda(editado(p, 'colores'))} />
                 </td>
                 <td className="p-1.5">
-                  <select value={valor(p, 'estado') || 'activo'} onChange={(e) => editar(p.id, { estado: e.target.value })} className={celda(editado(p, 'estado'))} aria-label="Estado">
+                  <select value={valor(p, 'estado') || 'activo'} onChange={(e) => editar(p.id, { estado: e.target.value })} className={`${celda(editado(p, 'estado'))} min-w-[130px]`} aria-label="Estado">
                     {ESTADOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
                   </select>
                 </td>
@@ -585,7 +608,7 @@ export default function EdicionRapidaProductos({
       </div>
 
       {/* Guardar */}
-      <div className={`sticky bottom-0 mt-3 -mx-3.5 -mb-3.5 px-3.5 py-3 rounded-b-xl border-t flex flex-wrap items-center gap-2 ${cantCambios ? 'bg-amber-50 border-ochre' : 'bg-panel border-line'}`}>
+      <div className={`sticky bottom-0 mt-3 -mx-3.5 -mb-3.5 px-3.5 py-3 rounded-b-xl border-t flex ${ampliado ? 'lg:mx-0 lg:mb-0 lg:rounded-lg lg:border' : ''} flex-wrap items-center gap-2 ${cantCambios ? 'bg-amber-50 border-ochre' : 'bg-panel border-line'}`}>
         <button type="button" onClick={guardar} disabled={!cantCambios || guardando} className="px-4 py-2 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-40">
           {guardando ? 'Guardando...' : `💾 Guardar cambios${cantCambios ? ` (${[nuevosConDatos.length && `${nuevosConDatos.length} nuevo${nuevosConDatos.length === 1 ? '' : 's'}`, cantEditados && `${cantEditados} editado${cantEditados === 1 ? '' : 's'}`].filter(Boolean).join(' + ')})` : ''}`}
         </button>
