@@ -126,7 +126,7 @@ export default function ArmarPlanilla({ password, rubros, onUsarSheet }: { passw
         let d: any = null
         for (let intento = 0; intento < 6 && !frenar.current; intento++) {
           const r = await fetch('/api/admin/productos/analizar-foto', { method: 'POST', headers, body: JSON.stringify({ imagenUrl: f.fotos[0], pista: nombreGenerico(f.producto) ? '' : f.producto }) }).catch(() => null)
-          if (r?.status === 429) { setIa((x) => x && { ...x, etapa: '⏳ La IA está ocupada (límite gratis o mucha demanda), sigo en unos segundos…' }); await new Promise((ok) => setTimeout(ok, 15000 + intento * 5000)); continue }
+          if (r?.status === 429) { setIa((x) => x && { ...x, etapa: '⏳ La IA gratis pide una pausa, sigo en unos segundos…' }); await new Promise((ok) => setTimeout(ok, 15000 + intento * 5000)); continue }
           d = r && r.ok ? await r.json().catch(() => null) : null
           if (!d) setErrorIA((r && (await r.json().catch(() => null))?.error) || 'la IA no respondió')
           break

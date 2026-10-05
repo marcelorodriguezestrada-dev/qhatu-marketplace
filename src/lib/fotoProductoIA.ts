@@ -3,9 +3,8 @@ import { puntuarRubros, type RubroPlano } from '@/lib/armarPlanilla'
 
 const norm = (t: string) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
-// Analiza la foto de un producto con IA para la importación masiva,
-// "Armar planilla" y /vender. Proveedor: Gemini de Google (plan gratis,
-// GEMINI_API_KEY) si está configurado; si no, o si falla, Groq.
+// Analiza la foto de un producto con IA (Groq) para la importación masiva
+// y "Armar planilla":
 // 1) Un modelo con visión mira la foto y dice QUÉ es (nombre, tipo,
 //    público, colores, descripción). Pedido chico a propósito: antes iba
 //    con la lista entera de categorías (~11.000 tokens por foto) y con el
@@ -13,7 +12,7 @@ const norm = (t: string) => String(t || '').toLowerCase().normalize('NFD').repla
 // 2) La categoría la elige Clasi Click con ese texto (mismo puntaje que
 //    "Armar planilla"); si no hay una clara, un modelo de texto elige
 //    entre los pocos candidatos. Nunca inventa un rubro.
-// Si la IA responde 429 (límite por minuto) tira LimiteIA para que el panel
+// Si Groq responde 429 (límite por minuto) tira LimiteIA para que el panel
 // espere y reintente; cualquier otro problema tira ErrorIA con el motivo.
 
 export class LimiteIA extends Error {}
@@ -53,120 +52,19 @@ async function modelosVision(): Promise<{ modelos: string[]; todos: string[] | n
   return { modelos: Array.from(new Set(candidatos)).sort((a, b) => orden(a) - orden(b)), todos }
 }
 
-// ——— Gemini (Google AI Studio, plan gratis) ———
-// Modelos: GEMINI_MODEL si está; si no, se le pregunta a Google cuáles hay
-// (los "flash", que son los del plan gratis) y se recuerda el que anda.
-const URL_GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
-let geminiQueAnda: string | null = null
-let geminiCache: { at: number; ids: string[] } | null = null
-
-async function modelosGemini(): Promise<string[]> {
-  const env = process.env.GEMINI_MODEL
-  const base = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
-  let ids: string[] | null = geminiCache && Date.now() - geminiCache.at < 10 * 60 * 1000 ? geminiCache.ids : null
-  if (!ids) {
-    try {
-      const r = await fetch(`${URL_GEMINI}/models?pageSize=200`, { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY! } })
-      if (r.ok) {
-        const d = await r.json()
-        ids = (d.models || [])
-          .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
-          .map((m: any) => String(m.name).replace(/^models\//, ''))
-          .filter((n: string) => /flash/.test(n) && !/image|tts|audio|live|thinking|embedding|exp\b/.test(n))
-        geminiCache = { at: Date.now(), ids: ids! }
-      }
-    } catch {}
-  }
-  // Estables antes que "preview" (los preview suelen estar saturados: 503),
-  // y entre ellos el más nuevo primero, el "-lite" después del normal.
-  const version = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || 0)
-  const lista = (ids && ids.length ? ids : base).sort((a, b) => Number(/preview|exp/.test(a)) - Number(/preview|exp/.test(b)) || version(b) - version(a) || Number(/lite/.test(a)) - Number(/lite/.test(b)))
-  return Array.from(new Set([...(env ? [env] : []), ...(geminiQueAnda ? [geminiQueAnda] : []), ...lista]))
-}
-
-async function gemini(model: string, partes: unknown[], maxTokens: number): Promise<any> {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 30000)
-  try {
-    const res = await fetch(`${URL_GEMINI}/models/${model}:generateContent`, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY! },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: partes }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: maxTokens,
-          responseMimeType: 'application/json',
-          // Los 2.5 "piensan" antes de responder y gastan el presupuesto: acá no hace falta.
-          ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-        },
-      }),
-    })
-    if (res.status === 429) throw new LimiteIA('Límite de la IA por minuto')
-    if (!res.ok) {
-      const txt = (await res.text()).slice(0, 300)
-      console.error('fotoProductoIA: Gemini respondió', res.status, txt)
-      const e = new ErrorIA(`Gemini respondió ${res.status}: ${txt.replace(/[{}"]/g, ' ').replace(/\s+/g, ' ').slice(0, 140)}`)
-      ;(e as any).status = res.status
-      ;(e as any).texto = txt
-      throw e
-    }
-    const data = await res.json()
-    const texto = (data.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
-    if (!texto) throw new ErrorIA(`Gemini no respondió nada${data.promptFeedback?.blockReason ? ` (${data.promptFeedback.blockReason})` : ''}.`)
-    return JSON.parse(texto.replace(/```json|```/g, '').trim())
-  } catch (err) {
-    if (err instanceof LimiteIA || err instanceof ErrorIA) throw err
-    throw new ErrorIA((err as any)?.name === 'AbortError' ? 'Gemini tardó demasiado.' : 'Gemini no devolvió una respuesta válida.')
-  } finally {
-    clearTimeout(t)
-  }
-}
-
-async function conGemini(partes: unknown[], maxTokens: number): Promise<any> {
-  let ultimo: unknown = null
-  let saturados = 0
-  let limitados = 0
-  for (const model of await modelosGemini()) {
-    try {
-      const r = await gemini(model, partes, maxTokens)
-      geminiQueAnda = model
-      return r
-    } catch (err) {
-      ultimo = err
-      const st = (err as any)?.status
-      // Límite gratis de ESTE modelo (cada modelo tiene el suyo) → probamos otro.
-      if (err instanceof LimiteIA) { limitados++; continue }
-      // Saturado ("high demand", 503/500) → otro modelo; es pasajero.
-      if (err instanceof ErrorIA && (st === 503 || st === 500 || st === 502)) { saturados++; continue }
-      // Modelo inexistente o sin acceso → el siguiente. Clave mala u otro → se corta.
-      if (err instanceof ErrorIA && (st === 404 || (st === 400 && /model|not found|not supported/i.test(String((err as any).texto))))) continue
-      throw err
-    }
-  }
-  // Todos saturados o al límite: el panel espera unos segundos y reintenta solo.
-  if (saturados || limitados) throw new LimiteIA(saturados ? 'Gemini está saturado en este momento' : 'Límite de la IA por minuto')
-  throw ultimo || new ErrorIA('Gemini no tiene modelos disponibles para esta clave.')
-}
-
-// La foto va adentro del pedido (base64): así no depende de que la IA pueda
-// abrir el link (ImgBB, Drive…).
-type Foto = { mime: string; b64: string | null; url: string }
-async function bajarFoto(url: string): Promise<Foto> {
-  if (url.startsWith('data:')) {
-    const m = url.match(/^data:([^;]+);base64,(.*)$/)
-    return { mime: m?.[1] || 'image/jpeg', b64: m?.[2] || null, url }
-  }
+// La foto va adentro del pedido (base64): así no depende de que Groq pueda
+// abrir el link (ImgBB, Drive…). Si pesa demasiado, va el link.
+async function aDataUrl(url: string): Promise<string> {
+  if (url.startsWith('data:')) return url
   try {
     const r = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (ClasiClick)' } })
     const tipo = (r.headers.get('content-type') || '').split(';')[0]
     if (!r.ok || !tipo.startsWith('image/')) throw new ErrorIA(`No se pudo abrir la foto (${r.status}).`)
     const buf = Buffer.from(await r.arrayBuffer())
-    return { mime: tipo, b64: buf.length <= 15_000_000 ? buf.toString('base64') : null, url }
+    return buf.length <= 3_500_000 ? `data:${tipo};base64,${buf.toString('base64')}` : url
   } catch (err) {
     if (err instanceof ErrorIA) throw err
-    return { mime: 'image/jpeg', b64: null, url }
+    return url
   }
 }
 
@@ -196,25 +94,7 @@ async function groq(cuerpo: Record<string, unknown>): Promise<any> {
   }
 }
 
-async function vision(foto: Foto, texto: string, maxTokens: number): Promise<any> {
-  let errorGemini: unknown = null
-  if (process.env.GEMINI_API_KEY && foto.b64) {
-    try {
-      return await conGemini([{ text: texto }, { inline_data: { mime_type: foto.mime, data: foto.b64 } }], Math.max(maxTokens, 600))
-    } catch (err) {
-      if (err instanceof LimiteIA || !process.env.GROQ_API_KEY) throw err
-      errorGemini = err // Probamos con Groq; si también falla, se muestra el de Gemini.
-    }
-  }
-  if (!process.env.GROQ_API_KEY) throw new ErrorIA('No hay IA configurada: agregá GEMINI_API_KEY (gratis en aistudio.google.com) en las variables del servidor.')
-  try {
-    return await visionGroq(foto.b64 && foto.b64.length <= 4_600_000 ? `data:${foto.mime};base64,${foto.b64}` : foto.url, texto, maxTokens)
-  } catch (err) {
-    throw errorGemini || err
-  }
-}
-
-async function visionGroq(imagen: string, texto: string, maxTokens: number): Promise<any> {
+async function vision(imagen: string, texto: string, maxTokens: number): Promise<any> {
   const { modelos, todos } = await modelosVision()
   if (!modelos.length) {
     throw new ErrorIA(`Groq no tiene modelos que miren fotos para esta cuenta. Modelos disponibles: ${(todos || []).slice(0, 12).join(', ') || 'ninguno'}.`)
@@ -251,10 +131,10 @@ async function visionGroq(imagen: string, texto: string, maxTokens: number): Pro
 export type AnalisisFoto = { rubroId: string | null; nombre: string; publico: string | null; colores: string[]; descripcion: string }
 
 export async function analizarFotoProducto(imagenUrl: string, categorias: CategoriaProducto[], pista?: string): Promise<AnalisisFoto> {
-  const foto = await bajarFoto(imagenUrl)
+  const imagen = await aDataUrl(imagenUrl)
   const pistaTxt = pista ? `\nEl archivo se llama "${pista}" (puede traer el nombre del producto).` : ''
   const r1 = await vision(
-    foto,
+    imagen,
     'Sos el catalogador de Clasi Click, un marketplace de Bolivia. Mirá la foto del producto que se vende.' + pistaTxt +
       '\nRespondé SOLO JSON: {"nombre": "<nombre comercial corto en español, máx 7 palabras, ej: Sandalia de taco con tiras>", ' +
       '"tipo": "<qué es en 1-3 palabras genéricas, ej: sandalia, zapato de vestir, blusa, banquito, celular>", ' +
@@ -292,11 +172,14 @@ export async function analizarFotoProducto(imagenUrl: string, categorias: Catego
     const hermanos = rubros.filter((r) => r.grupo && grupos.has(`${r.categoriaId}::${r.grupo}`))
     const candidatos = [...puntos.map((x) => x.r), ...hermanos].filter((r, i, arr) => arr.findIndex((y) => y.id === r.id) === i).slice(0, 30).map((r) => ({ r }))
     if (candidatos.length) {
-      const pedido = `Producto: "${nombre}" (${tipo}). Elegí su categoría de esta lista o null si ninguna corresponde:\n` + candidatos.map((c) => `${c.r.id} = ${[c.r.categoriaLabel, c.r.grupo, c.r.label].filter(Boolean).join(' > ')}`).join('\n') + '\nRespondé SOLO JSON: {"rubroId": "<id EXACTO o null>"}'
       try {
-        const r2 = process.env.GEMINI_API_KEY
-          ? await conGemini([{ text: pedido }], 200)
-          : await groq({ model: 'openai/gpt-oss-20b', max_completion_tokens: 400, reasoning_effort: 'low', response_format: { type: 'json_object' }, messages: [{ role: 'user', content: pedido }] })
+        const r2 = await groq({
+          model: 'openai/gpt-oss-20b',
+          max_completion_tokens: 400,
+          reasoning_effort: 'low',
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: `Producto: "${nombre}" (${tipo}). Elegí su categoría de esta lista o null si ninguna corresponde:\n` + candidatos.map((c) => `${c.r.id} = ${[c.r.categoriaLabel, c.r.grupo, c.r.label].filter(Boolean).join(' > ')}`).join('\n') + '\nRespondé SOLO JSON: {"rubroId": "<id EXACTO o null>"}' }],
+        })
         rubroId = candidatos.some((c) => c.r.id === r2.rubroId) ? String(r2.rubroId) : null
       } catch (err) {
         if (err instanceof LimiteIA) throw err
