@@ -19,9 +19,38 @@ export class LimiteIA extends Error {}
 export class ErrorIA extends Error {}
 
 const URL_GROQ = 'https://api.groq.com/openai/v1/chat/completions'
-// Si Groq da de baja un modelo, se prueba el siguiente.
-const MODELOS_VISION = () => Array.from(new Set([process.env.GROQ_VISION_MODEL, 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'].filter(Boolean) as string[]))
+// Modelos con visión: Groq los da de baja seguido (llama-4-scout ya no
+// está), así que se le pregunta a Groq cuáles tiene esta cuenta
+// (/v1/models), se prueban los que parecen de visión y se recuerda el que
+// anda. GROQ_VISION_MODEL (variable del servidor) va primero si está.
+const CONOCIDOS = ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct']
+const PARECE_VISION = /vision|scout|maverick|llama-4|[-/]vl\b|-vl-|qwen.*vl|gemma-?3|pixtral|llava|omni|kimi.*vl|multimodal/i
 let modeloQueAnda: string | null = null
+let listaCache: { at: number; ids: string[] } | null = null
+
+async function modelosDeLaCuenta(): Promise<string[] | null> {
+  if (listaCache && Date.now() - listaCache.at < 10 * 60 * 1000) return listaCache.ids
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } })
+    if (!r.ok) return null
+    const d = await r.json()
+    const ids: string[] = (d.data || []).filter((m: any) => m && m.active !== false).map((m: any) => String(m.id))
+    listaCache = { at: Date.now(), ids }
+    return ids
+  } catch {
+    return null
+  }
+}
+
+async function modelosVision(): Promise<{ modelos: string[]; todos: string[] | null }> {
+  const todos = await modelosDeLaCuenta()
+  const env = process.env.GROQ_VISION_MODEL
+  const deVision = (todos || []).filter((id) => PARECE_VISION.test(id))
+  // Preferidos primero: el configurado, el último que anduvo, Llama 4, el resto.
+  const orden = (id: string) => (id === env ? 0 : id === modeloQueAnda ? 1 : /llama-4/i.test(id) ? 2 : /vision|vl/i.test(id) ? 3 : 4)
+  const candidatos = todos ? [...(env ? [env] : []), ...deVision] : [...(env ? [env] : []), ...(modeloQueAnda ? [modeloQueAnda] : []), ...CONOCIDOS]
+  return { modelos: Array.from(new Set(candidatos)).sort((a, b) => orden(a) - orden(b)), todos }
+}
 
 // La foto va adentro del pedido (base64): así no depende de que Groq pueda
 // abrir el link (ImgBB, Drive…). Si pesa demasiado, va el link.
@@ -66,21 +95,37 @@ async function groq(cuerpo: Record<string, unknown>): Promise<any> {
 }
 
 async function vision(imagen: string, texto: string, maxTokens: number): Promise<any> {
-  const modelos = modeloQueAnda ? [modeloQueAnda, ...MODELOS_VISION().filter((m) => m !== modeloQueAnda)] : MODELOS_VISION()
-  let ultimo: unknown = null
-  for (const model of modelos) {
-    try {
-      const r = await groq({ model, max_completion_tokens: maxTokens, temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: [{ type: 'text', text: texto }, { type: 'image_url', image_url: { url: imagen } }] }] })
-      modeloQueAnda = model
-      return r
-    } catch (err) {
-      ultimo = err
-      // Modelo dado de baja / inexistente → el siguiente. Otro error → se corta.
-      const st = (err as any)?.status, txt = String((err as any)?.texto || '')
-      if (!(err instanceof ErrorIA) || !(st === 404 || (st === 400 && /model|decommission/i.test(txt)))) throw err
-    }
+  const { modelos, todos } = await modelosVision()
+  if (!modelos.length) {
+    throw new ErrorIA(`Groq no tiene modelos que miren fotos para esta cuenta. Modelos disponibles: ${(todos || []).slice(0, 12).join(', ') || 'ninguno'}.`)
   }
-  throw ultimo
+  let ultimo: unknown = null
+  const probados: string[] = []
+  for (const model of modelos) {
+    for (const conFormato of [true, false]) {
+      try {
+        const r = await groq({
+          model, max_completion_tokens: maxTokens, temperature: 0.1,
+          ...(conFormato ? { response_format: { type: 'json_object' } } : {}),
+          messages: [{ role: 'user', content: [{ type: 'text', text: texto + (conFormato ? '' : '\nRespondé solo el JSON, sin texto antes ni después.') }, { type: 'image_url', image_url: { url: imagen } }] }],
+        })
+        modeloQueAnda = model
+        return r
+      } catch (err) {
+        ultimo = err
+        const st = (err as any)?.status, txt = String((err as any)?.texto || '')
+        if (!(err instanceof ErrorIA)) throw err
+        // Este modelo no soporta el formato JSON: mismo modelo, sin formato.
+        if (conFormato && st === 400 && /response_format|json/i.test(txt)) continue
+        // Dado de baja, inexistente o no mira fotos → el siguiente modelo.
+        if (st === 404 || (st === 400 && /model|decommission|image|vision|multimodal|content.*(type|array)|not supported/i.test(txt))) break
+        throw err
+      }
+    }
+    probados.push(model)
+  }
+  const disponibles = (await modelosDeLaCuenta()) || []
+  throw new ErrorIA(`Ningún modelo de Groq pudo mirar la foto (probé: ${probados.join(', ')}). Modelos de tu cuenta: ${disponibles.slice(0, 15).join(', ') || 'no se pudo leer la lista'}. ${ultimo instanceof Error ? ultimo.message : ''}`.slice(0, 600))
 }
 
 export type AnalisisFoto = { rubroId: string | null; nombre: string; publico: string | null; colores: string[]; descripcion: string }
