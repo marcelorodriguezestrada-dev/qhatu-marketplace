@@ -6,12 +6,14 @@ import SelectorRubro from '@/components/admin/SelectorRubro'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 import ImportarCarpeta from '@/components/admin/ImportarCarpeta'
 import UnirRepetidos from '@/components/admin/UnirRepetidos'
+import SelectorLista from '@/components/admin/SelectorLista'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
 
 // Admin → Productos → "⚡ Edición rápida": una planilla con todos los
 // productos para cambiar muchos de una sin entrar a cada uno.
-// - Cada celda se edita en el lugar (nombre, categoría, público, precio,
-//   precio anterior, stock, talles, colores). Lo cambiado queda en
+// - Cada celda se edita en el lugar (nombre, descripción, categoría,
+//   público, precio, precio anterior, stock, talles, colores, estado).
+//   Talles y colores se tildan de una tabla (o se escribe uno nuevo). Lo cambiado queda en
 //   amarillo hasta que tocás "Guardar".
 // - Tildás varios y aplicás en masa: categoría, público, precio (+/- %,
 //   fijo o en oferta), talles y colores (reemplazar o agregar), stock.
@@ -31,13 +33,14 @@ type Prod = {
   stock?: number | null
   talles?: string[]
   colores?: string[]
+  descripcionCorta?: string
   estado?: string
   imagenUrl?: string
   thumbUrl?: string
   fotosAdicionales?: string[]
   claveImportacion?: string
 }
-type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'precioOriginal' | 'stock' | 'talles' | 'colores'>>
+type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'precioOriginal' | 'stock' | 'talles' | 'colores' | 'descripcionCorta' | 'estado'>>
 type Categoria = CategoriaProducto
 
 const POR_PAGINA = 50
@@ -72,6 +75,13 @@ const nuevoVacio = (base?: Partial<Nuevo>): Nuevo => ({ key: `n${++contadorNuevo
 const aLista = (t: string) => t.split(',').map((x) => x.trim()).filter(Boolean)
 const aTexto = (l?: string[]) => (l || []).join(', ')
 const redondear = (n: number) => Math.round(n)
+
+const ESTADOS = [
+  { id: 'activo', label: '🟢 Publicado' },
+  { id: 'oculto', label: '⚫ Oculto' },
+  { id: 'pendiente', label: '🟡 Pendiente' },
+  { id: 'rechazado', label: '🔴 Rechazado' },
+]
 
 export default function EdicionRapidaProductos({
   password,
@@ -114,6 +124,12 @@ export default function EdicionRapidaProductos({
     for (const c of categorias) for (const r of c.rubros) m[r.id] = c.id
     return m
   }, [categorias])
+
+  // Talles y colores que ya usan los productos (salen en la tabla para elegir).
+  const usados = useMemo(() => ({
+    talles: Array.from(new Set(productos.flatMap((p) => p.talles || []))),
+    colores: Array.from(new Set(productos.flatMap((p) => p.colores || []))),
+  }), [productos])
 
   const vendedores = useMemo(() => Array.from(new Set(productos.map((p) => p.vendedor || 'Sin nombre'))).sort(), [productos])
 
@@ -172,6 +188,7 @@ export default function EdicionRapidaProductos({
       precioOriginal: valor(p, 'precioOriginal') ? String(valor(p, 'precioOriginal')) : '',
       talles: aTexto(valor(p, 'talles')),
       colores: aTexto(valor(p, 'colores')),
+      descripcionCorta: valor(p, 'descripcionCorta') || '',
     })])
     if (!vendedorNuevos && p.vendedorId) setVendedorNuevos(p.vendedorId)
     setMensaje('Copiado como producto nuevo arriba (en verde): cambiá lo que haga falta y guardá.')
@@ -230,6 +247,8 @@ export default function EdicionRapidaProductos({
           break
         }
         case 'stock': editar(p.id, { stock: v === '' ? null : Math.max(0, Math.floor(num) || 0) }); break
+        case 'estado': if (v) editar(p.id, { estado: v }); break
+        case 'descripcion': editar(p.id, { descripcionCorta: v.slice(0, 300) }); break
       }
     }
     setMensaje(`Aplicado a ${elegidos.length} producto${elegidos.length === 1 ? '' : 's'} — revisá y tocá “Guardar cambios”.`)
@@ -315,7 +334,7 @@ export default function EdicionRapidaProductos({
       <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
-          <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos (a mano o desde una carpeta de fotos) y cambiar categoría, precios, ofertas, talles, colores y stock de muchos a la vez.</div>
+          <div className="font-body text-[11px] text-inksoft">Una planilla para cargar productos nuevos (a mano o desde una carpeta de fotos) y cambiar descripción, categoría, precios, ofertas, talles, colores, stock y estado de muchos a la vez.</div>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => { setImportando(true); setAbierto(true) }} className="px-3.5 py-2 rounded-lg border border-indigo-300 bg-panel text-indigo-700 font-body text-sm font-semibold">📥 Importar (carpeta, Sheet o armar planilla)</button>
@@ -337,6 +356,7 @@ export default function EdicionRapidaProductos({
     talles: 'Ej: 36, 37, 38 o S, M, L',
     colores: 'Ej: Negro, Marrón',
     stock: 'Unidades (vacío = sin control)',
+    descripcion: 'Texto para todos los seleccionados',
   }
 
   return (
@@ -377,6 +397,8 @@ export default function EdicionRapidaProductos({
             <option value="talles">Talles</option>
             <option value="colores">Colores</option>
             <option value="stock">Stock</option>
+            <option value="estado">Estado (publicado / oculto)</option>
+            <option value="descripcion">Descripción</option>
           </select>
           {accion === 'rubro' ? (
             <SelectorRubro categorias={categorias} value={valorAccion} onChange={setValorAccion} vacio="Elegí el rubro…" className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs w-60" cerca={productos.find((p) => sel.has(p.id))?.rubro} pista={productos.find((p) => sel.has(p.id))?.nombre} />
@@ -385,6 +407,13 @@ export default function EdicionRapidaProductos({
               <option value="">Elegí…</option>
               {PUBLICOS_PRODUCTO.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
             </select>
+          ) : accion === 'estado' ? (
+            <select value={valorAccion} onChange={(e) => setValorAccion(e.target.value)} className="px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-xs">
+              <option value="">Elegí…</option>
+              {ESTADOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+            </select>
+          ) : accion === 'talles' || accion === 'colores' ? (
+            <SelectorLista tipo={accion} value={aLista(valorAccion)} onChange={(l) => setValorAccion(aTexto(l))} extras={usados[accion]} placeholder={accion === 'talles' ? 'Tocá para elegir talles…' : 'Tocá para elegir colores…'} className="px-2.5 py-1.5 rounded-lg border border-line bg-panel font-body text-xs w-64" />
           ) : accion !== 'quitarOferta' ? (
             <input value={valorAccion} onChange={(e) => setValorAccion(e.target.value)} disabled={!sel.size} placeholder={placeholderAccion[accion]} className="px-3 py-2 rounded-lg border border-line font-body text-xs w-56" />
           ) : null}
@@ -437,18 +466,20 @@ export default function EdicionRapidaProductos({
 
       {/* Planilla */}
       <div className="overflow-x-auto border border-line rounded-lg">
-        <table className="w-full min-w-[980px] border-collapse">
+        <table className="w-full min-w-[1200px] border-collapse">
           <thead className="bg-panelalt">
             <tr className="font-body text-[11px] text-inksoft text-left">
               <th className="p-2 w-8"><input type="checkbox" checked={todosSel} onChange={alternarTodos} className="accent-teal" aria-label="Seleccionar todos" /></th>
-              <th className="p-2 w-[24%]">Producto</th>
-              <th className="p-2 w-[18%]">Categoría › Rubro</th>
-              <th className="p-2 w-[9%]">Público</th>
-              <th className="p-2 w-[8%]">Precio Bs</th>
-              <th className="p-2 w-[8%]">Antes Bs</th>
-              <th className="p-2 w-[6%]">Stock</th>
-              <th className="p-2 w-[13%]">Talles</th>
-              <th className="p-2 w-[13%]">Colores</th>
+              <th className="p-2 w-[17%]">Producto</th>
+              <th className="p-2 w-[16%]">Descripción</th>
+              <th className="p-2 w-[14%]">Categoría › Rubro</th>
+              <th className="p-2 w-[8%]">Público</th>
+              <th className="p-2 w-[7%]">Precio Bs</th>
+              <th className="p-2 w-[7%]">Antes Bs</th>
+              <th className="p-2 w-[5%]">Stock</th>
+              <th className="p-2 w-[11%]">Talles</th>
+              <th className="p-2 w-[11%]">Colores</th>
+              <th className="p-2 w-[120px]">Estado</th>
             </tr>
           </thead>
           <tbody>
@@ -474,6 +505,9 @@ export default function EdicionRapidaProductos({
                     </div>
                   </td>
                   <td className="p-1.5">
+                    <textarea value={n.descripcionCorta || ''} onChange={(e) => setNuevo(n.key, { descripcionCorta: e.target.value.slice(0, 300) })} rows={2} placeholder="Material, detalles…" className={`${cn(false)} resize-y`} aria-label="Descripción nuevo" />
+                  </td>
+                  <td className="p-1.5">
                     <SelectorRubro categorias={categorias} value={n.rubro} onChange={(v) => setNuevo(n.key, { rubro: v })} vacio="Elegí categoría *" className={cn(!n.rubro)} pista={n.nombre} cerca={nuevos[i - 1]?.rubro} />
                   </td>
                   <td className="p-1.5">
@@ -484,8 +518,9 @@ export default function EdicionRapidaProductos({
                   <td className="p-1.5"><input type="number" min={1} value={n.precio} onChange={(e) => setNuevo(n.key, { precio: e.target.value })} placeholder="*" className={cn(!(Number(n.precio) > 0))} aria-label="Precio nuevo" /></td>
                   <td className="p-1.5"><input type="number" min={0} value={n.precioOriginal} onChange={(e) => setNuevo(n.key, { precioOriginal: e.target.value })} placeholder="—" className={cn(false)} aria-label="Precio anterior nuevo" /></td>
                   <td className="p-1.5"><input type="number" min={0} value={n.stock} onChange={(e) => setNuevo(n.key, { stock: e.target.value })} placeholder="∞" className={cn(false)} aria-label="Stock nuevo" /></td>
-                  <td className="p-1.5"><input value={n.talles} onChange={(e) => setNuevo(n.key, { talles: e.target.value })} placeholder="36, 37…" className={cn(false)} aria-label="Talles nuevo" /></td>
-                  <td className="p-1.5"><input value={n.colores} onChange={(e) => setNuevo(n.key, { colores: e.target.value })} placeholder="Negro, …" className={cn(false)} aria-label="Colores nuevo" /></td>
+                  <td className="p-1.5"><SelectorLista tipo="talles" value={aLista(n.talles)} onChange={(l) => setNuevo(n.key, { talles: aTexto(l) })} extras={usados.talles} placeholder="Elegir talles" className={cn(false)} /></td>
+                  <td className="p-1.5"><SelectorLista tipo="colores" value={aLista(n.colores)} onChange={(l) => setNuevo(n.key, { colores: aTexto(l) })} extras={usados.colores} placeholder="Elegir colores" className={cn(false)} /></td>
+                  <td className="p-1.5 font-body text-[11px] text-emerald-700 pt-2.5">🟢 Publicado</td>
                 </tr>
               )
             })}
@@ -502,9 +537,12 @@ export default function EdicionRapidaProductos({
                     </div>
                     <div className="flex-1 min-w-0">
                       <input value={valor(p, 'nombre') || ''} onChange={(e) => editar(p.id, { nombre: e.target.value })} className={celda(editado(p, 'nombre'))} aria-label="Nombre" />
-                      <div className="font-body text-[10px] text-inksoft px-1.5 truncate">{p.vendedor || 'Sin vendedor'}{p.estado && p.estado !== 'activo' ? ` · ${p.estado}` : ''}</div>
+                      <div className="font-body text-[10px] text-inksoft px-1.5 truncate">{p.vendedor || 'Sin vendedor'}</div>
                     </div>
                   </div>
+                </td>
+                <td className="p-1.5">
+                  <textarea value={valor(p, 'descripcionCorta') || ''} onChange={(e) => editar(p.id, { descripcionCorta: e.target.value.slice(0, 300) })} rows={2} placeholder="Sin descripción" className={`${celda(editado(p, 'descripcionCorta'))} resize-y`} aria-label="Descripción" />
                 </td>
                 <td className="p-1.5">
                   <SelectorRubro categorias={categorias} value={valor(p, 'rubro') || ''} onChange={(v) => editar(p.id, { rubro: v })} vacio="⚠️ Sin rubro" className={celda(editado(p, 'rubro'))} pista={valor(p, 'nombre')} />
@@ -524,10 +562,15 @@ export default function EdicionRapidaProductos({
                   <input type="number" min={0} value={valor(p, 'stock') ?? ''} onChange={(e) => editar(p.id, { stock: e.target.value === '' ? null : Number(e.target.value) })} placeholder="∞" className={celda(editado(p, 'stock'))} aria-label="Stock" />
                 </td>
                 <td className="p-1.5">
-                  <input defaultValue={aTexto(valor(p, 'talles'))} key={`t-${p.id}-${aTexto(valor(p, 'talles'))}`} onBlur={(e) => editar(p.id, { talles: aLista(e.target.value) })} placeholder="36, 37…" className={celda(editado(p, 'talles'))} aria-label="Talles" />
+                  <SelectorLista tipo="talles" value={valor(p, 'talles') || []} onChange={(l) => editar(p.id, { talles: l })} extras={usados.talles} placeholder="Elegir talles" className={celda(editado(p, 'talles'))} />
                 </td>
                 <td className="p-1.5">
-                  <input defaultValue={aTexto(valor(p, 'colores'))} key={`c-${p.id}-${aTexto(valor(p, 'colores'))}`} onBlur={(e) => editar(p.id, { colores: aLista(e.target.value) })} placeholder="Negro, …" className={celda(editado(p, 'colores'))} aria-label="Colores" />
+                  <SelectorLista tipo="colores" value={valor(p, 'colores') || []} onChange={(l) => editar(p.id, { colores: l })} extras={usados.colores} placeholder="Elegir colores" className={celda(editado(p, 'colores'))} />
+                </td>
+                <td className="p-1.5">
+                  <select value={valor(p, 'estado') || 'activo'} onChange={(e) => editar(p.id, { estado: e.target.value })} className={celda(editado(p, 'estado'))} aria-label="Estado">
+                    {ESTADOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+                  </select>
                 </td>
               </tr>
             ))}
