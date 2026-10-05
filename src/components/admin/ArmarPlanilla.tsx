@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { leerFotos, pareceUnaTienda, type FuenteFoto, type ProductoLeido } from '@/lib/importarCarpeta'
-import { armarFilas, descargarPlanilla, type FilaPlanilla, type RubroPlano } from '@/lib/armarPlanilla'
+import { leerFotos, nombreGenerico, pareceUnaTienda, type FuenteFoto, type ProductoLeido } from '@/lib/importarCarpeta'
+import { armarFilas, descargarPlanilla, rutaDe, type FilaPlanilla, type RubroPlano } from '@/lib/armarPlanilla'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 
 // Importar → "🧾 Armar planilla": cuando no hay planilla, se arma desde la
@@ -26,6 +26,9 @@ export default function ArmarPlanilla({ password, rubros, onUsarSheet }: { passw
   const [filas, setFilas] = useState<FilaPlanilla[] | null>(null)
   const [unificadas, setUnificadas] = useState<[string, string][]>([])
   const [descargada, setDescargada] = useState(false)
+  // Nombre de tienda que quiere el admin para cada tienda detectada ("Gemini" → "Zapatería Ana").
+  const [renombres, setRenombres] = useState<Record<string, string>>({})
+  const [ia, setIa] = useState<{ hechos: number; total: number; etapa: string } | null>(null)
   const frenar = useRef(false)
   const elegirCarpeta = (el: HTMLInputElement | null) => { if (el) el.setAttribute('webkitdirectory', '') }
 
@@ -102,16 +105,63 @@ export default function ArmarPlanilla({ password, rubros, onUsarSheet }: { passw
     armar(productos, (p) => links.get(p) || { links: p.fotos.map((f) => f.name) })
   }
 
+  // "✨ Completar con IA": mira cada foto y completa el nombre (si es de
+  // cámara/IA), la categoría, los colores, el público y la descripción.
+  async function completarConIA() {
+    if (!filas) return
+    const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
+    const porId = new Map(rubros.map((r) => [r.id, r]))
+    const pendientes = filas.map((f, i) => [f, i] as const).filter(([f]) => /^https:\/\//.test(f.fotos[0] || '') && (nombreGenerico(f.producto) || !f.categoria || !f.descripcion))
+    if (!pendientes.length) return
+    frenar.current = false
+    const nuevas = [...filas]
+    let hechos = 0
+    setIa({ hechos: 0, total: pendientes.length, etapa: '' })
+    const cola = [...pendientes]
+    const trabajador = async () => {
+      while (cola.length && !frenar.current) {
+        const [f, i] = cola.shift()!
+        let d: any = null
+        for (let intento = 0; intento < 6 && !frenar.current; intento++) {
+          const r = await fetch('/api/admin/productos/analizar-foto', { method: 'POST', headers, body: JSON.stringify({ imagenUrl: f.fotos[0], pista: nombreGenerico(f.producto) ? '' : f.producto }) }).catch(() => null)
+          if (r?.status === 429) { setIa((x) => x && { ...x, etapa: '⏳ La IA gratis pide una pausa, sigo en unos segundos…' }); await new Promise((ok) => setTimeout(ok, 15000 + intento * 5000)); continue }
+          d = r && r.ok ? await r.json().catch(() => null) : null
+          break
+        }
+        if (d) {
+          const rubro = d.rubroId ? porId.get(d.rubroId) : undefined
+          nuevas[i] = {
+            ...f,
+            producto: nombreGenerico(f.producto) && d.nombre ? d.nombre : f.producto,
+            categoria: f.categoria || (rubro ? rutaDe(rubro) : ''),
+            colores: f.colores || (d.colores || []).join(', '),
+            publico: f.publico || ({ mujer: 'mujer', hombre: 'hombre', ninos: 'niños', unisex: 'unisex' } as Record<string, string>)[d.publico] || '',
+            descripcion: f.descripcion || d.descripcion || '',
+          }
+          setFilas([...nuevas])
+        }
+        hechos++
+        setIa((x) => x && { ...x, hechos, etapa: '' })
+      }
+    }
+    await Promise.all([trabajador(), trabajador()])
+    setIa(null)
+    setDescargada(false)
+  }
+
   async function descargar() {
     if (!filas) return
     const fecha = new Date().toISOString().slice(0, 10)
-    await descargarPlanilla(filas, `productos-clasiclick-${fecha}.xlsx`, origen, unificadas)
+    const conTiendas = filas.map((f) => (renombres[f.tienda]?.trim() ? { ...f, tienda: renombres[f.tienda].trim() } : f))
+    await descargarPlanilla(conTiendas, `productos-clasiclick-${fecha}.xlsx`, origen, unificadas)
     setDescargada(true)
   }
 
   const sinCategoria = filas?.filter((f) => !f.categoria).length || 0
   const sinPrecio = filas?.filter((f) => f.precio == null).length || 0
   const tiendas = filas ? [...new Set(filas.map((f) => f.tienda))] : []
+  const conNombreDeFoto = filas?.filter((f) => nombreGenerico(f.producto)).length || 0
+  const paraIA = filas?.filter((f) => /^https:\/\//.test(f.fotos[0] || '') && (nombreGenerico(f.producto) || !f.categoria || !f.descripcion)).length || 0
 
   return (
     <div>
@@ -180,6 +230,31 @@ export default function ArmarPlanilla({ password, rubros, onUsarSheet }: { passw
             {sinPrecio ? <span>Falta el precio en {sinPrecio}.</span> : null}
             {unificadas.length > 0 && <div className="text-inksoft text-[11px]">Tiendas unificadas: {unificadas.map(([a, b]) => `“${a}” → “${b}”`).join(', ')}.</div>}
           </div>
+          {/* Tienda: se puede cambiar (ej. "Gemini" salió del nombre de la foto). */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {tiendas.map((t) => (
+              <label key={t} className="flex items-center gap-1.5 bg-white border border-indigo-100 rounded-md px-2 py-1 font-body text-[11px] text-inksoft">
+                Tienda “{t}” →
+                <input value={renombres[t] ?? t} onChange={(e) => setRenombres((r) => ({ ...r, [t]: e.target.value }))} className="px-2 py-1 rounded border border-line font-body text-xs text-ink w-40" aria-label={`Nombre de la tienda ${t}`} />
+              </label>
+            ))}
+          </div>
+          {paraIA > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-2 bg-indigo-50 border border-indigo-200 rounded-md px-2.5 py-2">
+              <span className="font-body text-[11px] text-ink">
+                {conNombreDeFoto ? <><strong>{conNombreDeFoto}</strong> con nombre de foto (ej. “{filas.find((f) => nombreGenerico(f.producto))!.producto.slice(0, 28)}”). </> : null}
+                La IA puede mirar cada foto y completar el nombre, la categoría, los colores y la descripción.
+              </span>
+              {ia ? (
+                <>
+                  <span className="font-body text-[11px] text-indigo-700 font-semibold">✨ {ia.hechos} de {ia.total}{ia.etapa ? ` · ${ia.etapa}` : ''}</span>
+                  <button type="button" onClick={() => { frenar.current = true }} className="px-2.5 py-1 rounded-md border border-line bg-white font-body text-xs">Frenar</button>
+                </>
+              ) : (
+                <button type="button" onClick={completarConIA} className="px-3 py-1.5 rounded-lg border-none bg-indigo-600 text-white font-body text-xs font-semibold">✨ Completar con IA ({paraIA}{paraIA > 20 ? ` · ≈ ${Math.ceil(paraIA / 12)} min` : ''})</button>
+              )}
+            </div>
+          )}
           <div className="max-h-64 overflow-auto bg-white border border-indigo-100 rounded-md mb-2">
             <table className="w-full font-body text-[11px]">
               <thead className="sticky top-0 bg-panelalt text-inksoft text-left">
@@ -188,8 +263,8 @@ export default function ArmarPlanilla({ password, rubros, onUsarSheet }: { passw
               <tbody>
                 {filas.map((f, i) => (
                   <tr key={i} className="border-t border-line/60">
-                    <td className="px-2 py-1 whitespace-nowrap">{f.tienda}</td>
-                    <td className="px-2 py-1">{f.producto}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{renombres[f.tienda]?.trim() || f.tienda}</td>
+                    <td className={`px-2 py-1 ${nombreGenerico(f.producto) ? 'text-ochre' : ''}`}>{f.producto}{f.descripcion && <span className="block text-[10px] text-inksoft truncate max-w-[260px]">{f.descripcion}</span>}</td>
                     <td className="px-2 py-1">{f.publico || '—'}</td>
                     <td className="px-2 py-1">{f.categoria ? f.categoria.split(' > ').slice(-2).join(' › ') : <span className="text-ochre">la IA</span>}</td>
                     <td className="px-2 py-1 text-center">{f.fotos.length}</td>

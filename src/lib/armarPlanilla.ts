@@ -78,6 +78,7 @@ export type FilaPlanilla = {
   fotos: string[] // links (Drive o ImgBB) o nombres de archivo
   vista?: string // link de la miniatura
   archivo: string
+  descripcion?: string
 }
 
 // Tiendas escritas de dos formas ("risitas" y "risitas-bebes") → la más larga.
@@ -143,7 +144,7 @@ export async function descargarPlanilla(filas: FilaPlanilla[], nombreArchivo: st
     f.stock != null ? { value: f.stock, type: Number } : { value: null },
     { ...texto(f.categoria), backgroundColor: f.categoria ? undefined : '#FFF4D6' },
     texto(f.fotos.join(', ')),
-    { value: null }, { value: null }, { value: null },
+    { value: null }, texto(f.descripcion || ''), { value: null },
     { ...texto(f.archivo), color: '#888888' },
   ].map((c) => ({ ...c, alignVertical: 'center' })))
   const sinPrecio = filas.filter((f) => f.precio == null).length
