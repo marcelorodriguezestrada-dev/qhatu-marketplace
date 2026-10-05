@@ -5,7 +5,7 @@
 // La columna foto puede tener links (Drive compartido o web) o nombres de
 // archivo que se buscan en la carpeta de fotos elegida; varios separados
 // por coma.
-import { codigoTienda, esImagen, publicoEnTexto, type ProductoLeido } from '@/lib/importarCarpeta'
+import { codigoTienda, esImagen, publicoEnTexto, separarMarcaFoto, type ProductoLeido } from '@/lib/importarCarpeta'
 
 const normalizar = (t: string) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -127,5 +127,43 @@ export function leerSheet(
       fila,
     })
   })
-  return { productos, avisos, columnas }
+  return { productos: unirFotosDelMismo(productos, avisos), avisos, columnas }
+}
+
+// Filas del mismo producto con distinta foto ("Banquito a", "Banquito c",
+// "Banquito v" de la misma tienda) → un solo producto "Banquito" con todas
+// las fotos. Los datos (precio, talles…) salen de la primera fila que los
+// tenga.
+function unirFotosDelMismo(productos: ProductoLeido[], avisos: string[]): ProductoLeido[] {
+  const grupos = new Map<string, ProductoLeido[]>()
+  for (const p of productos) {
+    const { base, marca } = separarMarcaFoto(p.nombre)
+    const k = marca && !p.sku ? `${p.tienda}::${normalizar(base)}` : `${p.tienda}::${p.clave}`
+    grupos.set(k, [...(grupos.get(k) || []), p])
+  }
+  const out: ProductoLeido[] = []
+  for (const g of grupos.values()) {
+    const [p] = g
+    const { base, marca } = separarMarcaFoto(p.nombre)
+    if (!marca) { out.push(...g); continue }
+    const primero = <T,>(f: (x: ProductoLeido) => T | null | undefined, vacio: (v: T) => boolean = (v) => v == null || v === '' || (Array.isArray(v) && !v.length)) =>
+      g.map(f).find((v) => v != null && !vacio(v as T)) ?? f(p)
+    out.push({
+      ...p,
+      nombre: base,
+      precio: primero((x) => x.precio) ?? null,
+      precioAntes: primero((x) => x.precioAntes) ?? null,
+      publico: primero((x) => x.publico) ?? null,
+      talles: primero((x) => x.talles) || [],
+      colores: primero((x) => x.colores) || [],
+      stock: primero((x) => x.stock) ?? null,
+      categoriaTexto: primero((x) => x.categoriaTexto) || '',
+      descripcion: primero((x) => x.descripcion) || '',
+      fotos: g.flatMap((x) => x.fotos),
+      fotosLink: g.flatMap((x) => x.fotosLink || []),
+      archivo: g.length > 1 ? `filas ${g.map((x) => x.fila).join(', ')}` : p.archivo,
+    })
+    if (g.length > 1) avisos.push(`Filas ${g.map((x) => x.fila).join(', ')}: “${base}” con ${g.length} fotos (las unimos en un solo producto)`)
+  }
+  return out
 }

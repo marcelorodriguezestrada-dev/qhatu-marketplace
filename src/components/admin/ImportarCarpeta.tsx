@@ -335,6 +335,7 @@ export default function ImportarCarpeta({
               <div className="font-body text-[11px] text-inksoft bg-white rounded-md border border-indigo-100 p-2.5 mb-3 leading-relaxed">
                 <strong>Columnas</strong> (en cualquier orden): <code>tienda</code>*, <code>producto</code>*, <code>precio</code>*, <code>público</code>, <code>talles</code>, <code>colores</code>, <code>stock</code>, <code>categoría</code>, <code>foto</code>, <code>precio antes</code>, <code>descripción</code>, <code>código</code>.<br />
                 <strong>foto:</strong> el nombre del archivo (ej. <code>blusa-flores.jpg</code>) y abajo elegís la carpeta con las fotos, o un link (Drive compartido). Varias, separadas por coma.<br />
+                <strong>Varias fotos del mismo producto:</strong> una fila por foto con una letra o número al final (<code>Banquito a</code>, <code>Banquito b</code>…) y se unen en un solo producto “Banquito”.<br />
                 <strong>categoría</strong> vacía = la elige la IA mirando la foto. <strong>código</strong> (opcional) = el código del producto en la tienda, para reconocerlo al reimportar.
               </div>
               <div className="flex flex-wrap gap-2 items-center mb-2">
