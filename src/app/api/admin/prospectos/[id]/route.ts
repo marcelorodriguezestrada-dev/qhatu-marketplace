@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { FieldValue } from 'firebase-admin/firestore'
 import { getDb } from '@/lib/firebaseAdmin'
 import { numeroWhatsapp } from '@/lib/prospectos'
 import { leerCampana, limpiarProspecto } from '@/lib/prospectosServer'
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic'
 
 // PATCH { ...campos, estado? } → actualiza. Al pasar a "registrado" se le
 // asigna uno de los cupos de la campaña (si quedan): beneficio = true.
+// { registrar: 'texto' } suma una línea al historial de seguimiento.
 // DELETE → lo borra.
 const autorizado = (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
@@ -31,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const actual = doc.data() as any
       const ahora = new Date().toISOString()
       const cambios: Record<string, unknown> = { ...d, updatedAt: ahora }
+      if (typeof b.registrar === 'string' && b.registrar.trim()) cambios.historial = FieldValue.arrayUnion({ fecha: ahora, accion: b.registrar.trim().slice(0, 200) })
       if (d.estado && d.estado !== actual.estado) {
         if (d.estado === 'contactado' && !actual.contactadoAt) cambios.contactadoAt = ahora
         if (d.estado === 'registrado') {
@@ -42,7 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         }
       }
       tx.update(ref, cambios)
-      return { prospecto: { id: doc.id, ...actual, ...cambios } }
+      const historial = cambios.historial ? [...(actual.historial || []), { fecha: ahora, accion: String(b.registrar).trim().slice(0, 200) }] : actual.historial
+      return { prospecto: { id: doc.id, ...actual, ...cambios, historial } }
     })
     if ('error' in res) return NextResponse.json({ error: res.error }, { status: res.status })
     return NextResponse.json({ ok: true, ...res })
