@@ -5,6 +5,7 @@ import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import SelectorRubro from '@/components/admin/SelectorRubro'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 import ImportarCarpeta from '@/components/admin/ImportarCarpeta'
+import UnirRepetidos from '@/components/admin/UnirRepetidos'
 import type { CategoriaProducto } from '@/lib/arbolCategorias'
 
 // Admin → Productos → "⚡ Edición rápida": una planilla con todos los
@@ -33,6 +34,7 @@ type Prod = {
   estado?: string
   imagenUrl?: string
   thumbUrl?: string
+  fotosAdicionales?: string[]
   claveImportacion?: string
 }
 type Campos = Partial<Pick<Prod, 'nombre' | 'rubro' | 'publico' | 'precio' | 'precioOriginal' | 'stock' | 'talles' | 'colores'>>
@@ -309,6 +311,7 @@ export default function EdicionRapidaProductos({
 
   if (!abierto) {
     return (
+      <>
       <div className="bg-panel border border-teal rounded-xl p-3.5 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-body text-sm font-semibold text-ink">⚡ Edición rápida de productos</div>
@@ -320,6 +323,9 @@ export default function EdicionRapidaProductos({
           <button type="button" onClick={() => setAbierto(true)} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold">Abrir planilla</button>
         </div>
       </div>
+      {mensaje && <div className="font-body text-xs text-teal font-semibold -mt-3 mb-3">{mensaje}</div>}
+      <UnirRepetidos password={password} productos={productos} onUnidos={(msg) => { setMensaje(msg); onGuardado() }} />
+      </>
     )
   }
 
@@ -412,6 +418,8 @@ export default function EdicionRapidaProductos({
           }}
         />
       )}
+
+      <UnirRepetidos password={password} productos={productos} onUnidos={(msg) => { setMensaje(msg); onGuardado() }} />
 
       {/* Productos nuevos */}
       <div className={`rounded-lg p-3 mb-3 flex flex-wrap items-center gap-2 ${nuevos.length ? 'bg-emerald-50 border border-emerald-300' : 'bg-panelalt border border-line'}`}>
