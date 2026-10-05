@@ -19,6 +19,7 @@ import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
+import AdminCaptacion from '@/components/admin/AdminCaptacion'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminZonasEnvio from '@/components/admin/AdminZonasEnvio'
 import AdminMarketing from '@/components/admin/AdminMarketing'
@@ -95,7 +96,7 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
-type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas'
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas' | 'captacion'
 
 const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
@@ -103,6 +104,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'reparto', icono: '🛵', label: 'Reparto', ayuda: 'Entregas del día por zona', grupo: 'Ventas' },
   { id: 'cupones', icono: '🎟️', label: 'Cupones', ayuda: 'Promos y campañas', grupo: 'Ventas' },
   { id: 'marketing', icono: '📣', label: 'Marketing', ayuda: 'Campañas, mensajes y volantes', grupo: 'Ventas' },
+  { id: 'captacion', icono: '🎯', label: 'Captar tiendas', ayuda: 'Mapa de tiendas, prospectos y estrategia', grupo: 'Ventas' },
   { id: 'productos', icono: '📦', label: 'Productos', ayuda: 'Moderación y vendedores', grupo: 'Contenido' },
   { id: 'servicios', icono: '🧑‍🔧', label: 'Servicios profesionales', ayuda: 'Solicitudes e invitaciones', grupo: 'Contenido' },
   { id: 'anuncios', icono: '📢', label: 'Anuncios', ayuda: 'Clasificados, importar y Facebook', grupo: 'Contenido' },
@@ -1613,6 +1615,7 @@ export default function AdminPage() {
 
       {tab === 'cupones' && <AdminCupones password={password} />}
       {tab === 'marketing' && <AdminMarketing password={password} />}
+      {tab === 'captacion' && <AdminCaptacion password={password} />}
       {tab === 'analitica' && (
         <>
           <AdminRecuperacion password={password} />
