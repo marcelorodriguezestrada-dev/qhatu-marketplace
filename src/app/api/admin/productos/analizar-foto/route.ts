@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
-import { analizarFotoProducto, LimiteIA } from '@/lib/fotoProductoIA'
+import { analizarFotoProducto, ErrorIA, LimiteIA } from '@/lib/fotoProductoIA'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -31,10 +31,12 @@ export async function POST(req: NextRequest) {
   let categorias = CATEGORIAS_PRODUCTOS_BASE
   try { categorias = (await construirArbolCategoriasProductos()).categorias } catch {}
   try {
-    const r = await analizarFotoProducto(url, categorias, typeof pista === 'string' ? pista.slice(0, 120) : undefined)
-    return NextResponse.json(r || { rubroId: null, nombre: '', publico: null, colores: [], descripcion: '' })
+    return NextResponse.json(await analizarFotoProducto(url, categorias, typeof pista === 'string' ? pista.slice(0, 120) : undefined))
   } catch (err) {
     if (err instanceof LimiteIA) return NextResponse.json({ error: 'limite' }, { status: 429 })
+    // El motivo llega al panel (antes fallaba sin avisar).
+    if (err instanceof ErrorIA) return NextResponse.json({ error: err.message }, { status: 502 })
+    console.error('POST /api/admin/productos/analizar-foto', err)
     return NextResponse.json({ error: 'No se pudo analizar la foto.' }, { status: 500 })
   }
 }

@@ -68,6 +68,8 @@ export default function ImportarCarpeta({
   const [errorTienda, setErrorTienda] = useState('')
   const [avance, setAvance] = useState({ hechos: 0, total: 0, errores: 0, etapa: '' })
   const frenar = useRef(false)
+  // Por qué falló la IA (se muestra en la fila y al terminar).
+  const ultimoErrorIA = useRef('')
   // Para elegir carpetas (no archivos sueltos): se pone al aparecer el input.
   const elegirCarpeta = (el: HTMLInputElement | null) => { if (el) el.setAttribute('webkitdirectory', '') }
   const [resumen, setResumen] = useState({ nuevos: 0, actualizados: 0 })
@@ -203,9 +205,13 @@ export default function ImportarCarpeta({
         continue
       }
       const d = await r.json().catch(() => null)
-      if (!r.ok || !d) return null
+      if (!r.ok || !d) {
+        ultimoErrorIA.current = d?.error || `error ${r.status}`
+        return null
+      }
       return d
     }
+    ultimoErrorIA.current = 'la IA gratis siguió ocupada (límite por minuto); probá de nuevo en un rato'
     return null
   }
 
@@ -287,7 +293,7 @@ export default function ImportarCarpeta({
             thumbUrl: foto?.thumbUrl,
             fotosAdicionales: resto.map((x) => x.url),
             descripcionCorta: p.descripcion || ia?.descripcion || '',
-            error: !foto && errorFoto ? `Foto: ${errorFoto}` : !rubro ? (p.categoriaTexto ? `No reconocimos la categoría “${p.categoriaTexto}”: elegila` : 'Elegí la categoría') : undefined,
+            error: !foto && errorFoto ? `Foto: ${errorFoto}` : usarIA && foto && !ia ? `La IA no pudo mirar la foto: ${ultimoErrorIA.current || 'sin respuesta'}` : !rubro ? (p.categoriaTexto ? `No reconocimos la categoría “${p.categoriaTexto}”: elegila` : 'Elegí la categoría') : undefined,
           }
         } catch (err: any) {
           errores++
