@@ -77,9 +77,10 @@ async function modelosGemini(): Promise<string[]> {
       }
     } catch {}
   }
-  // Más nuevo primero ("gemini-3-flash" antes que "gemini-2.5-flash"), sin "-lite" adelante.
+  // Estables antes que "preview" (los preview suelen estar saturados: 503),
+  // y entre ellos el más nuevo primero, el "-lite" después del normal.
   const version = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || 0)
-  const lista = (ids && ids.length ? ids : base).sort((a, b) => version(b) - version(a) || Number(/lite/.test(a)) - Number(/lite/.test(b)) || Number(/preview/.test(a)) - Number(/preview/.test(b)))
+  const lista = (ids && ids.length ? ids : base).sort((a, b) => Number(/preview|exp/.test(a)) - Number(/preview|exp/.test(b)) || version(b) - version(a) || Number(/lite/.test(a)) - Number(/lite/.test(b)))
   return Array.from(new Set([...(env ? [env] : []), ...(geminiQueAnda ? [geminiQueAnda] : []), ...lista]))
 }
 
@@ -125,6 +126,8 @@ async function gemini(model: string, partes: unknown[], maxTokens: number): Prom
 
 async function conGemini(partes: unknown[], maxTokens: number): Promise<any> {
   let ultimo: unknown = null
+  let saturados = 0
+  let limitados = 0
   for (const model of await modelosGemini()) {
     try {
       const r = await gemini(model, partes, maxTokens)
@@ -133,11 +136,17 @@ async function conGemini(partes: unknown[], maxTokens: number): Promise<any> {
     } catch (err) {
       ultimo = err
       const st = (err as any)?.status
-      // Modelo inexistente o sin acceso → el siguiente. Clave mala, límite u otro → se corta.
+      // Límite gratis de ESTE modelo (cada modelo tiene el suyo) → probamos otro.
+      if (err instanceof LimiteIA) { limitados++; continue }
+      // Saturado ("high demand", 503/500) → otro modelo; es pasajero.
+      if (err instanceof ErrorIA && (st === 503 || st === 500 || st === 502)) { saturados++; continue }
+      // Modelo inexistente o sin acceso → el siguiente. Clave mala u otro → se corta.
       if (err instanceof ErrorIA && (st === 404 || (st === 400 && /model|not found|not supported/i.test(String((err as any).texto))))) continue
       throw err
     }
   }
+  // Todos saturados o al límite: el panel espera unos segundos y reintenta solo.
+  if (saturados || limitados) throw new LimiteIA(saturados ? 'Gemini está saturado en este momento' : 'Límite de la IA por minuto')
   throw ultimo || new ErrorIA('Gemini no tiene modelos disponibles para esta clave.')
 }
 
