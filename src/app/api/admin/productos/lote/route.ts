@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // Admin → Productos → "⚡ Edición rápida": guarda los cambios de muchos
 // productos de una (lotes de Firestore de hasta 400 escrituras).
-// POST { cambios: [{ id, nombre?, rubro?, publico?, precio?, precioOriginal?, stock?, talles?, colores?, estado? }] }
+// POST { cambios: [{ id, nombre?, rubro?, publico?, precio?, precioOriginal?, stock?, talles?, colores?, descripcionCorta?, estado? }] }
 const lista = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 60) : [])
 
 export async function POST(req: NextRequest) {
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     if (e.stock !== undefined) d.stock = sanearStock(e.stock)
     if (e.talles !== undefined) d.talles = lista(e.talles)
     if (e.colores !== undefined) d.colores = lista(e.colores)
+    if (typeof e.descripcionCorta === 'string') d.descripcionCorta = e.descripcionCorta.trim().slice(0, 300)
     if (e.estado !== undefined) {
       if (!['activo', 'pendiente', 'rechazado', 'oculto'].includes(e.estado)) { errores.push({ id, error: 'Estado inválido' }); continue }
       d.estado = e.estado
