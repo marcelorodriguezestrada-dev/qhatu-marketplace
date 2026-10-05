@@ -200,7 +200,7 @@ export default function ImportarCarpeta({
     for (let intento = 0; intento < 6; intento++) {
       const r = await fetch('/api/admin/productos/analizar-foto', { method: 'POST', headers, body: JSON.stringify({ imagenUrl, pista }) })
       if (r.status === 429) {
-        setAvance((a) => ({ ...a, etapa: '⏳ La IA está ocupada (límite gratis o mucha demanda), sigo en unos segundos…' }))
+        setAvance((a) => ({ ...a, etapa: '⏳ La IA gratis pide una pausa (límite por minuto), sigo en unos segundos…' }))
         await esperar(15000 + intento * 5000)
         continue
       }
