@@ -219,6 +219,39 @@ function CheckoutContent() {
   // Cuentas de prueba (ver src/lib/cuentasPrueba.ts): sin restricciones
   // de horario — tienda abierta y express siempre disponibles.
   const cuentaPrueba = esPrueba
+
+  // Fuera de horario (20 a 8 h) no se puede pagar: en vez de solo cortar,
+  // guardamos el carrito y le programamos un aviso en la 🔔 campanita
+  // para las 8:00 (ver /api/compras-fuera-horario). El admin los ve en
+  // Admin → Pedidos → "🌙 Quisieron comprar fuera de horario".
+  const [cerradoAhora, setCerradoAhora] = useState(() => !tiendaAbierta())
+  useEffect(() => {
+    const t = setInterval(() => setCerradoAhora(!tiendaAbierta()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+  const [avisoApertura, setAvisoApertura] = useState<'' | 'guardando' | 'listo' | 'error'>('')
+  async function avisarAlAbrir() {
+    if (!usuario || !items.length) return
+    setAvisoApertura('guardando')
+    try {
+      const token = await obtenerToken()
+      const r = await fetch('/api/compras-fuera-horario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          items: items.map((i) => ({ id: String(i.id), nombre: i.nombre, precio: i.precio, cantidad: i.cantidad, talla: i.tallaElegida, color: i.colorElegida, imagen: i.thumbUrl || i.imagenUrl })),
+          total: totalCarrito,
+          tienda: claveTienda,
+          nombre: nombreComprador,
+          whatsapp: whatsappComprador,
+          ciudad: ciudadComprador,
+        }),
+      })
+      setAvisoApertura(r.ok ? 'listo' : 'error')
+    } catch {
+      setAvisoApertura('error')
+    }
+  }
   const expressDisponible = cuentaPrueba || expressHorario
   useEffect(() => {
     if (envioExpress && !expressDisponible) setEnvioExpress(false)
@@ -885,7 +918,10 @@ function CheckoutContent() {
 
   async function confirmarEntregaYCrearPedidos() {
     if (!cuentaPrueba && !tiendaAbierta()) {
-      setError(mensajeTiendaCerrada())
+      setCerradoAhora(true)
+      setError('')
+      avisarAlAbrir() // guarda (o actualiza) carrito, nombre y WhatsApp
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
     if (!nombreComprador.trim()) {
@@ -1385,6 +1421,22 @@ function CheckoutContent() {
         </div>
       )}
 
+      {!cuentaPrueba && cerradoAhora && etapa === 'entrega' && items.length > 0 && (
+        <div className="bg-indigo-950 text-white rounded-xl px-4 py-3.5 mb-4">
+          <div className="font-body text-sm font-semibold">🌙 {mensajeTiendaCerrada()}</div>
+          <div className="font-body text-xs text-indigo-100 mt-1">
+            Tomamos pedidos de 8:00 a 20:00. Tu carrito y tus datos quedan guardados.
+          </div>
+          {avisoApertura === 'listo' ? (
+            <div className="font-body text-xs text-emerald-300 font-semibold mt-2">✓ Listo: a las 8:00 te avisamos en la 🔔 campanita para que termines tu compra en un toque.</div>
+          ) : (
+            <button type="button" onClick={avisarAlAbrir} disabled={avisoApertura === 'guardando' || !usuario} className="mt-2.5 px-3.5 py-2 rounded-lg border-none bg-white text-indigo-950 font-body text-xs font-semibold disabled:opacity-60">
+              {avisoApertura === 'guardando' ? 'Guardando…' : '🔔 Avisame cuando abra'}
+            </button>
+          )}
+          {avisoApertura === 'error' && <div className="font-body text-[11px] text-rose-300 mt-1">No se pudo guardar el aviso. Probá de nuevo.</div>}
+        </div>
+      )}
       {cuentaPrueba && (
         <div className="font-body text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-4">
           🧪 Cuenta de prueba: sin restricciones de horario (tienda y envío express siempre disponibles).
