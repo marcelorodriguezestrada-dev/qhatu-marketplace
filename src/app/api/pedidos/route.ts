@@ -231,6 +231,16 @@ export async function POST(req: NextRequest) {
         console.error('métrica recuperación', err)
       }
     }
+    // Si había querido comprar fuera de horario (20 a 8 h), queda como "volvió y compró".
+    if (usuarioLogueado) {
+      try {
+        const fh = await db.collection('comprasFueraHorario').where('uid', '==', usuarioLogueado.uid).get()
+        const ahoraISO = new Date().toISOString()
+        await Promise.all(fh.docs.filter((d) => !d.data().convertido).map((d) => d.ref.update({ convertido: true, pedidoId: ref.id, convertidoAt: ahoraISO })))
+      } catch (err) {
+        console.error('fuera de horario → convertido', err)
+      }
+    }
     // Compra que llegó por una campaña de marketing (no cuentan las de prueba).
     if (body.campana && !esPrueba) await sumarCampana(body.campana, { pedidos: 1, ventasBs: Number(total) || 0 })
     return NextResponse.json({ id: ref.id })

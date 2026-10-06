@@ -11,8 +11,12 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
     const snap = await db.collection('notificaciones').where('uid', '==', usuario.uid).get()
+    // Las programadas (ej. el aviso de "¡Ya abrimos!" de las 8:00) no se
+    // muestran antes de su hora.
+    const ahora = new Date().toISOString()
     const notificaciones = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((n: any) => !n.visibleDesde || n.visibleDesde <= ahora)
       .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     return NextResponse.json({ notificaciones })
   } catch (err) {
@@ -31,7 +35,8 @@ export async function PATCH(req: NextRequest) {
     const db = getDb()
     const snap = await db.collection('notificaciones').where('uid', '==', usuario.uid).where('leida', '==', false).get()
     const batch = db.batch()
-    snap.docs.forEach((d) => batch.update(d.ref, { leida: true }))
+    const ahora = new Date().toISOString()
+    snap.docs.filter((d) => !d.data().visibleDesde || d.data().visibleDesde <= ahora).forEach((d) => batch.update(d.ref, { leida: true }))
     await batch.commit()
     return NextResponse.json({ ok: true })
   } catch (err) {

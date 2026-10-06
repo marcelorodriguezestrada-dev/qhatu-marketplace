@@ -20,6 +20,7 @@ import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminCaptacion from '@/components/admin/AdminCaptacion'
+import AdminFueraHorario from '@/components/admin/AdminFueraHorario'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminZonasEnvio from '@/components/admin/AdminZonasEnvio'
 import AdminMarketing from '@/components/admin/AdminMarketing'
@@ -1625,6 +1626,7 @@ export default function AdminPage() {
 
       {tab === 'pedidos' && (
         <div>
+          <AdminFueraHorario password={password} />
           {pedidos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay pedidos.</div>}
           {pedidos.map((p) => {
             const estado = ESTADOS_LABEL[p.estado] || { texto: p.estado, color: 'text-inksoft' }
