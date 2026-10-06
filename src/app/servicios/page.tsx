@@ -9,6 +9,8 @@ import { useCategorias } from '@/lib/useCategorias'
 import { esPremiumVigente } from '@/lib/planPremium'
 import { ChipsCiudad, useFiltroCiudad } from '@/components/SelectorCiudad'
 import { buscarCiudad, ciudadDe, ciudadEnTexto, profesionalEnCiudad } from '@/data/ciudades'
+import BuscadorServicios from '@/components/BuscadorServicios'
+import { coincideServicio } from '@/lib/busquedaServicios'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -167,13 +169,31 @@ export default function ServiciosPage() {
   const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const q = sinAcentos(textoBusqueda.trim())
 
+  // Cada palabra tiene que estar (nombre, especialidad, rubro, grupo,
+  // categoría, servicios, zona), con plurales, femenino y sinónimos
+  // ("doctor" → médico) — ver src/lib/busquedaServicios.ts.
+  const coincideTexto = (p: Profesional) => {
+    const r = rubrosFlat.find((x) => x.id === p.rubro)
+    return coincideServicio(p, r ? { label: r.label, grupoLabel: r.grupoLabel, categoriaLabel: r.categoriaLabel } : undefined, textoBusqueda, { parcial: true })
+  }
+
+  // Cuántos profesionales hay (en la ciudad elegida) por rubro, grupo y
+  // categoría: las filas de botones solo muestran lo que tiene resultados.
+  const enCiudad = profesionales.filter((p) => profesionalEnCiudad(p, ciudadBuscada))
+  const conteo: Record<string, number> = {}
+  for (const p of enCiudad) {
+    const r = rubrosFlat.find((x) => x.id === p.rubro)
+    if (!r) continue
+    for (const k of [r.id, `c:${r.categoriaId}`, r.grupoId ? `g:${r.grupoId}` : '']) if (k) conteo[k] = (conteo[k] || 0) + 1
+  }
+  const cuenta = (k: string) => (conteo[k] ? ` (${conteo[k]})` : '')
+
   const coincideBusqueda = (p: Profesional) => {
     let matchRubro = true
     if (rubro !== 'Todo') matchRubro = p.rubro === rubro
     else if (grupoSel !== 'Todo') matchRubro = rubroIdsDeGrupo.includes(p.rubro)
     else if (categoriaSel !== 'Todo') matchRubro = rubroIdsDeCategoria.includes(p.rubro)
-    const texto = sinAcentos([p.nombre, p.zona, p.especialidad, p.rubro, buscarRubro(p.rubro)?.label].filter(Boolean).join(' '))
-    return matchRubro && (!q || texto.includes(q))
+    return matchRubro && (!q || coincideTexto(p))
   }
   // Para el aviso "no hay en tu ciudad, pero hay N en otras".
   const enOtrasCiudades = ciudadBuscada === 'todas' ? 0 : profesionales.filter((p) => coincideBusqueda(p) && !profesionalEnCiudad(p, ciudadBuscada)).length
@@ -205,8 +225,7 @@ export default function ServiciosPage() {
       matchRubro = rubroIdsDeCategoria.includes(p.rubro)
     }
 
-    const texto = sinAcentos([p.nombre, p.zona, p.especialidad, p.rubro, buscarRubro(p.rubro)?.label].filter(Boolean).join(' '))
-    return matchRubro && (!q || texto.includes(q))
+    return matchRubro && (!q || coincideTexto(p))
   })
 
   if (orden === 'cercania' && ubicacion) {
@@ -250,17 +269,21 @@ export default function ServiciosPage() {
 
       <div className="max-w-[960px] mx-auto px-5 py-6 pb-12">
         <div className="flex items-center gap-2 mb-4">
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const q = encodeURIComponent(busqueda || '')
-                router.push(`${pathname}${q ? `?q=${q}` : ''}`)
-              }
+          <BuscadorServicios
+            valor={busqueda}
+            onCambiar={setBusqueda}
+            onBuscar={(texto) => {
+              const q = encodeURIComponent(texto || '')
+              router.push(`${pathname}${q ? `?q=${q}` : ''}`)
             }}
+            onElegirRubro={(r) => {
+              setCategoriaSel(r.categoriaId)
+              setGrupoSel(r.grupoId || 'Todo')
+              setRubro(r.id)
+            }}
+            profesionales={enCiudad}
+            rubrosFlat={rubrosFlat}
             placeholder={multiciudad ? 'Buscar (ej: abogado en La Paz)' : 'Buscar por nombre, rubro o zona'}
-            className="flex-1 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
           <button
             type="button"
@@ -286,15 +309,17 @@ export default function ServiciosPage() {
             forma de volver a un nivel anterior; acá arriba solo se ve
             el paso siguiente, para no enterrar la pantalla en botones. */}
         {categoriaSel === 'Todo' && (
-          <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <div className="flex gap-2 mb-3 items-center overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0 pb-1" style={{ scrollbarWidth: 'none' }}>
             <button
               type="button"
               onClick={() => { setCategoriaSel('Todo'); setGrupoSel('Todo'); setRubro('Todo') }}
-              className="px-4 py-1.5 rounded-full border font-body text-sm font-medium border-maroon bg-maroonsoft text-maroon"
+              aria-label="Todas las categorías"
+              title="Todas las categorías"
+              className="w-9 h-9 rounded-full border flex items-center justify-center text-base shrink-0 border-maroon bg-maroonsoft text-maroon"
             >
-              Todas las categorías
+              🏠
             </button>
-            {categorias.map((c) => (
+            {categorias.filter((c) => conteo[`c:${c.id}`]).map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -308,9 +333,9 @@ export default function ServiciosPage() {
                     body: JSON.stringify({ tipo: 'servicio', valor: c.id }),
                   }).catch(() => {})
                 }}
-                className="px-4 py-1.5 rounded-full border font-body text-sm font-medium border-line bg-panel text-inksoft"
+                className="px-4 py-1.5 rounded-full border font-body text-sm font-medium border-line bg-panel text-inksoft shrink-0 whitespace-nowrap"
               >
-                {c.label}
+                {c.label}<span className="text-[11px] opacity-70">{cuenta(`c:${c.id}`)}</span>
               </button>
             ))}
           </div>
@@ -321,22 +346,22 @@ export default function ServiciosPage() {
             todavía, y solo si esa categoría tiene grupos definidos
             (categorías simples como "Belleza" pasan directo a rubros). */}
         {categoriaSel !== 'Todo' && grupoSel === 'Todo' && gruposDeCategoria.length > 0 && (
-          <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <div className="flex gap-2 mb-2 items-center overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0 pb-1" style={{ scrollbarWidth: 'none' }}>
             <button
               type="button"
               onClick={() => { setGrupoSel('Todo'); setRubro('Todo') }}
-              className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-maroon bg-maroonsoft text-maroon"
+              className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-maroon bg-maroonsoft text-maroon shrink-0 whitespace-nowrap"
             >
-              Todo {categorias.find((c) => c.id === categoriaSel)?.label || ''}
+              Todo {categorias.find((c) => c.id === categoriaSel)?.label || ''}{cuenta(`c:${categoriaSel}`)}
             </button>
-            {gruposDeCategoria.map((g) => (
+            {gruposDeCategoria.filter((g) => conteo[`g:${g.id}`]).map((g) => (
               <button
                 key={g.id}
                 type="button"
                 onClick={() => { setGrupoSel(g.id); setRubro('Todo') }}
-                className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-line bg-panel text-inksoft"
+                className="px-3.5 py-1.5 rounded-full border font-body text-xs font-medium border-line bg-panel text-inksoft shrink-0 whitespace-nowrap"
               >
-                {g.label}
+                {g.label}<span className="opacity-70">{cuenta(`g:${g.id}`)}</span>
               </button>
             ))}
           </div>
@@ -348,17 +373,17 @@ export default function ServiciosPage() {
             hayas elegido una, para poder cambiar entre especialidades
             del mismo grupo sin tener que volver para atrás. */}
         {categoriaSel !== 'Todo' && (grupoSel !== 'Todo' || gruposDeCategoria.length === 0) && (
-          <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <div className="flex gap-2 mb-2 items-center overflow-x-auto -mx-5 px-5 sm:mx-0 sm:px-0 pb-1" style={{ scrollbarWidth: 'none' }}>
             <button
               type="button"
               onClick={() => setRubro('Todo')}
-              className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+              className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium shrink-0 whitespace-nowrap ${
                 rubro === 'Todo' ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
               }`}
             >
               {grupoSel === 'Todo' ? 'Todos los rubros' : `Todo ${gruposDeCategoria.find((g) => g.id === grupoSel)?.label || ''}`}
             </button>
-            {rubrosVisibles.map((r) => (
+            {rubrosVisibles.filter((r) => conteo[r.id] || rubro === r.id).map((r) => (
               <button
                 key={r.id}
                 type="button"
@@ -370,11 +395,11 @@ export default function ServiciosPage() {
                     body: JSON.stringify({ tipo: 'servicio', valor: r.id }),
                   }).catch(() => {})
                 }}
-                className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium ${
+                className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-medium shrink-0 whitespace-nowrap ${
                   rubro === r.id ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panel text-inksoft'
                 }`}
               >
-                {r.label}
+                {r.label}<span className="opacity-70">{cuenta(r.id)}</span>
               </button>
             ))}
           </div>
