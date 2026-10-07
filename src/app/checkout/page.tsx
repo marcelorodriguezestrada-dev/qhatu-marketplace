@@ -222,6 +222,42 @@ function CheckoutContent() {
   // de horario — tienda abierta y express siempre disponibles.
   const cuentaPrueba = esPrueba
 
+  // Ubicación de prueba (cuentas de prueba): una casa fija en Potosí para
+  // probar el envío desde cualquier lado. Se cambia marcando otra casa en
+  // el mapa; "usar mi GPS real" la apaga.
+  const UBICACION_PRUEBA = { lat: -19.5797, lng: -65.7618, direccion: 'Fortunato Gumiel 20', zona: 'Cuarto Centenario' }
+  const [ubicacionPrueba, setUbicacionPrueba] = useState(UBICACION_PRUEBA)
+  const [gpsRealPrueba, setGpsRealPrueba] = useState(false)
+  useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('clasiclick_ubicacion_prueba') || 'null')
+      if (u && typeof u.lat === 'number') setUbicacionPrueba({ ...UBICACION_PRUEBA, ...u })
+      setGpsRealPrueba(localStorage.getItem('clasiclick_prueba_gps_real') === '1')
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  function guardarUbicacionPrueba(u: typeof UBICACION_PRUEBA) {
+    setUbicacionPrueba(u)
+    try { localStorage.setItem('clasiclick_ubicacion_prueba', JSON.stringify(u)) } catch {}
+  }
+  // Al elegir "Envío" con una cuenta de prueba, se completa sola con la
+  // casa de prueba (una vez; se puede cambiar o borrar).
+  const pruebaCompletada = useRef(false)
+  function completarConCasaPrueba() {
+    setDireccion(ubicacionPrueba.direccion)
+    setDireccionVerificada(true)
+    setZonaTexto(ubicacionPrueba.zona)
+    setZonaEntrega(ubicacionPrueba.zona)
+    setOrigenBarrio('manual')
+    setLat(ubicacionPrueba.lat)
+    setLng(ubicacionPrueba.lng)
+    setOrigenPunto('gps')
+  }
+  function cambiarGpsRealPrueba(v: boolean) {
+    setGpsRealPrueba(v)
+    try { localStorage.setItem('clasiclick_prueba_gps_real', v ? '1' : '0') } catch {}
+  }
+
   // Fuera de horario (20 a 8 h) no se puede pagar: en vez de solo cortar,
   // guardamos el carrito y le programamos un aviso en la 🔔 campanita
   // para las 8:00 (ver /api/compras-fuera-horario). El admin los ve en
@@ -879,7 +915,24 @@ function CheckoutContent() {
     setErrorCupon('')
   }
 
+  useEffect(() => {
+    if (!cuentaPrueba || gpsRealPrueba || pruebaCompletada.current || restaurando) return
+    if (etapa !== 'entrega' || !metodoElegido || metodoEntrega !== 'envio' || direccion.trim()) return
+    pruebaCompletada.current = true
+    completarConCasaPrueba()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuentaPrueba, gpsRealPrueba, restaurando, etapa, metodoElegido, metodoEntrega])
+
   function usarMiUbicacion() {
+    // Cuenta de prueba: "mi ubicación" es la de prueba en Potosí (salvo
+    // que elija usar el GPS real), para probar desde cualquier ciudad.
+    if (cuentaPrueba && !gpsRealPrueba) {
+      setLat(ubicacionPrueba.lat)
+      setLng(ubicacionPrueba.lng)
+      setOrigenPunto('gps')
+      setMapaAbierto(false)
+      return
+    }
     setBuscandoUbicacion(true)
     if (!navigator.geolocation) {
       setError('Tu navegador no soporta geolocalización.')
@@ -928,6 +981,8 @@ function CheckoutContent() {
     setLat(puntoMapa.lat)
     setLng(puntoMapa.lng)
     setOrigenPunto('mapa')
+    // Cuenta de prueba: el punto marcado pasa a ser su ubicación de prueba.
+    if (cuentaPrueba) guardarUbicacionPrueba({ ...ubicacionPrueba, lat: puntoMapa.lat, lng: puntoMapa.lng, direccion: direccion.trim() || ubicacionPrueba.direccion })
     setMapaAbierto(false)
     setError('')
   }
@@ -1458,6 +1513,14 @@ function CheckoutContent() {
       {cuentaPrueba && (
         <div className="font-body text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-4">
           🧪 Cuenta de prueba: sin restricciones de horario (tienda y envío express siempre disponibles).
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>📍 {gpsRealPrueba ? 'Ubicación: tu GPS real' : <>Ubicación de prueba: <b>{ubicacionPrueba.direccion}</b> · {ubicacionPrueba.zona} (Potosí)</>}</span>
+            {!gpsRealPrueba && etapa === 'entrega' && (
+              <button type="button" onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true); completarConCasaPrueba() }} className="px-2 py-0.5 rounded border border-indigo-300 bg-white text-indigo-700 font-semibold">Completar con esta casa</button>
+            )}
+            <button type="button" onClick={() => cambiarGpsRealPrueba(!gpsRealPrueba)} className="underline bg-transparent border-none p-0 text-indigo-700">{gpsRealPrueba ? 'volver a la de Potosí' : 'usar mi GPS real'}</button>
+            {!gpsRealPrueba && <span className="text-indigo-500">(para cambiarla, marcá otra casa en el mapa)</span>}
+          </div>
         </div>
       )}
 
