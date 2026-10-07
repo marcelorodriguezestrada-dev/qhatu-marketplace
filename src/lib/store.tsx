@@ -10,6 +10,8 @@ export type ItemCarrito = Producto & {
   // disponibles del producto. Opcionales: hay productos sin variantes.
   tallaElegida?: string
   colorElegida?: string
+  // Cuándo se agregó (ms): el carrito guarda cada producto 15 días.
+  agregadoAt?: number
 }
 
 // Identifica una línea del carrito — dos unidades del mismo producto
@@ -37,6 +39,10 @@ type CarritoContextType = {
 const CarritoContext = createContext<CarritoContextType | null>(null)
 
 const STORAGE_KEY = 'clasiclick_carrito'
+// Cada producto queda en el carrito 15 días desde que se agregó (o se le
+// cambió la cantidad); después se saca solo, para no ofrecer precios o
+// stock viejos. Los de antes de esta regla cuentan desde hoy.
+export const DIAS_CARRITO = 15
 
 export function CarritoProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ItemCarrito[]>([])
@@ -46,7 +52,11 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const guardado = localStorage.getItem(STORAGE_KEY)
-      if (guardado) setItems(JSON.parse(guardado))
+      if (guardado) {
+        const ahora = Date.now()
+        const lista: ItemCarrito[] = JSON.parse(guardado)
+        setItems(lista.map((i) => ({ ...i, agregadoAt: i.agregadoAt || ahora })).filter((i) => ahora - (i.agregadoAt as number) < DIAS_CARRITO * 86400000))
+      }
     } catch {
       // Si el JSON está corrupto, arrancamos con carrito vacío en vez de romper la app.
     }
@@ -60,14 +70,14 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
   }, [items, cargado])
 
   function agregar(p: Producto, opciones?: { talla?: string; color?: string }) {
-    const nuevo: ItemCarrito = { ...p, cantidad: 1, tallaElegida: opciones?.talla, colorElegida: opciones?.color }
+    const nuevo: ItemCarrito = { ...p, cantidad: 1, tallaElegida: opciones?.talla, colorElegida: opciones?.color, agregadoAt: Date.now() }
     const clave = claveLinea(nuevo)
     setItems((prev) => {
       const existe = prev.find((i) => claveLinea(i) === clave)
       // Tope por el stock que se conocía al agregar (el servidor lo vuelve
       // a controlar al comprar).
       const tope = (i: ItemCarrito) => (typeof p.stock === 'number' ? Math.min(i.cantidad + 1, Math.max(1, p.stock)) : i.cantidad + 1)
-      if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: tope(i) } : i))
+      if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: tope(i), agregadoAt: Date.now() } : i))
       return [...prev, nuevo]
     })
   }
@@ -77,7 +87,7 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) =>
       prev.map((i) =>
         claveLinea(i) === clave
-          ? { ...i, cantidad: Math.max(1, typeof i.stock === 'number' ? Math.min(Math.max(1, i.stock), i.cantidad + delta) : i.cantidad + delta) }
+          ? { ...i, agregadoAt: Date.now(), cantidad: Math.max(1, typeof i.stock === 'number' ? Math.min(Math.max(1, i.stock), i.cantidad + delta) : i.cantidad + delta) }
           : i
       )
     )

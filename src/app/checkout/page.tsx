@@ -11,6 +11,8 @@ import { useAuth } from '@/lib/auth'
 import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, distanciaKm, costoPorDistancia } from '@/data/zonasPotosi'
 import { validarDireccion, validarEntreCalles, validarZona, zonaLibreValida } from '@/lib/validarEntrega'
 import { entreCallesNoCoinciden, type EntreCallesInfo } from '@/lib/entreCalles'
+import InputSugerencias from '@/components/InputSugerencias'
+import { coincideInicio, leerDatosUsados, mezclarConCuenta, recordarDatos, type DatosUsados, type DireccionUsada } from '@/lib/datosUsados'
 import { buscarZonaEn, normZona, zonaMasCercana, zonasCercanas } from '@/lib/zonasEnvio'
 import { useZonasEnvio } from '@/lib/useZonasEnvio'
 import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
@@ -597,11 +599,13 @@ function CheckoutContent() {
     } catch {
       // JSON corrupto o localStorage bloqueado: se arranca normal.
     }
-    // Lo que ya había completado (si volvió atrás, al carrito o recargó la
-    // página): no se pierde. Solo del mismo usuario y de los últimos 7 días.
+    // Lo que ya había completado si volvió atrás (al carrito, a otro
+    // producto) o recargó la página hace poco: no se pierde. Pasadas 2
+    // horas se considera una compra nueva y el formulario arranca vacío:
+    // lo anterior aparece como sugerencia mientras escribe (ver más abajo).
     try {
       const b = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || 'null')
-      if (b && usuario && b.uid === usuario.uid && Date.now() - (b.guardadoAt || 0) < 7 * 24 * 60 * 60 * 1000) {
+      if (b && usuario && b.uid === usuario.uid && Date.now() - (b.guardadoAt || 0) < 2 * 60 * 60 * 1000) {
         if (b.metodoElegido) {
           setMetodoEntrega(b.metodoEntrega === 'retiro' || b.metodoEntrega === 'vendedor' ? b.metodoEntrega : 'envio')
           setMetodoElegido(true)
@@ -624,36 +628,22 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCargando])
 
-  // Precarga los datos que este comprador ya cargó en una compra
-  // anterior (nombre, WhatsApp, barrio, dirección, entre calles) —
-  // para no hacerlo escribir todo de nuevo cada vez. Recién se
-  // consulta cuando ya sabemos que NO hay una espera para restaurar
-  // (si no, pisaría los datos de un pedido en curso), y solo completa
-  // los campos que sigan vacíos, por si la persona ya empezó a
-  // escribir algo distinto.
+  // Datos de compras anteriores (nombre, WhatsApp, direcciones con su
+  // zona y entre calles): ya NO se precargan; se sugieren mientras escribe
+  // ("m" → "Marcelo Rodríguez"). Del navegador + lo guardado en su cuenta.
+  const [datosUsados, setDatosUsados] = useState<DatosUsados>({ nombres: [], whatsapps: [], direcciones: [] })
   useEffect(() => {
-    if (restaurando || etapa !== 'entrega' || !usuario) return
+    if (restaurando || !usuario) return
     let cancelado = false
+    setDatosUsados(leerDatosUsados(usuario.uid))
     ;(async () => {
       try {
         const token = await obtenerToken()
         if (!token) return
-        const res = await fetch('/api/usuarios/datos-envio', { headers: { Authorization: `Bearer ${token}` } })
-        const data = await res.json()
-        const d = data.datosEnvio
-        if (!d || cancelado) return
-        setNombreComprador((prev) => prev || d.nombreComprador || '')
-        setWhatsappComprador((prev) => prev || d.whatsappComprador || '')
-        if (d.zonaEntrega) {
-          setZonaEntrega((prev) => prev || d.zonaEntrega)
-          setOrigenBarrio((prev) => prev || 'guardado')
-        }
-        setDireccion((prev) => prev || d.direccion || '')
-        setEntreCalles((prev) => prev || d.entreCalles || '')
-        setReferenciaAdicional((prev) => prev || d.referenciaAdicional || '')
+        const data = await fetch('/api/usuarios/datos-envio', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
+        if (!cancelado && data.datosEnvio) setDatosUsados((prev) => mezclarConCuenta(prev, data.datosEnvio))
       } catch {
-        // Sin datos guardados (o falló la consulta): el comprador
-        // arranca con el formulario vacío, como siempre.
+        // Sin datos guardados: no hay sugerencias, nada más.
       }
     })()
     return () => {
@@ -661,6 +651,26 @@ function CheckoutContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurando, usuario])
+  const sugerir = (lista: string[], escrito: string) => lista.filter((x) => coincideInicio(x, escrito)).slice(0, 4).map((texto) => ({ texto }))
+  // Elegir una dirección usada completa también su zona, entre calles y referencia.
+  const [verificarLuego, setVerificarLuego] = useState(false)
+  function usarDireccion(d: DireccionUsada) {
+    setDireccion(d.direccion)
+    setDireccionVerificada(null)
+    setMotivoDireccion('')
+    if (origenPunto === 'direccion') { setLat(null); setLng(null); setOrigenPunto('') }
+    const z = d.zona ? buscarZonaEn(zonas, d.zona) : null
+    if (z) { setZonaTexto(z.nombre); setZonaEntrega(z.nombre); setOrigenBarrio('guardado') }
+    if (d.entreCalles) { setEntreCalles(d.entreCalles); setEntreConfirmado(false) }
+    if (d.referencia) setReferenciaAdicional(d.referencia)
+    setVerificarLuego(true)
+  }
+  useEffect(() => {
+    if (!verificarLuego) return
+    setVerificarLuego(false)
+    if (!validarDireccion(direccion)) verificarDireccion()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verificarLuego])
 
   useEffect(() => {
     if (restaurando) return
@@ -1148,6 +1158,7 @@ function CheckoutContent() {
       // Guardamos estos datos para la próxima compra — no bloquea nada
       // si falla (la compra ya se hizo), por eso no se espera ni se
       // muestra ningún error acá.
+      if (usuario) recordarDatos(usuario.uid, { nombre: nombreComprador, whatsapp: whatsappComprador, ...(metodoEntrega === 'envio' ? { direccion, zona: zonaEntrega, entreCalles, referencia: referenciaAdicional } : {}) })
       obtenerToken()
         .then((token) => {
           if (!token) return
@@ -1654,9 +1665,10 @@ function CheckoutContent() {
           <>
           <label className="block text-left mb-4">
             <span className="font-body text-[12px] font-semibold text-ink block mb-1">Tu nombre *</span>
-            <input
+            <InputSugerencias
               value={nombreComprador}
-              onChange={(e) => setNombreComprador(e.target.value)}
+              onChange={setNombreComprador}
+              opciones={sugerir(datosUsados.nombres, nombreComprador)}
               placeholder="Nombre y apellido"
               className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
             />
@@ -1664,10 +1676,12 @@ function CheckoutContent() {
 
           <label className="block text-left mb-4">
             <span className="font-body text-[12px] font-semibold text-ink block mb-1">Tu WhatsApp *</span>
-            <input
+            <InputSugerencias
               value={whatsappComprador}
-              onChange={(e) => setWhatsappComprador(e.target.value)}
+              onChange={setWhatsappComprador}
+              opciones={sugerir(datosUsados.whatsapps, whatsappComprador)}
               placeholder="Ej: 71234567"
+              inputMode="tel"
               className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
             />
             <span className="font-body text-[11px] text-inksoft block mt-1">
@@ -1679,10 +1693,13 @@ function CheckoutContent() {
             <>
               <label className="block text-left mb-1">
                 <span className="font-body text-[12px] font-semibold text-ink block mb-1">Calle y número *</span>
-                <input
+                <InputSugerencias
                   value={direccion}
-                  onChange={(e) => {
-                    setDireccion(e.target.value)
+                  opciones={datosUsados.direcciones.filter((d) => coincideInicio(d.direccion, direccion)).slice(0, 4).map((d) => ({ texto: d.direccion, detalle: [d.zona, d.entreCalles && `entre ${d.entreCalles}`].filter(Boolean).join(' · '), dato: d }))}
+                  onElegir={(s) => usarDireccion(s.dato as DireccionUsada)}
+                  icono="📍"
+                  onChange={(v) => {
+                    setDireccion(v)
                     setDireccionVerificada(null)
                     setMotivoDireccion('')
                     if (origenBarrio === 'direccion' || origenBarrio === 'guardado') setOrigenBarrio('')
@@ -1690,7 +1707,6 @@ function CheckoutContent() {
                   }}
                   onBlur={() => { tocar('direccion'); if (!validarDireccion(direccion) && direccionVerificada === null && !verificandoDireccion) verificarDireccion() }}
                   placeholder="Ej: Av. Universitaria 123"
-                  autoComplete="street-address"
                   className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${tocados.direccion && validarDireccion(direccion) ? 'border-maroon' : 'border-line'}`}
                 />
               </label>
@@ -1818,9 +1834,10 @@ function CheckoutContent() {
 
               <label className="block text-left mb-1">
                 <span className="font-body text-[12px] font-semibold text-ink block mb-1">Entre calles *</span>
-                <input
+                <InputSugerencias
                   value={entreCalles}
-                  onChange={(e) => { setEntreCalles(e.target.value); setEntreConfirmado(false) }}
+                  opciones={sugerir(Array.from(new Set(datosUsados.direcciones.map((d) => d.entreCalles).filter(Boolean))), entreCalles)}
+                  onChange={(v) => { setEntreCalles(v); setEntreConfirmado(false) }}
                   onBlur={() => tocar('entre')}
                   placeholder={sugerenciaEntre ? `Ej: ${sugerenciaEntre}` : 'Ej: Bolívar y Junín'}
                   className={`w-full px-3 py-2.5 rounded-lg border bg-panel font-body text-sm ${(tocados.entre && validarEntreCalles(entreCalles, direccion)) || (tocados.entre && entreNoCoincide) ? 'border-maroon' : 'border-line'}`}
