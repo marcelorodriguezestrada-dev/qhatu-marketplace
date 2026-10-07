@@ -1553,7 +1553,7 @@ function CheckoutContent() {
                       value={codigoCupon}
                       onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCuponEnPago() } }}
-                      placeholder="Coloque el código de su cupón"
+                      placeholder="Si tiene un cupón de envío escriba aquí el código"
                       className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
                     />
                     <button
@@ -2126,9 +2126,6 @@ function CheckoutContent() {
           ) : (
           <>
           <div className="text-left mb-4">
-            <div className="font-body text-[13px] text-ink font-medium mb-2">
-              📎 Subí la foto del comprobante
-            </div>
             {rechazoComprobante && !comprobanteUrl && (
               <div className="font-body text-sm text-maroon bg-maroonsoft border-2 border-maroon rounded-lg px-3.5 py-3 mb-3">
                 <div className="font-bold text-base">❌ Comprobante Inválido, vuelva a intentarlo</div>
@@ -2173,7 +2170,7 @@ function CheckoutContent() {
             ) : (
               <>
                 <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold cursor-pointer ${subiendoComprobante ? 'opacity-50 pointer-events-none' : ''}`}>
-                  📷 Elegir foto del comprobante
+                  📷 Subí comprobante
                   <input
                     type="file"
                     accept="image/*"
