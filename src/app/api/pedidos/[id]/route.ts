@@ -3,6 +3,7 @@ import { getDb, getUsuarioDesdeRequest, getAuthAdmin } from '@/lib/firebaseAdmin
 import { FieldValue } from 'firebase-admin/firestore'
 import { MAX_INTENTOS_COMPROBANTE } from '@/lib/ocrComprobante'
 import { reponerStockDePedido } from '@/lib/stockServer'
+import { liberarUsoCupon } from '@/lib/cuponesServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,10 +106,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         if (!['pendiente_pago', 'verificando_stock'].includes(pedido.estado)) return { error: 'Este pedido ya no se puede anular.', status: 400 }
         const ahora = new Date().toISOString()
         tx.update(ref, { estado: 'cancelado', canceladoAt: ahora, canceladoMotivo: 'El comprador volvió atrás para cambiar el pedido antes de pagar.', updatedAt: ahora })
-        return { ok: true }
+        return { ok: true, cupon: pedido.cupon || null }
       })
       if ('error' in resultado) return NextResponse.json({ error: resultado.error }, { status: resultado.status })
       await reponerStockDePedido(ref)
+      if (resultado.cupon?.cuponId && resultado.cupon?.checkoutId) await liberarUsoCupon(resultado.cupon.cuponId, resultado.cupon.checkoutId, params.id).catch((err) => console.error('liberar cupón', err))
       return NextResponse.json({ ok: true })
     }
 

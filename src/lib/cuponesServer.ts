@@ -48,3 +48,23 @@ export async function registrarUsoCupon(
     return { ok: true as const }
   })
 }
+
+// Pedido anulado antes de pagar (el comprador volvió atrás o aplicó otro
+// cupón en el pago): se saca ese pedido del uso del cupón y, si la compra
+// ya no tiene pedidos, se libera el uso (vuelve a poder usarlo).
+export async function liberarUsoCupon(cuponId: string, checkoutId: string, pedidoId: string) {
+  const db = getDb()
+  const cuponRef = db.collection('cupones').doc(cuponId)
+  const usoRef = cuponRef.collection('usos').doc(checkoutId)
+  await db.runTransaction(async (tx) => {
+    const uso = await tx.get(usoRef)
+    if (!uso.exists) return
+    const quedan = ((uso.data()?.pedidoIds as string[]) || []).filter((id) => id !== pedidoId)
+    if (quedan.length) {
+      tx.update(usoRef, { pedidoIds: quedan })
+    } else {
+      tx.delete(usoRef)
+      tx.update(cuponRef, { usosCount: FieldValue.increment(-1) })
+    }
+  })
+}
