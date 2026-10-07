@@ -20,6 +20,7 @@ import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminCaptacion from '@/components/admin/AdminCaptacion'
+import AdminFinanzas from '@/components/admin/AdminFinanzas'
 import AdminFueraHorario from '@/components/admin/AdminFueraHorario'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminZonasEnvio from '@/components/admin/AdminZonasEnvio'
@@ -97,7 +98,7 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
-type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas' | 'captacion'
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas' | 'captacion' | 'finanzas'
 
 const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
@@ -114,6 +115,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'categorias', icono: '🗂️', label: 'Categorías', ayuda: 'Rubros de servicios', grupo: 'Configuración' },
   { id: 'categorias-productos', icono: '🏷️', label: 'Categorías de productos', ayuda: 'Rubros de productos', grupo: 'Configuración' },
   { id: 'zonas', icono: '📍', label: 'Zonas de envío', ayuda: 'Zonas sugeridas por compradores', grupo: 'Configuración' },
+  { id: 'finanzas', icono: '💰', label: 'Finanzas', ayuda: 'Ingresos, gastos y reporte', grupo: 'Números' },
   { id: 'metricas', icono: '📊', label: 'Métricas', ayuda: 'Números del sitio', grupo: 'Números' },
   { id: 'analitica', icono: '📈', label: 'Analítica', ayuda: 'Eventos y recuperación de compras', grupo: 'Números' },
 ]
@@ -1617,6 +1619,7 @@ export default function AdminPage() {
       {tab === 'cupones' && <AdminCupones password={password} />}
       {tab === 'marketing' && <AdminMarketing password={password} />}
       {tab === 'captacion' && <AdminCaptacion password={password} />}
+      {tab === 'finanzas' && <AdminFinanzas password={password} />}
       {tab === 'analitica' && (
         <>
           <AdminRecuperacion password={password} />
