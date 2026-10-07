@@ -197,6 +197,10 @@ function CheckoutContent() {
   // moto lo entrega el mismo día en vez de al día siguiente. Solo
   // aplica con envío, nunca con retiro en tienda.
   const [envioExpress, setEnvioExpress] = useState(false)
+  // Hasta que no toca "Envío normal" o "Envío express" no se muestran el
+  // envío ni el total (aunque sus datos estén completos). No se restaura:
+  // cada vez que entra lo tiene que elegir.
+  const [tipoEnvioElegido, setTipoEnvioElegido] = useState(false)
   // Cupón de descuento / campaña (ver src/lib/cupones.ts). Se valida con
   // el servidor al tocar "Aplicar" y después se recalcula acá solo si
   // cambia el carrito, la zona o el método de entrega.
@@ -848,7 +852,7 @@ function CheckoutContent() {
   const costoEnvioFinal = costoEnvio - descuentoEnvioCupon
   // El envío y el total recién se muestran cuando eligió cómo recibirlo y,
   // con envío, completó una dirección válida y su zona.
-  const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (!!zonaEntrega && !validarDireccion(direccion) && !zonaNoCoincide && (lat != null || direccionVerificada === 'error')))
+  const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (tipoEnvioElegido && !!zonaEntrega && !validarDireccion(direccion) && !zonaNoCoincide && (lat != null || direccionVerificada === 'error')))
   const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
 
   async function aplicarCupon(codigoForzado?: string) {
@@ -1048,6 +1052,10 @@ function CheckoutContent() {
           return
         }
       }
+    }
+    if (metodoEntrega === 'envio' && !tipoEnvioElegido) {
+      setError('Elegí si querés Envío normal o Envío express.')
+      return
     }
     if (metodoEntrega === 'envio' && !zonaEntrega) {
       setError(validarZona(zonaTexto, { zonas, conPunto: true }) || 'Elegí tu zona para calcular el envío.')
@@ -1594,7 +1602,7 @@ function CheckoutContent() {
             )}
             {!entregaLista ? (
               <div className="font-body text-[12px] text-inksoft mt-1">
-                {!metodoElegido ? 'Elegí cómo recibirlo para ver el envío y el total.' : 'El envío y el total aparecen cuando completes tu dirección y tu zona.'}
+                {!metodoElegido ? 'Elegí cómo recibirlo para ver el envío y el total.' : metodoEntrega === 'envio' && !tipoEnvioElegido ? 'El envío y el total aparecen cuando elijas Envío normal o express.' : 'El envío y el total aparecen cuando completes tu dirección y tu zona.'}
               </div>
             ) : (
             <>
@@ -1918,13 +1926,13 @@ function CheckoutContent() {
                     { express: false, icono: '🛵', titulo: 'Envío normal', detalle: `Llega ${fechaEntregaTexto()}`, precio: zonaEntrega || lat != null ? bs(costoZona) : '', disabled: false, mostrar: true },
                     { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: cuentaPrueba || hayEntregaHoy() },
                   ].filter((o) => o.mostrar).map((o) => {
-                    const elegida = envioExpress === o.express
+                    const elegida = tipoEnvioElegido && envioExpress === o.express
                     return (
                       <label
                         key={o.titulo}
                         className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 cursor-pointer ${o.disabled ? 'opacity-50 cursor-not-allowed border-line bg-panelalt' : elegida ? 'border-teal bg-tealsoft' : 'border-line bg-panel'}`}
                       >
-                        <input type="radio" name="tipoEnvio" checked={elegida} disabled={o.disabled} onChange={() => setEnvioExpress(o.express)} className="sr-only" />
+                        <input type="radio" name="tipoEnvio" checked={elegida} disabled={o.disabled} onChange={() => { setEnvioExpress(o.express); setTipoEnvioElegido(true); setError('') }} className="sr-only" />
                         <span className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${elegida ? 'border-teal' : 'border-line'}`} aria-hidden>
                           {elegida && <span className="w-2.5 h-2.5 rounded-full bg-teal" />}
                         </span>
