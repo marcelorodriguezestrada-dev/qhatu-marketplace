@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapaProspectos } from '@/components/admin/MapaProspectos'
 import type { Caja, PuntoMapa } from '@/components/admin/MapaProspectosCliente'
 import { CIUDADES } from '@/data/ciudades'
+import { generarPassword } from '@/components/admin/CrearUsuario'
 import {
   CAMPANA_DEFECTO,
   ESTADOS_PROSPECTO,
   cuposRestantes,
   linkWhatsapp,
   mensajeInicialBase,
+  guionBase,
+  mensajeTiendaLista,
   numeroWhatsapp,
   PASOS_SEGUIMIENTO,
   esCelular,
@@ -61,6 +64,115 @@ function Mensaje({ titulo, texto, whatsapp }: { titulo: string; texto: string; w
         <a href={linkWhatsapp(whatsapp, texto)} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 rounded-md bg-[#25D366] text-white font-body text-[11px] font-semibold no-underline">💬 Enviar por WhatsApp</a>
         <Copiar texto={texto} />
       </div>
+    </div>
+  )
+}
+
+const ORIGEN = typeof window !== 'undefined' ? window.location.origin : 'https://clasiclick.ezeti.pro'
+
+// Email interno para quien no tiene correo: entra con este usuario y la
+// contraseña que le mandamos por WhatsApp.
+const emailInterno = (nombre: string) =>
+  `${nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '').slice(0, 18) || 'tienda'}${Math.floor(100 + Math.random() * 900)}@clasiclick.ezeti.pro`
+
+// 🏪 Crearle la tienda a un prospecto: cuenta de vendedor (con
+// contraseña lista para mandarle), lo marca Registrado (y le asigna el
+// cupo de la campaña) y lleva a cargarle los productos.
+function TiendaProspecto({ p, password, onCreada }: { p: Prospecto; password: string; onCreada: (cambios: Partial<Prospecto>) => void }) {
+  const [email, setEmail] = useState(p.email || '')
+  const [clave, setClave] = useState(() => generarPassword())
+  const [contacto, setContacto] = useState(p.contacto || '')
+  const [creando, setCreando] = useState(false)
+  const [error, setError] = useState('')
+  const [claveCreada, setClaveCreada] = useState('')
+
+  async function crear() {
+    setCreando(true)
+    setError('')
+    try {
+      const d = await fetch('/api/admin/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+        body: JSON.stringify({ email: email.trim(), nombre: contacto.trim(), nombreNegocio: p.nombre, whatsapp: esCelular(p.whatsapp) ? numeroWhatsapp(p.whatsapp).replace(/^591/, '') : '', ciudad: p.ciudad, password: clave }),
+      }).then((r) => r.json())
+      if (d.error) throw new Error(d.error)
+      setClaveCreada(clave)
+      onCreada({ vendedorId: d.uid, email: d.email, contacto: contacto.trim() || p.contacto, estado: 'registrado', registrar: 'Tienda creada en Clasi Click' } as any)
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo crear la tienda.')
+    } finally {
+      setCreando(false)
+    }
+  }
+
+  function irACargarProductos() {
+    try { localStorage.setItem('clasiclick_cargar_productos_de', JSON.stringify({ id: p.vendedorId, nombre: p.nombre })) } catch {}
+    window.location.hash = 'productos'
+    window.scrollTo({ top: 0 })
+  }
+
+  const inp = 'w-full px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm'
+  if (p.vendedorId) {
+    const msg = mensajeTiendaLista(p, p.email || '', claveCreada, ORIGEN, p.vendedorId)
+    return (
+      <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+        <div className="font-body text-sm font-semibold text-ink">🏪 Tienda creada{claveCreada ? '' : ''}</div>
+        <div className="font-body text-xs text-inksoft mt-0.5">Usuario: <b className="text-ink">{p.email}</b>{claveCreada && <> · Contraseña: <b className="text-ink">{claveCreada}</b></>}</div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button type="button" onClick={irACargarProductos} className="px-3 py-1.5 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold">📦 Cargarle productos</button>
+          <a href={linkWhatsapp(p.whatsapp, msg)} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-[#25D366] text-white font-body text-xs font-semibold no-underline">💬 Mandarle su tienda y acceso</a>
+          <a href={`/tienda/${p.vendedorId}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg border border-line bg-panel font-body text-xs text-ink no-underline">🛍️ Ver su tienda</a>
+        </div>
+        {!claveCreada && <div className="font-body text-[11px] text-inksoft mt-1.5">Si no recuerda la contraseña, cambiásela en Admin → Usuarios.</div>}
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-lg border border-teal bg-tealsoft/40 p-3">
+      <div className="font-body text-sm font-semibold text-ink">🏪 Crear su tienda en Clasi Click</div>
+      <div className="font-body text-[11px] text-inksoft mb-2">Le creo la cuenta con el nombre de la tienda y una contraseña para mandarle por WhatsApp. Queda como “Registrado”{' '}(y se le asigna el cupo de la promo si quedan).</div>
+      <div className="grid sm:grid-cols-3 gap-2">
+        <label className="font-body text-[11px] text-inksoft sm:col-span-1">Correo
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@gmail.com" className={inp} />
+          <button type="button" onClick={() => setEmail(emailInterno(p.nombre))} className="text-teal underline bg-transparent border-none p-0 text-[11px] mt-0.5">No tiene correo: crear uno interno</button>
+        </label>
+        <label className="font-body text-[11px] text-inksoft">Nombre del dueño/a<input value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Opcional" className={inp} /></label>
+        <label className="font-body text-[11px] text-inksoft">Contraseña
+          <div className="flex gap-1"><input value={clave} onChange={(e) => setClave(e.target.value)} className={inp} /><button type="button" onClick={() => setClave(generarPassword())} className="px-2 rounded-lg border border-line bg-panel text-xs" title="Otra">🔄</button></div>
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <button type="button" onClick={crear} disabled={creando || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || clave.length < 6} className="px-3.5 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-40">{creando ? 'Creando…' : `🏪 Crear tienda “${p.nombre}”`}</button>
+        <span className="font-body text-[11px] text-inksoft">Tienda: {p.nombre} · {p.ciudad === 'la-paz' ? 'La Paz' : 'Potosí'}{esCelular(p.whatsapp) ? ` · WhatsApp ${p.whatsapp}` : ''}</span>
+      </div>
+      {error && <div className="font-body text-xs text-maroon mt-1.5">{error}</div>}
+    </div>
+  )
+}
+
+function GuionLlamada({ guion, telefono }: { guion: { paso: string; decir: string }[]; telefono: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const texto = guion.map((g) => `${g.paso}\n${g.decir}`).join('\n\n')
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="font-body text-sm font-semibold text-ink">📞 Guion para la llamada</div>
+        <span className="font-body text-[11px] text-inksoft">unos 5 minutos</span>
+        <span className="flex-1" />
+        {telefono && <a href={`tel:+${numeroWhatsapp(telefono)}`} className="px-2.5 py-1 rounded-md bg-ink text-white font-body text-[11px] font-semibold no-underline">📞 Llamar</a>}
+        <Copiar texto={texto} />
+        <button type="button" onClick={() => setAbierto((v) => !v)} className="px-2 py-1 rounded-md border border-line bg-panel font-body text-[11px] text-ink">{abierto ? 'Ocultar' : 'Ver guion'}</button>
+      </div>
+      {abierto && (
+        <ol className="list-none p-0 m-0 mt-2 grid gap-2">
+          {guion.map((g, i) => (
+            <li key={i} className="bg-panel rounded-md px-3 py-2">
+              <div className="font-body text-[11px] font-semibold text-indigo-700">{g.paso}</div>
+              <div className="font-body text-sm text-ink">{g.decir}</div>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }
@@ -561,6 +673,8 @@ export default function AdminCaptacion({ password }: { password: string }) {
                       <span className="flex-1" />
                       <button type="button" onClick={() => borrar(p)} className="font-body text-xs text-maroon underline bg-transparent border-none">Borrar</button>
                     </div>
+                    {p.estado !== 'descartado' && <TiendaProspecto p={p} password={password} onCreada={(c) => actualizar(p.id, c)} />}
+                    {p.estado !== 'registrado' && !p.vendedorId && <GuionLlamada guion={p.estrategia?.guionLlamada?.length ? p.estrategia.guionLlamada : guionBase(p, campana, quedan)} telefono={p.whatsapp} />}
                     {!!p.historial?.length && (
                       <div className="bg-panelalt rounded-lg p-3">
                         <div className="font-body text-[11px] font-semibold text-inksoft uppercase tracking-wide mb-1">Historial</div>

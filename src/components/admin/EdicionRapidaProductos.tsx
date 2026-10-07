@@ -110,6 +110,23 @@ export default function EdicionRapidaProductos({
   // Pantalla completa en la compu (en el celular no cambia nada). Se recuerda.
   const [ampliado, setAmpliado] = useState(true)
   useEffect(() => { try { if (localStorage.getItem('clasiclick_edicion_ampliada') === '0') setAmpliado(false) } catch {} }, [])
+  // Viene de 🎯 Captar tiendas → "📦 Cargarle productos": abre la planilla
+  // con filas nuevas para la tienda recién creada.
+  const [cargandoPara, setCargandoPara] = useState<{ id: string; nombre: string } | null>(null)
+  useEffect(() => {
+    try {
+      const x = JSON.parse(localStorage.getItem('clasiclick_cargar_productos_de') || 'null')
+      if (!x?.id) return
+      localStorage.removeItem('clasiclick_cargar_productos_de')
+      setCargandoPara(x)
+      setVendedorNuevos(x.id)
+      setAbierto(true)
+      setNuevos((prev) => (prev.length ? prev : Array.from({ length: 3 }, () => nuevoVacio())))
+      onVendedorCreado?.()
+      setTimeout(() => document.getElementById('edicion-rapida')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   function cambiarAmpliado(v: boolean) {
     setAmpliado(v)
     try { localStorage.setItem('clasiclick_edicion_ampliada', v ? '1' : '0') } catch {}
@@ -379,7 +396,7 @@ export default function EdicionRapidaProductos({
   }
 
   return (
-    <div className={`bg-panel border border-teal rounded-xl p-3.5 mb-5 ${ampliado ? 'lg:fixed lg:inset-0 lg:z-40 lg:m-0 lg:rounded-none lg:border-0 lg:p-5 lg:overflow-y-auto lg:flex lg:flex-col' : ''}`}>
+    <div id="edicion-rapida" className={`bg-panel border border-teal rounded-xl p-3.5 mb-5 ${ampliado ? 'lg:fixed lg:inset-0 lg:z-40 lg:m-0 lg:rounded-none lg:border-0 lg:p-5 lg:overflow-y-auto lg:flex lg:flex-col' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className={`font-body text-sm font-semibold text-ink ${ampliado ? 'lg:text-lg' : ''}`}>⚡ Edición rápida de productos</div>
         <span className="flex-1" />
@@ -389,6 +406,11 @@ export default function EdicionRapidaProductos({
         <button type="button" onClick={() => { if (!cantCambios || confirm('Hay cambios sin guardar. ¿Cerrar igual?')) { setAbierto(false); setEdiciones({}); setNuevos([]); setSel(new Set()) } }} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>
       </div>
 
+      {cargandoPara && (
+        <div className="rounded-lg bg-emerald-50 border border-emerald-300 px-3 py-2 mb-3 font-body text-xs text-ink">
+          🏪 Cargando productos para <b>{cargandoPara.nombre}</b>: completá las filas verdes (foto, nombre, categoría y precio) o tocá “📥 Importar” para subir sus fotos de una carpeta o un Sheet. Después “💾 Guardar cambios”.
+        </div>
+      )}
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 mb-3">
         <input value={texto} onChange={(e) => { setTexto(e.target.value); setPagina(1) }} placeholder="Buscar por nombre, vendedor o rubro" className="flex-1 min-w-[180px] px-3 py-2 rounded-lg border border-line font-body text-xs" />

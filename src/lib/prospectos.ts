@@ -40,6 +40,9 @@ export type Prospecto = {
   proximoSeguimiento?: string | null
   historial?: { fecha: string; accion: string }[]
   telefonoFijo?: boolean
+  // Su cuenta de vendedor en Clasi Click, cuando le creamos la tienda.
+  vendedorId?: string | null
+  email?: string
 }
 
 export type Campana = { oferta: string; cupos: number; mensajeBase: string }
@@ -57,6 +60,8 @@ export type EstrategiaProspecto = {
   argumentos: string[]
   objeciones: { objecion: string; respuesta: string }[]
   pasos: string[]
+  // Guion para llamarlo por teléfono: qué decir en cada momento.
+  guionLlamada?: { paso: string; decir: string }[]
 }
 
 export type PlanCampana = {
@@ -157,8 +162,36 @@ export function estrategiaBase(p: Pick<Prospecto, 'nombre' | 'rubro' | 'ciudad' 
       'Día 7: seguimiento 2 (cierre de la promo).',
       'Al registrarse: marcarlo "Registrado" acá para asignarle el cupo y compartir su tienda en redes.',
     ],
+    guionLlamada: guionBase(p, campana, quedan),
   }
 }
+
+// Guion de llamada (sin IA): ~5 minutos, de la presentación al cierre.
+export function guionBase(p: Pick<Prospecto, 'nombre' | 'rubro' | 'ciudad' | 'contacto'>, campana: Campana, quedan: number): { paso: string; decir: string }[] {
+  const ciudad = nombreCiudad(p.ciudad)
+  const rubro = p.rubro ? p.rubro.toLowerCase() : 'sus productos'
+  return [
+    { paso: '1. Saludo y permiso (20 s)', decir: `Hola${p.contacto ? ` ${p.contacto}` : ''}, ¿qué tal? Soy de Clasi Click, te escribí por WhatsApp. ¿Tenés 3 minutitos? Te cuento algo rápido que te puede traer más ventas.` },
+    { paso: '2. Gancho', decir: `Estamos armando el marketplace de ${ciudad}: la gente entra desde el celular, ve productos con foto y precio, paga con QR y se lo llevamos a su casa. Y estamos eligiendo pocas tiendas de ${rubro} para empezar.` },
+    { paso: '3. Preguntá y escuchá', decir: '¿Hoy vendés por Facebook, WhatsApp o TikTok? ¿Hacés envíos? ¿Cuántos productos tenés más o menos? ¿Qué es lo que más se vende?' },
+    { paso: '4. Propuesta: su tienda virtual', decir: `Te creamos tu tienda virtual "${p.nombre}" con tu link propio para compartir en tus redes y estados. Cada producto con fotos, precio, talles y colores. El cliente compra solo, paga con QR y nosotros hacemos el envío; vos ves cada pedido en tu panel.` },
+    { paso: '5. Oferta y escasez', decir: `Las ${campana.cupos} primeras tiendas tienen ${campana.oferta}${quedan > 0 ? `, y quedan ${quedan} cupos` : ''}. No hay contrato ni permanencia.` },
+    { paso: '6. Siguiente paso (proponé vos)', decir: 'Si te parece, te la creo ahora mismo mientras hablamos: pasame por WhatsApp 5 fotos de tus productos más vendidos con el precio, y hoy mismo te mando el link de tu tienda funcionando.' },
+    { paso: '7. Si duda', decir: '"No tengo tiempo" → los productos te los cargo yo. "Ya vendo por Facebook" → esto suma: te da un link con carrito y cobro, y te llegan compradores nuevos. "¿Y después del año?" → te avisamos con tiempo y decidís vos.' },
+    { paso: '8. Cierre', decir: '¿Te parece bien? Entonces te pido: un correo (o te creo uno), las fotos con precio y a qué hora te puedo mostrar la tienda armada. ¡Bienvenido a Clasi Click!' },
+  ]
+}
+
+// Mensaje con sus datos de acceso cuando le creamos la tienda.
+export function mensajeTiendaLista(p: Pick<Prospecto, 'nombre' | 'contacto'>, email: string, password: string, sitio: string, vendedorId: string) {
+  return (
+    `${p.contacto ? `¡Hola ${p.contacto}!` : '¡Hola!'} 🎉 Ya está lista tu tienda *${p.nombre}* en Clasi Click.\n\n` +
+    `🛍️ Tu tienda: ${sitio}/tienda/${vendedorId}\n(compartí este link en tus estados y redes)\n\n` +
+    `Para entrar a tu panel y ver tus pedidos:\n👉 ${sitio}/login\nUsuario: ${email}\n${password ? `Contraseña: ${password}\n` : ''}\n` +
+    `Cualquier cosa me escribís por acá 🙌`
+  )
+}
+
 
 // ── Seguimiento ────────────────────────────────────────────────────────
 export const PASOS_SEGUIMIENTO = [

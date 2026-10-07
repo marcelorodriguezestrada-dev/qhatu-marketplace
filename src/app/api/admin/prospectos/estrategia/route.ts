@@ -93,8 +93,9 @@ export async function POST(req: NextRequest) {
       (campana.mensajeBase ? `Tono/mensaje base que usa el admin: ${campana.mensajeBase}\n` : '') +
       'Adaptá los argumentos a su rubro (qué se vende bien online de ese rubro, fotos, temporadas). ' +
       'JSON: {"resumen": "1-2 frases con el enfoque", "mensajeInicial": "primer WhatsApp con la oferta y el link", "seguimiento1": "a los 2 días si no responde", ' +
-      '"seguimiento2": "cierre por escasez", "argumentos": ["4-6 argumentos para su rubro"], "objeciones": [{"objecion": "...", "respuesta": "..."}] (3-5), "pasos": ["plan día por día"]}',
-    1800,
+      '"seguimiento2": "cierre por escasez", "argumentos": ["4-6 argumentos para su rubro"], "objeciones": [{"objecion": "...", "respuesta": "..."}] (3-5), "pasos": ["plan día por día"], ' +
+      '"guionLlamada": [{"paso": "1. Saludo y permiso", "decir": "lo que hay que decir, en primera persona, natural y corto"}] (7 u 8 pasos: saludo, gancho, preguntas para entender cómo vende hoy, propuesta de crearle su tienda virtual con link propio, oferta y escasez, siguiente paso concreto (crearla en la misma llamada con 5 fotos), respuestas a dudas, cierre pidiendo correo, fotos y horario)}',
+    2600,
   )
   const estrategia: EstrategiaProspecto = r
     ? {
@@ -105,6 +106,9 @@ export async function POST(req: NextRequest) {
         argumentos: lista(r.argumentos).length ? lista(r.argumentos) : base.argumentos,
         objeciones: (Array.isArray(r.objeciones) ? r.objeciones : []).slice(0, 6).map((o: any) => ({ objecion: String(o.objecion || ''), respuesta: String(o.respuesta || '') })).filter((o: any) => o.objecion) || base.objeciones,
         pasos: lista(r.pasos, 10).length ? lista(r.pasos, 10) : base.pasos,
+        guionLlamada: (Array.isArray(r.guionLlamada) ? r.guionLlamada : []).slice(0, 10).map((g: any) => ({ paso: String(g.paso || ''), decir: String(g.decir || '') })).filter((g: any) => g.decir).length
+          ? (r.guionLlamada as any[]).slice(0, 10).map((g: any) => ({ paso: String(g.paso || ''), decir: String(g.decir || '') })).filter((g: any) => g.decir)
+          : base.guionLlamada,
       }
     : base
   if (!estrategia.objeciones.length) estrategia.objeciones = base.objeciones
