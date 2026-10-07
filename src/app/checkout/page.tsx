@@ -866,9 +866,9 @@ function CheckoutContent() {
   const entregaLista = metodoElegido && (metodoEntrega !== 'envio' || (tipoEnvioElegido && !!zonaEntrega && !validarDireccion(direccion) && !zonaNoCoincide && (lat != null || direccionVerificada === 'error')))
   const totalCarrito = subtotalCarrito - descuentoCupon + costoEnvioFinal
 
-  async function aplicarCupon(codigoForzado?: string) {
+  async function aplicarCupon(codigoForzado?: string): Promise<boolean> {
     const codigo = (codigoForzado ?? codigoCupon).trim()
-    if (!codigo) return
+    if (!codigo) return false
     setCodigoCupon(codigo)
     setAplicandoCupon(true)
     setErrorCupon('')
@@ -884,9 +884,11 @@ function CheckoutContent() {
       setCuponAplicado(data.cupon)
       setCodigoCupon(data.cupon.codigo)
       track('aplicar_cupon', { cupon: data.cupon.codigo, tipo: data.cupon.tipo, subtotal: subtotalCarrito })
+      return true
     } catch (e: any) {
       setCuponAplicado(null)
       setErrorCupon(e?.message || 'No se pudo aplicar el cupón.')
+      return false
     } finally {
       setAplicandoCupon(false)
     }
@@ -929,6 +931,38 @@ function CheckoutContent() {
     setCodigoCupon('')
     setErrorCupon('')
   }
+
+  // Cupón en la pantalla de pago: el pedido ya está creado, así que al
+  // aplicar (o quitar) un cupón se anula el pedido sin pagar y se vuelve a
+  // crear igual pero con el descuento (mismo flujo que "volver atrás").
+  const [rehacer, setRehacer] = useState(false)
+  const [rehaciendo, setRehaciendo] = useState(false)
+  async function aplicarCuponEnPago(codigo?: string) {
+    const ok = await aplicarCupon(codigo)
+    if (ok && etapa === 'pagando') setRehacer(true)
+  }
+  function quitarCuponEnPago() {
+    quitarCupon()
+    if (etapa === 'pagando') setRehacer(true)
+  }
+  useEffect(() => {
+    if (!rehacer) return
+    setRehacer(false)
+    ;(async () => {
+      setRehaciendo(true)
+      const ids = subPedidosRef.current.map((x) => x.pedidoId).filter(Boolean) as string[]
+      try {
+        const token = await obtenerToken()
+        await Promise.all(ids.map((id) => fetch(`/api/pedidos/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ compradorVuelve: true }) }).catch(() => null)))
+      } catch {}
+      setSubPedidos([])
+      setPasoActual(0)
+      await confirmarEntregaYCrearPedidos()
+      setRehaciendo(false)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rehacer])
+
 
   useEffect(() => {
     if (!cuentaPrueba || gpsRealPrueba || pruebaCompletada.current || restaurando) return
@@ -1496,6 +1530,72 @@ function CheckoutContent() {
     )
   }
 
+  const bloqueCupon = (
+            <div>
+              {cuponAplicado ? (
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-body text-xs">
+                    <div className="font-semibold text-ink">🎟️ {cuponAplicado.codigo}</div>
+                    {resultadoCupon?.ok ? (
+                      <div className="text-teal">{resultadoCupon.descripcion} ✓</div>
+                    ) : (
+                      <div className="text-maroon">{resultadoCupon?.error}</div>
+                    )}
+                  </div>
+                  <button type="button" onClick={quitarCuponEnPago} className="shrink-0 font-body text-[11px] text-maroon underline">
+                    quitar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      value={codigoCupon}
+                      onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCuponEnPago() } }}
+                      placeholder="Coloque el código de su cupón"
+                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => aplicarCuponEnPago()}
+                      disabled={aplicandoCupon || !codigoCupon.trim()}
+                      className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+                    >
+                      {aplicandoCupon ? '...' : 'Aplicar'}
+                    </button>
+                  </div>
+                  {errorCupon && <div className="font-body text-[11px] text-maroon mt-1.5">{errorCupon}</div>}
+                  {cuponesDisponibles.length > 0 && (
+                    <div className="mt-2.5">
+                      <div className="font-body text-[11px] text-inksoft mb-1.5">Cupones disponibles para vos — tocá uno para aplicarlo:</div>
+                      <div className="flex flex-col gap-1.5">
+                        {cuponesDisponibles.map((c) => (
+                          <button
+                            key={c.codigo}
+                            type="button"
+                            onClick={() => aplicarCuponEnPago(c.codigo)}
+                            disabled={aplicandoCupon || rehaciendo}
+                            className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg border border-dashed border-teal bg-tealsoft hover:bg-tealsoft/70 disabled:opacity-60"
+                          >
+                            <span className="text-lg leading-none" aria-hidden="true">{c.tipo === 'envio_gratis' ? '🚚' : '🎁'}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-body text-xs font-semibold text-ink">{c.campana ? `${c.campana}: ` : ''}{c.descripcion}</span>
+                              <span className="block font-body text-[11px] text-inksoft">
+                                Código <span className="font-semibold text-teal tracking-wide">{c.codigo}</span>{c.vence && ` · válido hasta el ${c.vence}`}
+                              </span>
+                            </span>
+                            <span className="shrink-0 px-3 py-1.5 rounded-md bg-teal text-white font-body text-xs font-bold shadow-sm">Aplicar</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+  )
+
   return (
     <div className="max-w-[420px] mx-auto px-5 py-10">
       {etapa === 'pagando' ? (
@@ -1545,136 +1645,6 @@ function CheckoutContent() {
 
       {etapa === 'entrega' && (
         <div className="bg-panel border border-line rounded-xl p-6">
-          {/* Detalle de lo que se está comprando, con foto de cada
-              producto — va primero para que el comprador vea qué está
-              llevando antes de meterse a elegir método de entrega. */}
-          <div className="mb-5">
-            <div className="font-display text-lg font-bold text-ink mb-3">Tu pedido</div>
-            <div className="border-t border-line divide-y divide-line">
-              {items.map((it) => (
-                <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="py-3 font-body text-[13px] text-ink">
-                  <div className="flex items-center gap-3 mb-2">
-                    {(it.thumbUrl || it.imagenUrl) ? (
-                      <img
-                        src={it.thumbUrl || it.imagenUrl}
-                        alt={it.nombre}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-12 h-12 rounded-lg object-cover border border-line shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg border border-line bg-panelalt shrink-0" />
-                    )}
-                    <span className="flex-1 min-w-0 leading-snug">
-                      {it.nombre}
-                      {(it.tallaElegida || it.colorElegida) && (
-                        <span className="block text-[11px] text-inksoft">
-                          {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 pl-[60px]">
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => cambiarCantidad(it, -1)}
-                        className="w-6 h-6 border border-line rounded text-sm leading-none"
-                      >
-                        −
-                      </button>
-                      <span className="w-4 text-center text-[13px]">{it.cantidad}</span>
-                      <button
-                        type="button"
-                        onClick={() => cambiarCantidad(it, 1)}
-                        className="w-6 h-6 border border-line rounded text-sm leading-none"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <span className="shrink-0">{bs(it.precio * it.cantidad)}</span>
-                    <button
-                      type="button"
-                      onClick={() => quitar(it)}
-                      className="shrink-0 font-body text-[11px] text-maroon underline"
-                    >
-                      quitar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* El subtotal, el envío y el total se ven en el paso siguiente
-              (pago), así que acá solo queda el cupón. */}
-          <div className="mb-5">
-            {/* Cupón de descuento */}
-            <div>
-              {cuponAplicado ? (
-                <div className="flex items-start justify-between gap-2">
-                  <div className="font-body text-xs">
-                    <div className="font-semibold text-ink">🎟️ {cuponAplicado.codigo}</div>
-                    {resultadoCupon?.ok ? (
-                      <div className="text-teal">{resultadoCupon.descripcion} ✓</div>
-                    ) : (
-                      <div className="text-maroon">{resultadoCupon?.error}</div>
-                    )}
-                  </div>
-                  <button type="button" onClick={quitarCupon} className="shrink-0 font-body text-[11px] text-maroon underline">
-                    quitar
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex gap-2">
-                    <input
-                      value={codigoCupon}
-                      onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCupon() } }}
-                      placeholder="Coloque el código de su cupón"
-                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => aplicarCupon()}
-                      disabled={aplicandoCupon || !codigoCupon.trim()}
-                      className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
-                    >
-                      {aplicandoCupon ? '...' : 'Aplicar'}
-                    </button>
-                  </div>
-                  {errorCupon && <div className="font-body text-[11px] text-maroon mt-1.5">{errorCupon}</div>}
-                  {cuponesDisponibles.length > 0 && (
-                    <div className="mt-2.5">
-                      <div className="font-body text-[11px] text-inksoft mb-1.5">Cupones disponibles para vos — tocá uno para aplicarlo:</div>
-                      <div className="flex flex-col gap-1.5">
-                        {cuponesDisponibles.map((c) => (
-                          <button
-                            key={c.codigo}
-                            type="button"
-                            onClick={() => aplicarCupon(c.codigo)}
-                            disabled={aplicandoCupon}
-                            className="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg border border-dashed border-teal bg-tealsoft hover:bg-tealsoft/70 disabled:opacity-60"
-                          >
-                            <span className="text-lg leading-none" aria-hidden="true">{c.tipo === 'envio_gratis' ? '🚚' : '🎁'}</span>
-                            <span className="flex-1 min-w-0">
-                              <span className="block font-body text-xs font-semibold text-ink">{c.campana ? `${c.campana}: ` : ''}{c.descripcion}</span>
-                              <span className="block font-body text-[11px] text-inksoft">
-                                Código <span className="font-semibold text-teal tracking-wide">{c.codigo}</span>{c.vence && ` · válido hasta el ${c.vence}`}
-                              </span>
-                            </span>
-                            <span className="shrink-0 px-3 py-1.5 rounded-md bg-teal text-white font-body text-xs font-bold shadow-sm">Aplicar</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
           <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo quieres recibir tu pedido?</div>
 
           {/* Cómo recibirlo: opciones para elegir (como envío normal/express). */}
@@ -2098,6 +2068,12 @@ function CheckoutContent() {
               <span>{bs(subPedidos[pasoActual].total)}</span>
             </div>
           </div>
+
+          {!comprobanteUrl && subPedidos[pasoActual].estadoActual !== 'cancelado' && (
+            <div className="text-left mb-4">
+              {rehaciendo ? <div className="font-body text-xs text-inksoft">Aplicando…</div> : bloqueCupon}
+            </div>
+          )}
 
           <div className="font-body text-base font-bold text-ink bg-ochresoft border border-ochre rounded-lg px-4 py-3 mb-4 text-center">
             Descargue el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
