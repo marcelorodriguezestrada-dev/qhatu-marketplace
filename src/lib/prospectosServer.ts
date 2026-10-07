@@ -27,6 +27,8 @@ export function limpiarProspecto(b: any) {
   if (b.notas !== undefined) d.notas = texto(b.notas, 2000)
   if (b.contacto !== undefined) d.contacto = texto(b.contacto, 80)
   if (b.redes !== undefined) d.redes = texto(b.redes, 300)
+  if (b.vendedorId !== undefined) d.vendedorId = b.vendedorId ? texto(b.vendedorId, 128) : null
+  if (b.email !== undefined) d.email = texto(b.email, 120).toLowerCase()
   if (b.pasoSeguimiento !== undefined) d.pasoSeguimiento = Math.max(0, Math.min(3, Math.floor(Number(b.pasoSeguimiento) || 0)))
   if (b.proximoSeguimiento !== undefined) d.proximoSeguimiento = /^\d{4}-\d{2}-\d{2}$/.test(String(b.proximoSeguimiento || '')) ? b.proximoSeguimiento : null
   if (b.estado !== undefined && ESTADOS_PROSPECTO.some((e) => e.id === b.estado)) d.estado = b.estado
