@@ -1909,45 +1909,39 @@ function CheckoutContent() {
                 />
               </label>
 
-              <div className="flex flex-col gap-2.5 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setEnvioExpress(false)}
-                  className={`w-full py-3 rounded-full border font-body text-sm font-semibold ${
-                    !envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-                  }`}
-                >
-                  🛵 Envío normal
-                </button>
-                {/* Los domingos no hay reparto — no tiene sentido
-                    ofrecer "llega hoy mismo" ese día. Desde las 17:00
-                    se sigue mostrando, pero deshabilitado. */}
-                {(cuentaPrueba || hayEntregaHoy()) && (
-                  <button
-                    type="button"
-                    onClick={() => setEnvioExpress(true)}
-                    disabled={!expressDisponible}
-                    className={`w-full py-3 rounded-full border font-body text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${
-                      envioExpress ? 'border-maroon bg-maroon text-white' : 'border-line bg-panel text-inksoft'
-                    }`}
-                  >
-                    ⚡ Envío express{!expressDisponible && ' (no disponible)'}
-                  </button>
-                )}
-              </div>
+              {/* Tipo de envío: opciones para elegir (no botones de acción),
+                  con cuándo llega y cuánto cuesta cada una. */}
+              <fieldset className="mb-3 border-none p-0 m-0">
+                <legend className="font-body text-[12px] font-semibold text-ink mb-1.5">¿Cuándo lo querés recibir?</legend>
+                <div className="grid gap-2">
+                  {[
+                    { express: false, icono: '🛵', titulo: 'Envío normal', detalle: `Llega ${fechaEntregaTexto()}`, precio: zonaEntrega || lat != null ? bs(costoZona) : '', disabled: false, mostrar: true },
+                    { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: cuentaPrueba || hayEntregaHoy() },
+                  ].filter((o) => o.mostrar).map((o) => {
+                    const elegida = envioExpress === o.express
+                    return (
+                      <label
+                        key={o.titulo}
+                        className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 cursor-pointer ${o.disabled ? 'opacity-50 cursor-not-allowed border-line bg-panelalt' : elegida ? 'border-teal bg-tealsoft' : 'border-line bg-panel'}`}
+                      >
+                        <input type="radio" name="tipoEnvio" checked={elegida} disabled={o.disabled} onChange={() => setEnvioExpress(o.express)} className="sr-only" />
+                        <span className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${elegida ? 'border-teal' : 'border-line'}`} aria-hidden>
+                          {elegida && <span className="w-2.5 h-2.5 rounded-full bg-teal" />}
+                        </span>
+                        <span className="flex-1 min-w-0 text-left">
+                          <span className="block font-body text-sm font-semibold text-ink">{o.icono} {o.titulo}</span>
+                          <span className="block font-body text-[11px] text-inksoft">{o.detalle}</span>
+                        </span>
+                        {o.precio && <span className="font-body text-sm font-semibold text-ink shrink-0">{o.precio}</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
               {descuentoEnvioCupon > 0 && (
                 <div className="font-body text-sm text-teal bg-tealsoft border border-teal rounded-lg px-3 py-2.5 mb-3">
                   🎉 <strong>¡Envío gratis!</strong>
                   {costoEnvioFinal > 0 && <> — pagás solo el extra del express ({bs(costoEnvioFinal)})</>}
-                </div>
-              )}
-              {envioExpress ? (
-                <div className="font-body text-xs text-ink bg-ochresoft border border-ochre rounded-lg px-3 py-2 mb-3">
-                  ⚡ Para realizar esta opción debe ser usada antes de las {HORA_CORTE_EXPRESS} hs
-                </div>
-              ) : (
-                <div className="font-body text-[11px] text-inksoft mb-3">
-                  Recibirá su pedido {fechaEntregaTexto()}.
                 </div>
               )}
 
