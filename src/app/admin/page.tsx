@@ -1650,6 +1650,10 @@ export default function AdminPage() {
                       {p.metodoEntrega === 'retiro' ? '🏬 Retiro en tienda' : p.metodoEntrega === 'vendedor' ? '🚚 Envío del vendedor' : `🛵 ${p.zonaEntrega || 'Sin zona'}`} · {p.direccion ? `Entrega: ${p.direccion}` : 'Sin dirección'}
                       {p.entreCalles && ` (${p.entreCalles})`}
                       {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
+                      {p.validacionZona?.coincide === false && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold" title={`Escribió “${p.validacionZona.escrita}” pero su ubicación queda en ${p.validacionZona.cercanaAlPunto || '?'}${p.validacionZona.distanciaKm != null ? ` (la zona escrita está a ${p.validacionZona.distanciaKm} km)` : ''}. Confirmá la dirección por WhatsApp.`}>⚠ zona dudosa: el mapa dice {p.validacionZona.cercanaAlPunto}</span>
+                      )}
+                      {p.validacionZona && !p.validacionZona.enLista && p.metodoEntrega === 'envio' && <span className="ml-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">🆕 zona nueva</span>}
                     </div>
                     <div className={`font-body text-xs font-semibold ${estado.color}`}>{estado.texto}</div>
                   </div>
@@ -3183,6 +3187,10 @@ export default function AdminPage() {
                         {p.direccion || 'Sin dirección cargada'} · {p.zonaEntrega}
                         {p.entreCalles && ` (${p.entreCalles})`}
                         {p.referenciaAdicional && ` — ${p.referenciaAdicional}`}
+                      {p.validacionZona?.coincide === false && (
+                        <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold" title={`Escribió “${p.validacionZona.escrita}” pero su ubicación queda en ${p.validacionZona.cercanaAlPunto || '?'}${p.validacionZona.distanciaKm != null ? ` (la zona escrita está a ${p.validacionZona.distanciaKm} km)` : ''}. Confirmá la dirección por WhatsApp.`}>⚠ zona dudosa: el mapa dice {p.validacionZona.cercanaAlPunto}</span>
+                      )}
+                      {p.validacionZona && !p.validacionZona.enLista && p.metodoEntrega === 'envio' && <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">🆕 zona nueva</span>}
                       </div>
                       <div className="font-body text-[11px] text-inksoft">
                         {p.comprador || 'Sin email'} · {bs(p.total)}
