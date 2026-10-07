@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 // del checkout en ese punto (promedio de los pedidos).
 
 type Sugerida = { id: string; nombre: string; pedidos: number; lat: number; lng: number; cercana: string; ultimoPedido: string | null }
-type Extra = { nombre: string; lat: number; lng: number }
+type Extra = { nombre: string; lat: number; lng: number; agregadaSola?: boolean }
 
 export default function AdminZonasEnvio({ password }: { password: string }) {
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
@@ -74,7 +74,8 @@ export default function AdminZonasEnvio({ password }: { password: string }) {
         </div>
       )}
 
-      <div className="font-body text-sm font-semibold text-ink mb-2">Zonas agregadas por vos</div>
+      <div className="font-body text-sm font-semibold text-ink mb-1">Zonas agregadas</div>
+      <div className="font-body text-[11px] text-inksoft mb-2">Las que agregás vos, y las que se suman solas cuando 3 pedidos con la casa marcada escriben la misma zona en el mismo lugar (🤖).</div>
       {extras.length === 0 ? (
         <div className="font-body text-xs text-inksoft bg-panelalt rounded-lg p-3">Ninguna todavía (la lista tiene las zonas de siempre).</div>
       ) : (
@@ -82,6 +83,7 @@ export default function AdminZonasEnvio({ password }: { password: string }) {
           {extras.map((z) => (
             <div key={z.nombre} className="flex items-center gap-2 font-body text-sm">
               <span className="text-ink">{z.nombre}</span>
+              {z.agregadaSola && <span className="text-[11px] text-indigo-700" title="Se agregó sola por los pedidos">🤖</span>}
               <a href={mapa(z.lat, z.lng)} target="_blank" rel="noreferrer" className="text-[11px] text-teal underline">mapa</a>
               <button type="button" onClick={() => { if (confirm(`¿Quitar la zona ${z.nombre} de la lista?`)) accion({ accion: 'quitar', nombre: z.nombre }) }} className="text-[11px] text-maroon underline">quitar</button>
             </div>

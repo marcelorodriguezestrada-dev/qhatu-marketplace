@@ -159,6 +159,17 @@ export async function POST(req: NextRequest) {
       lng: typeof lng === 'number' ? lng : null,
       // De dónde salió el punto: 'mapa' (marcó su casa), 'gps' o 'direccion' (aproximado).
       origenUbicacion: ['mapa', 'gps', 'direccion'].includes(origenUbicacion) ? origenUbicacion : null,
+      // Control interno de la zona escrita vs. el punto de la casa (ver
+      // validacionZona en /checkout): Admin → Pedidos marca "⚠ zona dudosa".
+      validacionZona: body.validacionZona && typeof body.validacionZona === 'object'
+        ? {
+            escrita: String(body.validacionZona.escrita || '').slice(0, 60),
+            enLista: !!body.validacionZona.enLista,
+            cercanaAlPunto: body.validacionZona.cercanaAlPunto ? String(body.validacionZona.cercanaAlPunto).slice(0, 60) : null,
+            distanciaKm: typeof body.validacionZona.distanciaKm === 'number' ? body.validacionZona.distanciaKm : null,
+            coincide: typeof body.validacionZona.coincide === 'boolean' ? body.validacionZona.coincide : null,
+          }
+        : null,
       costoEnvio: Number(costoEnvio || 0),
       // Envío express: entrega el mismo día en vez del día siguiente, a
       // cambio de un costo fijo en vez del costo por barrio (ver

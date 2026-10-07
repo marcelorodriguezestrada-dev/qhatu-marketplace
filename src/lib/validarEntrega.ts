@@ -66,7 +66,7 @@ export function zonaLibreValida(texto: string): boolean {
 }
 
 export function validarZona(texto: string, opciones: { zonas?: ZonaEnvio[]; conPunto?: boolean } = {}): string | null {
-  if (!norm(texto)) return 'Elegí tu zona de la lista (se completa sola con tu dirección).'
+  if (!norm(texto)) return 'Escribí el nombre de tu zona o barrio.'
   if (buscarZonaEn(opciones.zonas || ZONAS_ENVIO_POTOSI, texto)) return null
   if (opciones.conPunto) return zonaLibreValida(texto) ? null : 'Ese nombre de zona no parece real: escribí el nombre de tu zona o barrio.'
   return 'Esa zona no está en la lista: elegí la más cercana, o marcá tu casa en el mapa y escribí el nombre de tu zona.'
