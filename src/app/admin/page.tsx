@@ -114,7 +114,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'usuarios', icono: '👥', label: 'Usuarios', ayuda: 'Crear, editar, contraseñas', grupo: 'Personas' },
   { id: 'categorias', icono: '🗂️', label: 'Categorías', ayuda: 'Rubros de servicios', grupo: 'Configuración' },
   { id: 'categorias-productos', icono: '🏷️', label: 'Categorías de productos', ayuda: 'Rubros de productos', grupo: 'Configuración' },
-  { id: 'zonas', icono: '📍', label: 'Zonas de envío', ayuda: 'Zonas sugeridas por compradores', grupo: 'Configuración' },
+  { id: 'zonas', icono: '📍', label: 'Envíos y checkout', ayuda: 'Opciones del checkout, zonas y mapa de costos', grupo: 'Configuración' },
   { id: 'finanzas', icono: '💰', label: 'Finanzas', ayuda: 'Ingresos, gastos y reporte', grupo: 'Números' },
   { id: 'metricas', icono: '📊', label: 'Métricas', ayuda: 'Números del sitio', grupo: 'Números' },
   { id: 'analitica', icono: '📈', label: 'Analítica', ayuda: 'Eventos y recuperación de compras', grupo: 'Números' },

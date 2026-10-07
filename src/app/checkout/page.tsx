@@ -12,10 +12,10 @@ import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, distanciaKm, costoP
 import { validarDireccion, validarEntreCalles, validarZona, zonaLibreValida } from '@/lib/validarEntrega'
 import { entreCallesNoCoinciden, type EntreCallesInfo } from '@/lib/entreCalles'
 import InputSugerencias from '@/components/InputSugerencias'
+import { OPCIONES_CHECKOUT_DEFECTO, type OpcionesCheckout } from '@/lib/opcionesCheckout'
 import { coincideInicio, leerDatosUsados, mezclarConCuenta, recordarDatos, type DatosUsados, type DireccionUsada } from '@/lib/datosUsados'
 import { buscarZonaEn, normZona, zonaMasCercana, zonasCercanas } from '@/lib/zonasEnvio'
 import { useZonasEnvio } from '@/lib/useZonasEnvio'
-import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
 import { ElegirUbicacion } from '@/components/ElegirUbicacion'
 import { leerComprobante, comprobanteValido, motivoRechazo, MAX_INTENTOS_COMPROBANTE, type ResultadoOCR } from '@/lib/ocrComprobante'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
@@ -226,6 +226,17 @@ function CheckoutContent() {
   // de horario — tienda abierta y express siempre disponibles.
   const cuentaPrueba = esPrueba
 
+  // Opciones del checkout que el admin prende o apaga (Admin → Envíos y
+  // checkout): usar ubicación (GPS), marcar en el mapa, envío express y
+  // retiro en tienda.
+  const [opcionesCheckout, setOpcionesCheckout] = useState<OpcionesCheckout>(OPCIONES_CHECKOUT_DEFECTO)
+  useEffect(() => {
+    fetch('/api/config-checkout').then((r) => r.json()).then((d) => d?.opciones && setOpcionesCheckout({ ...OPCIONES_CHECKOUT_DEFECTO, ...d.opciones })).catch(() => {})
+  }, [])
+  useEffect(() => {
+    if (!opcionesCheckout.express && envioExpress) setEnvioExpress(false)
+  }, [opcionesCheckout.express, envioExpress])
+
   // Ubicación de prueba (cuentas de prueba): una casa fija en Potosí para
   // probar el envío desde cualquier lado. Se cambia marcando otra casa en
   // el mapa; "usar mi GPS real" la apaga.
@@ -398,7 +409,6 @@ function CheckoutContent() {
   // Qué "Zona 1/2/3" está elegida en el primer selector — el segundo
   // selector (el barrio) recién muestra las opciones de ese grupo.
   const [grupoZonaSel, setGrupoZonaSel] = useState(grupoDeBarrio(ZONAS_ENVIO_POTOSI[0].nombre)?.id || ZONAS_AGRUPADAS[0].id)
-  const [mostrarMapaZonas, setMostrarMapaZonas] = useState(false)
   // De dónde salió el barrio: lo calculamos solos con la dirección (o
   // con la ubicación del celular), y el comprador solo lo elige a mano
   // si el mapa no encuentra su dirección o si quiere corregirlo.
@@ -1009,7 +1019,7 @@ function CheckoutContent() {
     }
     const validacionWhatsapp = validarWhatsappBoliviano(whatsappComprador)
     if (!validacionWhatsapp.valido) {
-      setError(validacionWhatsapp.motivo || 'Revisá tu número de WhatsApp.')
+      setError('Número de WhatsApp inválido.')
       return
     }
     if (metodoEntrega === 'envio' && envioExpress && !expressDisponible) {
@@ -1595,41 +1605,11 @@ function CheckoutContent() {
             </div>
           </div>
 
-          <div className="bg-panelalt rounded-lg px-3.5 py-3 mb-5">
-            <div className="font-body text-[12px] text-inksoft mb-0.5">Subtotal: {bs(subtotalCarrito)}</div>
-            {descuentoCupon > 0 && (
-              <div className="font-body text-[12px] text-teal font-semibold mb-0.5">Cupón {cuponAplicado?.codigo}: −{bs(descuentoCupon)}</div>
-            )}
-            {!entregaLista ? (
-              <div className="font-body text-[12px] text-inksoft mt-1">
-                {!metodoElegido ? 'Elegí cómo recibirlo para ver el envío y el total.' : metodoEntrega === 'envio' && !tipoEnvioElegido ? 'El envío y el total aparecen cuando elijas Envío normal o express.' : 'El envío y el total aparecen cuando completes tu dirección y tu zona.'}
-              </div>
-            ) : (
-            <>
-            {metodoEntrega === 'vendedor' && (
-              <div className="font-body text-[12px] text-inksoft mb-1">
-                Envío del vendedor: {envioVendedorTotal > 0 ? bs(envioVendedorTotal) : ''}{envioVendedorACoordinar ? `${envioVendedorTotal > 0 ? ' + ' : ''}a coordinar con el vendedor` : ''}
-              </div>
-            )}
-            {metodoEntrega === 'envio' && zonaEntrega && (
-              <div className="font-body text-[12px] text-inksoft mb-1">
-                {envioExpress ? 'Envío express' : 'Envío'}:{' '}
-                {descuentoEnvioCupon > 0 ? (
-                  <>
-                    <span className="line-through">{bs(costoEnvio)}</span>{' '}
-                    <span className="text-teal font-semibold">{costoEnvioFinal === 0 ? 'Gratis' : bs(costoEnvioFinal)}</span>
-                  </>
-                ) : (
-                  bs(costoEnvio)
-                )}
-              </div>
-            )}
-            <div className="font-display text-xl font-bold text-ink">Total {bs(totalCarrito)}</div>
-            </>
-            )}
-
+          {/* El subtotal, el envío y el total se ven en el paso siguiente
+              (pago), así que acá solo queda el cupón. */}
+          <div className="mb-5">
             {/* Cupón de descuento */}
-            <div className="mt-3 pt-3 border-t border-line">
+            <div>
               {cuponAplicado ? (
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-body text-xs">
@@ -1696,38 +1676,27 @@ function CheckoutContent() {
 
           <div className="font-display text-lg font-bold text-ink mb-3">¿Cómo quieres recibir tu pedido?</div>
 
-          <div className="flex gap-1 p-1 mb-4 bg-panelalt rounded-full">
-            {envioClasiDisponible && (
-              <button
-                type="button"
-                onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true) }}
-                className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                  metodoElegido && metodoEntrega === 'envio' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
-                }`}
-              >
-                🛵 Envío{envioVendedorDisponible ? ' Clasi Click' : ''}
-              </button>
-            )}
-            {envioVendedorDisponible && (
-              <button
-                type="button"
-                onClick={() => { setMetodoEntrega('vendedor'); setMetodoElegido(true) }}
-                className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                  metodoElegido && metodoEntrega === 'vendedor' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
-                }`}
-              >
-                🚚 Envío del vendedor
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => { setMetodoEntrega('retiro'); setMetodoElegido(true) }}
-              className={`flex-1 py-2.5 rounded-full font-body text-sm font-semibold transition-all ${
-                metodoElegido && metodoEntrega === 'retiro' ? 'bg-ink text-white shadow-sm' : 'text-inksoft'
-              }`}
-            >
-              🏬 Retiro{envioClasiDisponible && envioVendedorDisponible ? '' : ' en tienda'}
-            </button>
+          {/* Cómo recibirlo: opciones para elegir (como envío normal/express). */}
+          <div className="grid gap-2 mb-4" role="radiogroup" aria-label="Cómo recibir el pedido">
+            {[
+              { id: 'envio' as const, mostrar: envioClasiDisponible, icono: '🛵', titulo: `Envío${envioVendedorDisponible ? ' Clasi Click' : ''}`, detalle: 'Te lo llevamos a tu casa' },
+              { id: 'vendedor' as const, mostrar: envioVendedorDisponible, icono: '🚚', titulo: 'Envío del vendedor', detalle: 'Lo envía la tienda; el costo lo coordina con vos' },
+              { id: 'retiro' as const, mostrar: opcionesCheckout.retiro || (!envioClasiDisponible && !envioVendedorDisponible), icono: '🏬', titulo: 'Retiro en tienda', detalle: 'Lo pasás a buscar, sin costo de envío' },
+            ].filter((o) => o.mostrar).map((o) => {
+              const elegida = metodoElegido && metodoEntrega === o.id
+              return (
+                <label key={o.id} className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 cursor-pointer ${elegida ? 'border-teal bg-tealsoft' : 'border-line bg-panel'}`}>
+                  <input type="radio" name="metodoEntrega" checked={elegida} onChange={() => { setMetodoEntrega(o.id); setMetodoElegido(true); setError('') }} className="sr-only" />
+                  <span className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${elegida ? 'border-teal' : 'border-line'}`} aria-hidden>
+                    {elegida && <span className="w-2.5 h-2.5 rounded-full bg-teal" />}
+                  </span>
+                  <span className="flex-1 min-w-0 text-left">
+                    <span className="block font-body text-sm font-semibold text-ink">{o.icono} {o.titulo}</span>
+                    <span className="block font-body text-[11px] text-inksoft">{o.detalle}</span>
+                  </span>
+                </label>
+              )
+            })}
           </div>
           {!envioClasiDisponible && !envioVendedorDisponible && !consultandoVendedores && (
             <div className="font-body text-[12px] text-inksoft mb-3 -mt-2">
@@ -1804,6 +1773,7 @@ function CheckoutContent() {
                 )}
               </div>
               <div className={`flex flex-wrap gap-2 mb-3 ${direccionVerificada === false && lat == null ? 'p-2.5 rounded-lg border border-maroon bg-maroonsoft' : ''}`}>
+                {opcionesCheckout.gps && (
                 <button
                   type="button"
                   onClick={usarMiUbicacion}
@@ -1812,6 +1782,8 @@ function CheckoutContent() {
                 >
                   {buscandoUbicacion ? 'Buscando...' : origenPunto === 'gps' ? '✓ Usamos tu ubicación' : '📍 Estoy ahí: usar mi ubicación'}
                 </button>
+                )}
+                {opcionesCheckout.mapa && (
                 <button
                   type="button"
                   onClick={() => (mapaAbierto ? setMapaAbierto(false) : abrirMapa())}
@@ -1819,6 +1791,7 @@ function CheckoutContent() {
                 >
                   {origenPunto === 'mapa' && !mapaAbierto ? '✓ Casa marcada (cambiar)' : '🗺️ Marcar mi casa en el mapa'}
                 </button>
+                )}
               </div>
               {mapaAbierto && puntoMapa && (
                 <div className="mb-3">
@@ -1826,7 +1799,7 @@ function CheckoutContent() {
                   <ElegirUbicacion inicial={puntoMapa} onCambiar={(a, b) => setPuntoMapa({ lat: a, lng: b })} />
                   <div className="flex items-center gap-2 mt-2">
                     <span className="flex-1 font-body text-[12px] text-ink">
-                      Envío desde ese punto: <strong>{bs(costoPorDistancia(puntoMapa.lat, puntoMapa.lng))}</strong> · zona cercana: {cercanaA(puntoMapa.lat, puntoMapa.lng).nombre}
+                      Envío desde ese punto: <strong>{bs(costoPorDistancia(puntoMapa.lat, puntoMapa.lng))}</strong>
                     </span>
                     <button type="button" onClick={() => setMapaAbierto(false)} className="px-3 py-2 rounded-lg border border-line bg-panel font-body text-xs">Cancelar</button>
                     <button type="button" onClick={confirmarMapa} className="px-3 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold">Confirmar</button>
@@ -1867,7 +1840,7 @@ function CheckoutContent() {
                 ) : tocados.zona || zonaTexto ? (
                   <span className="text-maroon">⚠ {validarZona(zonaTexto, { zonas, conPunto: true })}</span>
                 ) : (
-                  <span className="text-inksoft">Se completa sola con tu dirección; si no es la tuya, cambiala.</span>
+                  <span className="text-inksoft">Escribí el nombre de tu zona o barrio.</span>
                 )}
               </div>
 
@@ -1908,7 +1881,7 @@ function CheckoutContent() {
                 )}
               </div>
               <label className="block text-left mb-4">
-                <span className="font-body text-[12px] font-semibold text-ink block mb-1">Referencia <span className="font-normal text-inksoft">(opcional)</span></span>
+                <span className="font-body text-[12px] font-semibold text-ink block mb-1">Otro dato de referencia <span className="font-normal text-inksoft">(opcional)</span></span>
                 <input
                   value={referenciaAdicional}
                   onChange={(e) => setReferenciaAdicional(e.target.value)}
@@ -1924,7 +1897,7 @@ function CheckoutContent() {
                 <div className="grid gap-2">
                   {[
                     { express: false, icono: '🛵', titulo: 'Envío normal', detalle: `Llega ${fechaEntregaTexto()}`, precio: zonaEntrega || lat != null ? bs(costoZona) : '', disabled: false, mostrar: true },
-                    { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: cuentaPrueba || hayEntregaHoy() },
+                    { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: opcionesCheckout.express && (cuentaPrueba || hayEntregaHoy()) },
                   ].filter((o) => o.mostrar).map((o) => {
                     const elegida = tipoEnvioElegido && envioExpress === o.express
                     return (
@@ -1953,20 +1926,6 @@ function CheckoutContent() {
                 </div>
               )}
 
-              <div className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => setMostrarMapaZonas((v) => !v)}
-                  className="font-body text-[12px] text-teal font-semibold underline"
-                >
-                  {mostrarMapaZonas ? 'Ocultar mapa de zonas' : 'Ver mapa de zonas y costos de envío'}
-                </button>
-                {mostrarMapaZonas && (
-                  <div className="mt-2">
-                    <MapaZonasPotosi zonaSeleccionada={zonaEntrega} />
-                  </div>
-                )}
-              </div>
 
             </>
           ) : (
@@ -1995,7 +1954,7 @@ function CheckoutContent() {
                     />
                   </label>
                   <label className="block text-left mb-4">
-                    <span className="font-body text-[11px] text-inksoft block mb-1">Referencia (opcional)</span>
+                    <span className="font-body text-[11px] text-inksoft block mb-1">Otro dato de referencia (opcional)</span>
                     <input
                       value={referenciaAdicional}
                       onChange={(e) => setReferenciaAdicional(e.target.value)}
@@ -2057,7 +2016,7 @@ function CheckoutContent() {
             disabled={authCargando}
             className="w-full py-3 rounded-lg border-none bg-maroon text-white font-body text-sm font-semibold disabled:opacity-60"
           >
-            {metodoEntrega !== 'envio' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Continuar al pago'}
+            {metodoEntrega !== 'envio' && metodoPago === 'efectivo' ? 'Continuar compra por WhatsApp' : 'Pagar'}
           </button>
           </>
           )}

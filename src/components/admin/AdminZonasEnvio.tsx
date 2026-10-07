@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { MapaZonasPotosi } from '@/components/MapaZonasPotosi'
+import { ETIQUETAS_OPCIONES, OPCIONES_CHECKOUT_DEFECTO, type OpcionesCheckout } from '@/lib/opcionesCheckout'
 
 // Admin → Zonas de envío. Las zonas que escriben los compradores con la
 // casa marcada en el mapa (y no están en la lista) aparecen acá con
@@ -17,6 +19,19 @@ export default function AdminZonasEnvio({ password }: { password: string }) {
   const [cargando, setCargando] = useState(true)
   const [nombres, setNombres] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
+  // Opciones del checkout (qué ve el comprador) y el mapa de zonas y costos.
+  const [opciones, setOpciones] = useState<OpcionesCheckout>(OPCIONES_CHECKOUT_DEFECTO)
+  const [guardadoOpc, setGuardadoOpc] = useState('')
+  const [verMapa, setVerMapa] = useState(false)
+  useEffect(() => { fetch('/api/config-checkout').then((r) => r.json()).then((d) => d?.opciones && setOpciones(d.opciones)).catch(() => {}) }, [])
+  async function cambiarOpcion(k: keyof OpcionesCheckout, v: boolean) {
+    const nuevas = { ...opciones, [k]: v }
+    setOpciones(nuevas)
+    setGuardadoOpc('Guardando…')
+    const d = await fetch('/api/admin/config-checkout', { method: 'PUT', headers, body: JSON.stringify({ opciones: nuevas }) }).then((r) => r.json()).catch(() => ({ error: 'No se pudo guardar.' }))
+    setGuardadoOpc(d.error ? d.error : '✓ Guardado')
+    setTimeout(() => setGuardadoOpc(''), 2000)
+  }
 
   async function cargar() {
     setCargando(true)
@@ -38,6 +53,29 @@ export default function AdminZonasEnvio({ password }: { password: string }) {
 
   return (
     <div>
+      <div className="bg-panel border border-line rounded-xl p-4 mb-5">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="font-display text-lg font-bold text-ink">Opciones del checkout</div>
+          {guardadoOpc && <span className="font-body text-[11px] text-teal">{guardadoOpc}</span>}
+        </div>
+        <div className="font-body text-xs text-inksoft mb-3">Tildá lo que querés que vea el comprador al finalizar la compra.</div>
+        <div className="grid gap-2">
+          {ETIQUETAS_OPCIONES.map((o) => (
+            <label key={o.id} className="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={opciones[o.id]} onChange={(e) => cambiarOpcion(o.id, e.target.checked)} className="accent-teal mt-0.5 w-4 h-4" />
+              <span>
+                <span className="block font-body text-sm text-ink">{o.label}</span>
+                <span className="block font-body text-[11px] text-inksoft">{o.ayuda}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 pt-3 border-t border-line">
+          <button type="button" onClick={() => setVerMapa((v) => !v)} className="font-body text-[12px] text-teal font-semibold underline bg-transparent border-none p-0">{verMapa ? 'Ocultar mapa de zonas y costos' : '🗺️ Ver mapa de zonas y costos de envío'}</button>
+          {verMapa && <div className="mt-2"><MapaZonasPotosi zonaSeleccionada="" /></div>}
+        </div>
+      </div>
+
       <div className="font-display text-lg font-bold text-ink mb-1">Zonas de envío</div>
       <div className="font-body text-xs text-inksoft mb-4">
         Cuando un comprador marca su casa en el mapa y escribe una zona que no está en la lista, aparece acá. El envío ya se le cobró según la distancia de su casa al centro; agregarla solo hace que la próxima vez aparezca en la lista.
