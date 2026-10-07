@@ -12,6 +12,7 @@ import { ZONAS_ENVIO_POTOSI, ZONAS_AGRUPADAS, grupoDeBarrio, distanciaKm, costoP
 import { validarDireccion, validarEntreCalles, validarZona, zonaLibreValida } from '@/lib/validarEntrega'
 import { entreCallesNoCoinciden, type EntreCallesInfo } from '@/lib/entreCalles'
 import InputSugerencias from '@/components/InputSugerencias'
+import QrLimpio from '@/components/QrLimpio'
 import { OPCIONES_CHECKOUT_DEFECTO, type OpcionesCheckout } from '@/lib/opcionesCheckout'
 import { coincideInicio, leerDatosUsados, mezclarConCuenta, recordarDatos, type DatosUsados, type DireccionUsada } from '@/lib/datosUsados'
 import { buscarZonaEn, normZona, zonaMasCercana, zonasCercanas } from '@/lib/zonasEnvio'
@@ -2047,15 +2048,10 @@ function CheckoutContent() {
               Pago {pasoActual + 1} de {subPedidos.length}
             </div>
           )}
-          <div className="mx-auto mb-3 w-14 h-14 rounded-full bg-tealsoft flex items-center justify-center text-2xl">
-            ✅
-          </div>
-
           {/* Resumen de lo que se está pagando, antes del QR -- para
               que quede clara la compra justo en el momento de pagar,
               no solo más arriba en el paso de entrega. */}
           <div className="text-left bg-panelalt border border-line rounded-lg p-3.5 mb-4">
-            <div className="font-body text-[11px] text-inksoft mb-1.5">Estás pagando</div>
             <div className="divide-y divide-line">
               {subPedidos[pasoActual].items.map((it, i) => (
                 <div key={i} className="flex items-center gap-2.5 py-1.5">
@@ -2107,9 +2103,6 @@ function CheckoutContent() {
             Descargue el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
           </div>
 
-          <div className="font-body text-[13px] text-ink font-medium mb-3">
-            Pagá con el QR
-          </div>
           {metodoEntrega !== 'envio' && (
             <div className="font-body text-[13px] text-inksoft mb-5">
               {subPedidos[pasoActual].cobroPropio
@@ -2120,16 +2113,7 @@ function CheckoutContent() {
 
           {subPedidos[pasoActual].qrImageUrl ? (
             <>
-              <img src={subPedidos[pasoActual].qrImageUrl} alt="Código QR de pago" loading="lazy" decoding="async" className="mx-auto w-48 rounded-lg border border-line mt-2" />
-              <a
-                href={subPedidos[pasoActual].qrImageUrl}
-                download="qr-pago.jpg"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 mt-3 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold"
-              >
-                ⬇ Descargar QR
-              </a>
+              <QrLimpio url={subPedidos[pasoActual].qrImageUrl!} nombreArchivo={`qr-pago-${bs(subPedidos[pasoActual].total).replace(/\D/g, '')}bs.png`} />
             </>
           ) : (
             <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink mt-2">
@@ -2145,7 +2129,7 @@ function CheckoutContent() {
             </div>
           )}
 
-          <div className="font-display text-2xl font-bold text-ink mt-4 mb-4">{bs(subPedidos[pasoActual].total)}</div>
+          <div className="mb-4" />
 
           {subPedidos[pasoActual].estadoActual === 'cancelado' ? (
             <div className="font-body text-sm text-maroon bg-maroonsoft border border-maroon rounded-lg px-4 py-4 text-left">
@@ -2212,13 +2196,16 @@ function CheckoutContent() {
               </div>
             ) : (
               <>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={subiendoComprobante}
-                  onChange={(e) => subirComprobante(e.target.files?.[0] || null)}
-                  className="font-body text-xs text-inksoft"
-                />
+                <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold cursor-pointer ${subiendoComprobante ? 'opacity-50 pointer-events-none' : ''}`}>
+                  📷 Elegir foto del comprobante
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={subiendoComprobante}
+                    onChange={(e) => { subirComprobante(e.target.files?.[0] || null); e.target.value = '' }}
+                    className="sr-only"
+                  />
+                </label>
                 {subiendoComprobante && <div className="font-body text-xs text-inksoft mt-1.5">Subiendo...</div>}
               </>
             )}
