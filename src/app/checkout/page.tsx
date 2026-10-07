@@ -1218,6 +1218,9 @@ function CheckoutContent() {
             origenUbicacion: metodoEntrega === 'envio' && lat != null ? origenPunto || null : null,
             validacionZona: metodoEntrega === 'envio' ? validacionZona : null,
             costoEnvio: envioGrupo,
+            // Envío de toda la compra antes del cupón (si el carrito tiene
+            // varias tiendas, el envío se reparte y cada pedido lleva una parte).
+            costoEnvioCompra: costoEnvio,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
             envioExpress: metodoEntrega === 'envio' ? envioExpress : false,

@@ -85,9 +85,11 @@ export async function POST(req: NextRequest) {
       }
     }
     const db = getDb()
-    // El envío de Clasi Click arranca en Bs 5 (ver costoPorDistancia); solo
-    // puede ser menos con un cupón de envío gratis.
-    if (metodoEntrega === 'envio' && !(Number(cupon?.descuentoEnvio) > 0) && Number(costoEnvio || 0) < 5) {
+    // El envío de Clasi Click arranca en Bs 5 (ver costoPorDistancia). Se
+    // controla el de TODA la compra antes del cupón: con varias tiendas en
+    // el carrito el envío se reparte y cada pedido lleva solo una parte.
+    const envioCompra = body.costoEnvioCompra != null ? Number(body.costoEnvioCompra) : Number(cupon?.costoEnvioCarrito ?? costoEnvio ?? 0)
+    if (metodoEntrega === 'envio' && !(envioCompra >= 5)) {
       return NextResponse.json({ error: 'El costo del envío no es válido. Volvé a elegir el envío.' }, { status: 400 })
     }
     const ref = db.collection('pedidos').doc()
