@@ -41,21 +41,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ encontrada: false, motivo: 'Escribí la calle y el número, no alcanza con un número solo.' })
     }
 
-    const consulta = `${direccion}, Potosí, Bolivia`
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bo&q=${encodeURIComponent(consulta)}`
-
-    const res = await fetch(url, {
-      headers: {
-        // Nominatim exige identificar la app que llama — un User-Agent
-        // genérico de librería HTTP hace que bloqueen el pedido.
-        'User-Agent': 'ClasiClick/1.0 (marketplace Potosí, Bolivia)',
-      },
-    })
-    if (!res.ok) {
+    // En el mapa las calles figuran como "Calle Chayanta", "Avenida
+    // Camacho"… y Nominatim a veces no encuentra "Chayanta 45" a secas: si
+    // no aparece, se prueba con "Calle …" y "Avenida …" adelante.
+    const buscar = async (texto: string) => {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bo&q=${encodeURIComponent(`${texto}, Potosí, Bolivia`)}`
+      const r = await fetch(url, {
+        headers: {
+          // Nominatim exige identificar la app que llama — un User-Agent
+          // genérico de librería HTTP hace que bloqueen el pedido.
+          'User-Agent': 'ClasiClick/1.0 (marketplace Potosí, Bolivia)',
+        },
+      })
+      if (!r.ok) return null
+      return r.json()
+    }
+    let resultados = await buscar(direccion)
+    if (resultados === null) {
       return NextResponse.json({ encontrada: null, motivo: 'servicio_no_disponible' })
     }
-
-    const resultados = await res.json()
+    const conPrefijo = /^\s*(calle|c\.|av\.?|avenida|pasaje|pje\.?|plaza|jir[oó]n)\b/i.test(direccion)
+    for (const prefijo of conPrefijo ? [] : ['Calle', 'Avenida']) {
+      if (Array.isArray(resultados) && resultados.length) break
+      await new Promise((ok) => setTimeout(ok, 1100)) // 1 consulta por segundo (política de Nominatim)
+      resultados = (await buscar(`${prefijo} ${direccion}`)) || resultados
+    }
     if (!Array.isArray(resultados) || resultados.length === 0) {
       return NextResponse.json({ encontrada: false, motivo: 'No encontramos esa dirección — revisá que esté bien escrita.' })
     }
