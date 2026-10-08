@@ -1611,7 +1611,12 @@ function CheckoutContent() {
                   <div className="font-body text-xs">
                     <div className="font-semibold text-ink">🎟️ {cuponAplicado.codigo}</div>
                     {resultadoCupon?.ok ? (
-                      <div className="text-teal">{resultadoCupon.descripcion} ✓</div>
+                      <div className="text-teal">
+                        {resultadoCupon.descripcion} ✓
+                        {cuponAplicado.tipo === 'envio_gratis' && costoEnvioFinal > 0 && (
+                          <div className="text-inksoft">Cubre el envío normal; el extra del express ({bs(costoEnvioFinal)}) se paga.</div>
+                        )}
+                      </div>
                     ) : (
                       <div className="text-maroon">{resultadoCupon?.error}</div>
                     )}
@@ -1622,22 +1627,24 @@ function CheckoutContent() {
                 </div>
               ) : (
                 <>
+                  <div className="font-body text-[11px] text-inksoft mb-1">Si tiene el código de un cupón de envío gratis escriba aquí</div>
                   <div className="flex gap-2">
                     <input
                       value={codigoCupon}
                       onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCuponEnPago() } }}
-                      placeholder="Si tiene un cupón de envío escriba aquí el código"
-                      className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case placeholder:text-[10px] placeholder:tracking-tight"
+                      placeholder="Código del cupón"
+                      aria-label="Código del cupón de envío gratis"
+                      className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case placeholder:text-xs"
                     />
-                    <button
+                    {codigoCupon.trim() && <button
                       type="button"
                       onClick={() => aplicarCuponEnPago()}
                       disabled={aplicandoCupon || !codigoCupon.trim()}
                       className="px-3 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
                     >
                       {aplicandoCupon ? '...' : 'Aplicar'}
-                    </button>
+                    </button>}
                   </div>
                   {errorCupon && <div className="font-body text-[11px] text-maroon mt-1.5">{errorCupon}</div>}
                   {cuponesDisponibles.length > 0 && (
