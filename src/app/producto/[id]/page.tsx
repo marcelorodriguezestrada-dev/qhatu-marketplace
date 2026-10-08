@@ -155,7 +155,8 @@ export default function ProductoDetallePage() {
   }
 
   function comprarAhora() {
-    if (agregarItemsAlCarrito()) router.push('/checkout')
+    // Directo al pago de ESTA tienda (si el carrito tiene cosas de otras, quedan guardadas).
+    if (agregarItemsAlCarrito()) router.push(`/checkout?tienda=${encodeURIComponent(producto?.vendedorId || 'plataforma')}`)
   }
 
   if (cargando) {

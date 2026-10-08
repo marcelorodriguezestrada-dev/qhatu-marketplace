@@ -60,9 +60,9 @@ export default function QrLimpio({ url, nombreArchivo = 'qr-pago.png' }: { url: 
   return (
     <>
       {listo ? (
-        <img src={src} alt="Código QR de pago" className={`mx-auto rounded-lg border border-line mt-2 ${limpio ? 'w-40 bg-white' : 'w-40'}`} />
+        <img src={src} alt="Código QR de pago" className={`mx-auto rounded-lg border border-line mt-2 ${limpio ? 'w-32 bg-white' : 'w-32'}`} />
       ) : (
-        <div className="mx-auto w-40 h-40 rounded-lg border border-line bg-panelalt mt-2 flex items-center justify-center font-body text-xs text-inksoft">Cargando QR…</div>
+        <div className="mx-auto w-32 h-32 rounded-lg border border-line bg-panelalt mt-2 flex items-center justify-center font-body text-xs text-inksoft">Cargando QR…</div>
       )}
       <a
         href={src}

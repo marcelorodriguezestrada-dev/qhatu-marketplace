@@ -158,6 +158,21 @@ function CheckoutContent() {
   const items = claveTienda
     ? itemsCarrito.filter((i) => (i.vendedorId || 'plataforma') === claveTienda)
     : itemsCarrito
+  // Se compra UNA tienda por vez. Si se llegó a /checkout sin ?tienda=
+  // (un link viejo, un aviso…): con una sola tienda en el carrito se pasa
+  // a esa; con varias, se pide elegir cuál pagar ahora (abajo).
+  const tiendasCarrito = Array.from(
+    itemsCarrito.reduce((m, i) => {
+      const k = i.vendedorId || 'plataforma'
+      const t = m.get(k) || { clave: k, nombre: i.tiendaNombre || i.vendedor || 'Clasi Click', items: [] as typeof itemsCarrito }
+      t.items.push(i)
+      return m.set(k, t)
+    }, new Map<string, { clave: string; nombre: string; items: typeof itemsCarrito }>()).values(),
+  )
+  useEffect(() => {
+    if (!claveTienda && tiendasCarrito.length === 1) router.replace(`/checkout?tienda=${encodeURIComponent(tiendasCarrito[0].clave)}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveTienda, tiendasCarrito.length])
 
   const [etapa, setEtapa] = useState<Etapa>('entrega')
   // QR/cuenta configurados por el admin desde /admin (ver
@@ -1566,6 +1581,29 @@ function CheckoutContent() {
     )
   }
 
+  if (!claveTienda && tiendasCarrito.length > 1 && etapa === 'entrega') {
+    return (
+      <div className="max-w-[420px] mx-auto px-5 py-10">
+        <button onClick={() => router.push('/')} className="border-none bg-transparent text-inksoft font-body text-[13px] mb-5 p-0">← Volver a la tienda</button>
+        <div className="bg-panel border border-line rounded-xl p-6">
+          <div className="font-display text-lg font-bold text-ink mb-1">¿Qué tienda querés pagar ahora?</div>
+          <div className="font-body text-[12px] text-inksoft mb-4">Tu carrito tiene productos de {tiendasCarrito.length} tiendas. Cada tienda se paga por separado; lo demás queda guardado en tu carrito.</div>
+          <div className="grid gap-2">
+            {tiendasCarrito.map((t) => (
+              <button key={t.clave} type="button" onClick={() => router.push(`/checkout?tienda=${encodeURIComponent(t.clave)}`)} className="w-full text-left px-3.5 py-3 rounded-xl border-2 border-line bg-panel hover:border-teal">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-body text-sm font-semibold text-ink">🏬 {t.nombre}</span>
+                  <span className="font-body text-sm font-semibold text-ink">{bs(t.items.reduce((s, i) => s + i.precio * i.cantidad, 0))}</span>
+                </div>
+                <div className="font-body text-[11px] text-inksoft truncate">{t.items.map((i) => `${i.cantidad > 1 ? `${i.cantidad}× ` : ''}${i.nombre}`).join(', ')}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const bloqueCupon = (
             <div>
               {cuponAplicado ? (
@@ -1590,13 +1628,13 @@ function CheckoutContent() {
                       onChange={(e) => { setCodigoCupon(e.target.value.toUpperCase()); setErrorCupon('') }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aplicarCuponEnPago() } }}
                       placeholder="Si tiene un cupón de envío escriba aquí el código"
-                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case"
+                      className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-line bg-panel font-body text-sm uppercase placeholder:normal-case placeholder:text-[10px] placeholder:tracking-tight"
                     />
                     <button
                       type="button"
                       onClick={() => aplicarCuponEnPago()}
                       disabled={aplicandoCupon || !codigoCupon.trim()}
-                      className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
+                      className="px-3 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-50"
                     >
                       {aplicandoCupon ? '...' : 'Aplicar'}
                     </button>
@@ -2243,7 +2281,7 @@ function CheckoutContent() {
             ) : (
               <>
                 <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold cursor-pointer ${subiendoComprobante ? 'opacity-50 pointer-events-none' : ''}`}>
-                  📷 Subí comprobante
+                  👆 Subí comprobante
                   <input
                     type="file"
                     accept="image/*"
