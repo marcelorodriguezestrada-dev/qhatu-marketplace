@@ -4,10 +4,14 @@ import { linkParaElegirContrasena } from '@/lib/linkContrasena'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sincronizarDatosCuenta } from '@/lib/datosCuentaServer'
 import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { FieldValue } from 'firebase-admin/firestore'
+import { sanearCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { sanearUbicacionPrueba } from '@/lib/cuentasPrueba'
 
 export const dynamic = 'force-dynamic'
 
-// PATCH { pausado: boolean }, { esPrueba: boolean } o { accion } — solo admin.
+// PATCH { pausado: boolean }, { esPrueba: boolean }, { ubicacionPrueba } o { accion } — solo admin.
 // accion 'verificar': da por verificado el email (no le llegó el código).
 // esPrueba marca/desmarca la cuenta de prueba (custom claim en Firebase
 // Auth; ver src/lib/cuentasPrueba.ts). Pausar bloquea el login del
@@ -106,6 +110,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
       if (u.disabled) return NextResponse.json({ error: 'El usuario está pausado. Reactivalo primero.' }, { status: 400 })
       const token = await authAdmin.createCustomToken(params.uid, { cargaAdmin: true })
       return NextResponse.json({ token, email: u.email || null })
+    }
+    // Casa de prueba de una cuenta de prueba (su ciudad + dirección).
+    if (body.ubicacionPrueba !== undefined) {
+      await cargarCiudadesServidor()
+      const u = body.ubicacionPrueba === null ? null : sanearUbicacionPrueba(body.ubicacionPrueba, sanearCiudad(body.ubicacionPrueba?.ciudad))
+      if (body.ubicacionPrueba !== null && !u) return NextResponse.json({ error: 'Dirección de prueba inválida.' }, { status: 400 })
+      await getDb().collection('usuarios').doc(params.uid).set({ ubicacionPrueba: u ?? FieldValue.delete() }, { merge: true })
+      if (u) {
+        const actual = (await authAdmin.getUser(params.uid)).customClaims || {}
+        await authAdmin.setCustomUserClaims(params.uid, { ...actual, esPrueba: true })
+      }
+      return NextResponse.json({ ok: true })
     }
     if (typeof body.esPrueba === 'boolean') {
       const actual = (await authAdmin.getUser(params.uid)).customClaims || {}

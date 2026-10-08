@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CIUDADES, buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import { gentilicioDe } from '@/lib/marketingAdmin'
 import { TEMAS_VOLANTE, codificarConfig, destinoDeTipo, textosBase, type ConfigVolante, type PosQR } from '@/lib/volantes'
 
@@ -23,6 +24,7 @@ function configBase(tipo: string, ciudad: CiudadId, tema = 'rojo'): ConfigVolant
 }
 
 export default function EditorVolantes({ password, campanas }: { password: string; campanas: { id: string; nombre: string; activa: boolean }[] }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
   const [ciudad, setCiudad] = useState<CiudadId>('potosi')
   const [config, setConfig] = useState<ConfigVolante>(() => configBase('general', 'potosi'))
@@ -184,7 +186,7 @@ export default function EditorVolantes({ password, campanas }: { password: strin
               <option value="historia">Historia / estado (9:16)</option>
             </select>
             <select value={ciudad} onChange={(e) => setCiudad(e.target.value as CiudadId)} className={sel} aria-label="Ciudad" title="Ciudad de los textos base y de la IA">
-              {CIUDADES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
             <select value={campana} onChange={(e) => setCampana(e.target.value)} className={sel} aria-label="Campaña">
               <option value="">Sin campaña (link normal)</option>

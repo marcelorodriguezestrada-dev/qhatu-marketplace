@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/anuncioPublico'
 
@@ -20,6 +21,7 @@ async function leerProducto(id: string) {
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const p = await leerProducto(params.id)
   if (!p) return { title: 'Producto | Clasi Click' }
 

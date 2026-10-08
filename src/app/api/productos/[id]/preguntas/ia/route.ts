@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { responderPreguntaProductoIA } from '@/lib/moderacionIA'
 import { MAX_PREGUNTA } from '@/lib/preguntas'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { tieneControlStock, agotado } from '@/lib/stock'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +22,7 @@ const TIPOS_VENTA: Record<string, string> = {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'sin-ip'
   const ahora = Date.now()
   const recientes = (usos.get(ip) || []).filter((t) => ahora - t < VENTANA_MS)

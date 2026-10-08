@@ -4,6 +4,8 @@ import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
 import { sanearCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { sanearUbicacionPrueba } from '@/lib/cuentasPrueba'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,7 +90,12 @@ export async function POST(req: NextRequest) {
     const nombre = String(body.nombre || '').trim().slice(0, 80)
     const nombreNegocio = String(body.nombreNegocio || '').trim().slice(0, 80)
     const whatsappLocal = String(body.whatsapp || '').trim()
+    await cargarCiudadesServidor()
     const ciudad = sanearCiudad(body.ciudad)
+    // Cuenta de prueba de una ciudad (con su casa de prueba para el checkout).
+    const esPrueba = body.esPrueba === true
+    const ubicacionPrueba = esPrueba ? sanearUbicacionPrueba(body.ubicacionPrueba, ciudad) : null
+    if (esPrueba && !ubicacionPrueba) return NextResponse.json({ error: 'Falta la dirección de prueba (ubicala en el mapa).' }, { status: 400 })
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Poné un email válido.' }, { status: 400 })
     }
@@ -110,6 +117,7 @@ export async function POST(req: NextRequest) {
       // persona — no le pedimos el código de verificación.
       const creado = await authAdmin.createUser({ email, emailVerified: true, ...(nombre ? { displayName: nombre } : {}), ...(passwordInicial ? { password: passwordInicial.slice(0, 100) } : {}) })
       uid = creado.uid
+      if (esPrueba) await authAdmin.setCustomUserClaims(uid, { esPrueba: true })
     } catch (err: any) {
       if (err?.code === 'auth/email-already-exists') {
         return NextResponse.json({ error: 'Ya existe una cuenta con ese email. Buscala en la lista de usuarios.' }, { status: 409 })
@@ -120,10 +128,10 @@ export async function POST(req: NextRequest) {
     const db = getDb()
     const ahora = new Date().toISOString()
     await db.collection('usuarios').doc(uid).set(
-      { email, nombre, whatsapp, ciudad, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora },
+      { email, nombre, whatsapp, ciudad, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora, ...(ubicacionPrueba ? { ubicacionPrueba } : {}) },
       { merge: true }
     )
-    if (nombreNegocio || whatsapp || ciudad !== 'potosi') {
+    if (nombreNegocio || whatsapp || (ciudad !== 'potosi' && !esPrueba)) {
       await db.collection('vendedores').doc(uid).set(
         { nombreNegocio, whatsapp, whatsappPais: whatsapp ? 'BO' : '', ciudad, email, creadoPorAdmin: true, updatedAt: ahora },
         { merge: true }

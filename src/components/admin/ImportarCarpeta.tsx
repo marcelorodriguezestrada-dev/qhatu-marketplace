@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CIUDADES, type CiudadId } from '@/data/ciudades'
+import { type CiudadId } from '@/data/ciudades'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import { claveImportacion, codigoTienda, leerFotos, nombreGenerico, pareceUnaTienda, separarMarcaFoto, type FotoArchivo, type ProductoLeido } from '@/lib/importarCarpeta'
 import { leerSheet } from '@/lib/importarSheet'
 import { buscarRubroPorTexto } from '@/lib/planillaProductos'
@@ -48,6 +49,7 @@ export default function ImportarCarpeta({
   categorias: CategoriaProducto[]
   existentes: Existente[]
 }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
   const [estado, setEstado] = useState<Estado>('elegir')
   const [modo, setModo] = useState<'carpeta' | 'sheet' | 'armar'>('carpeta')
@@ -412,7 +414,7 @@ export default function ImportarCarpeta({
                       <input value={formTienda.whatsapp} onChange={(e) => setFormTienda((f) => ({ ...f, whatsapp: e.target.value }))} placeholder="WhatsApp (opcional)" className="px-2.5 py-1.5 rounded-md border border-line font-body text-xs" />
                       <input value={formTienda.email} onChange={(e) => setFormTienda((f) => ({ ...f, email: e.target.value }))} placeholder="Email (opcional)" className="px-2.5 py-1.5 rounded-md border border-line font-body text-xs" />
                       <select value={formTienda.ciudad} onChange={(e) => setFormTienda((f) => ({ ...f, ciudad: e.target.value as CiudadId }))} className="px-2 py-1.5 rounded-md border border-line font-body text-xs">
-                        {CIUDADES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                        {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                       </select>
                       <div className="flex gap-1.5">
                         <button type="button" onClick={() => crearTienda(t.codigo)} className="px-3 py-1.5 rounded-md border-none bg-teal text-white font-body text-xs font-semibold">Crear</button>
