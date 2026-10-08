@@ -47,11 +47,29 @@ export function numeroLocalABolivia(numero: string): string {
 // se agrega acá.
 export function validarWhatsappPorPais(numero: string, paisId: string = PAIS_FALLBACK_ID): { valido: boolean; motivo?: string } {
   if (paisId === 'BO') return validarWhatsappBoliviano(numero)
+  if (paisId === 'AR') return validarWhatsappArgentino(numero)
   return { valido: false, motivo: 'Ese país todavía no está soportado.' }
+}
+
+// Argentina: código de área + número = 10 dígitos (ej. 11 2345 6789),
+// sin el 0 del área ni el 15. Acepta que lo peguen con 54 / 549 adelante.
+export function localArgentino(numero: string): string {
+  let l = (numero || '').replace(/\D/g, '')
+  if (l.startsWith('54') && l.length >= 12) l = l.slice(2)
+  if (l.startsWith('9') && l.length === 11) l = l.slice(1)
+  if (l.startsWith('0')) l = l.slice(1)
+  return l
+}
+export function validarWhatsappArgentino(numero: string): { valido: boolean; motivo?: string } {
+  const l = localArgentino(numero)
+  if (l.length !== 10) return { valido: false, motivo: 'Teléfono inválido: código de área + número, 10 dígitos (ej. 1123456789).' }
+  if (/^(\d)\1+$/.test(l)) return { valido: false, motivo: 'Ese número no parece real — revisalo.' }
+  return { valido: true }
 }
 
 export function numeroConCodigoPais(numero: string, codigoPais: string): string {
   const limpio = (numero || '').replace(/\D/g, '')
+  if (codigoPais === '54') return `549${localArgentino(limpio)}`
   if (limpio.startsWith(codigoPais) && limpio.length > 8) return limpio
   return codigoPais + limpio
 }

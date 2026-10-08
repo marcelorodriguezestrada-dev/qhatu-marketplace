@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/firebaseAdmin'
 import { CIUDADES, CIUDAD_POR_DEFECTO, registrarCiudades, type Ciudad, type EstadoCiudad, type ZonaCiudad } from '@/data/ciudades'
 import { PAISES_MERCADO, sanearPaisMercado, type PaisMercado } from '@/data/paisesMercado'
+import { registrarPaises } from '@/lib/mercado'
 
 // Ciudades y países guardados por el admin (solo servidor).
 // - config/ciudades: { ciudades: { [id]: { estado, envioClasiClick } }, extras: { [id]: ciudad nueva } }
@@ -92,6 +93,7 @@ export async function cargarCiudadesServidor(fresco = false): Promise<{ ciudades
     const p = sanearPaisMercado({ ...v, id })
     if (p) paises.push(p)
   }
+  registrarPaises(paises)
   const datos = { ciudades, paises }
   cache = { hasta: Date.now() + 60_000, datos }
   return datos

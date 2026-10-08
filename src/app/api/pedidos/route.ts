@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sumarCampana } from '@/lib/campanasServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
-import { numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { ahoraEnPais, paisDeCiudad, telefonoInternacional } from '@/lib/mercado'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { sanearCiudad } from '@/data/ciudades'
 import { HORA_CORTE_EXPRESS } from '@/lib/entregaDias'
 import { evaluarCupon } from '@/lib/cupones'
 import { esCuentaPruebaServidor } from '@/lib/cuentasPrueba'
@@ -68,16 +70,20 @@ export async function POST(req: NextRequest) {
     if (!items || !items.length || !total) {
       return NextResponse.json({ error: 'Faltan datos del pedido.' }, { status: 400 })
     }
+    // País de la compra (Bolivia, Argentina…): su hora, su teléfono y su moneda.
+    await cargarCiudadesServidor().catch(() => null)
+    const ciudadCompra = sanearCiudad(body.ciudadCompra)
+    const pais = paisDeCiudad(ciudadCompra)
     // Mismo corte que el checkout (envioExpressDisponible), pero con la
-    // hora de Bolivia (UTC-4, sin horario de verano): el servidor corre
-    // en UTC y no podemos confiar en el reloj del navegador.
+    // hora del país de la compra: el servidor corre en UTC y no podemos
+    // confiar en el reloj del navegador.
     // Las cuentas de prueba (Admin → Usuarios) no tienen restricción de
     // horario — verificado con el login, no con lo que mande el navegador.
     const usuarioLogueado = await getUsuarioDesdeRequest(req)
     const esPrueba = await esCuentaPruebaServidor(usuarioLogueado)
     if (envioExpress && !esPrueba) {
-      const ahoraBolivia = new Date(Date.now() - 4 * 60 * 60 * 1000)
-      if (ahoraBolivia.getUTCDay() === 0 || ahoraBolivia.getUTCHours() >= HORA_CORTE_EXPRESS) {
+      const ahoraLocal = ahoraEnPais(pais)
+      if (ahoraLocal.getDay() === 0 || ahoraLocal.getHours() >= HORA_CORTE_EXPRESS) {
         return NextResponse.json(
           { error: `El envío express solo está disponible para compras antes de las ${HORA_CORTE_EXPRESS}:00. Elegí envío normal para continuar.` },
           { status: 400 }
@@ -140,7 +146,11 @@ export async function POST(req: NextRequest) {
       // pedido, porque el registro de cuenta no pide nombre (ver
       // /login: solo pide email, contraseña y celular).
       nombreComprador: nombreComprador || null,
-      whatsappComprador: whatsappComprador ? numeroLocalABolivia(whatsappComprador) : null,
+      whatsappComprador: whatsappComprador ? telefonoInternacional(whatsappComprador, pais) : null,
+      // Ciudad y país de la compra; los montos están en la moneda de ese país.
+      ciudad: ciudadCompra,
+      pais: pais.id,
+      moneda: pais.moneda,
       vendedorId: vendedorId || null,
       // Guardamos nombre y WhatsApp del vendedor tal como estaban al
       // momento de la compra — así /admin puede mostrar de qué tienda

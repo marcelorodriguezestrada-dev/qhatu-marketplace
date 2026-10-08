@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buscarCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { buscarPaisMercado } from '@/lib/mercado'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +39,10 @@ export async function POST(req: NextRequest) {
     // calle/zona), no solo números — esto es lo que dejaba pasar cosas
     // como "33" o "1" (Nominatim a veces matchea un número suelto con
     // cualquier cosa, un código postal, un kilómetro de ruta, etc.).
+    // Ciudad donde buscar (Potosí si no viene: el checkout de siempre).
+    await cargarCiudadesServidor().catch(() => null)
+    const ciudad = buscarCiudad(typeof body.ciudad === 'string' ? body.ciudad : null)
+    const pais = buscarPaisMercado(ciudad.pais)
     const tieneLetras = /[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(direccion)
     if (direccion.length < 5 || !tieneLetras) {
       return NextResponse.json({ encontrada: false, motivo: 'Escribí la calle y el número, no alcanza con un número solo.' })
@@ -45,7 +52,7 @@ export async function POST(req: NextRequest) {
     // Camacho"… y Nominatim a veces no encuentra "Chayanta 45" a secas: si
     // no aparece, se prueba con "Calle …" y "Avenida …" adelante.
     const buscar = async (texto: string) => {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bo&q=${encodeURIComponent(`${texto}, Potosí, Bolivia`)}`
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=${pais.id.toLowerCase()}&q=${encodeURIComponent(`${texto}, ${ciudad.nombre}, ${pais.nombre}`)}`
       const r = await fetch(url, {
         headers: {
           // Nominatim exige identificar la app que llama — un User-Agent

@@ -9,6 +9,8 @@ export type Pais = { id: string; nombre: string; bandera: string; codigo: string
 
 export const PAISES: Pais[] = [
   { id: 'BO', nombre: 'Bolivia', bandera: '🇧🇴', codigo: '591' },
+  // Argentina: en WhatsApp los celulares van como 54 9 + código de área + número.
+  { id: 'AR', nombre: 'Argentina', bandera: '🇦🇷', codigo: '54' },
 ]
 
 export const PAIS_FALLBACK_ID = 'BO'

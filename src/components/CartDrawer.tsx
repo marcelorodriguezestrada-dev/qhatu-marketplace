@@ -1,11 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { useCarrito, ItemCarrito } from '@/lib/store'
 import { ProductIcon } from './ProductIcon'
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+// En la moneda del país de la tienda (Bs en Bolivia, $ en Argentina…).
+function bs(n: number, ciudad?: unknown) {
+  return formatoMoneda(n, paisDeCiudad(typeof ciudad === 'string' ? ciudad : null))
 }
 
 type Tienda = {
@@ -89,7 +91,7 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
                         {[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}
                       </div>
                     )}
-                    <div className="font-body text-xs text-inksoft mb-1.5">{bs(it.precio)}</div>
+                    <div className="font-body text-xs text-inksoft mb-1.5">{bs(it.precio, (it as any).ciudad)}</div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => cambiarCantidad(it, -1)} className="w-5.5 h-5.5 border border-line rounded text-sm">−</button>
                       <span className="font-body text-[13px]">{it.cantidad}</span>
@@ -102,7 +104,7 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
 
               <div className="flex justify-between items-center mt-2.5">
                 <div className="font-body text-[13px] text-inksoft">
-                  Subtotal: <span className="font-bold text-ink">{bs(tienda.subtotal)}</span>
+                  Subtotal: <span className="font-bold text-ink">{bs(tienda.subtotal, (tienda.items[0] as any)?.ciudad)}</span>
                 </div>
                 <button
                   onClick={() => irAPagar(tienda)}
@@ -115,10 +117,11 @@ export function CartDrawer({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {items.length > 0 && (
+        {/* El total de todo junto solo tiene sentido si todo está en la misma moneda. */}
+        {items.length > 0 && new Set(items.map((i) => paisDeCiudad((i as any).ciudad).moneda)).size === 1 && (
           <div className="border-t border-line pt-3 mt-1 flex justify-between font-body text-xs text-inksoft">
             <span>Total de todo el carrito</span>
-            <span className="font-bold text-ink">{bs(total)}</span>
+            <span className="font-bold text-ink">{bs(total, (items[0] as any)?.ciudad)}</span>
           </div>
         )}
       </div>

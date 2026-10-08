@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
-import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais } from '@/lib/validarWhatsapp'
+import { PAISES } from '@/data/paises'
+import { useCiudad } from '@/lib/ciudad'
+import { buscarCiudad } from '@/data/ciudades'
 
 const MENSAJES_FIREBASE: Record<string, string> = {
   'auth/invalid-credential': 'Email o contraseña incorrectos.',
@@ -53,6 +56,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [celular, setCelular] = useState('')
+  // País del celular: arranca en el de la ciudad elegida (ej. Buenos Aires → Argentina).
+  const { ciudadId } = useCiudad()
+  const paisCiudad = buscarCiudad(ciudadId).pais
+  const [paisCelular, setPaisCelular] = useState<string | null>(null)
+  const paisCel = paisCelular || (PAISES.some((p) => p.id === paisCiudad) ? paisCiudad : 'BO')
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
@@ -127,7 +135,7 @@ export default function LoginPage() {
     }
 
     if (modo === 'registro') {
-      const chequeoCelular = validarWhatsappBoliviano(celular)
+      const chequeoCelular = validarWhatsappPorPais(celular, paisCel)
       if (!chequeoCelular.valido) {
         setError(chequeoCelular.motivo || 'Celular inválido.')
         return
@@ -152,7 +160,7 @@ export default function LoginPage() {
         const resRegistrar = await fetch('/api/usuarios/registrar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ celular, campana: leerCampana() }),
+          body: JSON.stringify({ celular, paisCelular: paisCel, campana: leerCampana() }),
         })
         if (!resRegistrar.ok) {
           const dataRegistrar = await resRegistrar.json().catch(() => ({}))
@@ -190,7 +198,7 @@ export default function LoginPage() {
   async function guardarCelular(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const chequeo = validarWhatsappBoliviano(celular)
+    const chequeo = validarWhatsappPorPais(celular, paisCel)
     if (!chequeo.valido) { setError(chequeo.motivo || 'Celular inválido.'); return }
     setCargando(true)
     try {
@@ -198,7 +206,7 @@ export default function LoginPage() {
       const res = await fetch('/api/usuarios/registrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ celular, campana: leerCampana() }),
+        body: JSON.stringify({ celular, paisCelular: paisCel, campana: leerCampana() }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.error || 'No pudimos guardar el celular. Probá de nuevo.'); return }
@@ -313,15 +321,7 @@ export default function LoginPage() {
           Entraste con Google como <strong>{usuario?.email}</strong>. Dejanos tu celular para coordinar tus pedidos.
         </div>
         <form onSubmit={guardarCelular}>
-          <input
-            type="tel"
-            value={celular}
-            onChange={(e) => setCelular(e.target.value)}
-            placeholder="Celular (8 dígitos, sin el +591)"
-            required
-            autoFocus
-            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-          />
+          <CampoCelular pais={paisCel} onPais={setPaisCelular} celular={celular} onCelular={setCelular} autoFocus />
           {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
           <button
             type="submit"
@@ -393,14 +393,7 @@ export default function LoginPage() {
           />
         )}
         {modo === 'registro' && (
-          <input
-            type="tel"
-            value={celular}
-            onChange={(e) => setCelular(e.target.value)}
-            placeholder="Celular (8 dígitos, sin el +591)"
-            required
-            className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-          />
+          <CampoCelular pais={paisCel} onPais={setPaisCelular} celular={celular} onCelular={setCelular} />
         )}
         {error && <div className="font-body text-xs text-maroon mb-3">{error}</div>}
         {aviso && <div className="font-body text-xs text-teal mb-3">{aviso}</div>}
@@ -436,6 +429,29 @@ export default function LoginPage() {
       <Link href="/ayuda" className="block w-full text-center font-body text-[11px] text-inksoft underline mt-4">
         Centro de ayuda
       </Link>
+    </div>
+  )
+}
+
+// Celular con el país adelante (🇧🇴 +591 / 🇦🇷 +54).
+function CampoCelular({ pais, onPais, celular, onCelular, autoFocus }: { pais: string; onPais: (p: string) => void; celular: string; onCelular: (v: string) => void; autoFocus?: boolean }) {
+  const p = PAISES.find((x) => x.id === pais) || PAISES[0]
+  return (
+    <div className="flex gap-2 mb-3">
+      {PAISES.length > 1 && (
+        <select value={p.id} onChange={(e) => onPais(e.target.value)} className="px-2 py-2.5 rounded-lg border border-line font-body text-sm bg-panel shrink-0" aria-label="País del celular">
+          {PAISES.map((x) => <option key={x.id} value={x.id}>{x.bandera} +{x.codigo}</option>)}
+        </select>
+      )}
+      <input
+        type="tel"
+        value={celular}
+        onChange={(e) => onCelular(e.target.value)}
+        placeholder={p.id === 'AR' ? 'Celular (código de área + número, ej. 1123456789)' : 'Celular (8 dígitos, sin el +591)'}
+        required
+        autoFocus={autoFocus}
+        className="flex-1 min-w-0 px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
+      />
     </div>
   )
 }

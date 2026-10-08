@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BannerCuponPromo from '@/components/BannerCuponPromo'
@@ -24,8 +25,9 @@ const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales')
   loading: () => <div className="w-full h-[260px] rounded-xl border border-line bg-panelalt flex items-center justify-center font-body text-sm text-inksoft">Cargando mapa...</div>,
 })
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+// Precio en la moneda del país de la tienda (Bs en Bolivia, $ en Argentina…).
+function bs(n: number, ciudad?: unknown) {
+  return formatoMoneda(n, paisDeCiudad(typeof ciudad === 'string' ? ciudad : null))
 }
 
 function esNuevo(createdAt?: string) {
@@ -179,7 +181,7 @@ export default function ProductoDetallePage() {
     // Link limpio (sin ?parámetros): la vista previa con foto y precio la
     // arma ./layout.tsx del lado del servidor.
     const url = typeof window !== 'undefined' ? `${window.location.origin}/producto/${id}` : ''
-    const texto = `${producto.nombre}${producto.precio ? ` — Bs ${Number(producto.precio).toLocaleString('es-BO')}` : ''} en Clasi Click`
+    const texto = `${producto.nombre}${producto.precio ? ` — ${bs(Number(producto.precio), producto.ciudad)}` : ''} en Clasi Click`
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: producto.nombre, text: texto, url })
@@ -398,7 +400,7 @@ export default function ProductoDetallePage() {
               <h1 className="font-display text-2xl font-bold text-ink mb-4">{producto.nombre}</h1>
 
               {tieneDescuento && (
-                <div className="font-body text-sm text-inksoft line-through mb-1">{bs(producto.precioOriginal)}</div>
+                <div className="font-body text-sm text-inksoft line-through mb-1">{bs(producto.precioOriginal, producto.ciudad)}</div>
               )}
               {producto.cantidadResenas > 0 && (
                 <a href="#resenas" className="flex items-center gap-1.5 mb-1.5 font-body text-xs text-inksoft hover:underline">
@@ -408,7 +410,7 @@ export default function ProductoDetallePage() {
                 </a>
               )}
               <div className="flex items-baseline gap-2 mb-6">
-                <span className="font-display text-3xl font-bold text-ink">{bs(producto.precio)}</span>
+                <span className="font-display text-3xl font-bold text-ink">{bs(producto.precio, producto.ciudad)}</span>
                 {tieneDescuento && (
                   <span className="font-body text-sm font-semibold text-teal">{porcentajeOff}% OFF</span>
                 )}
@@ -500,7 +502,7 @@ export default function ProductoDetallePage() {
                 {tienda?.whatsapp && (
                   <a
                     href={`https://wa.me/${tienda.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-                      `Hola! Te escribo por "${producto.nombre}" (Bs ${producto.precio}) que vi en Clasi Click.`
+                      `Hola! Te escribo por "${producto.nombre}" (${bs(Number(producto.precio), producto.ciudad)}) que vi en Clasi Click.`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
