@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { CIUDAD_POR_DEFECTO, buscarCiudad, esCiudadId, registrarCiudades, todasLasCiudades, type Ciudad, type CiudadId, type EstadoCiudad, type ZonaCiudad } from '@/data/ciudades'
 import { useAuth } from '@/lib/auth'
+import { registrarPaises } from '@/lib/mercado'
+import type { PaisMercado } from '@/data/paisesMercado'
 
 // Ciudad del comprador. Orden de prioridad:
 // 1. La que eligió a mano (se guarda en este navegador).
@@ -29,7 +31,7 @@ export type CiudadPublica = {
   centro: Ciudad['centro']
   zonas: ZonaCiudad[]
 }
-export type PaisPublico = { id: string; nombre: string; bandera: string; moneda: string; simboloMoneda: string; prefijoTel: string; digitosTel: number; zonaHoraria: string }
+export type PaisPublico = PaisMercado
 
 let cachePaises: PaisPublico[] = []
 export const paisesCargados = () => cachePaises
@@ -42,6 +44,7 @@ export function cargarCiudades(fresco = false): Promise<CiudadPublica[]> {
       .then((d) => {
         const cs = (d.ciudades || []) as CiudadPublica[]
         cachePaises = (d.paises || []) as PaisPublico[]
+        registrarPaises(cachePaises)
         // Las ciudades agregadas desde el admin: así buscarCiudad() las conoce.
         registrarCiudades(cs.filter((c) => c.extra).map((c) => ({ ...c, activa: c.activa, regionesIP: [], ciudadesIP: [] })))
         return cs

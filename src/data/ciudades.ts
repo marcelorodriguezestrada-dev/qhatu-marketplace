@@ -180,7 +180,8 @@ export function sanearEnvioPropio(v: any, haceEnvios?: boolean): EnvioPropio {
 // ¿Este vendedor le puede enviar a un comprador de `ciudadComprador`?
 export function envioPropioLlegaA(envio: EnvioPropio | null | undefined, ciudadVendedor: CiudadId, ciudadComprador: CiudadId): boolean {
   if (!envio?.activo) return false
-  return envio.alcance === 'bolivia' || ciudadVendedor === ciudadComprador
+  // 'bolivia' = todo su país (el nombre quedó de cuando solo había Bolivia).
+  return (envio.alcance === 'bolivia' && buscarCiudad(ciudadVendedor).pais === buscarCiudad(ciudadComprador).pais) || ciudadVendedor === ciudadComprador
 }
 
 // Filtro de ciudad de listados: una ciudad o 'todas'.
@@ -198,7 +199,8 @@ export function profesionalEnCiudad(p: { ciudad?: unknown; atiendeOnline?: boole
 // Producto visible para un comprador de `ciudad`: es de su ciudad o el
 // vendedor envía a todo Bolivia (enviaATodoBolivia se copia de la tienda).
 export function productoEnCiudad(p: { ciudad?: unknown; enviaATodoBolivia?: boolean }, ciudad: CiudadId): boolean {
-  return ciudadDe(p) === ciudad || p.enviaATodoBolivia === true
+  // enviaATodoBolivia = envía a todo SU país (no cruza a otro país).
+  return ciudadDe(p) === ciudad || (p.enviaATodoBolivia === true && buscarCiudad(ciudadDe(p)).pais === buscarCiudad(ciudad).pais)
 }
 
 // "abogado en La Paz" → { ciudad: 'la-paz', resto: 'abogado' }.

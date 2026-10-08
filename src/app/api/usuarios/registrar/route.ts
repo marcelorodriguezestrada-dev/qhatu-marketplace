@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sumarCampana } from '@/lib/campanasServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
-import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { numeroConCodigoPais, validarWhatsappPorPais } from '@/lib/validarWhatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +16,10 @@ export async function POST(req: NextRequest) {
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
 
   try {
-    const { celular, campana } = await req.json()
-    const chequeo = validarWhatsappBoliviano(celular || '')
+    const { celular, campana, paisCelular } = await req.json()
+    // Bolivia (de siempre) o Argentina; el número boliviano se guarda sin el 591, como antes.
+    const pais = paisCelular === 'AR' ? 'AR' : 'BO'
+    const chequeo = validarWhatsappPorPais(celular || '', pais)
     if (!chequeo.valido) {
       return NextResponse.json({ error: chequeo.motivo }, { status: 400 })
     }
@@ -27,7 +29,8 @@ export async function POST(req: NextRequest) {
     const yaExistia = previo.exists
     await db.collection('usuarios').doc(usuario.uid).set(
       {
-        celular: (celular || '').replace(/\D/g, ''),
+        celular: pais === 'BO' ? (celular || '').replace(/\D/g, '') : numeroConCodigoPais(celular || '', '54'),
+        celularPais: pais,
         email: usuario.email,
         // Con Google el correo ya viene verificado; si ya estaba verificada, no se pierde.
         emailVerificado: usuario.conGoogle || previo.data()?.emailVerificado === true,

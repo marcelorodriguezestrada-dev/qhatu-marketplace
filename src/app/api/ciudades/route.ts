@@ -12,7 +12,8 @@ export async function GET() {
   return NextResponse.json(
     {
       ciudades: ciudades.map((c) => ({ ...c, activa: c.estado === 'abierta', prueba: c.estado === 'prueba' })),
-      paises: paises.map((p) => ({ id: p.id, nombre: p.nombre, bandera: p.bandera, moneda: p.moneda, simboloMoneda: p.simboloMoneda, prefijoTel: p.prefijoTel, digitosTel: p.digitosTel, zonaHoraria: p.zonaHoraria })),
+      // Con las formas de pago: el checkout muestra el QR / alias / CVU de cada país.
+      paises,
     },
     { headers: { 'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=600' } },
   )

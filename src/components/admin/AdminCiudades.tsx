@@ -5,6 +5,7 @@ import { cargarCiudades } from '@/lib/ciudad'
 import type { EstadoCiudad } from '@/data/ciudades'
 import { banderaDe, type PaisMercado } from '@/data/paisesMercado'
 import type { CiudadInfo } from '@/lib/ciudadesServer'
+import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 
 // Admin → Inicio → "🌎 Países y ciudades".
 // - Cada ciudad: Abierta (todos la ven) / En prueba (solo las cuentas de
@@ -30,7 +31,7 @@ const PAIS_VACIO: PaisMercado = {
   prefijoTel: '',
   digitosTel: 10,
   zonaHoraria: '',
-  pagos: { qr: true, transferencia: false, linkPago: '', alias: '', cuenta: '', titular: '', banco: '' },
+  pagos: { qr: true, transferencia: false, qrUrl: '', linkPago: '', alias: '', cuenta: '', titular: '', banco: '' },
 }
 
 const input = 'w-full px-2.5 py-1.5 rounded-md border border-line bg-panel font-body text-xs'
@@ -160,6 +161,7 @@ export default function AdminCiudades({ password }: { password: string }) {
                     />
                     Envío Clasi Click
                   </label>
+                  {c.pais !== 'BO' && c.envioClasiClick && <span className="text-[10px] text-maroon">las tarifas de envío todavía son las de Potosí</span>}
                   {c.id === 'potosi' && <span className="text-[11px] text-inksoft">(siempre abierta)</span>}
                   {c.extra && (
                     <button
@@ -276,6 +278,26 @@ export default function AdminCiudades({ password }: { password: string }) {
             <input type="checkbox" checked={pe.pagos.qr} onChange={(e) => setPago({ qr: e.target.checked })} className="accent-teal" />
             QR (en Argentina: el QR de Mercado Pago)
           </label>
+          {pe.pagos.qr && pe.id !== 'BO' && (
+            <div className="flex items-center gap-3 pl-5">
+              {pe.pagos.qrUrl ? <img src={pe.pagos.qrUrl} alt="QR" className="w-20 h-20 object-contain border border-line rounded bg-white" /> : <span className="font-body text-[11px] text-maroon">Falta subir la imagen del QR</span>}
+              <label className="px-3 py-1.5 rounded-md border border-teal bg-tealsoft text-teal font-body text-xs font-semibold cursor-pointer">
+                {guardando === 'qr' ? 'Subiendo...' : pe.pagos.qrUrl ? 'Cambiar QR' : '👆 Subir QR'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0]
+                    if (!f) return
+                    setGuardando('qr')
+                    try { setPago({ qrUrl: (await subirFotoAdmin(password, f, false)).url }) } catch (err: any) { setMensaje(err?.message || 'No se pudo subir el QR.') } finally { setGuardando(null) }
+                  }}
+                />
+              </label>
+            </div>
+          )}
+          {pe.id === 'BO' && <div className="pl-5 font-body text-[10px] text-inksoft">En Bolivia se usa el QR de siempre (configuración de pagos).</div>}
           <label className="flex items-center gap-1.5 font-body text-xs text-ink cursor-pointer">
             <input type="checkbox" checked={pe.pagos.transferencia} onChange={(e) => setPago({ transferencia: e.target.checked })} className="accent-teal" />
             Transferencia (alias / CVU / CBU)
@@ -304,7 +326,7 @@ export default function AdminCiudades({ password }: { password: string }) {
             <span className={etiqueta}>Link de pago (opcional, ej. Mercado Pago)</span>
             <input value={pe.pagos.linkPago} onChange={(e) => setPago({ linkPago: e.target.value })} placeholder="https://link.mercadopago.com.ar/..." className={input} />
           </label>
-          <div className="font-body text-[10px] text-inksoft">Queda guardado. El checkout va a usar estas formas de pago (y la subida del QR de cada país) cuando habilitemos la compra en ese país; por ahora todo se cobra con el QR de Bolivia.</div>
+          <div className="font-body text-[10px] text-inksoft">En el checkout de este país se muestran el QR, los datos de transferencia (con botón para copiar) y el link de pago. Fuera de Bolivia el comprobante no se lee solo: lo revisás vos en Admin → Pedidos.</div>
           <div className="flex gap-2">
             <button type="button" onClick={guardarPais} disabled={guardando === 'pais' || !pe.nombre.trim() || (paisEditado?.nuevo && pe.id.length !== 2)} className="px-3 py-1.5 rounded-md border-none bg-ink text-white font-body text-xs font-semibold disabled:opacity-40">
               {guardando === 'pais' ? 'Guardando...' : 'Guardar país'}

@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 import { FRANJA_LABEL } from '@/components/SelectorHorarioEntrega'
 import { fechaEntregaDefault } from '@/lib/entregaDias'
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+// En la moneda del país del pedido (los de antes no tienen país: Bolivia).
+function bs(n: number, pais?: string) {
+  return formatoMoneda(n, buscarPaisMercado(pais))
 }
 
 // Los 4 pasos que ve el comprador. El backend solo tiene estos 4 estados
@@ -117,7 +119,7 @@ export default function SeguimientoPedidoPage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="font-display text-xl font-bold text-ink">Pedido #{pedido.id?.slice(0, 6)}</div>
-          <div className="font-body text-[13px] text-inksoft">{bs(pedido.total || 0)} · {(pedido.items || []).length} producto(s)</div>
+          <div className="font-body text-[13px] text-inksoft">{bs(pedido.total || 0, pedido.pais)} · {(pedido.items || []).length} producto(s)</div>
           {pedido.createdAt && (
             <div className="font-body text-[11px] text-inksoft">{fechaLegibleBolivia(pedido.createdAt)}</div>
           )}
@@ -204,7 +206,7 @@ export default function SeguimientoPedidoPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-body text-sm text-ink truncate">{item.nombre}</div>
-                <div className="font-body text-[11px] text-inksoft">{item.cantidad} x {bs(item.precio || 0)}</div>
+                <div className="font-body text-[11px] text-inksoft">{item.cantidad} x {bs(item.precio || 0, pedido.pais)}</div>
               </div>
               {pedido.estado === 'entregado' && item.id && (
                 <Link href={`/producto/${item.id}#resenas`} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-ochre bg-ochresoft font-body text-[11px] font-semibold text-ink">

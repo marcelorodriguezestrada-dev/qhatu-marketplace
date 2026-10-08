@@ -19,15 +19,18 @@ import { buscarZonaEn, normZona, zonaMasCercana, zonasCercanas } from '@/lib/zon
 import { useZonasEnvio } from '@/lib/useZonasEnvio'
 import { ElegirUbicacion } from '@/components/ElegirUbicacion'
 import { leerComprobante, comprobanteValido, motivoRechazo, MAX_INTENTOS_COMPROBANTE, type ResultadoOCR } from '@/lib/ocrComprobante'
-import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
+import { ahoraEnPais, buscarPaisMercado, ejemploTelefono, esBolivia, formatoMoneda, paisDeCiudad, validarTelefono } from '@/lib/mercado'
 import { ProductIcon } from '@/components/ProductIcon'
 import SelectorHorarioEntrega, { type Franja } from '@/components/SelectorHorarioEntrega'
 import { evaluarCupon, tomarCuponPendiente, type Cupon } from '@/lib/cupones'
 import { track } from '@/lib/tracking'
 import { fechaEntregaDefault, hayEntregaHoy, envioExpressDisponible, HORA_CORTE_EXPRESS, tiendaAbierta, mensajeTiendaCerrada } from '@/lib/entregaDias'
 
+// Moneda del país de la tienda que se está pagando (Bs en Bolivia, $ en
+// Argentina…). La fija el componente en cada render (ver paisCompra).
+let PAIS_BS = buscarPaisMercado('BO')
 function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+  return formatoMoneda(n, PAIS_BS)
 }
 
 // Ventana horaria aproximada de entrega, según a qué salida de la moto
@@ -158,6 +161,14 @@ function CheckoutContent() {
   const items = claveTienda
     ? itemsCarrito.filter((i) => (i.vendedorId || 'plataforma') === claveTienda)
     : itemsCarrito
+  // País de la tienda que se paga: define moneda, teléfono, horario y
+  // forma de pago (Bolivia: QR con lectura automática del comprobante;
+  // Argentina: QR de Mercado Pago / transferencia, se revisa a mano).
+  const ciudadTiendaCompra = ((items[0] as any)?.ciudad as string | undefined) || null
+  const paisCompra = paisDeCiudad(ciudadTiendaCompra)
+  PAIS_BS = paisCompra
+  const pagaEnBolivia = esBolivia(paisCompra)
+  const ahoraLocal = () => ahoraEnPais(paisCompra)
   // Se compra UNA tienda por vez. Si se llegó a /checkout sin ?tienda=
   // (un link viejo, un aviso…): con una sola tienda en el carrito se pasa
   // a esa; con varias, se pide elegir cuál pagar ahora (abajo).
@@ -233,11 +244,13 @@ function CheckoutContent() {
   // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
   // hora de corte: ahí el botón se deshabilita y, si estaba elegido, se
   // cae solo a envío normal.
-  const [expressHorario, setExpressHorario] = useState(() => envioExpressDisponible())
+  const [expressHorario, setExpressHorario] = useState(() => envioExpressDisponible(ahoraLocal()))
   useEffect(() => {
-    const t = setInterval(() => setExpressHorario(envioExpressDisponible()), 60_000)
+    setExpressHorario(envioExpressDisponible(ahoraLocal()))
+    const t = setInterval(() => setExpressHorario(envioExpressDisponible(ahoraLocal())), 60_000)
     return () => clearInterval(t)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paisCompra.id])
   // Cuentas de prueba (ver src/lib/cuentasPrueba.ts): sin restricciones
   // de horario — tienda abierta y express siempre disponibles.
   const cuentaPrueba = esPrueba
@@ -290,7 +303,7 @@ function CheckoutContent() {
     // El punto de arranque es aproximado: si nunca se marcó la casa en el
     // mapa, se busca la dirección real en el mapa (una vez) y queda guardada.
     if (!(ubicacionPrueba as any).exacta) {
-      fetch('/api/validar-direccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direccion: ubicacionPrueba.direccion }) })
+      fetch('/api/validar-direccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direccion: ubicacionPrueba.direccion, ciudad: ubicacionPrueba.ciudad }) })
         .then((r) => r.json())
         .then((d) => {
           if (d?.encontrada !== true || typeof d.lat !== 'number') return
@@ -310,11 +323,13 @@ function CheckoutContent() {
   // guardamos el carrito y le programamos un aviso en la 🔔 campanita
   // para las 8:00 (ver /api/compras-fuera-horario). El admin los ve en
   // Admin → Pedidos → "🌙 Quisieron comprar fuera de horario".
-  const [cerradoAhora, setCerradoAhora] = useState(() => !tiendaAbierta())
+  const [cerradoAhora, setCerradoAhora] = useState(() => !tiendaAbierta(ahoraLocal()))
   useEffect(() => {
-    const t = setInterval(() => setCerradoAhora(!tiendaAbierta()), 60_000)
+    setCerradoAhora(!tiendaAbierta(ahoraLocal()))
+    const t = setInterval(() => setCerradoAhora(!tiendaAbierta(ahoraLocal())), 60_000)
     return () => clearInterval(t)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paisCompra.id])
   const [avisoApertura, setAvisoApertura] = useState<'' | 'guardando' | 'listo' | 'error'>('')
   async function avisarAlAbrir() {
     if (!usuario || !items.length) return
@@ -503,7 +518,7 @@ function CheckoutContent() {
       const res = await fetch('/api/validar-direccion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direccion }),
+        body: JSON.stringify({ direccion, ciudad: ciudadComprador }),
       })
       const data = await res.json()
       let resultado: boolean | 'error' | null = data.encontrada === null ? 'error' : !!data.encontrada
@@ -1089,7 +1104,7 @@ function CheckoutContent() {
   }
 
   async function confirmarEntregaYCrearPedidos() {
-    if (!cuentaPrueba && !tiendaAbierta()) {
+    if (!cuentaPrueba && !tiendaAbierta(ahoraLocal())) {
       setCerradoAhora(true)
       setError('')
       avisarAlAbrir() // guarda (o actualiza) carrito, nombre y WhatsApp
@@ -1104,7 +1119,7 @@ function CheckoutContent() {
       setError('Escribí tu WhatsApp antes de continuar — lo necesitamos para el comprobante y para avisarte del pedido.')
       return
     }
-    const validacionWhatsapp = validarWhatsappBoliviano(whatsappComprador)
+    const validacionWhatsapp = validarTelefono(whatsappComprador, paisCompra)
     if (!validacionWhatsapp.valido) {
       setError('Número de WhatsApp inválido.')
       return
@@ -1216,8 +1231,10 @@ function CheckoutContent() {
         const descuentoGrupo = descuentosRepartidos[i]
         const totalGrupo = subtotal - descuentoGrupo + envioGrupo
 
-        let qrImageUrl = qrPlataforma
-        let cbu = cbuPlataforma
+        // Fuera de Bolivia: el QR / la cuenta de Clasi Click de ese país
+        // (Admin → Países y ciudades).
+        let qrImageUrl = pagaEnBolivia ? qrPlataforma : paisCompra.pagos.qr ? paisCompra.pagos.qrUrl : ''
+        let cbu = pagaEnBolivia ? cbuPlataforma : paisCompra.pagos.transferencia ? paisCompra.pagos.cuenta : ''
         let cobroPropio = false
         let vendedorNombre = clave === 'plataforma' ? 'Clasi Click' : grupoItems[0]?.vendedor || 'Vendedor'
         let whatsappVendedor = ''
@@ -1234,8 +1251,8 @@ function CheckoutContent() {
             // confirmada la entrega — así protegemos al comprador si
             // el envío se complica.
             if (metodoEntrega !== 'envio' && data.configurado) {
-              qrImageUrl = data.qrImageUrl || qrPlataforma
-              cbu = data.cbu || cbuPlataforma
+              qrImageUrl = data.qrImageUrl || qrImageUrl
+              cbu = data.cbu || cbu
               cobroPropio = true
               if (data.nombreNegocio) vendedorNombre = data.nombreNegocio
             } else if (data.nombreNegocio) {
@@ -1273,6 +1290,8 @@ function CheckoutContent() {
             // Envío de toda la compra antes del cupón (si el carrito tiene
             // varias tiendas, el envío se reparte y cada pedido lleva una parte).
             costoEnvioCompra: costoEnvio,
+            // Ciudad de la compra (para el país: moneda, teléfono y horario en el servidor).
+            ciudadCompra: ciudadTiendaCompra || ciudadComprador,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
             envioExpress: metodoEntrega === 'envio' ? envioExpress : false,
@@ -1470,12 +1489,16 @@ function CheckoutContent() {
     // El OCR arranca en paralelo y NUNCA bloquea la subida: si tarda o
     // falla (conexión lenta, foto borrosa), el comprobante igual queda
     // subido y el comprador puede seguir. Es una ayuda, no un filtro.
+    // La lectura automática está hecha para los comprobantes de Bolivia
+    // (Bs, bancos de acá); en otros países el comprobante se revisa a mano.
     const montoEsperado = subPedidos[pasoActual]?.total ?? 0
-    setLeyendoOCR(true)
-    leerComprobante(file, montoEsperado)
-      .then((r) => setResultadoOCR(r))
-      .catch((e) => console.error('OCR falló, se ignora:', e))
-      .finally(() => setLeyendoOCR(false))
+    if (pagaEnBolivia) {
+      setLeyendoOCR(true)
+      leerComprobante(file, montoEsperado)
+        .then((r) => setResultadoOCR(r))
+        .catch((e) => console.error('OCR falló, se ignora:', e))
+        .finally(() => setLeyendoOCR(false))
+    }
 
     try {
       const token = await obtenerToken()
@@ -1700,7 +1723,7 @@ function CheckoutContent() {
 
       {!cuentaPrueba && cerradoAhora && etapa === 'entrega' && items.length > 0 && (
         <div className="bg-indigo-950 text-white rounded-xl px-4 py-3.5 mb-4">
-          <div className="font-body text-sm font-semibold">🌙 {mensajeTiendaCerrada()}</div>
+          <div className="font-body text-sm font-semibold">🌙 {mensajeTiendaCerrada(ahoraLocal())}</div>
           <div className="font-body text-xs text-indigo-100 mt-1">
             Tomamos pedidos de 8:00 a 20:00. Tu carrito y tus datos quedan guardados.
           </div>
@@ -1783,7 +1806,7 @@ function CheckoutContent() {
               value={whatsappComprador}
               onChange={setWhatsappComprador}
               opciones={sugerir(datosUsados.whatsapps, whatsappComprador)}
-              placeholder="Ej: 71234567"
+              placeholder={ejemploTelefono(paisCompra)}
               inputMode="tel"
               className="w-full px-3 py-2.5 rounded-lg border border-line bg-panel font-body text-sm"
             />
@@ -1948,7 +1971,7 @@ function CheckoutContent() {
                 <div className="grid gap-2">
                   {[
                     { express: false, icono: '🛵', titulo: 'Envío normal', detalle: `Llega ${fechaEntregaTexto()}`, precio: zonaEntrega || lat != null ? bs(costoZona) : '', disabled: false, mostrar: true },
-                    { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: opcionesCheckout.express && (cuentaPrueba || hayEntregaHoy()) },
+                    { express: true, icono: '⚡', titulo: 'Envío express', detalle: expressDisponible ? `Llega hoy mismo · pedí antes de las ${HORA_CORTE_EXPRESS}:00` : `Solo para pedidos antes de las ${HORA_CORTE_EXPRESS}:00`, precio: zonaEntrega || lat != null ? bs(costoZona + COSTO_ENVIO_EXPRESS_EXTRA) : `+${bs(COSTO_ENVIO_EXPRESS_EXTRA)}`, disabled: !expressDisponible, mostrar: opcionesCheckout.express && (cuentaPrueba || hayEntregaHoy(ahoraLocal())) },
                   ].filter((o) => o.mostrar).map((o) => {
                     const elegida = tipoEnvioElegido && envioExpress === o.express
                     return (
@@ -2198,7 +2221,9 @@ function CheckoutContent() {
           )}
 
           <div className="font-body text-base font-bold text-ink bg-ochresoft border border-ochre rounded-lg px-4 py-3 mb-4 text-center">
-            Descargue el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.
+            {subPedidos[pasoActual].qrImageUrl
+              ? 'Descargue el QR para el pago. Una vez realizado vuelva a esta página y suba el comprobante.'
+              : 'Pague con alguna de estas opciones. Una vez realizado vuelva a esta página y suba el comprobante.'}
           </div>
 
           {metodoEntrega !== 'envio' && (
@@ -2213,7 +2238,7 @@ function CheckoutContent() {
             <>
               <QrLimpio url={subPedidos[pasoActual].qrImageUrl!} nombreArchivo={`qr-pago-${bs(subPedidos[pasoActual].total).replace(/\D/g, '')}bs.png`} />
             </>
-          ) : (
+          ) : !pagaEnBolivia && !subPedidos[pasoActual].cobroPropio ? null : (
             <div className="text-left bg-panelalt border border-line rounded-lg p-4 font-body text-[13px] text-ink mt-2">
               {subPedidos[pasoActual].cbu ? (
                 <div><strong>Cuenta / CBU:</strong> {subPedidos[pasoActual].cbu}</div>
@@ -2226,6 +2251,9 @@ function CheckoutContent() {
               )}
             </div>
           )}
+
+          {/* Fuera de Bolivia: transferencia (alias / CVU) y link de pago de Clasi Click en ese país. */}
+          {!pagaEnBolivia && !subPedidos[pasoActual].cobroPropio && <DatosPagoPais pais={paisCompra} total={bs(subPedidos[pasoActual].total)} />}
 
           <div className="mb-4" />
 
@@ -2433,6 +2461,43 @@ function CheckoutContent() {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+// Formas de pago de Clasi Click en un país que no es Bolivia (Admin →
+// Inicio → Países y ciudades): transferencia con alias / CVU (con botón
+// para copiar) y link de pago (ej. Mercado Pago).
+function DatosPagoPais({ pais, total }: { pais: ReturnType<typeof buscarPaisMercado>; total: string }) {
+  const [copiado, setCopiado] = useState('')
+  const p = pais.pagos
+  const filas = p.transferencia
+    ? ([['Alias', p.alias], ['CVU / CBU', p.cuenta], ['Titular', p.titular], ['Banco', p.banco]] as const).filter(([, v]) => v)
+    : []
+  if (!filas.length && !p.linkPago && !(p.qr && p.qrUrl)) {
+    return <div className="font-body text-[12px] text-inksoft bg-panelalt border border-line rounded-lg p-3 mt-2">Todavía no cargamos los datos de pago para {pais.nombre}. Escribinos por WhatsApp para pagar.</div>
+  }
+  return (
+    <div className="text-left mt-2 grid gap-2">
+      {filas.length > 0 && (
+        <div className="bg-panelalt border border-line rounded-lg p-3 font-body text-[13px] text-ink">
+          <div className="font-semibold mb-1.5">Transferí {total}</div>
+          {filas.map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-2 py-0.5">
+              <span><span className="text-inksoft">{k}:</span> <strong className="break-all">{v}</strong></span>
+              {(k === 'Alias' || k === 'CVU / CBU') && (
+                <button type="button" onClick={() => { navigator.clipboard?.writeText(v); setCopiado(k); setTimeout(() => setCopiado(''), 1500) }} className="shrink-0 px-2 py-0.5 rounded border border-line bg-panel text-[11px]">
+                  {copiado === k ? '✓' : 'Copiar'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {p.linkPago && (
+        <a href={p.linkPago} target="_blank" rel="noopener noreferrer" className="block w-full text-center py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold no-underline">
+          💳 Pagar con link
+        </a>
       )}
     </div>
   )

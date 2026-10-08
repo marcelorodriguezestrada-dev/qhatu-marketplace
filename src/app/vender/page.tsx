@@ -1,6 +1,7 @@
 'use client'
 
 import { leerCampana } from '@/lib/campana'
+import { buscarPaisMercado, formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -30,8 +31,11 @@ const BANK_ACCOUNT_NUMBER = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || ''
 
 const ICONOS = ['boot', 'sandal', 'shoe', 'sneaker', 'textile', 'sweater', 'hat', 'bag']
 
+// Moneda del país de la tienda (Bs en Bolivia, $ en Argentina…); la
+// fija el componente en cada render.
+let PAIS_TIENDA = buscarPaisMercado('BO')
 function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+  return formatoMoneda(n, PAIS_TIENDA)
 }
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
@@ -107,6 +111,7 @@ export default function VenderPage() {
   const [cobroNegocio, setCobroNegocio] = useState('')
   const { ciudadId: ciudadComprador } = useCiudad()
   const [tiendaCiudad, setTiendaCiudad] = useState<CiudadId | null>(null)
+  PAIS_TIENDA = paisDeCiudad(tiendaCiudad || ciudadComprador)
   const [cobroWhatsapp, setCobroWhatsapp] = useState('')
   const [cobroWhatsappPais, setCobroWhatsappPais] = useState(PAIS_FALLBACK_ID)
   const [subiendoQrCobro, setSubiendoQrCobro] = useState(false)
@@ -1019,7 +1024,7 @@ export default function VenderPage() {
             type="number"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
-            placeholder="Precio en Bs"
+            placeholder={`Precio en ${PAIS_TIENDA.simboloMoneda}`}
             className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm"
           />
         </div>
@@ -1577,7 +1582,7 @@ export default function VenderPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <label className="font-body text-[11px] text-inksoft">
-                  Costo del envío (Bs)
+                  Costo del envío ({PAIS_TIENDA.simboloMoneda})
                   <input
                     value={envioCosto}
                     onChange={(e) => setEnvioCosto(e.target.value.replace(/[^\d]/g, ''))}
@@ -1590,7 +1595,7 @@ export default function VenderPage() {
                   ¿A dónde enviás?
                   <select value={envioAlcance} onChange={(e) => setEnvioAlcance(e.target.value as 'ciudad' | 'bolivia')} className="w-full mt-1 px-3 py-2 rounded-lg border border-line font-body text-sm bg-panel">
                     <option value="ciudad">Solo dentro de mi ciudad</option>
-                    <option value="bolivia">A todo Bolivia</option>
+                    <option value="bolivia">A todo {PAIS_TIENDA.nombre}</option>
                   </select>
                 </label>
               </div>

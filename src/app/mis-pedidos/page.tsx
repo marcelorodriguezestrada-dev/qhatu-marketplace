@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import MiCuenta from '@/components/MiCuenta'
@@ -17,8 +18,9 @@ const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
   cancelado: { texto: 'Cancelado', color: 'text-red-600' },
 }
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+// En la moneda del país del pedido (los de antes no tienen país: Bolivia).
+function bs(n: number, pais?: string) {
+  return formatoMoneda(n, buscarPaisMercado(pais))
 }
 
 export default function MisPedidosPage() {
@@ -126,7 +128,7 @@ export default function MisPedidosPage() {
             {p.createdAt && (
               <div className="font-body text-[11px] text-inksoft mb-1.5">{fechaLegibleBolivia(p.createdAt)}</div>
             )}
-            <div className="font-body text-xs text-inksoft mb-1">{(p.items || []).length} producto(s) · {bs(p.total || 0)}</div>
+            <div className="font-body text-xs text-inksoft mb-1">{(p.items || []).length} producto(s) · {bs(p.total || 0, p.pais)}</div>
             <div className="font-body text-[11px] text-inksoft mb-3">
               Envío: {p.zonaEntrega || 'Sin zona'} · {p.direccion || 'Sin dirección'}
             </div>
@@ -161,7 +163,7 @@ export default function MisPedidosPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-body text-sm text-ink truncate">{item.nombre}</div>
-                    <div className="font-body text-[11px] text-inksoft">{item.cantidad} x {bs(item.precio || 0)}</div>
+                    <div className="font-body text-[11px] text-inksoft">{item.cantidad} x {bs(item.precio || 0, p.pais)}</div>
                   </div>
                   {p.estado === 'entregado' && item.id && !esMiPedidoComoVendedor(p) && (
                     <Link href={`/producto/${item.id}#resenas`} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-ochre bg-ochresoft font-body text-[11px] font-semibold text-ink">

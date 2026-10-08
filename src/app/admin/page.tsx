@@ -1,6 +1,8 @@
 'use client'
 
 import { nombreRubro } from '@/lib/arbolCategorias'
+import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
+import { banderaDe } from '@/data/paisesMercado'
 import { useEffect, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { GraficoBarras } from '@/components/GraficoBarras'
@@ -36,8 +38,9 @@ import { entrarComoUsuario } from '@/lib/modoAdmin'
 import { useSeccionHash, SidebarSecciones, MenuCelularSecciones, VolverCelularSecciones, type ItemSeccion } from '@/components/NavSecciones'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
 
-function bs(n: number) {
-  return 'Bs ' + n.toLocaleString('es-BO')
+function bs(n: number, pais?: string) {
+  // Pedidos de otro país (ej. Argentina): en su moneda.
+  return formatoMoneda(n, buscarPaisMercado(pais))
 }
 
 const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
@@ -1724,7 +1727,7 @@ export default function AdminPage() {
                         )}
                         {p.ocrCoincide === false && (
                           <div className="font-body text-[11px] text-maroon mb-0.5">
-                            ⚠ Lectura automática: {bs(p.ocrMonto)} — no coincide con {bs(p.total)}. Revisá la imagen.
+                            ⚠ Lectura automática: {bs(p.ocrMonto, p.pais)} — no coincide con {bs(p.total, p.pais)}. Revisá la imagen.
                           </div>
                         )}
                         {p.ocrCoincide == null && p.ocrPareceComprobante !== false && (
@@ -1770,7 +1773,7 @@ export default function AdminPage() {
                       {' '}(lo absorbe Clasi Click)
                     </div>
                   )}
-                  <div className="font-body text-xs font-semibold text-ink text-right">Total: {bs(p.total)}</div>
+                  <div className="font-body text-xs font-semibold text-ink text-right">Total: {bs(p.total, p.pais)}{p.pais && p.pais !== 'BO' ? ` ${banderaDe(p.pais)}` : ''}</div>
                 </div>
 
                 {p.estado === 'verificando_stock' && (
@@ -1778,7 +1781,7 @@ export default function AdminPage() {
                     {p.vendedorWhatsapp && (
                       <a
                         href={`https://wa.me/${p.vendedorWhatsapp}?text=${encodeURIComponent(
-                          `Hola ${p.vendedorNombre}! Te escribo de Clasi Click — llegó un pedido nuevo (${p.items?.length || 0} producto(s), Bs ${p.total}). ¿Podés confirmarme si tenés stock disponible?`
+                          `Hola ${p.vendedorNombre}! Te escribo de Clasi Click — llegó un pedido nuevo (${p.items?.length || 0} producto(s), ${bs(p.total, p.pais)}). ¿Podés confirmarme si tenés stock disponible?`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -3194,7 +3197,7 @@ export default function AdminPage() {
                       {p.validacionZona && !p.validacionZona.enLista && p.metodoEntrega === 'envio' && <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">🆕 zona nueva</span>}
                       </div>
                       <div className="font-body text-[11px] text-inksoft">
-                        {p.comprador || 'Sin email'} · {bs(p.total)}
+                        {p.comprador || 'Sin email'} · {bs(p.total, p.pais)}
                         {(p.lat == null || p.lng == null) && <span className="text-maroon"> · sin ubicación GPS, confirmar dirección a mano</span>}
                       </div>
                     </div>

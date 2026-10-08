@@ -12,6 +12,9 @@ export type MetodosPagoPais = {
   qr: boolean
   // Transferencia: alias / CVU / CBU o cuenta, con titular y banco.
   transferencia: boolean
+  // Imagen del QR de cobro de Clasi Click en ese país (Bolivia usa el
+  // de Admin → configuración de pagos, como siempre).
+  qrUrl: string
   // Link de pago (ej. Mercado Pago), opcional.
   linkPago: string
   alias: string
@@ -32,7 +35,7 @@ export type PaisMercado = {
   pagos: MetodosPagoPais
 }
 
-const PAGOS_VACIOS: MetodosPagoPais = { qr: true, transferencia: false, linkPago: '', alias: '', cuenta: '', titular: '', banco: '' }
+const PAGOS_VACIOS: MetodosPagoPais = { qr: true, transferencia: false, qrUrl: '', linkPago: '', alias: '', cuenta: '', titular: '', banco: '' }
 
 export const PAISES_MERCADO: PaisMercado[] = [
   { id: 'BO', nombre: 'Bolivia', bandera: '🇧🇴', moneda: 'BOB', simboloMoneda: 'Bs', prefijoTel: '591', digitosTel: 8, zonaHoraria: 'America/La_Paz', pagos: { ...PAGOS_VACIOS } },
@@ -68,6 +71,7 @@ export function sanearPaisMercado(v: any, base?: PaisMercado): PaisMercado | nul
     pagos: {
       qr: typeof p.qr === 'boolean' ? p.qr : pb.qr,
       transferencia: typeof p.transferencia === 'boolean' ? p.transferencia : pb.transferencia,
+      qrUrl: /^https:\/\//.test(String(p.qrUrl ?? pb.qrUrl ?? '')) ? txt(p.qrUrl ?? pb.qrUrl, 500) : '',
       linkPago: txt(p.linkPago ?? pb.linkPago, 300),
       alias: txt(p.alias ?? pb.alias, 60),
       cuenta: txt(p.cuenta ?? pb.cuenta, 60),
