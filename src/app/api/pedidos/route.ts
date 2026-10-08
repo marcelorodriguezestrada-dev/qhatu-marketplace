@@ -210,6 +210,31 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     }
 
+    // Rehecho de pedidos anulados (el comprador volvió a cambiar algo o
+    // aplicó un cupón en el pago): hereda sus comprobantes rechazados, en
+    // orden, para que el admin vea todos los intentos y el límite de 3 no
+    // se reinicie. Solo de pedidos anulados de la misma persona y tienda.
+    const anteriores = Array.isArray(body.anteriores) ? (body.anteriores as unknown[]).filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9]{1,40}$/.test(x)).slice(0, 10) : []
+    const previos: { id: string; data: any }[] = []
+    if (anteriores.length && comprador) {
+      const docs = await db.getAll(...anteriores.map((id) => db.collection('pedidos').doc(id)))
+      for (const d of docs) {
+        const p = d.data() as any
+        if (d.exists && p?.estado === 'cancelado' && String(p.comprador || '').toLowerCase() === String(comprador).toLowerCase() && (p.vendedorId || null) === (vendedorId || null)) previos.push({ id: d.id, data: p })
+      }
+    }
+    if (previos.length) {
+      const vistos = new Set<string>()
+      const rechazados = previos
+        .flatMap((p) => (Array.isArray(p.data.comprobantesRechazados) ? p.data.comprobantesRechazados : []).map((c: any) => ({ ...c, pedidoId: c.pedidoId || p.id })))
+        .filter((c: any) => { const k = `${c.url}|${c.fecha}`; if (vistos.has(k)) return false; vistos.add(k); return true })
+        .sort((a: any, b: any) => String(a.fecha).localeCompare(String(b.fecha)))
+      Object.assign(datosPedido, {
+        reemplazaA: Array.from(new Set([...previos.flatMap((p) => p.data.reemplazaA || []), ...previos.map((p) => p.id)])),
+        ...(rechazados.length ? { comprobantesRechazados: rechazados, intentosComprobante: rechazados.length } : {}),
+      })
+    }
+
     // Stock: se verifica y descuenta en la misma transacción que crea el
     // pedido — así dos personas no pueden comprar la última unidad a la
     // vez. Productos sin stock cargado no se controlan (ver src/lib/stock.ts).
@@ -221,6 +246,8 @@ export async function POST(req: NextRequest) {
       return r
     })
     if (!creado.ok) return NextResponse.json({ error: creado.error, sinStock: true }, { status: 409 })
+    // Los anulados quedan apuntando al pedido que los reemplazó.
+    for (const p of previos) await db.collection('pedidos').doc(p.id).update({ reemplazadoPor: ref.id }).catch(() => {})
 
     // Zona escrita a mano (no está en la lista) con la casa marcada: se
     // suma a "Zonas sugeridas" del admin. No frena el pedido si falla.

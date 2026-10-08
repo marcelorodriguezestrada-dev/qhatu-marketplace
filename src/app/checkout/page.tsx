@@ -695,6 +695,11 @@ function CheckoutContent() {
   // Espejo de subPedidos siempre actualizado, para que el intervalo del
   // polling no trabaje con una copia vieja capturada en el closure.
   const subPedidosRef = useRef<SubPedido[]>([])
+  // Pedidos sin pagar que se anularon para rehacerlos (volvió a cambiar
+  // algo o aplicó un cupón en el pago): el pedido nuevo hereda sus
+  // comprobantes rechazados, así el admin ve todos los intentos y el
+  // límite de 3 no vuelve a cero.
+  const anterioresRef = useRef<string[]>([])
   useEffect(() => {
     subPedidosRef.current = subPedidos
   }, [subPedidos])
@@ -882,6 +887,7 @@ function CheckoutContent() {
 
   function volverAlPedido() {
     const ids = subPedidosRef.current.map((s) => s.pedidoId).filter(Boolean) as string[]
+    anterioresRef.current = [...anterioresRef.current, ...ids].slice(-10)
     setSubPedidos([])
     setPasoActual(0)
     setPasosConfirmados(new Set())
@@ -1018,6 +1024,7 @@ function CheckoutContent() {
     ;(async () => {
       setRehaciendo(true)
       const ids = subPedidosRef.current.map((x) => x.pedidoId).filter(Boolean) as string[]
+      anterioresRef.current = [...anterioresRef.current, ...ids].slice(-10)
       try {
         const token = await obtenerToken()
         await Promise.all(ids.map((id) => fetch(`/api/pedidos/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ compradorVuelve: true }) }).catch(() => null)))
@@ -1292,6 +1299,7 @@ function CheckoutContent() {
             costoEnvioCompra: costoEnvio,
             // Ciudad de la compra (para el país: moneda, teléfono y horario en el servidor).
             ciudadCompra: ciudadTiendaCompra || ciudadComprador,
+            anteriores: anterioresRef.current,
             metodoEntrega,
             metodoPago: metodoPagoGrupo,
             envioExpress: metodoEntrega === 'envio' ? envioExpress : false,
@@ -1342,6 +1350,7 @@ function CheckoutContent() {
 
       uidCompradorRef.current = usuario?.uid ?? null
       setSubPedidos(nuevos)
+      if (nuevos.length) anterioresRef.current = []
       setPasoActual(0)
 
       // Guardamos estos datos para la próxima compra — no bloquea nada

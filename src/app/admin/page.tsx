@@ -1681,12 +1681,21 @@ export default function AdminPage() {
                   )}
                 </div>
 
+                {(p.reemplazadoPor || p.reemplazaA?.length > 0) && (
+                  <div className="mt-2 font-body text-[11px] text-indigo-700">
+                    {p.reemplazadoPor && <>↪ Anulado y rehecho como el pedido #{String(p.reemplazadoPor).slice(0, 6)} (el comprador cambió algo o aplicó un cupón en el pago).</>}
+                    {p.reemplazaA?.length > 0 && <>↩ Rehace {p.reemplazaA.length === 1 ? 'el pedido' : 'los pedidos'} {p.reemplazaA.map((x: string) => `#${x.slice(0, 6)}`).join(', ')} (anulado{p.reemplazaA.length === 1 ? '' : 's'}): sus intentos de pago están acá abajo.</>}
+                  </div>
+                )}
                 {p.comprobantesRechazados?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-line">
-                    <div className="font-body text-[11px] font-semibold text-maroon mb-1.5">
-                      ❌ {p.comprobantesRechazados.length} comprobante{p.comprobantesRechazados.length === 1 ? '' : 's'} rechazado{p.comprobantesRechazados.length === 1 ? '' : 's'} automáticamente
-                      {p.canceladoMotivo && ` — ${p.canceladoMotivo}`}
+                    <div className="font-body text-[11px] font-semibold text-ink mb-0.5">
+                      🧾 Intentos de pago: {p.comprobantesRechazados.length + (p.comprobanteUrl ? 1 : 0)}
+                      <span className="font-normal text-maroon"> · {p.comprobantesRechazados.length} rechazado{p.comprobantesRechazados.length === 1 ? '' : 's'} automáticamente</span>
+                      {p.comprobanteUrl && <span className="font-normal text-teal"> · 1 enviado</span>}
                     </div>
+                    {p.canceladoMotivo && <div className="font-body text-[11px] text-maroon mb-1.5">{p.canceladoMotivo}</div>}
+                    <div className="font-body text-[10px] text-inksoft mb-1.5">En orden, del primero al último (tocá la imagen para verla en grande).</div>
                     <div className="flex flex-col gap-1.5">
                       {p.comprobantesRechazados.map((c: any, i: number) => (
                         <div key={i} className="flex items-center gap-2">
@@ -1698,8 +1707,12 @@ export default function AdminPage() {
                             <div className="w-10 h-10 rounded-md bg-panelalt border border-line shrink-0" />
                           )}
                           <div className="font-body text-[11px] text-inksoft">
-                            {i + 1}. {c.motivo}
-                            {c.fecha && <span className="block text-[10px]">{new Date(c.fecha).toLocaleString('es-BO')}</span>}
+                            <b className="text-maroon">{i + 1}. ❌ Rechazado</b> — {c.motivo}
+                            {typeof c.montoLeido === 'number' && <> · leído {bs(c.montoLeido, p.pais)}</>}
+                            <span className="block text-[10px]">
+                              {c.fecha && new Date(c.fecha).toLocaleString('es-BO')}
+                              {c.pedidoId && c.pedidoId !== p.id && <> · en el pedido anterior #{String(c.pedidoId).slice(0, 6)} (lo rehízo al cambiar algo o aplicar un cupón)</>}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -1709,7 +1722,10 @@ export default function AdminPage() {
 
                 {p.comprobanteUrl && (
                   <div className="mt-3 pt-3 border-t border-line">
-                    <div className="font-body text-[11px] text-inksoft mb-1.5">Comprobante enviado por el comprador</div>
+                    <div className="font-body text-[11px] text-inksoft mb-1.5">
+                      {p.comprobantesRechazados?.length > 0 ? <b className="text-teal">{p.comprobantesRechazados.length + 1}. ✓ Comprobante final enviado por el comprador</b> : 'Comprobante enviado por el comprador'}
+                      {p.informadoPagoAt && <span className="text-[10px]"> · {new Date(p.informadoPagoAt).toLocaleString('es-BO')}</span>}
+                    </div>
                     <div className="flex items-start gap-2.5">
                       <a href={p.comprobanteUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
                         <img src={p.comprobanteUrl} alt="Comprobante" className="w-16 h-16 rounded-lg object-cover border border-line" />
