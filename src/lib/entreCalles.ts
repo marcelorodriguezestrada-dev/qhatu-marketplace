@@ -14,7 +14,7 @@ export type EntreCallesInfo = {
   sugeridas: string[]
   // Esquinas de su cuadra según el mapa (lo escrito tiene que ser una de estas).
   cruces: string[]
-  // Todas las calles con nombre de alrededor.
+  // Calles con nombre a ≤ 300 m (sin la de la casa), de la más cercana a la más lejana.
   cercanas: string[]
 }
 
@@ -52,7 +52,10 @@ export function mismaCalle(escrita: string, osm: string): boolean {
   // Por una palabra fuerte: "gumiel" ↔ "Fortunato Gumiel", "sucre" ↔ "Antonio José de Sucre".
   const pa = palabras(a)
   const pb = palabras(b)
-  return pa.length > 0 && pa.every((w) => w.length >= 4 && pb.some((x) => x === w || (w.length >= 5 && distLev(w, x) <= tol(w.length))))
+  const igual = (w: string, x: string) => x === w || (w.length >= 5 && distLev(w, x) <= tol(w.length))
+  if (pa.length > 0 && pa.every((w) => w.length >= 4 && pb.some((x) => igual(w, x)))) return true
+  // Al revés, para nombres abreviados en el mapa: "Victor Flores" ↔ "V. Flores".
+  return pb.length > 0 && pb.every((w) => w.length >= 5 && pa.some((x) => igual(w, x)))
 }
 
 // "Bolívar y Chayanta", "bolivar / chayanta", "entre bolivar e hoyos", "esq. Sucre"
@@ -65,7 +68,7 @@ export function separarEntreCalles(texto: string): string[] {
 }
 
 // "Calle Bolívar" → "Bolívar" (para mostrar); las avenidas quedan con "Av.".
-const sinCalle = (n: string) => n.replace(/^calle\s+/i, '').replace(/^avenida\s+/i, 'Av. ')
+export const sinCalle = (n: string) => n.replace(/^calle\s+/i, '').replace(/^avenida\s+/i, 'Av. ')
 
 // Distancias en metros sobre un plano local (alcanza para unos cientos de metros).
 function plano(lat0: number) {
@@ -101,6 +104,9 @@ export function analizarEntreCalles(calles: CalleOSM[], punto: { lat: number; ln
 
   // La calle de la casa: la escrita (si está cerca, ≤ 250 m) o la más cercana al punto.
   const medidas = conNombre.map((c) => ({ c, ...masCerca(c) }))
+  // Calles con nombre a ≤ 300 m de la casa, de la más cercana a la más lejana
+  // (cruces y paralelas: la gente dice "entre calles" de las dos formas).
+  const cercanasOrdenadas = Array.from(new Set([...medidas].filter((m) => m.d <= 300).sort((a, b) => a.d - b.d).map((m) => m.c.nombre)))
   const escritas = medidas.filter((m) => calleEscrita && mismaCalle(calleEscrita, m.c.nombre) && m.d <= 250)
   const base = (escritas.length ? escritas : medidas).sort((a, b) => a.d - b.d)[0]
   const nombreCalle = base.c.nombre
@@ -131,15 +137,18 @@ export function analizarEntreCalles(calles: CalleOSM[], punto: { lat: number; ln
   }
   const cruces = Array.from(new Set([...aceptadas(atras), ...aceptadas(adelante)]))
   const sugeridas = [atras[0], adelante[0]].filter((e): e is NonNullable<typeof e> => !!e).map((e) => sinCalle(e.nombre))
-  return { calle: nombreCalle, sugeridas: Array.from(new Set(sugeridas)), cruces, cercanas }
+  return { calle: nombreCalle, sugeridas: Array.from(new Set(sugeridas)), cruces, cercanas: cercanasOrdenadas.filter((n) => n !== nombreCalle && !mismaCalle(n, nombreCalle)) }
 }
 
 // ¿Lo escrito en "Entre calles" cuadra con el mapa? null = bien o no se
-// puede saber; si no, las calles escritas que no cruzan la suya cerca.
+// puede saber; si no, las calles escritas que no aparecen cerca de la casa
+// (ni como esquina ni como paralela a ≤ 300 m). No se exige que sean las
+// esquinas exactas: el punto puede correrse y el mapa no siempre está completo.
 export function entreCallesNoCoinciden(texto: string, info: EntreCallesInfo | null): string[] | null {
-  if (!info || !info.calle || !info.cruces.length) return null
+  if (!info || !info.calle || (!info.cruces.length && !info.cercanas.length)) return null
   const escritas = separarEntreCalles(texto)
   if (!escritas.length) return null
-  const malas = escritas.filter((e) => !info.cruces.some((c) => mismaCalle(e, c)) && !mismaCalle(e, info.calle!))
+  const validas = [...info.cruces, ...info.cercanas]
+  const malas = escritas.filter((e) => !validas.some((c) => mismaCalle(e, c)) && !mismaCalle(e, info.calle!))
   return malas.length ? malas : null
 }
