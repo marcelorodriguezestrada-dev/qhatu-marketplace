@@ -2262,7 +2262,8 @@ function CheckoutContent() {
                 <div className="flex items-center gap-2.5 mb-2">
                   <img src={comprobanteUrl} alt="Comprobante" className="w-14 h-14 rounded-lg object-cover border border-line" />
                   <div className="flex-1">
-                    <div className="font-body text-xs text-teal">✓ Comprobante subido</div>
+                    {/* ✓✓ cuando además se verificó (monto y destinatario coinciden). */}
+                    <div className="font-body text-xs text-teal">{!leyendoOCR && resultadoOCR?.coincide === true ? '✓✓' : '✓'} Comprobante subido</div>
                     <button
                       type="button"
                       onClick={() => { setComprobanteUrl(''); setResultadoOCR(null) }}
@@ -2275,11 +2276,6 @@ function CheckoutContent() {
 
                 {leyendoOCR && (
                   <div className="font-body text-[11px] text-inksoft">Leyendo el comprobante...</div>
-                )}
-                {!leyendoOCR && resultadoOCR?.coincide === true && (
-                  <div className="font-body text-[11px] text-teal bg-tealsoft border border-teal rounded-lg px-2.5 py-2">
-                    ✓ Comprobante verificado
-                  </div>
                 )}
                 {(registrandoRechazo || (!leyendoOCR && resultadoOCR && !comprobanteValido(resultadoOCR))) && (
                   <div className="font-body text-[11px] text-inksoft">Revisando el comprobante...</div>
