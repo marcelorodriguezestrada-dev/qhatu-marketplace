@@ -268,6 +268,19 @@ function CheckoutContent() {
     setLat(ubicacionPrueba.lat)
     setLng(ubicacionPrueba.lng)
     setOrigenPunto('gps')
+    // El punto de arranque es aproximado: si nunca se marcó la casa en el
+    // mapa, se busca la dirección real en el mapa (una vez) y queda guardada.
+    if (!(ubicacionPrueba as any).exacta) {
+      fetch('/api/validar-direccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ direccion: ubicacionPrueba.direccion }) })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.encontrada !== true || typeof d.lat !== 'number') return
+          setLat(d.lat)
+          setLng(d.lng)
+          guardarUbicacionPrueba({ ...ubicacionPrueba, lat: d.lat, lng: d.lng, exacta: true } as any)
+        })
+        .catch(() => {})
+    }
   }
   function cambiarGpsRealPrueba(v: boolean) {
     setGpsRealPrueba(v)
@@ -1031,7 +1044,7 @@ function CheckoutContent() {
     setLng(puntoMapa.lng)
     setOrigenPunto('mapa')
     // Cuenta de prueba: el punto marcado pasa a ser su ubicación de prueba.
-    if (cuentaPrueba) guardarUbicacionPrueba({ ...ubicacionPrueba, lat: puntoMapa.lat, lng: puntoMapa.lng, direccion: direccion.trim() || ubicacionPrueba.direccion })
+    if (cuentaPrueba) guardarUbicacionPrueba({ ...ubicacionPrueba, lat: puntoMapa.lat, lng: puntoMapa.lng, direccion: direccion.trim() || ubicacionPrueba.direccion, exacta: true } as any)
     setMapaAbierto(false)
     setError('')
   }
@@ -1979,6 +1992,48 @@ function CheckoutContent() {
                 null
               )}
             </>
+          )}
+
+          {/* Resumen antes de pagar (cuando ya eligió cómo recibirlo y, con
+              envío, el tipo de envío): se pueden cambiar cantidades, quitar
+              o volver a agregar más productos. */}
+          {entregaLista && items.length > 0 && (
+            <div className="mb-4 rounded-xl border border-line bg-panelalt p-3.5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-body text-sm font-semibold text-ink">🧾 Resumen de tu pedido</div>
+                <Link href={vendedorIdTienda ? `/tienda/${vendedorIdTienda}` : '/'} className="font-body text-[12px] text-teal font-semibold underline">➕ Agregar más</Link>
+              </div>
+              <div className="divide-y divide-line">
+                {items.map((it) => (
+                  <div key={`${it.id}__${it.tallaElegida || ''}__${it.colorElegida || ''}`} className="flex items-center gap-2.5 py-2">
+                    <div className="w-10 h-10 rounded-md bg-panel border border-line overflow-hidden shrink-0 flex items-center justify-center">
+                      {it.thumbUrl || it.imagenUrl ? <img src={it.thumbUrl || it.imagenUrl} alt={it.nombre} className="w-full h-full object-cover" /> : <ProductIcon kind={it.icono} size={16} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-body text-[13px] text-ink truncate">{it.nombre}</div>
+                      {(it.tallaElegida || it.colorElegida) && <div className="font-body text-[11px] text-inksoft">{[it.tallaElegida && `Talla ${it.tallaElegida}`, it.colorElegida].filter(Boolean).join(' · ')}</div>}
+                      <div className="flex items-center gap-2 mt-1">
+                        <button type="button" onClick={() => cambiarCantidad(it, -1)} disabled={it.cantidad <= 1} className="w-6 h-6 rounded border border-line bg-panel text-xs disabled:opacity-40" aria-label="Menos">−</button>
+                        <span className="font-body text-xs text-ink w-4 text-center">{it.cantidad}</span>
+                        <button type="button" onClick={() => cambiarCantidad(it, 1)} className="w-6 h-6 rounded border border-line bg-panel text-xs" aria-label="Más">+</button>
+                        <button type="button" onClick={() => quitar(it)} className="font-body text-[11px] text-maroon underline bg-transparent border-none p-0 ml-1">quitar</button>
+                      </div>
+                    </div>
+                    <span className="font-body text-[13px] text-ink shrink-0">{bs(it.precio * it.cantidad)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-line mt-1 pt-2 grid gap-0.5 font-body text-[13px]">
+                <div className="flex justify-between text-inksoft"><span>Subtotal</span><span>{bs(subtotalCarrito)}</span></div>
+                {descuentoCupon > 0 && <div className="flex justify-between text-teal"><span>Cupón {cuponAplicado?.codigo}</span><span>−{bs(descuentoCupon)}</span></div>}
+                {metodoEntrega === 'envio' && (
+                  <div className="flex justify-between text-inksoft"><span>{envioExpress ? 'Envío express' : 'Envío'}</span><span>{descuentoEnvioCupon > 0 ? <><span className="line-through mr-1">{bs(costoEnvio)}</span><span className="text-teal font-semibold">{costoEnvioFinal === 0 ? 'Gratis' : bs(costoEnvioFinal)}</span></> : bs(costoEnvio)}</span></div>
+                )}
+                {metodoEntrega === 'vendedor' && <div className="flex justify-between text-inksoft"><span>Envío del vendedor</span><span>{envioVendedorTotal > 0 ? bs(envioVendedorTotal) : 'a coordinar'}</span></div>}
+                {metodoEntrega === 'retiro' && <div className="flex justify-between text-inksoft"><span>Retiro en tienda</span><span>Sin costo</span></div>}
+                <div className="flex justify-between font-semibold text-ink text-sm pt-1"><span>Total</span><span>{bs(totalCarrito)}</span></div>
+              </div>
+            </div>
           )}
 
           {error && (
