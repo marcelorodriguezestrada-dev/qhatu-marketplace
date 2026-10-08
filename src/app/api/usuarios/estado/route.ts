@@ -38,17 +38,20 @@ export async function GET(req: NextRequest) {
     }
     // Cuenta de prueba (Admin → Usuarios): sin restricciones de horario.
     const esPrueba = registro.customClaims?.esPrueba === true
-    // El admin "entrando como" el vendedor (ver src/lib/modoAdmin.ts)
-    // no tiene el código de verificación — no lo frenamos.
-    if (usuario.cargaAdmin) return NextResponse.json({ emailVerificado: true, esPrueba })
-
     const doc = await getDb().collection('usuarios').doc(usuario.uid).get()
     const datos = doc.data()
+    // Cuenta de prueba de una ciudad: su ciudad y su casa de prueba (ver
+    // Admin → Usuarios → "Crear usuario de prueba").
+    const prueba = esPrueba ? { ciudadPrueba: datos?.ubicacionPrueba?.ciudad || null, ubicacionPrueba: datos?.ubicacionPrueba || null } : {}
+    // El admin "entrando como" el vendedor (ver src/lib/modoAdmin.ts)
+    // no tiene el código de verificación — no lo frenamos.
+    if (usuario.cargaAdmin) return NextResponse.json({ emailVerificado: true, esPrueba, ...prueba })
+
     const emailVerificado = estaVerificada(registro, datos)
     // Con Google no pasó por el formulario de registro: le falta el
     // celular (obligatorio), que se le pide una sola vez en /login.
     const faltaCelular = entroConGoogle(registro) && !datos?.celular && !datos?.whatsapp
-    return NextResponse.json({ emailVerificado, esPrueba, faltaCelular })
+    return NextResponse.json({ emailVerificado, esPrueba, faltaCelular, ...prueba })
   } catch (err) {
     console.error('GET /api/usuarios/estado', err)
     // Si falla la consulta, dejamos pasar — mejor no bloquear a nadie

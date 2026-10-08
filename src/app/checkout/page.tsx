@@ -3,7 +3,7 @@
 import { leerCampana } from '@/lib/campana'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useCiudad } from '@/lib/ciudad'
-import { ciudadDe, envioPropioLlegaA, type CiudadId, type EnvioPropio } from '@/data/ciudades'
+import { buscarCiudad, ciudadDe, envioPropioLlegaA, type CiudadId, type EnvioPropio } from '@/data/ciudades'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCarrito, ItemCarrito } from '@/lib/store'
@@ -144,7 +144,7 @@ export default function CheckoutPage() {
 
 function CheckoutContent() {
   const { items: itemsCarrito, cambiarCantidad, quitar, vaciarTienda } = useCarrito()
-  const { usuario, cargando: authCargando, emailVerificado, obtenerToken , esPrueba } = useAuth()
+  const { usuario, cargando: authCargando, emailVerificado, obtenerToken , esPrueba, ubicacionPrueba: casaDeLaCuenta } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -253,23 +253,27 @@ function CheckoutContent() {
     if (!opcionesCheckout.express && envioExpress) setEnvioExpress(false)
   }, [opcionesCheckout.express, envioExpress])
 
-  // Ubicación de prueba (cuentas de prueba): una casa fija en Potosí para
-  // probar el envío desde cualquier lado. Se cambia marcando otra casa en
-  // el mapa; "usar mi GPS real" la apaga.
-  const UBICACION_PRUEBA = { lat: -19.5797, lng: -65.7618, direccion: 'Fortunato Gumiel 20', zona: 'Cuarto Centenario' }
+  // Ubicación de prueba (cuentas de prueba): una casa fija para probar el
+  // envío desde cualquier lado. Es la de la cuenta (Admin → Usuarios →
+  // "Crear usuario de prueba", ej. una casa en Buenos Aires) o, si no
+  // tiene, Fortunato Gumiel 20 en Potosí. Se cambia marcando otra casa en
+  // el mapa (queda guardada en este navegador, por ciudad); "usar mi GPS
+  // real" la apaga.
+  const UBICACION_PRUEBA: { lat: number; lng: number; direccion: string; zona: string; ciudad: string; exacta?: boolean } = casaDeLaCuenta || { lat: -19.5797, lng: -65.7618, direccion: 'Fortunato Gumiel 20', zona: 'Cuarto Centenario', ciudad: 'potosi' }
+  const clavePrueba = `clasiclick_ubicacion_prueba${UBICACION_PRUEBA.ciudad === 'potosi' ? '' : `_${UBICACION_PRUEBA.ciudad}`}`
   const [ubicacionPrueba, setUbicacionPrueba] = useState(UBICACION_PRUEBA)
   const [gpsRealPrueba, setGpsRealPrueba] = useState(false)
   useEffect(() => {
     try {
-      const u = JSON.parse(localStorage.getItem('clasiclick_ubicacion_prueba') || 'null')
-      if (u && typeof u.lat === 'number') setUbicacionPrueba({ ...UBICACION_PRUEBA, ...u })
+      const u = JSON.parse(localStorage.getItem(clavePrueba) || 'null')
+      setUbicacionPrueba(u && typeof u.lat === 'number' ? { ...UBICACION_PRUEBA, ...u, ciudad: UBICACION_PRUEBA.ciudad } : UBICACION_PRUEBA)
       setGpsRealPrueba(localStorage.getItem('clasiclick_prueba_gps_real') === '1')
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [clavePrueba, casaDeLaCuenta?.lat, casaDeLaCuenta?.lng])
   function guardarUbicacionPrueba(u: typeof UBICACION_PRUEBA) {
     setUbicacionPrueba(u)
-    try { localStorage.setItem('clasiclick_ubicacion_prueba', JSON.stringify(u)) } catch {}
+    try { localStorage.setItem(clavePrueba, JSON.stringify(u)) } catch {}
   }
   // Al elegir "Envío" con una cuenta de prueba, se completa sola con la
   // casa de prueba (una vez; se puede cambiar o borrar).
@@ -1714,7 +1718,7 @@ function CheckoutContent() {
         <div className="font-body text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-4">
           🧪 Cuenta de prueba: sin restricciones de horario (tienda y envío express siempre disponibles).
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>📍 {gpsRealPrueba ? 'Ubicación: tu GPS real' : <>Ubicación de prueba: <b>{ubicacionPrueba.direccion}</b> · {ubicacionPrueba.zona} (Potosí)</>}</span>
+            <span>📍 {gpsRealPrueba ? 'Ubicación: tu GPS real' : <>Ubicación de prueba: <b>{ubicacionPrueba.direccion}</b>{ubicacionPrueba.zona ? ` · ${ubicacionPrueba.zona}` : ''} ({buscarCiudad(ubicacionPrueba.ciudad).nombre})</>}</span>
             {!gpsRealPrueba && etapa === 'entrega' && (
               <button type="button" onClick={() => { setMetodoEntrega('envio'); setMetodoElegido(true); completarConCasaPrueba() }} className="px-2 py-0.5 rounded border border-indigo-300 bg-white text-indigo-700 font-semibold">Completar con esta casa</button>
             )}

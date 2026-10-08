@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sanearCiudad, sanearEnvioPropio } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { qrImageUrl, cbu, nombreNegocio, direccion, lat, lng, horarios, tiposVenta, logoUrl, whatsapp, whatsappPais, ciudad, envioPropio } = body
+    await cargarCiudadesServidor() // ciudades agregadas desde el admin
     const ciudadTienda = sanearCiudad(ciudad)
     // El whatsapp es opcional (no todos quieren que les escriban antes
     // de comprar), pero si lo cargan, lo validamos según el país

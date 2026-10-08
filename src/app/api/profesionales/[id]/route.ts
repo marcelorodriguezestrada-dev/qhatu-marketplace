@@ -6,6 +6,7 @@ import { validarHorario } from '@/data/turnos'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 import { sanearCiudad, sanearViajaA, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -163,6 +164,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (idiomas !== undefined) cambios.idiomas = sanearIdiomas(idiomas)
     if (cvPublico !== undefined) cambios.cvPublico = cvPublico !== false
     // Ciudad y forma de atención (lo edita el dueño desde Mi perfil o el admin).
+    await cargarCiudadesServidor() // ciudades agregadas desde el admin
     if (ciudad !== undefined) cambios.ciudad = sanearCiudad(ciudad)
     if (atiendePresencial !== undefined) cambios.atiendePresencial = atiendePresencial !== false
     if (atiendeOnline !== undefined) cambios.atiendeOnline = atiendeOnline === true

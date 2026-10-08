@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reescribirMarketingIA } from '@/lib/moderacionIA'
 import { buscarCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 
 export const dynamic = 'force-dynamic'
 
 // POST (admin) { base, red, tono, ciudad } → otra versión del texto con IA.
 export async function POST(req: NextRequest) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const p = req.headers.get('x-admin-password')
   if (!p || p !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const body = await req.json()

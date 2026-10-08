@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ZONAS_POTOSI } from '@/data/zonasPotosi'
-import { CIUDADES, zonasDeCiudad, type CiudadId } from '@/data/ciudades'
-import { useCiudad } from '@/lib/ciudad'
+import { zonasDeCiudad, type CiudadId } from '@/data/ciudades'
+import { useCiudad, useTodasLasCiudades } from '@/lib/ciudad'
 import { CampoCiudad } from '@/components/SelectorCiudad'
 import { useAuth } from '@/lib/auth'
 import { useCategorias, agruparRubros } from '@/lib/useCategorias'
@@ -22,6 +22,7 @@ import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
 const RUBRO_ESCRIBIR_PROPIO = '__custom__'
 
 export default function PublicarServicioPage() {
+  const ciudadesTodas = useTodasLasCiudades()
   const { usuario, cargando, obtenerToken } = useAuth()
   const router = useRouter()
   const { categorias, rubrosFlat } = useCategorias()
@@ -416,7 +417,7 @@ export default function PublicarServicioPage() {
             <div className="mt-2">
               <div className="font-body text-xs text-inksoft mb-1">🚗 También viajo a atender a:</div>
               <div className="flex flex-wrap gap-2">
-                {CIUDADES.filter((c) => c.id !== ciudadFinal).map((c) => (
+                {ciudadesTodas.filter((c) => c.id !== ciudadFinal).map((c) => (
                   <label key={c.id} className="flex items-center gap-1.5 font-body text-sm text-ink cursor-pointer">
                     <input
                       type="checkbox"

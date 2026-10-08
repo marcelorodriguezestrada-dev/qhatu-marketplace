@@ -18,3 +18,15 @@ export async function esCuentaPruebaServidor(usuario: { uid: string } | null | u
     return false
   }
 }
+
+// Casa de prueba de una cuenta de prueba: la usa el checkout para probar
+// el envío en su ciudad (se guarda en usuarios/{uid}.ubicacionPrueba).
+export type UbicacionPruebaGuardada = { lat: number; lng: number; direccion: string; zona: string; ciudad: string; exacta: true }
+
+export function sanearUbicacionPrueba(v: any, ciudad: string): UbicacionPruebaGuardada | null {
+  const lat = Number(v?.lat)
+  const lng = Number(v?.lng)
+  const direccion = String(v?.direccion || '').trim().slice(0, 120)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || !direccion) return null
+  return { lat, lng, direccion, zona: String(v?.zona || '').trim().slice(0, 60), ciudad, exacta: true }
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sumarCampana } from '@/lib/campanasServer'
 import { sanearCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { evaluarConIA, categorizarAnuncio } from '@/lib/moderacionIA'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb()
+    await cargarCiudadesServidor() // ciudades agregadas desde el admin
     const ref = await db.collection('anuncios').add({
       titulo,
       descripcion,

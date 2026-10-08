@@ -31,6 +31,7 @@ import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
 import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
 import CrearUsuario, { mensajeAcceso, abrirWhatsapp, generarPassword } from '@/components/admin/CrearUsuario'
+import CrearUsuarioPrueba from '@/components/admin/CrearUsuarioPrueba'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
 import { useSeccionHash, SidebarSecciones, MenuCelularSecciones, VolverCelularSecciones, type ItemSeccion } from '@/components/NavSecciones'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
@@ -3296,6 +3297,7 @@ export default function AdminPage() {
       {tab === 'usuarios' && (
         <div>
           <CrearUsuario password={password} onCreado={() => cargarUsuarios()} />
+          <CrearUsuarioPrueba password={password} onCreado={() => cargarUsuarios()} />
           <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
             <div className="font-body text-sm font-semibold text-ink">
               Usuarios registrados {usuarios.length > 0 && <span className="text-inksoft font-normal">({usuarios.length})</span>}

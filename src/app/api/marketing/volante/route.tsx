@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og'
 import QRCode from 'qrcode'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { buscarCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { gentilicioDe } from '@/lib/marketingAdmin'
 import { buscarTema, decodificarConfig, destinoDeTipo, textosBase, type ConfigVolante } from '@/lib/volantes'
 
@@ -34,6 +35,7 @@ async function imagenComoDataUrl(url: string | undefined): Promise<string | null
 const lineas = (t: string) => t.split('|').map((x) => x.trim()).filter(Boolean)
 
 export async function GET(req: Request) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const q = new URL(req.url).searchParams
   const formato = q.get('formato') || 'post'
   const W = 1080

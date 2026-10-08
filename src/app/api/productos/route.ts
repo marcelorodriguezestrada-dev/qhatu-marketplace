@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sumarCampana } from '@/lib/campanasServer'
 import { ciudadDe, sanearCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
     let tiendaLogoUrl = ''
     // El producto hereda la ciudad de la tienda (Potosí si no cargó).
     // Si todavía no guardó su tienda, vale la ciudad que manda el formulario.
+    await cargarCiudadesServidor() // ciudades agregadas desde el admin
     let ciudad = sanearCiudad(body.ciudad)
     let enviaATodoBolivia = false
     try {

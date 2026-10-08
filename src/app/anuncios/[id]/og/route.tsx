@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { leerAnuncioPublico } from '@/lib/anuncioPublico'
 
@@ -10,6 +11,7 @@ const COLOR_TIPO: Record<string, string> = { venta: '#2F6E5C', busqueda: '#C98A2
 // Imagen de vista previa (1200x630) para anuncios SIN foto: así el link
 // compartido por WhatsApp no sale "pelado". Colores de la marca.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const anuncio = await leerAnuncioPublico(params.id)
   const titulo = anuncio ? String(anuncio.titulo || '').slice(0, 90) : 'Anuncios clasificados'
   const precio = anuncio?.precio ? `Bs ${Number(anuncio.precio).toLocaleString('es-BO')}` : ''

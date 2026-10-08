@@ -33,6 +33,10 @@ type AuthContextType = {
   // Cuenta de prueba (Admin → Usuarios): puede comprar sin restricciones
   // de horario. Viene de /api/usuarios/estado al iniciar la sesión.
   esPrueba: boolean
+  // Cuenta de prueba de una ciudad (Admin → Usuarios → "Crear usuario de
+  // prueba"): su ciudad y la casa que usa el checkout para probar el envío.
+  ciudadPrueba: string | null
+  ubicacionPrueba: UbicacionPrueba | null
   // Entró con Google y todavía no dejó su celular (se le pide en /login).
   faltaCelular: boolean
   marcarCelularListo: () => void
@@ -48,6 +52,8 @@ type AuthContextType = {
   obtenerToken: () => Promise<string | null>
 }
 
+export type UbicacionPrueba = { lat: number; lng: number; direccion: string; zona: string; ciudad: string; exacta?: boolean }
+
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -55,6 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cargando, setCargando] = useState(true)
   const [emailVerificado, setEmailVerificado] = useState<boolean | null>(null)
   const [esPrueba, setEsPrueba] = useState(false)
+  const [ciudadPrueba, setCiudadPrueba] = useState<string | null>(null)
+  const [ubicacionPrueba, setUbicacionPrueba] = useState<UbicacionPrueba | null>(null)
   const [faltaCelular, setFaltaCelular] = useState(false)
 
   // Se chequea una sola vez por sesión iniciada — así CUALQUIER página
@@ -70,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       setEmailVerificado(data.emailVerificado !== false)
       setEsPrueba(data.esPrueba === true)
+      setCiudadPrueba(typeof data.ciudadPrueba === 'string' ? data.ciudadPrueba : null)
+      setUbicacionPrueba(data.ubicacionPrueba && typeof data.ubicacionPrueba.lat === 'number' ? data.ubicacionPrueba : null)
       setFaltaCelular(data.faltaCelular === true)
     } catch {
       // si falla la consulta, no dejamos a la persona trabada sin poder
@@ -93,6 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!u) {
         setEmailVerificado(null)
         setEsPrueba(false)
+        setCiudadPrueba(null)
+        setUbicacionPrueba(null)
         setFaltaCelular(false)
         return
       }
@@ -157,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, faltaCelular, marcarCelularListo, login, registrarse, loginConGoogle, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, ciudadPrueba, ubicacionPrueba, faltaCelular, marcarCelularListo, login, registrarse, loginConGoogle, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )

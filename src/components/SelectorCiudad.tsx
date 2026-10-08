@@ -1,8 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useCiudad } from '@/lib/ciudad'
-import { CIUDADES, buscarCiudad, esCiudadId, type CiudadId, type FiltroCiudadValor } from '@/data/ciudades'
+import { useCiudad, useTodasLasCiudades, type CiudadPublica } from '@/lib/ciudad'
+import { banderaDe } from '@/data/paisesMercado'
+
+// "🇦🇷 Buenos Aires" cuando hay ciudades de más de un país; 🧪 si está en prueba.
+function etiqueta(c: CiudadPublica, lista: CiudadPublica[]) {
+  const variosPaises = new Set(lista.map((x) => x.pais)).size > 1
+  return `${variosPaises ? `${banderaDe(c.pais)} ` : ''}${c.nombre}${c.prueba ? ' 🧪' : ''}`
+}
+import { buscarCiudad, esCiudadId, type CiudadId, type FiltroCiudadValor } from '@/data/ciudades'
 
 // "📍 Potosí ▾" (como el "Enviar a…" de Mercado Libre): cambia la ciudad
 // del comprador. No aparece mientras haya una sola ciudad abierta.
@@ -51,7 +58,7 @@ export function SelectorCiudad({ variante = 'oscura' }: { variante?: 'oscura' | 
               onClick={() => { elegir(c.id); setAbierto(false) }}
               className={`w-full text-left px-3 py-2 font-body text-sm ${c.id === ciudad.id ? 'text-teal font-semibold bg-tealsoft' : 'text-ink hover:bg-panelalt'}`}
             >
-              {c.id === ciudad.id ? '✓ ' : ''}{c.nombre}
+              {c.id === ciudad.id ? '✓ ' : ''}{etiqueta(c, abiertas)}
             </button>
           ))}
         </div>
@@ -82,7 +89,7 @@ export function BannerCiudad() {
             onClick={() => elegir(c.id)}
             className={`px-5 py-2 rounded-lg font-body text-sm font-semibold ${c.id === sugerida ? 'border-none bg-teal text-white' : 'border border-line bg-panel text-ink'}`}
           >
-            {c.nombre}
+            {etiqueta(c, abiertas)}
           </button>
         ))}
       </div>
@@ -107,9 +114,10 @@ export function CampoCiudad({
   className?: string
   etiqueta?: string
 }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const { abiertas, multiciudad } = useCiudad()
   if (!todas && !multiciudad) return null
-  const opciones = todas ? CIUDADES.map((c) => ({ id: c.id, nombre: c.nombre })) : abiertas
+  const opciones = todas ? ciudadesTodas.map((c) => ({ id: c.id, nombre: c.nombre })) : abiertas
   const lista = opciones.some((c) => c.id === value) ? opciones : [...opciones, { id: value, nombre: buscarCiudad(value).nombre }]
   return (
     <label className={`block font-body text-xs text-ink ${className}`}>

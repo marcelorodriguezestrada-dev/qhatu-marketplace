@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { textoMarketingIA } from '@/lib/moderacionIA'
 import { SITE_URL } from '@/lib/anuncioPublico'
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic'
 // de productos PROPIOS del vendedor logueado (máx. 5). IA si está
 // disponible; si no, plantilla.
 export async function POST(req: NextRequest) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
   try {

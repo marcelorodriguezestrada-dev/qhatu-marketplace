@@ -2,14 +2,15 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
-import { useCiudad } from '@/lib/ciudad'
+import { useCiudad, useTodasLasCiudades } from '@/lib/ciudad'
 import { CampoCiudad } from '@/components/SelectorCiudad'
-import { CIUDADES, buscarCiudad, ciudadDe, zonasDeCiudad, type CiudadId } from '@/data/ciudades'
+import { buscarCiudad, ciudadDe, zonasDeCiudad, type CiudadId } from '@/data/ciudades'
 
 // Mi perfil → "📍 Dónde y cómo atendés": ciudad, zona y forma de
 // atención (presencial / online / viaja a otras ciudades). Online hace
 // que el perfil aparezca en todas las ciudades.
 export default function AtencionProfesional({ profesional, onGuardado }: { profesional: any; onGuardado: (cambios: Record<string, any>) => void }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const { obtenerToken } = useAuth()
   const { multiciudad } = useCiudad()
   const [ciudad, setCiudad] = useState<CiudadId>(ciudadDe(profesional))
@@ -78,7 +79,7 @@ export default function AtencionProfesional({ profesional, onGuardado }: { profe
         <div className="mb-2">
           <div className="font-body text-xs text-inksoft mb-1">🚗 También viajo a atender a:</div>
           <div className="flex flex-wrap gap-3">
-            {CIUDADES.filter((c) => c.id !== ciudad).map((c) => (
+            {ciudadesTodas.filter((c) => c.id !== ciudad).map((c) => (
               <label key={c.id} className="flex items-center gap-1.5 font-body text-sm text-ink cursor-pointer">
                 <input type="checkbox" checked={viajaA.includes(c.id)} onChange={(e) => setViajaA((v) => (e.target.checked ? [...v, c.id] : v.filter((x) => x !== c.id)))} className="accent-teal" />
                 {c.nombre}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapaProspectos } from '@/components/admin/MapaProspectos'
 import type { Caja, PuntoMapa } from '@/components/admin/MapaProspectosCliente'
 import { CIUDADES } from '@/data/ciudades'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import { generarPassword } from '@/components/admin/CrearUsuario'
 import {
   CAMPANA_DEFECTO,
@@ -178,6 +179,7 @@ function GuionLlamada({ guion, telefono }: { guion: { paso: string; decir: strin
 }
 
 export default function AdminCaptacion({ password }: { password: string }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const [ciudad, setCiudad] = useState<'potosi' | 'la-paz'>('potosi')
   const [prospectos, setProspectos] = useState<Prospecto[]>([])
   const [campana, setCampana] = useState<Campana>(CAMPANA_DEFECTO)
@@ -218,7 +220,7 @@ export default function AdminCaptacion({ password }: { password: string }) {
 
   function cambiarCiudad(c: 'potosi' | 'la-paz') {
     setCiudad(c)
-    const x = CIUDADES.find((y) => y.id === c)!
+    const x = ciudadesTodas.find((y) => y.id === c)!
     setCentro([x.centro.lat, x.centro.lng])
     setTiendas([])
   }
@@ -418,7 +420,7 @@ export default function AdminCaptacion({ password }: { password: string }) {
             <div className="font-body text-xs text-inksoft">Buscá tiendas en el mapa, escribiles por WhatsApp y seguí cada prospecto hasta que se registre.</div>
           </div>
           <div className="flex gap-1 bg-panelalt rounded-lg p-1">
-            {CIUDADES.map((c) => (
+            {ciudadesTodas.map((c) => (
               <button key={c.id} type="button" onClick={() => cambiarCiudad(c.id as any)} className={`px-3 py-1.5 rounded-md border-none font-body text-xs font-semibold ${ciudad === c.id ? 'bg-ink text-white' : 'bg-transparent text-ink'}`}>{c.nombre}</button>
             ))}
           </div>

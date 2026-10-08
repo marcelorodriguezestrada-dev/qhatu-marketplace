@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { textosVolanteIA } from '@/lib/moderacionIA'
 import { buscarCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { TEMAS_VOLANTE, sanearConfigVolante } from '@/lib/volantes'
 
 export const dynamic = 'force-dynamic'
 
 // POST (admin) { idea, ciudad } → { config } con los textos del volante.
 export async function POST(req: NextRequest) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const p = req.headers.get('x-admin-password')
   if (!p || p !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const body = await req.json()

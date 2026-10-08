@@ -1,11 +1,13 @@
 import { ImageResponse } from 'next/og'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb } from '@/lib/firebaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
 // Imagen de vista previa (1200x630) para productos sin foto.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   let nombre = 'Clasi Click'
   let precio = ''
   let vendedor = ''

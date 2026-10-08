@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, METRICAS_CAMPANA, codigoCampana } from '@/lib/campanas'
 import { sanearCiudad } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
     const obj = OBJETIVOS_CAMPANA.find((o) => o.id === body.objetivo) || OBJETIVOS_CAMPANA[0]
     const destino = typeof body.destino === 'string' && body.destino.startsWith('/') && !body.destino.startsWith('//') ? body.destino.slice(0, 120) : obj.destino
     const id = codigoCampana(nombre)
+    await cargarCiudadesServidor() // ciudades agregadas desde el admin
     const doc = { nombre, canal, objetivo: obj.id, destino, ciudad: sanearCiudad(body.ciudad), activa: true, createdAt: new Date().toISOString() }
     await getDb().collection('campanas').doc(id).set(doc)
     return NextResponse.json({ id, ...doc })

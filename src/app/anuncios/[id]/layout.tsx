@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { labelTipoAnuncio } from '@/data/anuncios'
 import { leerAnuncioPublico, SITE_URL } from '@/lib/anuncioPublico'
 
@@ -8,6 +9,7 @@ import { leerAnuncioPublico, SITE_URL } from '@/lib/anuncioPublico'
 // arma acá, del lado del servidor: foto, título, precio y descripción.
 // Si el anuncio no tiene foto, usamos la imagen generada en ./og.
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const anuncio = await leerAnuncioPublico(params.id)
   if (!anuncio) return { title: 'Anuncio | Clasi Click' }
 

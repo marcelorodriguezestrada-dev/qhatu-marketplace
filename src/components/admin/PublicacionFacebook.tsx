@@ -1,6 +1,7 @@
 'use client'
 
-import { CIUDADES, buscarCiudad, ciudadDe, type CiudadId } from '@/data/ciudades'
+import { buscarCiudad, ciudadDe, type CiudadId } from '@/data/ciudades'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import { useEffect, useMemo, useState } from 'react'
 
 // Admin → Anuncios → "📣 Armar publicación para Facebook": junta lo que la
@@ -31,6 +32,7 @@ export function limpiarPedido(texto: string): string {
 }
 
 export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios: Anuncio[]; rubroLabel: (id?: string) => string | undefined }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const [dias, setDias] = useState(14)
   const [incluirAprobados, setIncluirAprobados] = useState(true)
   const [soloNuevos, setSoloNuevos] = useState(true)
@@ -120,7 +122,7 @@ export default function PublicacionFacebook({ anuncios, rubroLabel }: { anuncios
         <label className="flex items-center gap-1.5">
           Ciudad
           <select value={ciudad} onChange={(e) => { setCiudad(e.target.value as CiudadId); setEditado(false) }} className="px-2 py-1 rounded-lg border border-line bg-panel">
-            {CIUDADES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-1.5">

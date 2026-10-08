@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, linkCampana } from '@/lib/campanas'
 import { TEXTOS_ADMIN, gentilicioDe } from '@/lib/marketingAdmin'
-import { CIUDADES, buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import EditorVolantes from './EditorVolantes'
 
 // Admin → "📣 Marketing": campañas con link rastreable (?c=) y sus
@@ -34,6 +35,7 @@ type CampanaFila = {
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
 
 export default function AdminMarketing({ password }: { password: string }) {
+  const ciudadesTodas = useTodasLasCiudades()
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
   const [campanas, setCampanas] = useState<CampanaFila[] | null>(null)
   const [copiado, setCopiado] = useState<string | null>(null)
@@ -140,7 +142,7 @@ export default function AdminMarketing({ password }: { password: string }) {
   )
   const selectCiudad = (valor: CiudadId, onChange: (v: CiudadId) => void) => (
     <select value={valor} onChange={(e) => onChange(e.target.value as CiudadId)} className={sel} aria-label="Ciudad">
-      {CIUDADES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+      {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
     </select>
   )
 

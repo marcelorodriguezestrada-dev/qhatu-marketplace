@@ -15,13 +15,24 @@ import { CENTRO_POTOSI, ZONAS_ENVIO_POTOSI } from './zonasPotosi'
 //   Cruz, así que eso solo SUGIERE la ciudad; nunca se filtra sin que la
 //   persona la confirme.
 
-export type CiudadId = 'potosi' | 'la-paz'
+// Potosí y La Paz vienen de acá; las que agrega el admin (Admin → Inicio
+// → Ciudades, ej. Buenos Aires) se guardan en config/ciudades y se suman
+// en tiempo de ejecución con registrarCiudades().
+export type CiudadId = string
+
+// Estado de una ciudad: abierta (todos la ven), en prueba (solo las
+// cuentas de prueba) o cerrada.
+export type EstadoCiudad = 'abierta' | 'prueba' | 'cerrada'
 
 export type ZonaCiudad = { nombre: string; lat: number; lng: number; grupo?: string }
 
 export type Ciudad = {
   id: CiudadId
   nombre: string
+  // País (código ISO, ver src/data/paises.ts).
+  pais: string
+  // Agregada desde el admin (no está en este archivo).
+  extra?: boolean
   departamento: string
   centro: { lat: number; lng: number; nombre: string }
   activa: boolean
@@ -65,6 +76,7 @@ export const CIUDADES: Ciudad[] = [
   {
     id: 'potosi',
     nombre: 'Potosí',
+    pais: 'BO',
     departamento: 'Potosí',
     centro: { ...CENTRO_POTOSI, nombre: 'Plaza 10 de Noviembre' },
     activa: true,
@@ -76,6 +88,7 @@ export const CIUDADES: Ciudad[] = [
   {
     id: 'la-paz',
     nombre: 'La Paz',
+    pais: 'BO',
     departamento: 'La Paz',
     centro: { lat: -16.4964, lng: -68.1375, nombre: 'Plaza San Francisco' },
     activa: false,
@@ -86,12 +99,30 @@ export const CIUDADES: Ciudad[] = [
   },
 ]
 
+// Ciudades agregadas desde el admin. En el navegador las registra
+// cargarCiudades() (src/lib/ciudad.ts); en el servidor,
+// cargarCiudadesServidor() (src/lib/ciudadesServer.ts).
+let EXTRAS: Ciudad[] = []
+export function registrarCiudades(extras: Ciudad[]) {
+  EXTRAS = extras.filter((c) => c && c.id && !CIUDADES.some((b) => b.id === c.id)).map((c) => ({ ...c, extra: true, zonas: c.zonas || [], regionesIP: [], ciudadesIP: [] }))
+}
+
+// Todas las ciudades conocidas (las de acá + las del admin), sin importar su estado.
+export function todasLasCiudades(): Ciudad[] {
+  return [...CIUDADES, ...EXTRAS]
+}
+
 export function buscarCiudad(id: string | null | undefined): Ciudad {
-  return CIUDADES.find((c) => c.id === id) || CIUDADES.find((c) => c.id === CIUDAD_POR_DEFECTO)!
+  return todasLasCiudades().find((c) => c.id === id) || CIUDADES.find((c) => c.id === CIUDAD_POR_DEFECTO)!
 }
 
 export function esCiudadId(id: unknown): id is CiudadId {
-  return typeof id === 'string' && CIUDADES.some((c) => c.id === id)
+  return typeof id === 'string' && todasLasCiudades().some((c) => c.id === id)
+}
+
+// "Buenos Aires" → "buenos-aires" (id de una ciudad nueva).
+export function idCiudadDesdeNombre(nombre: string): string {
+  return nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 }
 
 const norm = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
