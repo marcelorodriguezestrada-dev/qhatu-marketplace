@@ -23,7 +23,24 @@ export async function GET(req: NextRequest) {
       const docs = await db.getAll(...ids.slice(i, i + 100).map((id) => db.collection('notificaciones').doc(id)))
       docs.forEach((d) => { if (d.exists && d.data()?.leida) leidas.add(d.id) })
     }
-    return NextResponse.json({ compras: compras.map((c) => ({ ...c, avisoLeido: leidas.has(c.notificacionId) })) })
+    // Si no escribió su WhatsApp en el checkout, usamos el celular de su
+    // cuenta (el que dejó al registrarse) para poder escribirle igual.
+    const sinNumero = Array.from(new Set(compras.filter((c) => !c.whatsapp && c.uid).map((c) => c.uid as string)))
+    const deCuenta = new Map<string, { whatsapp: string; nombre: string }>()
+    for (let i = 0; i < sinNumero.length; i += 100) {
+      const docs = await db.getAll(...sinNumero.slice(i, i + 100).map((uid) => db.collection('usuarios').doc(uid)))
+      docs.forEach((d) => {
+        const u = d.data()
+        const numero = String(u?.whatsapp || u?.celular || '')
+        if (numero) deCuenta.set(d.id, { whatsapp: numero, nombre: String(u?.nombre || '') })
+      })
+    }
+    return NextResponse.json({
+      compras: compras.map((c) => {
+        const cuenta = !c.whatsapp ? deCuenta.get(c.uid) : undefined
+        return { ...c, avisoLeido: leidas.has(c.notificacionId), ...(cuenta ? { whatsapp: cuenta.whatsapp, whatsappDeCuenta: true, nombre: c.nombre || cuenta.nombre } : {}) }
+      }),
+    })
   } catch (err) {
     console.error('GET /api/admin/fuera-horario', err)
     return NextResponse.json({ error: 'No se pudo leer la lista.' }, { status: 500 })

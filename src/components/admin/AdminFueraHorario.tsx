@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import type { CompraFueraHorario } from '@/lib/fueraHorario'
+import { buscarCiudad } from '@/data/ciudades'
 
 // Admin → Pedidos: quienes quisieron comprar fuera de horario (20 a 8 h).
 // A cada uno le llega solo el aviso a la campanita a las 8:00; desde acá
 // ves si lo leyó, si volvió y compró, y le podés escribir por WhatsApp.
 
-type Fila = CompraFueraHorario & { avisoLeido: boolean }
+type Fila = CompraFueraHorario & { avisoLeido: boolean; whatsappDeCuenta?: boolean }
 
 const hora = (iso: string) => {
   const d = new Date(new Date(iso).getTime() - 4 * 3600_000)
@@ -60,19 +61,28 @@ export default function AdminFueraHorario({ password }: { password: string }) {
           <div className="grid gap-1.5">
             {lista.map((c) => {
               const productos = c.items.map((i) => `${i.cantidad > 1 ? `${i.cantidad}× ` : ''}${i.nombre}${i.talla ? ` (T${i.talla})` : ''}`).join(', ')
-              const texto = `¡Hola ${c.nombre || ''}! 👋 Soy de Clasi Click. Quisiste comprar ${c.items[0]?.nombre || 'en nuestra tienda'}${c.items.length > 1 ? ' y más' : ''} cuando ya habíamos cerrado. ¡Ya estamos abiertos! Tu carrito te espera 👉 https://clasiclick.ezeti.pro${c.tienda ? `/checkout?tienda=${c.tienda}` : '/checkout'}`
+              const link = `https://clasiclick.ezeti.pro${c.tienda ? `/checkout?tienda=${encodeURIComponent(c.tienda)}` : '/checkout'}`
+              const texto = `¡Hola${c.nombre ? ` ${c.nombre}` : ''}! 👋 Soy de Clasi Click. Quisiste comprar ${c.items[0]?.nombre || 'en nuestra tienda'}${c.items.length > 1 ? ' y más' : ''} cuando ya habíamos cerrado. ¡Ya estamos abiertos! 🛍️ Tu carrito te espera, terminá tu compra acá 👉 ${link}`
               const estadoAviso = c.convertido ? '✅ Volvió y compró' : c.avisoEn > ahora ? `⏰ Aviso programado ${hora(c.avisoEn)}` : c.avisoLeido ? '👀 Vio el aviso, no compró' : '🔔 Aviso enviado, sin abrir'
               return (
                 <div key={c.id} className={`flex flex-wrap items-center gap-2 border rounded-lg px-3 py-2 ${c.convertido ? 'border-emerald-200 bg-emerald-50/50' : 'border-line'}`}>
                   <div className="flex-1 min-w-[220px]">
-                    <div className="font-body text-sm text-ink"><b>{c.nombre || c.email}</b> <span className="text-[11px] text-inksoft">· {hora(c.ultimoIntento)}{c.intentos > 1 ? ` · ${c.intentos} intentos` : ''} · {c.ciudad === 'la-paz' ? 'La Paz' : 'Potosí'}</span></div>
+                    <div className="font-body text-sm text-ink"><b>{c.nombre || c.email}</b> <span className="text-[11px] text-inksoft">· {hora(c.ultimoIntento)}{c.intentos > 1 ? ` · ${c.intentos} intentos` : ''} · {buscarCiudad(c.ciudad).nombre}</span></div>
                     <div className="font-body text-[11px] text-inksoft truncate" title={productos}>{productos} · <b className="text-ink">Bs {Math.round(c.total)}</b></div>
                     <div className="font-body text-[11px] text-indigo-700">{estadoAviso}{c.contactadoAt ? ' · 💬 le escribiste' : ''}</div>
+                    {c.whatsappDeCuenta && <div className="font-body text-[10px] text-inksoft">WhatsApp de su cuenta: +{wa(c.whatsapp)}</div>}
                   </div>
                   {c.whatsapp && !c.convertido && (
-                    <a href={`https://wa.me/${wa(c.whatsapp)}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer" onClick={() => marcarContactado(c)} className="px-3 py-1.5 rounded-lg bg-[#25D366] text-white font-body text-xs font-semibold no-underline">💬 WhatsApp</a>
+                    <a href={`https://wa.me/${wa(c.whatsapp)}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer" onClick={() => marcarContactado(c)} title={c.whatsappDeCuenta ? 'Número de su cuenta (no lo escribió en el checkout)' : undefined} className="px-3 py-1.5 rounded-lg bg-[#25D366] text-white font-body text-xs font-semibold no-underline">
+                      💬 Invitar por WhatsApp
+                    </a>
                   )}
-                  {!c.whatsapp && <span className="font-body text-[11px] text-inksoft">{c.email}</span>}
+                  {!c.whatsapp && !c.convertido && c.email && (
+                    <a href={`mailto:${c.email}?subject=${encodeURIComponent('Tu carrito en Clasi Click te espera 🛍️')}&body=${encodeURIComponent(texto)}`} onClick={() => marcarContactado(c)} className="px-3 py-1.5 rounded-lg border border-line bg-panel text-ink font-body text-xs font-semibold no-underline">✉️ Invitar por email</a>
+                  )}
+                  {!c.convertido && (
+                    <button type="button" onClick={() => navigator.clipboard?.writeText(texto)} className="px-2.5 py-1.5 rounded-lg border border-line bg-panel font-body text-[11px] text-inksoft" title="Copiar el mensaje con el link">📋 Copiar mensaje</button>
+                  )}
                 </div>
               )
             })}
