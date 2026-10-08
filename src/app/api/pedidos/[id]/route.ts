@@ -120,7 +120,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // el comprobante), así que no pedimos login para guardarla: alcanza
     // con conocer el id del pedido.
     if (franjaHoraria) {
-      if (!['8-13', '13-19'].includes(franjaHoraria)) {
+      // Las de ahora (semana / sábado) y las viejas, por si quedó una pestaña abierta.
+      if (!['9-13', '14-19', '10-13', '14-16', '8-13', '13-19'].includes(franjaHoraria)) {
         return NextResponse.json({ error: 'Franja horaria inválida.' }, { status: 400 })
       }
       // fechaEntrega: si el comprador no puede recibirlo mañana (el

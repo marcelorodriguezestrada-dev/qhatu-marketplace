@@ -33,12 +33,20 @@ const ESTADOS_PREVIOS: Record<string, string> = {
 // del pago (o el lunes, si ese día siguiente cae domingo — no hay
 // reparto ese día) — a menos que el comprador haya elegido otro día
 // desde acá o desde /checkout (pedido.fechaEntrega, yyyy-mm-dd).
-function fechaEntregaTexto(pagadoAt?: string, fechaEntrega?: string): string {
+function fechaEntregaTexto(pagadoAt?: string, fechaEntrega?: string, express?: boolean): string {
+  const hoy = new Date().toDateString()
   if (fechaEntrega) {
     const [y, m, d] = fechaEntrega.split('-').map(Number)
-    return new Date(y, m - 1, d).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+    const f = new Date(y, m - 1, d)
+    const texto = f.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+    return f.toDateString() === hoy ? `hoy, ${texto}` : texto
   }
   const base = pagadoAt ? new Date(pagadoAt) : new Date()
+  // Express: se entrega el mismo día del pago.
+  if (express) {
+    const texto = base.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' })
+    return base.toDateString() === hoy ? `hoy, ${texto}` : texto
+  }
   const manana = new Date(base)
   manana.setDate(manana.getDate() + 1)
   const entrega = fechaEntregaDefault(base)
@@ -136,7 +144,7 @@ export default function SeguimientoPedidoPage() {
           {esEnvio && pedido.estado !== 'entregado' && (
             <div className="bg-tealsoft border border-teal rounded-xl p-4 mb-5 text-center">
               <div className="font-body text-[13px] text-ink">
-                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt, pedido.fechaEntrega)}
+                Estarás recibiendo el pedido {fechaEntregaTexto(pedido.pagadoAt, pedido.fechaEntrega, pedido.envioExpress)}
                 {pedido.franjaHoraria ? `, en el horario de ${FRANJA_LABEL[pedido.franjaHoraria]}` : ''}.
                 {' '}Entregamos en <span className="font-semibold">{pedido.direccion || 'la dirección que diste'}</span>.
               </div>

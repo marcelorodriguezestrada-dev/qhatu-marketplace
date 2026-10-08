@@ -60,6 +60,7 @@ export default function SelectorHorarioEntrega({
   // elegido aparte.
   const [franjaSeleccion, setFranjaSeleccion] = useState<Franja>('')
   const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState('')
   // Si ya venía confirmado (franjaInicial ya cargado, por ejemplo
   // porque el componente se volvió a renderizar en la misma sesión sin
   // desmontarse) arrancamos directo mostrando el mensaje final.
@@ -112,19 +113,31 @@ export default function SelectorHorarioEntrega({
   async function confirmar() {
     if (!franjaSeleccion) return
     setGuardando(true)
+    setErrorGuardar('')
+    // Express: se guarda HOY como fecha (si no, el seguimiento del pedido
+    // calcula el día por default, que es mañana).
+    const hoy = new Date()
+    const isoHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+    const fecha = soloHoy ? isoHoy : fechaElegida || null
     try {
-      await Promise.all(
+      const resps = await Promise.all(
         pedidoIds.map((id) =>
           fetch(`/api/pedidos/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ franjaHoraria: franjaSeleccion, fechaEntrega: fechaElegida || null }),
+            body: JSON.stringify({ franjaHoraria: franjaSeleccion, fechaEntrega: fecha }),
           })
         )
       )
-      onGuardado?.({ franjaHoraria: franjaSeleccion, fechaEntrega: fechaElegida || null })
+      if (resps.some((r) => !r.ok)) {
+        setErrorGuardar('No se pudo guardar el horario. Probá de nuevo.')
+        return
+      }
+      onGuardado?.({ franjaHoraria: franjaSeleccion, fechaEntrega: soloHoy ? null : fecha })
       setFranjaConfirmada(franjaSeleccion)
       setConfirmado(true)
+    } catch {
+      setErrorGuardar('No se pudo guardar el horario. Probá de nuevo.')
     } finally {
       setGuardando(false)
     }
@@ -182,6 +195,7 @@ export default function SelectorHorarioEntrega({
         >
           {guardando ? 'Guardando...' : 'Continuar'}
         </button>
+        {errorGuardar && <div className="font-body text-[12px] text-maroon mt-2 text-center">{errorGuardar}</div>}
       </div>
     )
   }
