@@ -8,7 +8,16 @@ import { ciudadDesdeGeoIP } from '@/data/ciudades'
 // (sin Vercel) estos headers no vienen y no se sugiere nada.
 export const COOKIE_CIUDAD_IP = 'clasiclick_ciudad_ip'
 
+// Dominio viejo → el nuevo (www.clasiclick.com), con la misma página:
+// los links que ya se compartieron siguen funcionando.
+const DOMINIOS_VIEJOS = ['clasiclick.ezeti.pro']
+
 export function middleware(req: NextRequest) {
+  const host = (req.headers.get('host') || '').toLowerCase()
+  if (DOMINIOS_VIEJOS.includes(host)) {
+    const destino = new URL(req.nextUrl.pathname + req.nextUrl.search, 'https://www.clasiclick.com')
+    return NextResponse.redirect(destino, 308)
+  }
   const res = NextResponse.next()
   if (req.cookies.get(COOKIE_CIUDAD_IP)) return res
   const sugerida = ciudadDesdeGeoIP(

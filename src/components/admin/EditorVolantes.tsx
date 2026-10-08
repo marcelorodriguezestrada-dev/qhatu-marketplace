@@ -14,7 +14,7 @@ import { TEMAS_VOLANTE, codificarConfig, destinoDeTipo, textosBase, type ConfigV
 //   estampamos el QR de la campaña donde elijas.
 // - Guardar como plantilla para reusarla.
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 
 type Plantilla = { id: string; nombre: string; config: ConfigVolante }
 

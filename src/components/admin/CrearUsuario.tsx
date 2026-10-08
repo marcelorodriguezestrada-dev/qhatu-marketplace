@@ -11,7 +11,7 @@ import type { CiudadId } from '@/data/ciudades'
 // Desde acá mismo podés "entrar como" ese usuario para cargarle los
 // productos.
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 
 // Contraseña fácil de dictar/copiar: sin letras que se confunden (l, 1, O, 0).
 export function generarPassword() {

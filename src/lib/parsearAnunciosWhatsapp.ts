@@ -70,7 +70,7 @@ export function mensajeInvitacionAnuncio(): string {
 Te escribo porque desde Clasi Click —un emprendimiento 100% potosino creado para impulsar a nuestra gente y a los negocios locales— queremos ayudarte a multiplicar tus ventas. 🚀
 Podemos subir este mismo anuncio que pusiste en Cambalache a nuestra plataforma totalmente gratis, o si prefieres promocionar otro producto/servicio, ¡también es 100% gratuito!
 Además, nuestra página cuenta con un sistema inteligente que realiza un matcheo o conexión automática: en cuanto alguien busca o solicita en Potosí lo que tú vendes, el sistema los conecta en tiempo real para que tu anuncio se escuche y atienda al instante.
-Puedes ver la sección de anuncios e ingresar aquí: https://clasiclick.ezeti.pro/anuncios
+Puedes ver la sección de anuncios e ingresar aquí: https://www.clasiclick.com/anuncios
 ¿Te parece bien que publiquemos este anuncio o prefieres enviarme fotos e información nueva para subirlo hoy mismo? 🙌`
 }
 

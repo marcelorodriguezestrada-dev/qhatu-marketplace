@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       if (!q) return NextResponse.json({ error: 'Escribí qué buscar.' }, { status: 400 })
       const pais = String(body.pais || '').toLowerCase()
       const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=es${/^[a-z]{2}$/.test(pais) ? `&countrycodes=${pais}` : ''}&q=${encodeURIComponent(q)}`
-      const r = await fetch(url, { headers: { 'User-Agent': 'ClasiClick/1.0 (clasiclick.ezeti.pro)' } }).catch(() => null)
+      const r = await fetch(url, { headers: { 'User-Agent': 'ClasiClick/1.0 (www.clasiclick.com)' } }).catch(() => null)
       const d = r && r.ok ? await r.json().catch(() => []) : []
       if (!Array.isArray(d) || !d[0]) return NextResponse.json({ error: 'No lo encontramos en el mapa. Probá con otro nombre (ej. "Plaza de Mayo, Buenos Aires").' }, { status: 404 })
       return NextResponse.json({ lat: Number(d[0].lat), lng: Number(d[0].lon), nombre: String(d[0].display_name || q).split(',').slice(0, 2).join(',').trim() })

@@ -43,7 +43,7 @@ import {
 // - 📅 Seguimiento: primer mensaje → seguimiento a los 2 días → cierre a
 //   los 3; "Hoy toca" muestra a quién escribirle y con qué mensaje.
 
-const SITIO = typeof window !== 'undefined' ? `${window.location.origin}/vender` : 'https://clasiclick.ezeti.pro/vender'
+const SITIO = typeof window !== 'undefined' ? `${window.location.origin}/vender` : 'https://www.clasiclick.com/vender'
 const colorEstado = (e: EstadoProspecto) => ESTADOS_PROSPECTO.find((x) => x.id === e)?.color || '#6366f1'
 const vacio = { nombre: '', rubro: '', whatsapp: '', contacto: '', direccion: '', redes: '', notas: '', lat: null as number | null, lng: null as number | null }
 
@@ -69,12 +69,12 @@ function Mensaje({ titulo, texto, whatsapp }: { titulo: string; texto: string; w
   )
 }
 
-const ORIGEN = typeof window !== 'undefined' ? window.location.origin : 'https://clasiclick.ezeti.pro'
+const ORIGEN = typeof window !== 'undefined' ? window.location.origin : 'https://www.clasiclick.com'
 
 // Email interno para quien no tiene correo: entra con este usuario y la
 // contraseña que le mandamos por WhatsApp.
 const emailInterno = (nombre: string) =>
-  `${nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '').slice(0, 18) || 'tienda'}${Math.floor(100 + Math.random() * 900)}@clasiclick.ezeti.pro`
+  `${nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '').slice(0, 18) || 'tienda'}${Math.floor(100 + Math.random() * 900)}@clasiclick.com`
 
 // 🏪 Crearle la tienda a un prospecto: cuenta de vendedor (con
 // contraseña lista para mandarle), lo marca Registrado (y le asigna el

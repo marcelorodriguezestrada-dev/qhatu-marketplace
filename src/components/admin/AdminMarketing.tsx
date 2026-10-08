@@ -11,7 +11,7 @@ import EditorVolantes from './EditorVolantes'
 // números, mensajes para invitar vendedores/profesionales, posts para
 // compradores (plantilla o IA) y volantes con QR listos para descargar.
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 
 type CampanaFila = {
   id: string
