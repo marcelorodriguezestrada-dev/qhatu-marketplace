@@ -11,7 +11,7 @@ import { generarPassword } from '@/components/admin/CrearUsuario'
 // Con ella se ve esa ciudad, se compra a cualquier hora y el checkout
 // arranca con su casa de prueba (la dirección de acá, ubicada en el mapa).
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 const input = 'w-full px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm'
 
 export default function CrearUsuarioPrueba({ password, onCreado }: { password: string; onCreado: () => void }) {

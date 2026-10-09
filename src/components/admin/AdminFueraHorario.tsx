@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { CompraFueraHorario } from '@/lib/fueraHorario'
 import { buscarCiudad } from '@/data/ciudades'
+import { SITE_URL } from '@/lib/sitio'
 
 // Admin → Pedidos: quienes quisieron comprar fuera de horario (20 a 8 h).
 // A cada uno le llega solo el aviso a la campanita a las 8:00; desde acá
@@ -61,7 +62,7 @@ export default function AdminFueraHorario({ password }: { password: string }) {
           <div className="grid gap-1.5">
             {lista.map((c) => {
               const productos = c.items.map((i) => `${i.cantidad > 1 ? `${i.cantidad}× ` : ''}${i.nombre}${i.talla ? ` (T${i.talla})` : ''}`).join(', ')
-              const link = `https://clasiclick.ezeti.pro${c.tienda ? `/checkout?tienda=${encodeURIComponent(c.tienda)}` : '/checkout'}`
+              const link = `${SITE_URL}${c.tienda ? `/checkout?tienda=${encodeURIComponent(c.tienda)}` : '/checkout'}`
               const texto = `¡Hola${c.nombre ? ` ${c.nombre}` : ''}! 👋 Soy de Clasi Click. Quisiste comprar ${c.items[0]?.nombre || 'en nuestra tienda'}${c.items.length > 1 ? ' y más' : ''} cuando ya habíamos cerrado. ¡Ya estamos abiertos! 🛍️ Tu carrito te espera, terminá tu compra acá 👉 ${link}`
               const estadoAviso = c.convertido ? '✅ Volvió y compró' : c.avisoEn > ahora ? `⏰ Aviso programado ${hora(c.avisoEn)}` : c.avisoLeido ? '👀 Vio el aviso, no compró' : '🔔 Aviso enviado, sin abrir'
               return (

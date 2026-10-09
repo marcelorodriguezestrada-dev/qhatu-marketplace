@@ -10,7 +10,7 @@ import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlan
 // redes con sus productos: texto (IA o plantilla), imagen lista para
 // post o estado, catálogo para WhatsApp e ideas para vender más.
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 const MAX_PRODUCTOS = 5
 
 export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTienda }: { misProductos: any[]; tienda: string; irA: (s: any) => void; ciudadTienda?: CiudadId }) {

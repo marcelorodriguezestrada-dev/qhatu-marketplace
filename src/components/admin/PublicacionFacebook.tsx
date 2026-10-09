@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 // ("te conectamos"). Se recuerda qué pedidos ya se publicaron para no
 // repetirlos en la próxima publicación.
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 const CLAVE = 'clasiclick_publicados_facebook'
 
 type Anuncio = { id: string; titulo?: string; descripcion?: string; tipo?: string; estado?: string; rubro?: string; createdAt?: string; ciudad?: string }

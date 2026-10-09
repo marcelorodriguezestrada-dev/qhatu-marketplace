@@ -2,7 +2,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 
 // URL pública del sitio, para armar links absolutos (vista previa al
 // compartir por WhatsApp, botón Compartir).
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://clasiclick.ezeti.pro').replace(/\/$/, '')
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.clasiclick.com').replace(/\/$/, '')
 
 // Anuncio aprobado leído del lado del servidor (para la vista previa
 // al compartir). null si no existe o todavía no está aprobado — mismo
