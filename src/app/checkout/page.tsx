@@ -1663,7 +1663,7 @@ function CheckoutContent() {
                 </div>
               ) : (
                 <>
-                  <div className="font-body text-[11px] text-inksoft mb-1">Si tiene el código de un cupón de envío gratis escriba aquí</div>
+                  <div className="font-body text-[11px] text-inksoft mb-1">Si tiene un cupón de envío gratis escriba el código aquí 👇</div>
                   <div className="flex gap-2">
                     <input
                       value={codigoCupon}
@@ -2325,7 +2325,7 @@ function CheckoutContent() {
             ) : (
               <>
                 <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-teal text-teal bg-tealsoft font-body text-sm font-bold cursor-pointer ${subiendoComprobante ? 'opacity-50 pointer-events-none' : ''}`}>
-                  👆 Subí comprobante
+                  👉 Subí comprobante
                   <input
                     type="file"
                     accept="image/*"
