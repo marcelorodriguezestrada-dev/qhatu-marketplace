@@ -32,12 +32,17 @@ export default function BuscadorProductos({
   onBuscar,
   productos,
   rubroDe,
+  placeholder = 'Buscar productos, marcas y más…',
+  claro = false,
 }: {
   valor: string
   onCambiar: (v: string) => void
   onBuscar: (q: string) => void
   productos: { nombre: string; vendedor: string; publico?: string; rubro?: string; etiquetasBusqueda?: string[] }[]
   rubroDe: (id?: string) => { label: string; categoriaLabel: string } | undefined
+  placeholder?: string
+  // Campo blanco con letra oscura (la cabecera del inicio).
+  claro?: boolean
 }) {
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(-1)
@@ -125,11 +130,13 @@ export default function BuscadorProductos({
             elegir(mostrar && activo >= 0 ? sugerencias[activo].texto : valor)
           }
         }}
-        placeholder="Buscar productos, marcas y más…"
+        placeholder={placeholder}
         role="combobox"
         aria-expanded={mostrar}
         aria-autocomplete="list"
-        className="w-full px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50"
+        className={claro
+          ? 'w-full px-4 py-2.5 md:py-3 rounded-l-lg border-none bg-white text-ink font-body text-sm md:text-[15px] outline-none placeholder:text-inksoft/70'
+          : 'w-full px-3.5 py-2 rounded-lg border-none bg-white/10 text-white font-body text-sm outline-none placeholder:text-white/50'}
       />
       {mostrar && (
         <ul role="listbox" className="absolute left-0 right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-lg border border-line py-1 overflow-hidden">

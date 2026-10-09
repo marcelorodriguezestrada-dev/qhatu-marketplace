@@ -19,6 +19,7 @@ import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { CartDrawer } from '@/components/CartDrawer'
 import { track } from '@/lib/tracking'
 import { registrarInteres } from '@/lib/interes'
+import { registrarVisto } from '@/lib/vistos'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -106,6 +107,7 @@ export default function ProductoDetallePage() {
           fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
           track('ver_producto', { productoId: detalle.id, precio: detalle.precio, categoria: detalle.rubro })
           registrarInteres(detalle.id, 'visto', detalle.nombre)
+          registrarVisto(detalle.id)
 
           if (detalle.vendedorId) {
             const t = await fetch(`/api/vendedores/${detalle.vendedorId}`).then((r) => r.json())
