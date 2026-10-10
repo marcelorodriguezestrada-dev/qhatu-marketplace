@@ -25,6 +25,14 @@ export default function AdminContenido({ password }: { password: string }) {
   const [mensaje, setMensaje] = useState('')
   const [porLink, setPorLink] = useState<{ url: string; nombre: string; tipo: 'video' | 'imagen' } | null>(null)
   const [editando, setEditando] = useState<Medio | null>(null)
+  const [prueba, setPrueba] = useState<{ ok: boolean; texto: string } | null>(null)
+
+  async function probarConexion() {
+    setPrueba({ ok: true, texto: 'Probando…' })
+    const d = await fetch('/api/admin/medios', { method: 'POST', headers, body: JSON.stringify({ accion: 'probar' }) }).then((r) => r.json()).catch(() => null)
+    if (d?.ok) setPrueba({ ok: true, texto: d.mensaje })
+    else setPrueba({ ok: false, texto: `${d?.error || 'No se pudo probar.'}${d?.detalle ? ` (Cloud name: ${d.detalle.cloud} · API Key: ${d.detalle.key} · API Secret: ${d.detalle.secret})` : ''}` })
+  }
 
   async function cargar() {
     const [m, l] = await Promise.all([
@@ -66,7 +74,13 @@ export default function AdminContenido({ password }: { password: string }) {
       xhr.send(form)
     })
     setSubiendo(null)
-    if (!res?.secure_url) { setMensaje(res?.error?.message ? `Cloudinary: ${res.error.message}` : 'No se pudo subir el archivo.'); return }
+    if (!res?.secure_url) {
+      const msg = String(res?.error?.message || '')
+      setMensaje(/signature/i.test(msg)
+        ? 'Cloudinary rechazó la firma: el API Secret cargado en Vercel no es el correcto. Tocá “🔌 Probar conexión” para revisarlo.'
+        : msg ? `Cloudinary: ${msg}` : 'No se pudo subir el archivo.')
+      return
+    }
     await guardarMedio({
       tipo: res.resource_type === 'image' ? 'imagen' : 'video',
       nombre: file.name.replace(/\.[^.]+$/, ''),
@@ -123,6 +137,7 @@ export default function AdminContenido({ password }: { password: string }) {
               ⬆️ Subir video o imagen
               <input type="file" accept="video/*,image/*" className="hidden" disabled={!cloud.activo || !!subiendo} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) subir(f) }} />
             </label>
+            <button type="button" onClick={probarConexion} className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs font-semibold text-ink">🔌 Probar conexión</button>
             <button type="button" onClick={() => setPorLink({ url: '', nombre: '', tipo: 'video' })} className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs font-semibold text-ink">🔗 Agregar por link</button>
           </div>
         </div>
@@ -133,7 +148,8 @@ export default function AdminContenido({ password }: { password: string }) {
             <div className="h-2 rounded bg-panelalt mt-1 overflow-hidden"><div className="h-full bg-verde transition-all" style={{ width: `${subiendo.pct}%` }} /></div>
           </div>
         )}
-        {mensaje && <div className="mb-3 font-body text-xs text-teal">{mensaje}</div>}
+        {prueba && <div className={`mb-3 font-body text-xs ${prueba.ok ? 'text-teal' : 'text-maroon'}`}>{prueba.texto}</div>}
+        {mensaje && <div className={`mb-3 font-body text-xs ${/rechaz|no se pudo|cloudinary:/i.test(mensaje) ? 'text-maroon' : 'text-teal'}`}>{mensaje}</div>}
 
         {porLink && (
           <div className="mb-3 grid gap-2 border border-teal rounded-lg p-3">
