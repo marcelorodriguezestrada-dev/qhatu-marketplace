@@ -8,6 +8,7 @@ import {
   diasEntre, faseDe, fasesLanzamiento, sumarDias, type ConfigLanzamiento, type Publicacion,
 } from '@/lib/lanzamiento'
 import { SITE_URL } from '@/lib/sitio'
+import { miniaturaVideo, type Medio } from '@/lib/medios'
 
 // Admin → Marketing → "🚀 Plan de lanzamiento": fecha y metas, las 4
 // fases, el calendario de publicaciones por red (la IA lo arma), cada
@@ -59,10 +60,18 @@ export default function AdminLanzamiento({ password }: { password: string }) {
   // Manual
   const [nueva, setNueva] = useState<Propuesta | null>(null)
 
+  // Piezas (videos / imágenes) de la biblioteca, para ver cuál va en cada publicación.
+  const [medios, setMedios] = useState<Medio[]>([])
+  const [cloud, setCloud] = useState('')
   async function cargar() {
-    const d = await fetch('/api/admin/lanzamiento', { headers }).then((r) => r.json()).catch(() => null)
+    const [d, m] = await Promise.all([
+      fetch('/api/admin/lanzamiento', { headers }).then((r) => r.json()).catch(() => null),
+      fetch('/api/admin/medios', { headers }).then((r) => r.json()).catch(() => null),
+    ])
     if (d?.config) setCfg(d.config)
     setPubs(d?.publicaciones || [])
+    setMedios(m?.medios || [])
+    setCloud(m?.cloudinary?.cloud || '')
   }
   useEffect(() => { cargar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -334,6 +343,27 @@ export default function AdminLanzamiento({ password }: { password: string }) {
               {ESTADOS_PUBLICACION.map((e) => (
                 <button key={e.id} type="button" onClick={() => cambiar(pubAbierta.id, { estado: e.id })} className={`px-2.5 py-1 rounded-full border font-body text-xs ${pubAbierta.estado === e.id ? 'bg-ink text-white border-ink' : 'bg-panel text-ink border-line'}`}>{e.label}</button>
               ))}
+            </div>
+            <div className="bg-panelalt rounded-lg p-3">
+              <div className="font-semibold font-body text-xs text-inksoft mb-1">🎞️ Pieza para esta publicación</div>
+              {medios.filter((m) => m.publicacionId === pubAbierta.id).length === 0 ? (
+                <div className="font-body text-xs text-inksoft">Todavía no tiene. Subila en <b>Marketing → 🎬 Contenido</b> y asignala a esta publicación.</div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {medios.filter((m) => m.publicacionId === pubAbierta.id).map((m) => {
+                    const vista = m.tipo === 'imagen' ? m.url : m.origen === 'cloudinary' && m.publicId && cloud ? miniaturaVideo(cloud, m.publicId) : ''
+                    return (
+                      <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer" className="w-24 no-underline">
+                        <span className="relative block w-24 h-28 rounded-md overflow-hidden bg-marca">
+                          {vista ? <img src={vista} alt={m.nombre} className="w-full h-full object-cover" /> : <span className="absolute inset-0 flex items-center justify-center text-2xl">{m.tipo === 'video' ? '🎬' : '🖼️'}</span>}
+                          {m.tipo === 'video' && <span className="absolute bottom-1 right-1 px-1 rounded bg-black/60 text-white font-body text-[9px]">▶ video</span>}
+                        </span>
+                        <span className="block font-body text-[10px] text-ink truncate mt-0.5">{m.nombre}</span>
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             {pubAbierta.idea && <div className="bg-panelalt rounded-lg p-3 font-body text-sm text-ink"><div className="font-semibold text-xs text-inksoft mb-0.5">🎬 Qué grabar / diseñar</div>{pubAbierta.idea}</div>}
             <div className="bg-panelalt rounded-lg p-3">
