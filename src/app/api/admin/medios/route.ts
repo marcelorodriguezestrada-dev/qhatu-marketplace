@@ -19,7 +19,10 @@ const esAdmin = (req: NextRequest) => {
   return !!p && p === process.env.ADMIN_PASSWORD
 }
 const noAutorizado = () => NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
-const cloud = () => ({ nombre: process.env.CLOUDINARY_CLOUD_NAME || '', key: process.env.CLOUDINARY_API_KEY || '', secret: process.env.CLOUDINARY_API_SECRET || '' })
+// Sin espacios, comillas ni saltos de línea (es fácil que se cuelen al
+// pegarlas en Vercel, y con eso Cloudinary rechaza la firma).
+const limpiar = (v: string | undefined) => String(v || '').trim().replace(/^["']|["']$/g, '').trim()
+const cloud = () => ({ nombre: limpiar(process.env.CLOUDINARY_CLOUD_NAME), key: limpiar(process.env.CLOUDINARY_API_KEY), secret: limpiar(process.env.CLOUDINARY_API_SECRET) })
 const firmar = (params: Record<string, string | number>, secret: string) =>
   createHash('sha1').update(Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join('&') + secret).digest('hex')
 
@@ -36,6 +39,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const c = cloud()
+    // Prueba las claves contra Cloudinary (ping con usuario = API Key y clave = API Secret).
+    if (body.accion === 'probar') {
+      if (!c.nombre || !c.key || !c.secret) return NextResponse.json({ ok: false, error: 'Faltan variables en Vercel: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.' })
+      const r = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(c.nombre)}/ping`, { headers: { Authorization: `Basic ${Buffer.from(`${c.key}:${c.secret}`).toString('base64')}` } }).catch(() => null)
+      if (r?.ok) return NextResponse.json({ ok: true, mensaje: `✓ Conectado a Cloudinary (${c.nombre}).` })
+      const motivo = r?.status === 401 ? 'la API Key o el API Secret no son correctos (revisá que sean de la misma cuenta y que el Secret esté completo)' : r?.status === 404 ? `no existe una cuenta con el Cloud name “${c.nombre}”` : 'no se pudo conectar'
+      return NextResponse.json({ ok: false, error: `Cloudinary: ${motivo}. Corregilo en Vercel → Settings → Environment Variables y volvé a desplegar.`, detalle: { cloud: c.nombre, key: `${c.key.slice(0, 4)}…${c.key.slice(-3)} (${c.key.length} caracteres)`, secret: `${c.secret.length} caracteres` } })
+    }
     if (body.accion === 'firmar') {
       if (!c.nombre || !c.key || !c.secret) return NextResponse.json({ error: 'Falta configurar Cloudinary (ver instrucciones en la pantalla).' }, { status: 400 })
       const timestamp = Math.floor(Date.now() / 1000)
