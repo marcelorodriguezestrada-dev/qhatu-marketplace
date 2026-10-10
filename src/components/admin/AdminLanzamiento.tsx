@@ -59,6 +59,22 @@ export default function AdminLanzamiento({ password }: { password: string }) {
   const [conIA, setConIA] = useState(true)
   // Manual
   const [nueva, setNueva] = useState<Propuesta | null>(null)
+  // Compartir el calendario por link
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
+  const [compartido, setCompartido] = useState<{ token: string; permiso: 'ver' | 'marcar' } | null | undefined>(undefined)
+  const linkCompartido = compartido ? `${SITE_URL}/calendario/${compartido.token}` : ''
+  async function cargarCompartido() {
+    const d = await fetch('/api/admin/lanzamiento/compartir', { headers }).then((r) => r.json()).catch(() => null)
+    setCompartido(d?.compartido ?? null)
+  }
+  async function crearCompartido(permiso: 'ver' | 'marcar') {
+    const d = await fetch('/api/admin/lanzamiento/compartir', { method: 'POST', headers, body: JSON.stringify({ accion: 'crear', permiso }) }).then((r) => r.json()).catch(() => null)
+    if (d?.compartido) setCompartido(d.compartido)
+  }
+  async function revocarCompartido() {
+    await fetch('/api/admin/lanzamiento/compartir', { method: 'POST', headers, body: JSON.stringify({ accion: 'revocar' }) }).catch(() => null)
+    setCompartido(null)
+  }
 
   // Piezas (videos / imágenes) de la biblioteca, para ver cuál va en cada publicación.
   const [medios, setMedios] = useState<Medio[]>([])
@@ -195,10 +211,41 @@ export default function AdminLanzamiento({ password }: { password: string }) {
           <button type="button" onClick={() => setEditandoPlan((v) => !v)} className="px-3 py-1.5 rounded-md border border-white/25 bg-transparent text-white font-body text-xs font-semibold">⚙️ Fecha, metas y promos</button>
           <button type="button" onClick={() => { setIaAbierta(true); setPropuestas(null) }} className="px-3 py-1.5 rounded-md bg-verde text-marca border-none font-body text-xs font-bold">✨ Armar calendario con IA</button>
           <button type="button" onClick={() => setNueva({ fecha: hoy, red: 'tiktok', formato: 'video', titulo: '', idea: '', texto: '👉 {LINK}', hashtags: '', objetivo: 'compradores', estado: 'pendiente' })} className="px-3 py-1.5 rounded-md border border-white/25 bg-transparent text-white font-body text-xs font-semibold">➕ Publicación a mano</button>
+          <button type="button" onClick={() => { setCompartirAbierto((v) => !v); cargarCompartido() }} className="px-3 py-1.5 rounded-md border border-white/25 bg-transparent text-white font-body text-xs font-semibold">🔗 Compartir calendario</button>
         </div>
       </div>
 
       {mensaje && <div className="font-body text-xs text-teal">{mensaje}</div>}
+
+      {compartirAbierto && (
+        <div className="bg-panel border border-teal rounded-xl p-4 grid gap-2.5">
+          <div className="flex items-center justify-between"><div className="font-body text-sm font-semibold text-ink">🔗 Compartir el calendario</div><button type="button" onClick={() => setCompartirAbierto(false)} className="font-body text-xs text-inksoft bg-transparent border-none">Cerrar ✕</button></div>
+          <div className="font-body text-[11px] text-inksoft">Quien tenga el link ve el calendario (qué publicar cada día, la idea y el texto con su link) sin entrar al admin. No ve los números ni puede cambiar nada más. Lo podés anular cuando quieras.</div>
+          {compartido === undefined ? (
+            <div className="font-body text-xs text-inksoft">Cargando…</div>
+          ) : !compartido ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => crearCompartido('ver')} className="px-3 py-1.5 rounded-md bg-ink text-white border-none font-body text-xs font-semibold">👀 Crear link (solo ver)</button>
+              <button type="button" onClick={() => crearCompartido('marcar')} className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs font-semibold text-ink">✅ Crear link (ver y marcar publicadas)</button>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2 bg-panelalt rounded-lg p-2.5">
+                <span className="font-body text-xs text-ink break-all flex-1">{linkCompartido}</span>
+                <Copiar texto={linkCompartido} />
+              </div>
+              <div className="font-body text-[11px] text-inksoft">{compartido.permiso === 'marcar' ? '✅ Puede ver y marcar publicaciones como publicadas.' : '👀 Solo puede ver.'} Dentro del link hay un botón para agregarlo a Google Calendar o al calendario del celular (se actualiza solo).</div>
+              <div className="flex flex-wrap gap-2">
+                <a href={`https://wa.me/?text=${encodeURIComponent(`📅 Calendario de publicaciones de Clasi Click: qué publicar cada día, con el texto y el link listos 👉 ${linkCompartido}`)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-md bg-[#25D366] text-white font-body text-xs font-semibold no-underline">💬 Mandar por WhatsApp</a>
+                <a href={linkCompartido} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs font-semibold text-ink no-underline">Abrir</a>
+                <button type="button" onClick={() => crearCompartido(compartido.permiso === 'marcar' ? 'ver' : 'marcar')} className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs text-ink">{compartido.permiso === 'marcar' ? 'Cambiar a solo ver' : 'Permitir marcar publicadas'}</button>
+                <button type="button" onClick={revocarCompartido} className="px-3 py-1.5 rounded-md border border-line bg-panel font-body text-xs text-maroon">Anular link</button>
+              </div>
+              <div className="font-body text-[10px] text-inksoft">Cambiar el permiso crea un link nuevo: el anterior deja de funcionar.</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {editandoPlan && (
         <div className="bg-panel border border-teal rounded-xl p-4 grid gap-2.5">
