@@ -28,6 +28,7 @@ import AdminFueraHorario from '@/components/admin/AdminFueraHorario'
 import AdminPortada from '@/components/admin/AdminPortada'
 import AdminZonasEnvio from '@/components/admin/AdminZonasEnvio'
 import AdminMarketing from '@/components/admin/AdminMarketing'
+import AdminLanzamiento from '@/components/admin/AdminLanzamiento'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import AdminAnalitica from '@/components/admin/AdminAnalitica'
 import AdminRecuperacion from '@/components/admin/AdminRecuperacion'
@@ -1633,7 +1634,7 @@ export default function AdminPage() {
 
 
       {tab === 'cupones' && <AdminCupones password={password} />}
-      {tab === 'marketing' && <AdminMarketing password={password} />}
+      {tab === 'marketing' && <MarketingConPestanas password={password} />}
       {tab === 'captacion' && <AdminCaptacion password={password} />}
       {tab === 'finanzas' && <AdminFinanzas password={password} />}
       {tab === 'analitica' && (
@@ -4109,6 +4110,21 @@ export default function AdminPage() {
       )}
         </main>
       </div>
+    </div>
+  )
+}
+// Marketing: el plan de lanzamiento (calendario por red con IA) y las
+// campañas / textos de siempre.
+function MarketingConPestanas({ password }: { password: string }) {
+  const [vista, setVista] = useState<'lanzamiento' | 'campanas'>('lanzamiento')
+  return (
+    <div>
+      <div className="flex gap-1.5 mb-4">
+        {([['lanzamiento', '🚀 Plan de lanzamiento'], ['campanas', '🎯 Campañas y textos']] as const).map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setVista(id)} className={`px-3.5 py-1.5 rounded-full border font-body text-xs font-semibold ${vista === id ? 'bg-ink text-white border-ink' : 'bg-panel text-ink border-line'}`}>{label}</button>
+        ))}
+      </div>
+      {vista === 'lanzamiento' ? <AdminLanzamiento password={password} /> : <AdminMarketing password={password} />}
     </div>
   )
 }
