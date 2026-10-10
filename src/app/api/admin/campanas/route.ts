@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     const db = getDb()
     const snap = await db.collection('campanas').get()
     const desde = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10)
+    // Las de cada publicación del plan de lanzamiento se ven en su propia pestaña.
     const campanas = await Promise.all(
-      snap.docs.map(async (d) => {
+      snap.docs.filter((d) => !d.data()?.lanzamiento).map(async (d) => {
         const x = d.data() as any
         const dias = await d.ref.collection('dias').get().catch(() => null)
         const serie = (dias?.docs || []).filter((dd) => dd.id >= desde).map((dd) => ({ dia: dd.id, visitas: dd.data().visitas || 0 }))
