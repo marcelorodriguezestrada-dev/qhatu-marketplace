@@ -90,3 +90,49 @@ export async function calendarioIA(cfg: ConfigLanzamiento, desde: string, dias: 
     return null
   }
 }
+
+// Recomendaciones de la IA sobre el reporte (Admin → Marketing → 📊 Reportes).
+export async function recomendacionesIA(reporte: any): Promise<{ resumen: string; recomendaciones: { titulo: string; detalle: string }[] } | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  const datos = {
+    hoy: reporte.hoy, lanzamiento: reporte.lanzamiento, total: reporte.total, metas: reporte.metas, conteo: reporte.conteo,
+    porRed: reporte.porRed, porFormato: reporte.porFormato,
+    mejores: reporte.mejores.slice(0, 5).map((p: any) => ({ titulo: p.titulo, red: p.red, formato: p.formato, visitas: p.visitas, cuentas: p.registros, compras: p.pedidos })),
+    atrasadas: reporte.atrasadas.length, sinPieza: reporte.sinPieza.length,
+    ultimos7dias: reporte.serie.slice(-7).map((s: any) => ({ dia: s.dia, visitas: s.visitas, compras: s.pedidos })),
+  }
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b',
+        max_completion_tokens: 2500,
+        reasoning_effort: 'medium',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Sos el analista de marketing de Clasi Click, un marketplace de Bolivia que está en su lanzamiento. Con los números reales que te paso (visitas, cuentas, tiendas y compras que trajo cada publicación por su link), escribí un resumen de 1–2 frases y de 3 a 6 recomendaciones concretas y accionables para esta semana: qué red y qué formato priorizar, qué repetir, qué dejar, cómo llegar a las metas. ' +
+              'Usá SOLO los datos que te paso; si hay pocos datos, decilo y recomendá cómo conseguirlos. Español de Bolivia, directo, sin tecnicismos. ' +
+              'Respondé SOLO JSON: {"resumen":"...","recomendaciones":[{"titulo":"corto","detalle":"1–2 frases"}]}',
+          },
+          { role: 'user', content: JSON.stringify(datos) },
+        ],
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+    const recomendaciones = (Array.isArray(p.recomendaciones) ? p.recomendaciones : [])
+      .map((x: any) => ({ titulo: String(x?.titulo || '').slice(0, 120), detalle: String(x?.detalle || '').slice(0, 400) }))
+      .filter((x: any) => x.titulo)
+      .slice(0, 6)
+    return recomendaciones.length ? { resumen: String(p.resumen || '').slice(0, 400), recomendaciones } : null
+  } catch (err) {
+    console.error('recomendacionesIA', err)
+    return null
+  }
+}
