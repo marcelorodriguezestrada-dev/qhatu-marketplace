@@ -17,6 +17,12 @@ const config: Config = {
         ochresoft: '#F6E8CD',
         teal: '#2F6E5C',
         tealsoft: '#DCEBE5',
+        // Marca (logo de Clasi Click): azul noche + verde.
+        marca: '#0D1526',
+        marcaalt: '#17223A',
+        verde: '#16C35B',
+        verdeoscuro: '#0E9A47',
+        verdesoft: '#DDF6E7',
       },
       fontFamily: {
         display: ['var(--font-space-grotesk)', 'sans-serif'],

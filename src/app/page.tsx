@@ -22,13 +22,24 @@ import MenuCategorias from '@/components/MenuCategorias'
 import { SelectorCiudad, BannerCiudad } from '@/components/SelectorCiudad'
 import { useCiudad } from '@/lib/ciudad'
 import { productoEnCiudad } from '@/data/ciudades'
+import { LogoClasiClick } from '@/components/LogoClasiClick'
+import { AccesosInicio, BarraInferiorCelular, CarruselProductos, CategoriasInicio, HeroInicio, TarjetasInicio } from '@/components/inicio/BloquesInicio'
+import { leerVistos } from '@/lib/vistos'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 
 export default function CatalogoPage() {
   const { categorias: categoriasProductos, rubrosFlat, buscarRubroProducto } = useCategoriasProductos()
   const [todosLosProductos, setProductos] = useState<Producto[]>(PRODUCTOS_SEED)
   // Productos de la ciudad del comprador + los de tiendas que envían a
   // todo Bolivia (llevan "🚚 Envía desde …").
-  const { ciudadId } = useCiudad()
+  const { ciudadId, ciudad, abiertas } = useCiudad()
+  const envioClasiCiudad = abiertas.find((c) => c.id === ciudadId)?.envioClasiClick ?? ciudadId === 'potosi'
+  // "Menos de Bs 50" (o su equivalente en otro país): ?max= en la URL.
+  const [precioMax, setPrecioMax] = useState<number | null>(null)
+  const topeBarato = paisDeCiudad(ciudadId).id === 'BO' ? 50 : 20000
+  // Lo último que vio esta persona (ver src/lib/vistos.ts).
+  const [vistos, setVistos] = useState<string[]>([])
+  useEffect(() => { setVistos(leerVistos()) }, [])
   const productos = todosLosProductos.filter((p) => productoEnCiudad(p as any, ciudadId))
   const [publico, setPublico] = useState('Todo')
   const [categoria, setCategoria] = useState('Todo')
@@ -66,7 +77,8 @@ export default function CatalogoPage() {
   const filtrados = productos.filter((p) => {
     const matchPublico = publico === 'Todo' || (p.publico || 'unisex') === publico
     const matchCat = enSeleccion(p)
-    return matchPublico && matchCat
+    const matchPrecio = precioMax == null || p.precio <= precioMax
+    return matchPublico && matchCat && matchPrecio
   })
 
   // Solo entran acá los descuentos reales (precioOriginal cargado por
@@ -115,6 +127,8 @@ export default function CatalogoPage() {
     if (cat) setCategoria(cat)
     if (rub) setRubroSel(rub)
     if (gru) setGrupoSel(gru)
+    const max = Number(params.get('max'))
+    if (max > 0) setPrecioMax(max)
   }, [])
 
   // Atrás/adelante del navegador: seguir la búsqueda de la URL.
@@ -177,6 +191,7 @@ export default function CatalogoPage() {
   }
 
   function quitarFiltroCategoria() {
+    setPrecioMax(null)
     setPublico('Todo')
     setCategoria('Todo')
     setRubroSel(null)
@@ -184,88 +199,114 @@ export default function CatalogoPage() {
     window.history.replaceState(null, '', '/')
   }
 
+  const hayFiltro = !!(rubroSel || grupoSel || categoria !== 'Todo' || precioMax != null)
+  const irAProductos = () => document.getElementById('productos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const productosVistos = vistos.map((id) => productos.find((p) => String(p.id) === id)).filter((p): p is Producto => !!p)
+  const ultimoVisto = productosVistos[0] || null
+  // "Inspirado en lo último que viste": del mismo rubro (o categoría) que lo último que abrió.
+  const inspirados = (() => {
+    if (!ultimoVisto) return [] as Producto[]
+    const cat = buscarRubroProducto(ultimoVisto.rubro)?.categoriaId
+    const mismos = productos.filter((p) => p.id !== ultimoVisto.id && (p.rubro === ultimoVisto.rubro || (cat && buscarRubroProducto(p.rubro)?.categoriaId === cat)))
+    return [...productosVistos.slice(1), ...mismos].filter((p, k, arr) => arr.findIndex((x) => x.id === p.id) === k).slice(0, 12)
+  })()
+  const novedades = [...productos].filter((p) => (p as any).createdAt).sort((a, b) => String((b as any).createdAt).localeCompare(String((a as any).createdAt))).slice(0, 12)
+  const categoriasConProductos = categoriasProductos.filter((c) => conteoCategorias[c.id]).map((c) => ({ id: c.id, label: c.label, cantidad: conteoCategorias[c.id] })).sort((a, b) => b.cantidad - a.cantidad)
+
   return (
-    <div className="min-h-screen">
-      <div className="bg-ink px-4 sm:px-5 py-3">
-        <div className="max-w-[960px] mx-auto">
-          <div className="flex items-center gap-3 mb-2.5">
-            <Link href="/" className="font-display text-xl font-bold text-white shrink-0">Clasi Click</Link>
-            <div className="flex-1" />
-            {/* La campanita va acá arriba (no en la fila de links de abajo):
-                esa fila se desplaza de costado en el celular y cortaba
-                tanto la campanita como su panel. */}
+    <div className="min-h-screen pb-20 md:pb-0">
+      {/* Cabecera con la marca: logo, buscador grande al medio, ciudad y menú. */}
+      <header className="bg-marca sticky top-0 z-20 shadow-md">
+        <div className="max-w-[1180px] mx-auto px-4 sm:px-5 pt-2.5 pb-2">
+          <div className="flex items-center gap-3 md:gap-6">
+            <Link href="/" className="shrink-0" aria-label="Clasi Click — inicio">
+              <span className="md:hidden"><LogoClasiClick size={30} /></span>
+              <span className="hidden md:inline"><LogoClasiClick size={40} /></span>
+            </Link>
+            {/* En la compu el buscador va en la misma fila, bien grande. */}
+            <div className="hidden md:flex flex-1 items-center bg-white rounded-lg shadow-sm overflow-visible max-w-[640px]">
+              <BuscadorProductos
+                valor={busqueda}
+                onCambiar={setBusqueda}
+                onBuscar={buscar}
+                productos={productos}
+                rubroDe={buscarRubroProducto}
+                placeholder="Buscar productos, marcas y más…"
+                claro
+              />
+              <button type="button" onClick={() => buscar(busqueda)} className="px-4 self-stretch rounded-r-lg bg-verde text-marca text-lg border-none" aria-label="Buscar">🔍</button>
+            </div>
+            <div className="flex-1 md:hidden" />
+            <div className="hidden lg:block font-body text-[11px] text-white/60 leading-tight text-right shrink-0">Ahorrá tiempo.<br /><span className="text-verde font-semibold">Viví más feliz.</span></div>
             {usuario && <NotificacionesBell variante="oscura" />}
             <button
               onClick={() => setCarritoAbierto(true)}
-              className="border-none bg-white/10 text-white px-3 sm:px-4 py-2 rounded-lg font-body text-sm shrink-0 whitespace-nowrap"
+              className="relative border-none bg-white/10 text-white px-3 py-2 rounded-lg font-body text-sm shrink-0"
+              aria-label="Carrito"
             >
-              🛒 {cantidadCarrito > 0 && `(${cantidadCarrito})`}
+              🛒
+              {cantidadCarrito > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-verde text-marca text-[10px] font-bold flex items-center justify-center">{cantidadCarrito}</span>}
             </button>
           </div>
 
-          <div className="flex items-center gap-2 mb-2.5">
+          {/* Celular: el buscador ocupa todo el ancho, debajo del logo. */}
+          <div className="md:hidden flex items-center bg-white rounded-lg mt-2.5 shadow-sm">
             <BuscadorProductos
               valor={busqueda}
               onCambiar={setBusqueda}
               onBuscar={buscar}
               productos={productos}
               rubroDe={buscarRubroProducto}
+              placeholder="Buscar en Clasi Click"
+              claro
             />
-            <button
-              type="button"
-              onClick={() => buscar(busqueda)}
-              className="px-3 py-2 rounded-lg bg-white/20 text-white text-sm shrink-0"
-              aria-label="Buscar"
-            >
-              🔍
-            </button>
+            <button type="button" onClick={() => buscar(busqueda)} className="px-3.5 self-stretch rounded-r-lg bg-verde text-marca border-none" aria-label="Buscar">🔍</button>
           </div>
 
-          <div className="relative">
-          <MenuCategorias
-            categorias={categoriasProductos}
-            abierto={menuCategorias}
-            onCerrar={() => setMenuCategorias(false)}
-            onElegir={elegirCategoria}
-            conteo={conteoCategorias}
-          />
-          <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
-            <SelectorCiudad />
-            <button type="button" onClick={() => setMenuCategorias((v) => !v)} className="border-none bg-transparent text-white font-body text-[13px] font-semibold shrink-0 whitespace-nowrap">
-              Categorías ▾
-            </button>
-            <Link href="/servicios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
-              Servicios
-            </Link>
-            <Link href="/anuncios" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
-              Anuncios
-            </Link>
-            <Link href="/ayuda" className="border-none bg-transparent text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">
-              Ayuda
-            </Link>
-            <Link href="/vender" className="border-none bg-white/10 text-white px-3 py-1.5 rounded-lg font-body text-[13px] shrink-0 whitespace-nowrap">
-              Vender
-            </Link>
-            {usuario ? (
-              <>
-                <Link href="/mis-pedidos" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
-                  Mis pedidos
-                </Link>
-                <button onClick={() => logout()} className="border-none bg-transparent text-white/60 font-body text-[12px] shrink-0 whitespace-nowrap">
-                  {usuario.email?.split('@')[0]} · salir
-                </button>
-              </>
-            ) : (
-              <Link href="/login" className="border-none bg-transparent text-white/80 font-body text-[13px] shrink-0 whitespace-nowrap">
-                Iniciar sesión
-              </Link>
-            )}
-          </div>
+          <div className="relative mt-2">
+            <MenuCategorias
+              categorias={categoriasProductos}
+              abierto={menuCategorias}
+              onCerrar={() => setMenuCategorias(false)}
+              onElegir={elegirCategoria}
+              conteo={conteoCategorias}
+            />
+            <div className="flex items-center gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
+              {abiertas.length > 1 ? (
+                <SelectorCiudad />
+              ) : (
+                <span className="font-body text-[12px] text-white/70 shrink-0 whitespace-nowrap">📍 Estás en <b className="text-white">{ciudad.nombre}</b></span>
+              )}
+              <button type="button" onClick={() => setMenuCategorias((v) => !v)} className="border-none bg-transparent text-white font-body text-[13px] font-semibold shrink-0 whitespace-nowrap">
+                Categorías ▾
+              </button>
+              {ofertas.length > 0 && (
+                <button type="button" onClick={() => document.getElementById('ofertas')?.scrollIntoView({ behavior: 'smooth' })} className="border-none bg-transparent text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Ofertas</button>
+              )}
+              <Link href="/servicios" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Servicios</Link>
+              <Link href="/anuncios" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Anuncios</Link>
+              <Link href="/vender" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Vender</Link>
+              <Link href="/ayuda" className="text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">Ayuda</Link>
+              <span className="flex-1 hidden sm:block" />
+              {usuario ? (
+                <>
+                  <Link href="/mis-pedidos" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Mis compras</Link>
+                  <button onClick={() => logout()} className="border-none bg-transparent text-white/55 font-body text-[12px] shrink-0 whitespace-nowrap">
+                    👤 {usuario.email?.split('@')[0]} · salir
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="text-white font-body text-[13px] font-semibold shrink-0 whitespace-nowrap">Ingresá</Link>
+                  <Link href="/login" className="text-white/70 font-body text-[13px] shrink-0 whitespace-nowrap">Creá tu cuenta</Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-[960px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
+      <div className="max-w-[1180px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
         <BannerCiudad />
         {consulta.trim() ? (
           <ListadoResultados
@@ -279,39 +320,34 @@ export default function CatalogoPage() {
           />
         ) : (
         <>
-        {portada?.accesos !== false && (
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {/* Estás en Productos: ese botón va en verde (seleccionado) y
-              Servicios en blanco. */}
-          <div className="bg-teal border-2 border-teal rounded-xl p-4 sm:p-5 text-center" aria-current="page">
-            <div className="text-2xl mb-1">🛍️</div>
-            <div className="font-display text-sm sm:text-base font-bold text-white">Productos</div>
-            <div className="font-body text-[11px] sm:text-xs text-white/80">Comprá acá abajo</div>
-          </div>
-          <Link
-            href="/servicios"
-            className="bg-panel border-2 border-line hover:border-teal rounded-xl p-4 sm:p-5 text-center"
-          >
-            <div className="text-2xl mb-1">🧑‍🔧</div>
-            <div className="font-display text-sm sm:text-base font-bold text-ink">Servicios</div>
-            <div className="font-body text-[11px] sm:text-xs text-inksoft">Profesionales</div>
-          </Link>
-        </div>
+        {!hayFiltro && (
+          <>
+            {/* Portada informativa (como Mercado Libre): primero lo útil, los productos más abajo. */}
+            {portada?.banners !== false && <BannerCarousel />}
+            <HeroInicio ciudad={ciudad.nombre} onVer={irAProductos} />
+            {portada?.accesos !== false && <AccesosInicio onProductos={irAProductos} onOfertas={() => document.getElementById('ofertas')?.scrollIntoView({ behavior: 'smooth' })} hayOfertas={!!portada?.ofertas && ofertas.length > 0} logueado={!!usuario} />}
+            <TarjetasInicio
+              carrito={items}
+              ultimoVisto={ultimoVisto}
+              ciudadId={ciudadId}
+              envioClasiClick={envioClasiCiudad}
+              onAbrirCarrito={() => setCarritoAbierto(true)}
+              topeBarato={topeBarato}
+              onMenosDe={(n) => { setPrecioMax(n); window.history.replaceState(null, '', `/?max=${n}`); setTimeout(irAProductos, 50) }}
+            />
+            {portada?.cupon && <BannerCuponPromo />}
+            <CategoriasInicio categorias={categoriasConProductos} onElegir={(id) => elegirCategoria(id, null)} />
+            {portada?.ofertas && <CarruselProductos id="ofertas" titulo="🔥 Ofertas" productos={ofertas} ciudadId={ciudadId} />}
+            <CarruselProductos titulo="Inspirado en lo último que viste" productos={inspirados} ciudadId={ciudadId} />
+            <CarruselProductos titulo="✨ Recién llegados" productos={novedades} ciudadId={ciudadId} accion={{ label: 'Ver todo', onClick: irAProductos }} />
+            <div id="productos" className="font-display text-lg sm:text-xl font-bold text-ink mb-3 scroll-mt-32">Productos para vos</div>
+          </>
         )}
 
-        {portada?.ofertas && ofertas.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">🔥</span>
-              <div className="font-display text-base font-bold text-ink">Ofertas</div>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'none' }}>
-              {ofertas.map((p) => (
-                <div key={p.id} className="w-40 sm:w-44 shrink-0">
-                  <ProductCard p={p} ciudadComprador={ciudadId} />
-                </div>
-              ))}
-            </div>
+        {precioMax != null && (
+          <div className="flex items-center gap-2 mb-3 font-body text-sm">
+            <span className="px-3 py-1 rounded-full bg-verdesoft text-verdeoscuro font-semibold">Menos de {formatoMoneda(precioMax, paisDeCiudad(ciudadId))}</span>
+            <button type="button" onClick={() => { setPrecioMax(null); window.history.replaceState(null, '', '/') }} className="px-2.5 py-0.5 rounded-full border border-line bg-panel text-inksoft text-xs">✕ Quitar</button>
           </div>
         )}
 
@@ -347,11 +383,7 @@ export default function CatalogoPage() {
           ))}
         </div>
 
-        {portada?.cupon && <BannerCuponPromo />}
-
-        {categoria === 'Todo' && !rubroSel && !grupoSel ? (
-          portada?.banners && <BannerCarousel />
-        ) : (
+        {categoria === 'Todo' && !rubroSel && !grupoSel ? null : (
           // Fila 2: género como filtro secundario dentro de la categoría —
           // solo los que tienen productos ahí.
           publicosDisponibles.length > 1 && (
@@ -432,6 +464,7 @@ export default function CatalogoPage() {
         )}
       </div>
 
+      <BarraInferiorCelular cantidadCarrito={cantidadCarrito} onCarrito={() => setCarritoAbierto(true)} logueado={!!usuario} />
       {carritoAbierto && <CartDrawer onClose={() => setCarritoAbierto(false)} />}
     </div>
   )
