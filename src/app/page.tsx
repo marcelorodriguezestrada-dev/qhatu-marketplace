@@ -19,7 +19,7 @@ import { useAuth } from '@/lib/auth'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { PUBLICOS_PRODUCTO } from '@/data/publicoProducto'
 import MenuCategorias from '@/components/MenuCategorias'
-import { SelectorCiudad, BannerCiudad } from '@/components/SelectorCiudad'
+import { SelectorCiudad } from '@/components/SelectorCiudad'
 import { useCiudad } from '@/lib/ciudad'
 import { productoEnCiudad } from '@/data/ciudades'
 import { LogoClasiClick } from '@/components/LogoClasiClick'
@@ -307,7 +307,6 @@ export default function CatalogoPage() {
       </header>
 
       <div className="max-w-[1180px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-12">
-        <BannerCiudad />
         {consulta.trim() ? (
           <ListadoResultados
             consulta={consulta}
@@ -324,9 +323,9 @@ export default function CatalogoPage() {
           <>
             {/* Portada informativa (como Mercado Libre): primero lo útil, los productos más abajo. */}
             {portada?.banners !== false && <BannerCarousel />}
-            <HeroInicio ciudad={ciudad.nombre} onVer={irAProductos} />
+            {portada?.hero !== false && <HeroInicio ciudad={ciudad.nombre} onVer={irAProductos} />}
             {portada?.accesos !== false && <AccesosInicio onProductos={irAProductos} onOfertas={() => document.getElementById('ofertas')?.scrollIntoView({ behavior: 'smooth' })} hayOfertas={!!portada?.ofertas && ofertas.length > 0} logueado={!!usuario} />}
-            <TarjetasInicio
+            {portada?.tarjetas !== false && <TarjetasInicio
               carrito={items}
               ultimoVisto={ultimoVisto}
               ciudadId={ciudadId}
@@ -334,12 +333,16 @@ export default function CatalogoPage() {
               onAbrirCarrito={() => setCarritoAbierto(true)}
               topeBarato={topeBarato}
               onMenosDe={(n) => { setPrecioMax(n); window.history.replaceState(null, '', `/?max=${n}`); setTimeout(irAProductos, 50) }}
-            />
+            />}
             {portada?.cupon && <BannerCuponPromo />}
-            <CategoriasInicio categorias={categoriasConProductos} onElegir={(id) => elegirCategoria(id, null)} />
+            {portada?.categorias !== false && <CategoriasInicio categorias={categoriasConProductos} onElegir={(id) => elegirCategoria(id, null)} />}
             {portada?.ofertas && <CarruselProductos id="ofertas" titulo="🔥 Ofertas" productos={ofertas} ciudadId={ciudadId} />}
-            <CarruselProductos titulo="Inspirado en lo último que viste" productos={inspirados} ciudadId={ciudadId} />
-            <CarruselProductos titulo="✨ Recién llegados" productos={novedades} ciudadId={ciudadId} accion={{ label: 'Ver todo', onClick: irAProductos }} />
+            {portada?.carruseles !== false && (
+              <>
+                <CarruselProductos titulo="Inspirado en lo último que viste" productos={inspirados} ciudadId={ciudadId} />
+                <CarruselProductos titulo="✨ Recién llegados" productos={novedades} ciudadId={ciudadId} accion={{ label: 'Ver todo', onClick: irAProductos }} />
+              </>
+            )}
             <div id="productos" className="font-display text-lg sm:text-xl font-bold text-ink mb-3 scroll-mt-32">Productos para vos</div>
           </>
         )}

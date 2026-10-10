@@ -111,6 +111,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
       const token = await authAdmin.createCustomToken(params.uid, { cargaAdmin: true })
       return NextResponse.json({ token, email: u.email || null })
     }
+    // Ciudad que ve este usuario (null = automática, por la IP / la que elija).
+    if (body.ciudadAsignada !== undefined) {
+      await cargarCiudadesServidor()
+      const c = body.ciudadAsignada === null || body.ciudadAsignada === '' ? null : sanearCiudad(body.ciudadAsignada)
+      await getDb().collection('usuarios').doc(params.uid).set({ ciudadAsignada: c ?? FieldValue.delete() }, { merge: true })
+      return NextResponse.json({ ok: true })
+    }
     // Casa de prueba de una cuenta de prueba (su ciudad + dirección).
     if (body.ubicacionPrueba !== undefined) {
       await cargarCiudadesServidor()

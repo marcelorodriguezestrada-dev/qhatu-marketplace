@@ -1,6 +1,7 @@
 'use client'
 
 import { nombreRubro } from '@/lib/arbolCategorias'
+import { useTodasLasCiudades } from '@/lib/ciudad'
 import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
 import { banderaDe } from '@/data/paisesMercado'
 import { useEffect, useState } from 'react'
@@ -146,6 +147,7 @@ export default function AdminPage() {
   const [categoriaProductoExpandida, setCategoriaProductoExpandida] = useState<string | null>(null)
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
+  const ciudadesTodas = useTodasLasCiudades()
   const [anuncios, setAnuncios] = useState<any[]>([])
   const [banners, setBanners] = useState<any[]>([])
   const [subiendoBanner, setSubiendoBanner] = useState(false)
@@ -655,6 +657,16 @@ export default function AdminPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ accion: 'verificar' }),
+    }).then(() => cargarUsuarios())
+  }
+
+  // Ciudad que ve el usuario ('' = automática: por la IP o la que elija).
+  function asignarCiudadUsuario(uid: string, ciudad: string) {
+    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? { ...u, ciudadAsignada: ciudad || null } : u)))
+    fetch(`/api/admin/usuarios/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ ciudadAsignada: ciudad || null }),
     }).then(() => cargarUsuarios())
   }
 
@@ -3420,6 +3432,15 @@ export default function AdminPage() {
                           ✅ Verificar a mano
                         </button>
                       )}
+                      <select
+                        value={u.ciudadAsignada || ''}
+                        onChange={(e) => asignarCiudadUsuario(u.uid, e.target.value)}
+                        title="Qué ciudad ve este usuario. Automática = la detectada por su IP (o la que elija)."
+                        className={`px-2 py-1.5 rounded-md border font-body text-[11px] ${u.ciudadAsignada ? 'border-teal bg-tealsoft text-teal font-semibold' : 'border-line bg-panel'}`}
+                      >
+                        <option value="">📍 Ciudad: automática</option>
+                        {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>📍 Ve {c.nombre}</option>)}
+                      </select>
                       <button
                         type="button"
                         onClick={() => pausarUsuario(u.uid, !u.pausado)}

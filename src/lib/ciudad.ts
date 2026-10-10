@@ -7,10 +7,11 @@ import { registrarPaises } from '@/lib/mercado'
 import type { PaisMercado } from '@/data/paisesMercado'
 
 // Ciudad del comprador. Orden de prioridad:
-// 1. La que eligió a mano (se guarda en este navegador).
-// 2. Si no eligió: Potosí (donde están hoy los usuarios). La sugerida por
-//    IP (cookie del middleware) solo se usa para PROPONERLA en el cartel,
-//    porque en Bolivia la IP del celular suele caer en La Paz.
+// 1. La que le fijó el admin a su cuenta (Admin → Usuarios).
+// 2. La que eligió a mano en "📍 Ciudad" (se guarda en este navegador).
+// 3. Cuenta de prueba de una ciudad: esa ciudad.
+// 4. La detectada por la IP (cookie del middleware), si está abierta.
+// 5. Potosí.
 // Solo se ofrecen las ciudades abiertas (/api/ciudades); si hay una
 // sola, no se muestra nada de esto.
 
@@ -78,7 +79,7 @@ export function useCiudad() {
   // Las ciudades "en prueba" solo las ven las cuentas de prueba; una
   // cuenta de prueba de una ciudad (ej. test-buenos-aires@test.com)
   // arranca en esa ciudad.
-  const { esPrueba, ciudadPrueba } = useAuth()
+  const { esPrueba, ciudadPrueba, ciudadAsignada } = useAuth()
   const [elegida, setElegida] = useState<CiudadId | null>(null)
   const [sugerida, setSugerida] = useState<CiudadId | null>(null)
   const [todas, setTodas] = useState<CiudadPublica[]>([])
@@ -102,12 +103,17 @@ export function useCiudad() {
     }
   }, [])
 
-  const abiertas = todas.filter((c) => c.activa || (c.prueba && esPrueba))
-  // Si eligió una ciudad que después se cerró, vuelve a Potosí (o a la de
-  // su cuenta de prueba).
+  // Cuenta con ciudad fijada por el admin (Admin → Usuarios): ve solo esa
+  // (aunque esté en prueba o cerrada para el resto).
+  const fija = ciudadAsignada ? todas.find((c) => c.id === ciudadAsignada) || null : null
+  const abiertas = fija ? [fija] : todas.filter((c) => c.activa || (c.prueba && esPrueba))
+  // Orden: la que fijó el admin › la que eligió a mano › la de su cuenta
+  // de prueba › la detectada por la IP › Potosí. Si la elegida se cerró,
+  // sigue con las demás.
   const valida = elegida && abiertas.some((c) => c.id === elegida) ? elegida : null
   const dePrueba = esPrueba && ciudadPrueba && abiertas.some((c) => c.id === ciudadPrueba) ? ciudadPrueba : null
-  const ciudadId: CiudadId = valida || dePrueba || CIUDAD_POR_DEFECTO
+  const porIP = sugerida && abiertas.some((c) => c.id === sugerida) ? sugerida : null
+  const ciudadId: CiudadId = fija?.id || valida || dePrueba || porIP || CIUDAD_POR_DEFECTO
   return {
     ciudadId,
     ciudad: buscarCiudad(ciudadId),

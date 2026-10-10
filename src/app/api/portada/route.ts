@@ -4,7 +4,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 export const dynamic = 'force-dynamic'
 
 // Qué secciones de la portada se muestran (ver src/lib/portada.ts).
-const IDS = ['ofertas', 'cupon', 'banners', 'accesos']
+const IDS = ['hero', 'tarjetas', 'categorias', 'carruseles', 'ofertas', 'cupon', 'banners', 'accesos']
 
 async function leer(): Promise<Record<string, boolean>> {
   const base: Record<string, boolean> = Object.fromEntries(IDS.map((id) => [id, true]))
