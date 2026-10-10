@@ -6,16 +6,20 @@ import { useEffect, useState } from 'react'
 // en la portada"). Se guarda en Firestore config/portada; sin nada
 // guardado, se ve todo.
 export const SECCIONES_PORTADA = [
+  { id: 'hero', label: '🟢 Portada con el lema (“Ahorrá tiempo. Viví más feliz.”)', ayuda: 'El cartel grande de arriba con el logo y los botones Ver productos / Vendé gratis.' },
+  { id: 'tarjetas', label: '🧾 Tarjetas informativas', ayuda: 'Tu carrito, visto recientemente, medios de pago, envío, menos de Bs 50, vendé gratis.' },
+  { id: 'categorias', label: '🗂️ Categorías con íconos', ayuda: 'El bloque de categorías con productos.' },
+  { id: 'carruseles', label: '✨ “Inspirado en lo que viste” y “Recién llegados”', ayuda: 'Las filas de productos antes de la grilla.' },
   { id: 'ofertas', label: '🔥 Ofertas', ayuda: 'La fila de productos con descuento.' },
   { id: 'cupon', label: '🚚 Banner del cupón (envío gratis / descuento)', ayuda: 'El aviso del cupón destacado, en la portada y en cada producto.' },
   { id: 'banners', label: '🖼️ Banners de Clasi Click', ayuda: 'El carrusel de imágenes que cargás acá abajo.' },
-  { id: 'accesos', label: '🛍️ Botones Productos / Servicios', ayuda: 'Los dos botones grandes de arriba.' },
+  { id: 'accesos', label: '🛍️ Accesos con íconos', ayuda: 'La fila de íconos: Productos, Ofertas, Servicios, Anuncios, Vender…' },
 ] as const
 
 export type SeccionPortada = (typeof SECCIONES_PORTADA)[number]['id']
 export type ConfigPortada = Record<SeccionPortada, boolean>
 
-export const PORTADA_POR_DEFECTO: ConfigPortada = { ofertas: true, cupon: true, banners: true, accesos: true }
+export const PORTADA_POR_DEFECTO: ConfigPortada = { hero: true, tarjetas: true, categorias: true, carruseles: true, ofertas: true, cupon: true, banners: true, accesos: true }
 
 let cache: Promise<ConfigPortada> | null = null
 export function cargarPortada(forzar = false): Promise<ConfigPortada> {

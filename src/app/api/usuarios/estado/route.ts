@@ -42,7 +42,11 @@ export async function GET(req: NextRequest) {
     const datos = doc.data()
     // Cuenta de prueba de una ciudad: su ciudad y su casa de prueba (ver
     // Admin → Usuarios → "Crear usuario de prueba").
-    const prueba = esPrueba ? { ciudadPrueba: datos?.ubicacionPrueba?.ciudad || null, ubicacionPrueba: datos?.ubicacionPrueba || null } : {}
+    const prueba = {
+      ...(esPrueba ? { ciudadPrueba: datos?.ubicacionPrueba?.ciudad || null, ubicacionPrueba: datos?.ubicacionPrueba || null } : {}),
+      // Ciudad que le fijó el admin (Admin → Usuarios): ve esa ciudad.
+      ciudadAsignada: typeof datos?.ciudadAsignada === 'string' ? datos.ciudadAsignada : null,
+    }
     // El admin "entrando como" el vendedor (ver src/lib/modoAdmin.ts)
     // no tiene el código de verificación — no lo frenamos.
     if (usuario.cargaAdmin) return NextResponse.json({ emailVerificado: true, esPrueba, ...prueba })

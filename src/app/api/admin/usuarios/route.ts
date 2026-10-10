@@ -29,12 +29,12 @@ export async function GET(req: NextRequest) {
     const [productosSnap, profesionalesSnap, creadosSnap] = await Promise.all([
       db.collection('productos').select('vendedorId').get(),
       db.collection('profesionales').select('solicitanteUid').get(),
-      db.collection('usuarios').select('whatsapp', 'celular', 'creadoPorAdmin', 'emailVerificado').get(),
+      db.collection('usuarios').select('whatsapp', 'celular', 'creadoPorAdmin', 'emailVerificado', 'ciudadAsignada').get(),
     ])
     // WhatsApp (para mandar el link de acceso / editar sus datos) y si la
     // cuenta la creó el admin.
-    const datosUsuario = new Map<string, { whatsapp: string; celular: string; creadoPorAdmin: boolean; emailVerificado: boolean }>()
-    creadosSnap.docs.forEach((doc) => datosUsuario.set(doc.id, { whatsapp: doc.data().whatsapp || '', celular: doc.data().celular || '', creadoPorAdmin: doc.data().creadoPorAdmin === true, emailVerificado: doc.data().emailVerificado === true }))
+    const datosUsuario = new Map<string, { whatsapp: string; celular: string; creadoPorAdmin: boolean; emailVerificado: boolean; ciudadAsignada: string | null }>()
+    creadosSnap.docs.forEach((doc) => datosUsuario.set(doc.id, { whatsapp: doc.data().whatsapp || '', celular: doc.data().celular || '', creadoPorAdmin: doc.data().creadoPorAdmin === true, emailVerificado: doc.data().emailVerificado === true, ciudadAsignada: doc.data().ciudadAsignada || null }))
 
     const conteoProductos = new Map<string, number>()
     productosSnap.docs.forEach((doc) => {
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
       celular: datosUsuario.get(u.uid)?.celular || null,
       verificado: estaVerificada(u, datosUsuario.get(u.uid)),
       conGoogle: u.providerData.some((p) => p.providerId === 'google.com'),
+      ciudadAsignada: datosUsuario.get(u.uid)?.ciudadAsignada || null,
     }))
 
     // Los más recientes primero.

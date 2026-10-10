@@ -36,6 +36,8 @@ type AuthContextType = {
   // Cuenta de prueba de una ciudad (Admin → Usuarios → "Crear usuario de
   // prueba"): su ciudad y la casa que usa el checkout para probar el envío.
   ciudadPrueba: string | null
+  // Ciudad que le fijó el admin a esta cuenta (Admin → Usuarios): ve esa ciudad.
+  ciudadAsignada: string | null
   ubicacionPrueba: UbicacionPrueba | null
   // Entró con Google y todavía no dejó su celular (se le pide en /login).
   faltaCelular: boolean
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [emailVerificado, setEmailVerificado] = useState<boolean | null>(null)
   const [esPrueba, setEsPrueba] = useState(false)
   const [ciudadPrueba, setCiudadPrueba] = useState<string | null>(null)
+  const [ciudadAsignada, setCiudadAsignada] = useState<string | null>(null)
   const [ubicacionPrueba, setUbicacionPrueba] = useState<UbicacionPrueba | null>(null)
   const [faltaCelular, setFaltaCelular] = useState(false)
 
@@ -79,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setEmailVerificado(data.emailVerificado !== false)
       setEsPrueba(data.esPrueba === true)
       setCiudadPrueba(typeof data.ciudadPrueba === 'string' ? data.ciudadPrueba : null)
+      setCiudadAsignada(typeof data.ciudadAsignada === 'string' ? data.ciudadAsignada : null)
       setUbicacionPrueba(data.ubicacionPrueba && typeof data.ubicacionPrueba.lat === 'number' ? data.ubicacionPrueba : null)
       setFaltaCelular(data.faltaCelular === true)
     } catch {
@@ -104,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setEmailVerificado(null)
         setEsPrueba(false)
         setCiudadPrueba(null)
+        setCiudadAsignada(null)
         setUbicacionPrueba(null)
         setFaltaCelular(false)
         return
@@ -169,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, ciudadPrueba, ubicacionPrueba, faltaCelular, marcarCelularListo, login, registrarse, loginConGoogle, logout, recuperarPassword, obtenerToken }}>
+    <AuthContext.Provider value={{ usuario, cargando, emailVerificado, marcarEmailVerificado, esPrueba, ciudadPrueba, ciudadAsignada, ubicacionPrueba, faltaCelular, marcarCelularListo, login, registrarse, loginConGoogle, logout, recuperarPassword, obtenerToken }}>
       {children}
     </AuthContext.Provider>
   )
