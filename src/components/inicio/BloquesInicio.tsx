@@ -44,6 +44,7 @@ export function AccesosInicio({ onProductos, onOfertas, hayOfertas, logueado }: 
       <Circulo icono="🗂️" label="Categorías" href="/categorias" />
       <Circulo icono="🏪" label="Vendé gratis" href="/vender" />
       {logueado && <Circulo icono="📦" label="Mis pedidos" href="/mis-pedidos" />}
+      {logueado && <Circulo icono="📊" label="Estadísticas" href="/mis-estadisticas" />}
       <Circulo icono="❓" label="Ayuda" href="/ayuda" />
     </div>
   )

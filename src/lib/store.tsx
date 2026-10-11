@@ -80,6 +80,8 @@ export function CarritoProvider({ children }: { children: React.ReactNode }) {
       if (existe) return prev.map((i) => (claveLinea(i) === clave ? { ...i, cantidad: tope(i), agregadoAt: Date.now() } : i))
       return [...prev, nuevo]
     })
+    // Para las estadísticas del vendedor ("agregado al carrito").
+    if (p.vendedorId) fetch(`/api/productos/${p.id}/carrito`, { method: 'POST' }).catch(() => {})
   }
 
   function cambiarCantidad(item: ItemCarrito, delta: number) {

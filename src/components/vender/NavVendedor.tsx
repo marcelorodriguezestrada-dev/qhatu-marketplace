@@ -10,12 +10,13 @@ import { useEffect, useRef, useState } from 'react'
 // vuelve al menú y los links de la campanita (/vender#preguntas) abren
 // directo donde corresponde.
 
-export type SeccionVendedor = 'resumen' | 'publicar' | 'publicaciones' | 'preguntas' | 'marketing' | 'ventas' | 'tienda' | 'premium' | 'cuenta'
+export type SeccionVendedor = 'resumen' | 'publicar' | 'publicaciones' | 'estadisticas' | 'preguntas' | 'marketing' | 'ventas' | 'tienda' | 'premium' | 'cuenta'
 
 export const SECCIONES: { id: SeccionVendedor; icono: string; label: string; ayuda: string }[] = [
   { id: 'resumen', icono: '🏠', label: 'Resumen', ayuda: 'Cómo va tu tienda hoy' },
   { id: 'publicar', icono: '➕', label: 'Publicar', ayuda: 'Un producto o muchos con Excel' },
   { id: 'publicaciones', icono: '📦', label: 'Publicaciones', ayuda: 'Tus productos, precios y stock' },
+  { id: 'estadisticas', icono: '📊', label: 'Estadísticas', ayuda: 'Vistas, contactos y ventas de cada producto' },
   { id: 'preguntas', icono: '💬', label: 'Preguntas', ayuda: 'Respondé a los compradores' },
   { id: 'marketing', icono: '📣', label: 'Marketing', ayuda: 'Publicaciones para tus redes' },
   { id: 'ventas', icono: '🧾', label: 'Ventas', ayuda: 'Pedidos para confirmar y entregar' },

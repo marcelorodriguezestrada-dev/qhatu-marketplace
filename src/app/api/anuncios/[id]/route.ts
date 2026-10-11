@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { ejecutarMacheo } from '@/lib/macheoAnuncios'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { sumarEstadisticaUsuario } from '@/lib/estadisticasUsuario'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
     ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
     sumarMetricaDiaria('vistasAnuncios').catch(() => {})
+    if (!esAdmin(req)) sumarEstadisticaUsuario(data.autorUid, 'a', params.id, 'vistas').catch(() => {})
     return NextResponse.json({ id: doc.id, ...data })
   } catch (err) {
     console.error('GET /api/anuncios/[id]', err)

@@ -104,7 +104,8 @@ export default function ProductoDetallePage() {
             (p: any) => p.rubro === detalle.rubro && p.id !== detalle.id
           )
           setRelacionados(otros.slice(0, 4))
-          fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
+          // El propio vendedor mirando su producto no suma vistas.
+          if (!usuario || usuario.uid !== detalle.vendedorId) fetch(`/api/productos/${id}/vista`, { method: 'POST' }).catch(() => {})
           track('ver_producto', { productoId: detalle.id, precio: detalle.precio, categoria: detalle.rubro })
           registrarInteres(detalle.id, 'visto', detalle.nombre)
           registrarVisto(detalle.id)
@@ -508,7 +509,7 @@ export default function ProductoDetallePage() {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => fetch(`/api/vendedores/${producto.vendedorId}/click-whatsapp`, { method: 'POST' }).catch(() => {})}
+                    onClick={() => fetch(`/api/vendedores/${producto.vendedorId}/click-whatsapp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productoId: producto.id }) }).catch(() => {})}
                     className="w-full py-3 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold flex items-center justify-center gap-1.5"
                   >
                     💬 Contactar

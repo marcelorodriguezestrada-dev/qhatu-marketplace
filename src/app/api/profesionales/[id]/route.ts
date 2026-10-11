@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { sumarEstadisticaUsuario } from '@/lib/estadisticasUsuario'
 import { validarHorario } from '@/data/turnos'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (!req.nextUrl.searchParams.get('sinVista')) {
       ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
       sumarMetricaDiaria('vistasProfesionales').catch(() => {})
+      sumarEstadisticaUsuario(doc.get('solicitanteUid'), 's', params.id, 'vistas').catch(() => {})
     }
 
     const datos: Record<string, any> = { ...doc.data() }
