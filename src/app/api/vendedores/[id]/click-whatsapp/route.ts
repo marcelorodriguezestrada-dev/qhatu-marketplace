@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { sumarEstadisticaUsuario } from '@/lib/estadisticasUsuario'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       { merge: true }
     )
     sumarMetricaDiaria('clicsWhatsappVendedor').catch(() => {})
+    // La ficha manda de qué producto vino el contacto (/mis-estadisticas).
+    const body = await req.json().catch(() => ({}))
+    await sumarEstadisticaUsuario(params.id, 'p', body?.productoId || 'general', 'contactos')
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ ok: false })

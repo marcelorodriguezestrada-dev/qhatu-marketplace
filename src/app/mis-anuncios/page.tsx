@@ -96,7 +96,10 @@ export default function MisAnunciosPage() {
     <div className="max-w-[560px] mx-auto px-5 py-8">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div className="font-display text-xl font-bold text-ink">Mis anuncios</div>
-        <Link href="/publicar-anuncio" className="font-body text-xs text-maroon underline shrink-0 mt-1">+ Nuevo</Link>
+        <div className="flex gap-3 shrink-0 mt-1">
+          <Link href="/mis-estadisticas?ver=anuncios" className="font-body text-xs text-teal underline">📊 Estadísticas</Link>
+          <Link href="/publicar-anuncio" className="font-body text-xs text-maroon underline">+ Nuevo</Link>
+        </div>
       </div>
       <div className="mb-5" />
 

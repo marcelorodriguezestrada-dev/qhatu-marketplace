@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
+import { sumarEstadisticaUsuario } from '@/lib/estadisticasUsuario'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,10 +11,10 @@ export const dynamic = 'force-dynamic'
 // +1 a un contador; no guarda quién lo tocó.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await getDb().collection('profesionales').doc(params.id).update({
-      clicsWhatsapp: FieldValue.increment(1),
-    })
+    const ref = getDb().collection('profesionales').doc(params.id)
+    await ref.update({ clicsWhatsapp: FieldValue.increment(1) })
     sumarMetricaDiaria('clicsWhatsapp').catch(() => {})
+    await sumarEstadisticaUsuario((await ref.get()).get('solicitanteUid'), 's', params.id, 'contactos')
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ ok: false })

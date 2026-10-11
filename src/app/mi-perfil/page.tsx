@@ -908,9 +908,12 @@ export default function MiPerfilPage() {
           </div>
         ) : (
           <div className="font-body text-xs text-inksoft">
-            Ver cuánta gente te vio y te contactó es un beneficio Premium.
+            Mirá cuánta gente vio tu perfil y te escribió en los últimos 7 días. Con Premium ves el día a día y 30 / 90 días.
           </div>
         )}
+        <Link href="/mis-estadisticas?ver=servicios" className="inline-block mt-3 px-3 py-1.5 rounded-lg border border-teal bg-tealsoft text-teal font-body text-xs font-semibold">
+          📊 Ver mis estadísticas
+        </Link>
       </div>
 
       {/* --- Galería de fotos (beneficio Premium) --- */}
