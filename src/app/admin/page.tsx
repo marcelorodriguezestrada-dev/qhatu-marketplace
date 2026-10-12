@@ -280,6 +280,13 @@ export default function AdminPage() {
   // null = formulario en modo "publicar nuevo". Con un id, el mismo
   // formulario pasa a modo edición de ese profesional ya existente.
   const [profesionalEditandoId, setProfesionalEditandoId] = useState<string | null>(null)
+  // Admin → Servicios en pestañas, para no scrollear todo.
+  const [vistaServ, setVistaServ] = useState<'publicados' | 'pendientes' | 'form' | 'importar'>('publicados')
+  const [buscarServ, setBuscarServ] = useState('')
+  const [filtroCiudadServ, setFiltroCiudadServ] = useState('')
+  const [filtroPlanServ, setFiltroPlanServ] = useState<'' | 'premium' | 'basico'>('')
+  const [ordenServ, setOrdenServ] = useState<'contactos' | 'vistas' | 'recientes' | 'nombre'>('contactos')
+  const [limiteServ, setLimiteServ] = useState(40)
   const [editHorarioBloques, setEditHorarioBloques] = useState<BloqueHorario[]>([])
   const [editNuevoBloqueDias, setEditNuevoBloqueDias] = useState<number[]>([])
   const [editNuevoBloqueDesde, setEditNuevoBloqueDesde] = useState('09:00')
@@ -1114,6 +1121,7 @@ export default function AdminPage() {
       setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
       setRedesPf(['']); setReservasPf({ consultorio: false, videollamada: false }); setLinkVideoPf('')
       setProfesionalEditandoId(null)
+      setVistaServ('publicados')
       cargarProfesionales()
     } finally {
       setPublicando(false)
@@ -1125,6 +1133,8 @@ export default function AdminPage() {
   // corregir cualquier dato sin tener que borrarlo y volver a cargarlo.
   function abrirEditarProfesional(p: any) {
     setProfesionalEditandoId(p.id)
+    setVistaServ('form')
+    window.scrollTo({ top: 0 })
     setNombre(p.nombre || '')
     const rubroInfo = buscarRubro(p.rubro)
     setCategoriaSel(rubroInfo?.categoriaId || categorias[0]?.id || '')
@@ -1161,6 +1171,7 @@ export default function AdminPage() {
 
   function cancelarEdicionProfesional() {
     setProfesionalEditandoId(null)
+    setVistaServ('publicados')
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
     setCiudadPf('potosi')
@@ -1219,7 +1230,8 @@ export default function AdminPage() {
     }
   }
 
-  function borrarProfesional(id: string) {
+  function borrarProfesional(id: string, nombre?: string) {
+    if (!confirm(`¿Borrar ${nombre || 'este profesional'}? No se puede deshacer.`)) return
     fetch(`/api/profesionales/${id}`, {
       method: 'DELETE',
       headers: { 'x-admin-password': password },
@@ -2113,7 +2125,32 @@ export default function AdminPage() {
 
       {tab === 'servicios' && (
         <div>
-          <form onSubmit={publicarProfesional} className="bg-panel border border-line rounded-xl p-5 mb-8">
+          {(() => {
+            const pendientes = profesionales.filter((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada').length + profesionales.filter((p) => p.planEstadoPago === 'informado_pago').length
+            const publicados = profesionales.filter((p) => !p.estado || p.estado === 'aprobado').length
+            const pestañas: { id: typeof vistaServ; label: string; badge?: number }[] = [
+              { id: 'publicados', label: `📋 Publicados (${publicados})` },
+              { id: 'pendientes', label: '⏳ Pendientes', badge: pendientes },
+              { id: 'form', label: profesionalEditandoId ? `✏️ Editando: ${nombre || '...'}` : '➕ Nuevo' },
+              { id: 'importar', label: '📥 Importar' },
+            ]
+            return (
+              <div className="sticky top-0 z-20 -mx-1 px-1 py-2 mb-4 bg-bg/95 backdrop-blur flex gap-1.5 overflow-x-auto border-b border-line">
+                {pestañas.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setVistaServ(t.id)}
+                    className={`shrink-0 px-3 py-1.5 rounded-full border font-body text-xs font-semibold whitespace-nowrap max-w-[260px] truncate ${vistaServ === t.id ? 'bg-ink text-white border-ink' : 'bg-panel text-ink border-line'}`}
+                  >
+                    {t.label}
+                    {!!t.badge && <span className="ml-1.5 bg-maroon text-white rounded-full px-1.5 text-[10px]">{t.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
+          <form onSubmit={publicarProfesional} className={`${vistaServ === 'form' ? '' : 'hidden '}bg-panel border border-line rounded-xl p-5 mb-8`}>
             <div className="flex items-center justify-between mb-3">
               <div className="font-body text-sm font-semibold text-ink">
                 {profesionalEditandoId ? 'Editando profesional' : 'Nuevo profesional'}
@@ -2507,7 +2544,7 @@ export default function AdminPage() {
             </button>
           </form>
 
-          <div className="bg-panel border border-line rounded-xl p-5 mb-8">
+          <div className={`${vistaServ === 'importar' ? '' : 'hidden '}bg-panel border border-line rounded-xl p-5 mb-8`}>
             <div className="font-body text-sm font-semibold text-ink mb-2">Importar en lote (desde WhatsApp)</div>
             <div className="font-body text-[11px] text-inksoft mb-2">
               Pegá el texto de un canal/grupo de WhatsApp con varios avisos de oficios o servicios seguidos (título, teléfono y descripción cada uno) — mismo formato que en Anuncios. A diferencia de los anuncios, acá <strong>ningún</strong> importado se publica solo: todos entran a "Solicitudes pendientes" de abajo con rubro y zona sin definir, para que los revises uno por uno, les asignes el rubro/zona real, y uses "Pedir más info" si hace falta antes de aprobar.
@@ -2603,6 +2640,10 @@ export default function AdminPage() {
             )}
           </div>
 
+          <div className={vistaServ === 'pendientes' ? '' : 'hidden'}>
+          {profesionales.filter((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada' || p.planEstadoPago === 'informado_pago').length === 0 && (
+            <div className="font-body text-sm text-inksoft bg-panel border border-line rounded-xl p-6 text-center mb-6">✓ No hay solicitudes ni pagos pendientes.</div>
+          )}
           {profesionales.some((p) => p.estado === 'pendiente_revision' || p.estado === 'info_solicitada') && (
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <div className="font-body text-xs text-inksoft">
@@ -2882,53 +2923,94 @@ export default function AdminPage() {
             </div>
           )}
 
-          <div className="font-body text-sm font-semibold text-ink mb-3">
-            Publicados ({profesionales.filter((p) => !p.estado || p.estado === 'aprobado').length})
           </div>
-          {[...profesionales]
-            .filter((p) => !p.estado || p.estado === 'aprobado')
-            .sort((a, b) => (b.clicsWhatsapp || 0) - (a.clicsWhatsapp || 0))
-            .map((p) => (
-            <div key={p.id} className="bg-panel border border-line rounded-lg p-3.5 mb-2.5 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
-                {p.imagenUrl ? (
-                  <img src={p.thumbUrl || p.imagenUrl} alt={p.nombre} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                ) : (
-                  <ServiceIcon kind={p.icono} size={20} />
+
+          {vistaServ === 'publicados' && (() => {
+            const q = buscarServ.trim().toLowerCase()
+            const lista = profesionales
+              .filter((p) => !p.estado || p.estado === 'aprobado')
+              .filter((p) => !filtroCiudadServ || ciudadDe(p) === filtroCiudadServ)
+              .filter((p) => !filtroPlanServ || (filtroPlanServ === 'premium' ? p.plan === 'premium' : p.plan !== 'premium'))
+              .filter((p) => !q || [p.nombre, p.especialidad, buscarRubro(p.rubro)?.label, p.zona, p.whatsapp, p.email].some((x) => String(x || '').toLowerCase().includes(q)))
+              .sort((a, b) =>
+                ordenServ === 'vistas' ? (b.vistas || 0) - (a.vistas || 0)
+                : ordenServ === 'recientes' ? String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+                : ordenServ === 'nombre' ? String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es')
+                : (b.clicsWhatsapp || 0) - (a.clicsWhatsapp || 0))
+            const sel = 'px-2 py-1.5 rounded-md border border-line bg-panel font-body text-xs'
+            return (
+              <div>
+                <div className="flex flex-wrap gap-2 items-center mb-3">
+                  <input
+                    value={buscarServ}
+                    onChange={(e) => { setBuscarServ(e.target.value); setLimiteServ(40) }}
+                    placeholder="🔍 Buscar por nombre, rubro, zona o WhatsApp"
+                    className="flex-1 min-w-[220px] px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm"
+                  />
+                  <select value={filtroCiudadServ} onChange={(e) => setFiltroCiudadServ(e.target.value)} className={sel} aria-label="Ciudad">
+                    <option value="">📍 Todas las ciudades</option>
+                    {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>{banderaDe(c.pais)} {c.nombre}</option>)}
+                  </select>
+                  <select value={filtroPlanServ} onChange={(e) => setFiltroPlanServ(e.target.value as any)} className={sel} aria-label="Plan">
+                    <option value="">Todos los planes</option>
+                    <option value="premium">⭐ Premium</option>
+                    <option value="basico">Básico</option>
+                  </select>
+                  <select value={ordenServ} onChange={(e) => setOrdenServ(e.target.value as any)} className={sel} aria-label="Orden">
+                    <option value="contactos">Más contactos</option>
+                    <option value="vistas">Más vistas</option>
+                    <option value="recientes">Más recientes</option>
+                    <option value="nombre">Nombre A-Z</option>
+                  </select>
+                  <button type="button" onClick={() => { cancelarEdicionProfesional(); setVistaServ('form') }} className="px-3 py-1.5 rounded-md border-none bg-maroon text-white font-body text-xs font-semibold">➕ Nuevo</button>
+                </div>
+                <div className="font-body text-[11px] text-inksoft mb-2">{lista.length} de {profesionales.filter((p) => !p.estado || p.estado === 'aprobado').length} publicados</div>
+                <div className="bg-panel border border-line rounded-xl overflow-hidden mb-4">
+                  {lista.length === 0 && <div className="font-body text-sm text-inksoft p-6 text-center">Ningún profesional coincide.</div>}
+                  {lista.slice(0, limiteServ).map((p) => {
+                    const r = reservasDe(p)
+                    const conAgenda = p.plan === 'premium' && (r.consultorio || r.videollamada) && (p.horarioTurnos?.bloques?.length > 0)
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 px-3 py-2 border-b border-line last:border-b-0 hover:bg-panelalt">
+                        <div className="w-9 h-9 rounded-lg bg-panelalt flex items-center justify-center text-maroon shrink-0 overflow-hidden">
+                          {p.imagenUrl ? <img src={p.thumbUrl || p.imagenUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <ServiceIcon kind={p.icono} size={18} />}
+                        </div>
+                        <button type="button" onClick={() => abrirEditarProfesional(p)} className="flex-1 min-w-0 text-left bg-transparent border-none p-0">
+                          <div className="font-body text-sm font-semibold text-ink truncate">
+                            {p.nombre}
+                            {p.plan === 'premium' && <span className="ml-1.5 text-[10px] font-bold text-ochre">⭐ Premium</span>}
+                          </div>
+                          <div className="font-body text-[11px] text-inksoft truncate">
+                            {banderaDe(buscarCiudad(ciudadDe(p)).pais)} {buscarCiudad(ciudadDe(p)).nombre} · {buscarRubro(p.rubro)?.label || p.especialidad || 'Sin rubro'}{p.zona ? ` · ${p.zona}` : ''}
+                          </div>
+                        </button>
+                        <div className="hidden sm:flex items-center gap-2 font-body text-[11px] text-inksoft shrink-0">
+                          {(r.consultorio || r.videollamada) && (
+                            <span title={conAgenda ? 'Calendario activo' : 'Marcó reservas pero falta Premium u horarios'} className={conAgenda ? 'text-teal' : 'text-ochre'}>
+                              {r.consultorio ? '🏢' : ''}{r.videollamada ? '🎥' : ''}{conAgenda ? '' : '⚠️'}
+                            </span>
+                          )}
+                          <span title="Vistas">👁 {p.vistas || 0}</span>
+                          <span title="Contactos por WhatsApp">💬 {p.clicsWhatsapp || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <a href={`/servicios/${p.id}`} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-inksoft underline" title="Ver perfil público">Ver</a>
+                          <a href={`/servicios/${p.id}/cv`} target="_blank" rel="noopener noreferrer" className="hidden sm:inline font-body text-xs text-inksoft underline">{p.cvPublico === false ? 'CV 🔒' : 'CV'}</a>
+                          <button type="button" onClick={() => abrirEditarProfesional(p)} className="font-body text-xs text-teal font-semibold underline">Editar</button>
+                          <button type="button" onClick={() => borrarProfesional(p.id, p.nombre)} className="font-body text-xs text-maroon underline">Borrar</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {lista.length > limiteServ && (
+                  <button type="button" onClick={() => setLimiteServ((n) => n + 40)} className="w-full py-2 rounded-lg border border-line bg-panel font-body text-xs font-semibold text-ink mb-4">
+                    Ver más ({lista.length - limiteServ} restantes)
+                  </button>
                 )}
               </div>
-              <div className="flex-1">
-                <div className="font-body text-sm font-medium text-ink">{p.nombre}</div>
-                <div className="font-body text-xs text-inksoft">
-                  {buscarRubro(p.rubro)?.label} · {p.zona} · {p.plan === 'premium' ? 'Premium' : 'Básico'}
-                </div>
-                <div className="font-body text-[11px] text-inksoft mt-0.5">
-                  👁 {p.vistas || 0} vistas · 💬 {p.clicsWhatsapp || 0} contactos
-                </div>
-              </div>
-              <a
-                href={`/servicios/${p.id}/cv`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-body text-xs text-inksoft underline shrink-0"
-                title={p.cvPublico === false ? 'CV oculto en el perfil público' : undefined}
-              >
-                {p.cvPublico === false ? 'CV 🔒' : 'CV'}
-              </a>
-              <button
-                onClick={() => abrirEditarProfesional(p)}
-                className="font-body text-xs text-teal underline shrink-0"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => borrarProfesional(p.id)}
-                className="font-body text-xs text-maroon underline shrink-0"
-              >
-                Borrar
-              </button>
-            </div>
-          ))}
+            )
+          })()}
         </div>
       )}
 
