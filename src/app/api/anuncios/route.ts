@@ -7,6 +7,7 @@ import { evaluarConIA, categorizarAnuncio } from '@/lib/moderacionIA'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   try {
     const db = getDb()
-    const esAdmin = req.headers.get('x-admin-password') === process.env.ADMIN_PASSWORD
+    const esAdmin = (await esClaveAdmin(req.headers.get('x-admin-password')))
     const snap = await db.collection('anuncios').get()
     let anuncios = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
     if (!esAdmin) anuncios = anuncios.filter((a) => a.estado === 'aprobado')

@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sanearConfigVolante } from '@/lib/volantes'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-const esAdmin = (req: NextRequest) => {
+const esAdmin = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 
 // Plantillas de volantes guardadas (Admin → Marketing → Volantes).
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const snap = await getDb().collection('volantes_plantillas').get()
     const plantillas = snap.docs
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
 
 // POST { nombre, config, id? } — crear o actualizar.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const body = await req.json()
   const nombre = String(body.nombre || '').trim().slice(0, 50)
   if (nombre.length < 2) return NextResponse.json({ error: 'Poné un nombre a la plantilla.' }, { status: 400 })
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const id = new URL(req.url).searchParams.get('id')
   if (id) await getDb().collection('volantes_plantillas').doc(id).delete()
   return NextResponse.json({ ok: true })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { leerListaPegada, type FilaPegada } from '@/lib/prospectos'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
 // renglón (src/lib/prospectos.ts → leerListaPegada).
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const texto = String(b.texto || '').slice(0, 12000)
   if (!texto.trim()) return NextResponse.json({ error: 'Pegá la lista de tiendas.' }, { status: 400 })

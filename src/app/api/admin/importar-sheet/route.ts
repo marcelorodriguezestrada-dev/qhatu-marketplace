@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ function parsearCSV(texto: string): string[][] {
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const { url } = await req.json().catch(() => ({}))
   const m = String(url || '').match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/)
   if (!m) return NextResponse.json({ error: 'Pegá el link de una planilla de Google (docs.google.com/spreadsheets/…).' }, { status: 400 })

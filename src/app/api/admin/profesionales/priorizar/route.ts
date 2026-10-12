@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
 import { priorizarInvitacionesIA, textoEspera } from '@/lib/moderacionIA'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic'
 // No cambia estados ni le escribe a nadie.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   }
   if (!process.env.GROQ_API_KEY) {

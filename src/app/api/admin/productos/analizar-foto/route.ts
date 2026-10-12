@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
 import { analizarFotoProducto, ErrorIA, LimiteIA } from '@/lib/fotoProductoIA'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -10,7 +11,7 @@ export const maxDuration = 60
 // Para "📁 Importar carpeta" del admin. 429 = esperar y reintentar.
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'Falta configurar GROQ_API_KEY en el servidor.' }, { status: 503 })
   const { imagenUrl, pista } = await req.json().catch(() => ({}))
   if (typeof imagenUrl !== 'string' || !/^https:\/\//.test(imagenUrl)) return NextResponse.json({ error: 'Imagen inválida.' }, { status: 400 })

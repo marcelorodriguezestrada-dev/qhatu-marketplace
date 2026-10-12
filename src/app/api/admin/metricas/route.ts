@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, contarUsuarios } from '@/lib/firebaseAdmin'
 import { construirSerieDiaria, reagruparPor, agruparPorDiaSemana, compararSemanas, ultimosDiasContinuos } from '@/lib/serieTiempo'
 import { esPremiumVigente, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic'
 // sesiones y no lo hacemos), directamente no se muestra.
 export async function GET(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
 

@@ -4,13 +4,14 @@ import { METRICAS_CAMPANA } from '@/lib/campanas'
 import { diaBolivia } from '@/lib/fechaBolivia'
 import { leerConfigLanzamiento, recomendacionesIA } from '@/lib/lanzamientoServer'
 import { armarReporte, recomendacionesBasicas } from '@/lib/reporteMarketing'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const esAdmin = (req: NextRequest) => {
+const esAdmin = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 
 // GET (admin) ?dias=30: el reporte del plan de lanzamiento, armado con los
@@ -38,7 +39,7 @@ async function datos(dias: number) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const dias = Math.min(90, Math.max(7, Number(req.nextUrl.searchParams.get('dias')) || 30))
     return NextResponse.json({ reporte: await datos(dias) })
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const reporte = await datos(30)
     const ia = await recomendacionesIA(reporte)

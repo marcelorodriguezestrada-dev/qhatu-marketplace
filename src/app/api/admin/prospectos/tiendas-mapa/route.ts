@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rubroOSM, type TiendaMapa } from '@/lib/prospectos'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ const SERVIDORES = ['https://overpass-api.de/api/interpreter', 'https://overpass
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const [s, o, n, e] = [b.sur, b.oeste, b.norte, b.este].map(Number)
   if (![s, o, n, e].every(Number.isFinite) || n <= s || e <= o) return NextResponse.json({ error: 'Falta la zona del mapa.' }, { status: 400 })

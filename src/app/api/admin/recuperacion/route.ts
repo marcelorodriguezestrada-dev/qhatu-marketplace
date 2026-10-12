@@ -3,18 +3,19 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { sanearConfigRecuperacion } from '@/lib/recuperacion'
 import { diaBoliviaISO } from '@/lib/trackingConfig'
 import { leerConfigRecuperacion, invalidarCacheRecuperacion, ejecutarRecuperacion } from '@/lib/recuperacionServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 // GET — configuración, métricas de los últimos 14 días (enviados /
 // abiertos / compras), último envío y hora pico sugerida (de la analítica).
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     const db = getDb()
     const dias = Array.from({ length: 14 }, (_, i) => diaBoliviaISO(Date.now() - i * 86400_000))
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 // POST { accion: 'guardar', config } | { accion: 'enviar' } (enviar ahora,
 // sin esperar la hora; respeta igual la espera y el tope por persona).
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     const body = await req.json()
     const db = getDb()

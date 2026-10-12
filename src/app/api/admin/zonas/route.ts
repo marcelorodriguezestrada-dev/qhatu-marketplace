@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { leerZonasExtra } from '@/lib/zonasEnvioServer'
 import { armarZonas, buscarZonaEn, zonaMasCercana } from '@/lib/zonasEnvio'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,13 +10,13 @@ export const dynamic = 'force-dynamic'
 // GET → { extras, sugeridas: [{ id, nombre, pedidos, lat, lng, cercana, ultimoPedido }] }
 // POST { accion: 'agregar', id?, nombre, lat, lng } → la suma a la lista (y borra la sugerida)
 //      { accion: 'descartar', id } · { accion: 'quitar', nombre } (saca una agregada)
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const extras = await leerZonasExtra()
     const zonas = armarZonas(extras)
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const body = await req.json()
     const db = getDb()

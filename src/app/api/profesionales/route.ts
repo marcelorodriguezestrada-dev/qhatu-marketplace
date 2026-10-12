@@ -8,6 +8,7 @@ import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 import { sanearRedes } from '@/lib/redesSociales'
 import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     let profesionales = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
 
     const password = req.headers.get('x-admin-password')
-    const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+    const esAdmin = (await esClaveAdmin(password))
 
     if (!esAdmin) {
       profesionales = profesionales.filter((p) => !p.estado || p.estado === 'aprobado')
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 // el endpoint separado /api/profesionales/solicitud.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {

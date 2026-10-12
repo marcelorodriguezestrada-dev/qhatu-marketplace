@@ -4,6 +4,7 @@ import { RUBRO_DE_GRUPO } from '@/data/categoriasProductos'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, sanearFotosAdicionales } from '@/lib/planPremium'
 import { sanearStock } from '@/lib/stock'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(password))
   if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
   }
@@ -54,7 +55,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const usuario = await getUsuarioDesdeRequest(req)
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(password))
 
   if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })

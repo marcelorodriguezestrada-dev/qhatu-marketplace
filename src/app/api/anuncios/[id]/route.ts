@@ -4,11 +4,12 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { ejecutarMacheo } from '@/lib/macheoAnuncios'
 import { sumarMetricaDiaria } from '@/lib/metricasDiarias'
 import { sumarEstadisticaUsuario } from '@/lib/estadisticasUsuario'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
-  return req.headers.get('x-admin-password') === process.env.ADMIN_PASSWORD
+async function esAdmin(req: NextRequest) {
+  return (await esClaveAdmin(req.headers.get('x-admin-password')))
 }
 
 // GET — público, pero solo si está aprobado (o si sos admin). Suma
@@ -19,12 +20,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const doc = await ref.get()
     if (!doc.exists) return NextResponse.json({ error: 'No encontrado.' }, { status: 404 })
     const data = doc.data()!
-    if (data.estado !== 'aprobado' && !esAdmin(req)) {
+    if (data.estado !== 'aprobado' && !await esAdmin(req)) {
       return NextResponse.json({ error: 'No encontrado.' }, { status: 404 })
     }
     ref.update({ vistas: FieldValue.increment(1) }).catch(() => {})
     sumarMetricaDiaria('vistasAnuncios').catch(() => {})
-    if (!esAdmin(req)) sumarEstadisticaUsuario(data.autorUid, 'a', params.id, 'vistas').catch(() => {})
+    if (!await esAdmin(req)) sumarEstadisticaUsuario(data.autorUid, 'a', params.id, 'vistas').catch(() => {})
     return NextResponse.json({ id: doc.id, ...data })
   } catch (err) {
     console.error('GET /api/anuncios/[id]', err)
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 // PATCH — solo admin: aprobar, rechazar, o editar campos.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 
   try {
     const body = await req.json()
@@ -82,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 // DELETE — solo admin.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     await getDb().collection('anuncios').doc(params.id).delete()
     return NextResponse.json({ ok: true })

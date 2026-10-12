@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { CAMPANA_DEFECTO, hoyBolivia, numeroWhatsapp, type Campana } from '@/lib/prospectos'
 import { leerCampana, limpiarProspecto } from '@/lib/prospectosServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,13 +11,13 @@ export const dynamic = 'force-dynamic'
 // POST { nombre, rubro, ciudad, whatsapp, direccion, lat, lng, notas, contacto, redes, origen, osmId } → crea un prospecto
 // POST { lote: [...] } → crea varios (lista pegada); salta los repetidos (mismo WhatsApp o mismo nombre en la ciudad)
 // PUT { campana: { oferta, cupos, mensajeBase } } → guarda la campaña (config/captacion)
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const [snap, campana] = await Promise.all([getDb().collection('prospectos').get(), leerCampana()])
     const prospectos = snap.docs
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 const texto = (v: unknown, max = 200) => String(v ?? '').trim().slice(0, max)
 
 export async function POST(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   if (Array.isArray(b.lote)) return crearLote(b.lote.slice(0, 200), b.ciudad)
   const d = limpiarProspecto(b)
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const c = b.campana || {}
   const campana: Campana = {

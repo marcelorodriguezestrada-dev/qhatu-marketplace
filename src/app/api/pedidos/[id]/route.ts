@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { MAX_INTENTOS_COMPROBANTE } from '@/lib/ocrComprobante'
 import { reponerStockDePedido } from '@/lib/stockServer'
 import { liberarUsoCupon } from '@/lib/cuponesServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,7 +147,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         return NextResponse.json({ error: 'Medio de pago inválido.' }, { status: 400 })
       }
       const password = req.headers.get('x-admin-password')
-      if (!password || password !== process.env.ADMIN_PASSWORD) {
+      if (!(await esClaveAdmin(password))) {
         return NextResponse.json({ error: 'Solo el admin puede registrar el pago al vendedor.' }, { status: 401 })
       }
       await ref.update({
@@ -191,7 +192,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const password = req.headers.get('x-admin-password')
-    const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+    const esAdmin = (await esClaveAdmin(password))
 
     if (!esAdmin) {
       const usuario = await getUsuarioDesdeRequest(req)
@@ -257,7 +258,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 // DELETE: solo el admin puede eliminar un pedido.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(password))
   if (!esAdmin) {
     return NextResponse.json({ error: 'Solo el admin puede eliminar pedidos.' }, { status: 401 })
   }

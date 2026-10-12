@@ -4,6 +4,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { CIUDADES, CIUDAD_POR_DEFECTO, idCiudadDesdeNombre } from '@/data/ciudades'
 import { PAISES_MERCADO, sanearPaisMercado } from '@/data/paisesMercado'
 import { cargarCiudadesServidor, olvidarCacheCiudades, sanearCiudadExtra } from '@/lib/ciudadesServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +16,19 @@ export const dynamic = 'force-dynamic'
 //   POST { accion: 'pais', pais }          (crear o editar)
 //   POST { accion: 'ubicar', q, pais }     → { lat, lng, nombre } (buscar en el mapa)
 
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 const noAutorizado = () => NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) return noAutorizado()
+  if (!(await autorizado(req))) return noAutorizado()
   return NextResponse.json(await cargarCiudadesServidor(true))
 }
 
 export async function POST(req: NextRequest) {
-  if (!autorizado(req)) return noAutorizado()
+  if (!(await autorizado(req))) return noAutorizado()
   try {
     const body = await req.json()
     const ref = getDb().collection('config').doc('ciudades')

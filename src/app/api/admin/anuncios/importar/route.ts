@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { numeroConCodigoPais, validarWhatsappPorPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
-  return req.headers.get('x-admin-password') === process.env.ADMIN_PASSWORD
+async function esAdmin(req: NextRequest) {
+  return (await esClaveAdmin(req.headers.get('x-admin-password')))
 }
 
 // POST { anuncios: [{ titulo, descripcion, telefono, tipo, estado, notaAdmin }] }
@@ -17,7 +18,7 @@ function esAdmin(req: NextRequest) {
 // lugar queda marcado `creadoPorAdmin: true` y el teléfono original
 // tal cual se cargó, sin pasar por el login de nadie.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 
   try {
     const body = await req.json()

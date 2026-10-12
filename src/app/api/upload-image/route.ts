@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 // Sube una imagen a ImgBB (servicio gratuito de hosting de imágenes) y
 // devuelve la URL pública resultante. Acepta dos formas de autenticarse:
@@ -13,7 +14,7 @@ import { getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 export async function POST(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   const passwordAdmin = req.headers.get('x-admin-password')
-  const esAdmin = passwordAdmin && passwordAdmin === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(passwordAdmin))
 
   if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión para subir una imagen.' }, { status: 401 })

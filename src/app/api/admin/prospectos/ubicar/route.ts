@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ async function buscar(q: string, caja: string) {
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const c = CIUDAD[b.ciudad] || CIUDAD.potosi
   const direccion = String(b.direccion || '').replace(/\([^)]*\)/g, '').trim()
