@@ -1092,6 +1092,8 @@ export default function AdminPage() {
         historialLaboral: deBorradores(historialCV),
         idiomas: idiomasCV,
         cvPublico,
+        // La agenda (Premium) también se guarda con "Guardar cambios".
+        ...(profesionalEditandoId && plan === 'premium' ? { horarioTurnos: { bloques: bloquesConPendienteAdmin() } } : {}),
       }
       const editando = !!profesionalEditandoId
       const res = await fetch(
@@ -1172,6 +1174,16 @@ export default function AdminPage() {
     setEditNuevoBloqueDias((dias) => (dias.includes(diaId) ? dias.filter((d) => d !== diaId) : [...dias, diaId].sort()))
   }
 
+  // Los bloques ya agregados + el que está a medio cargar (días elegidos
+  // pero sin tocar "+ Agregar bloque"), para no perderlo al guardar.
+  function bloquesConPendienteAdmin(): BloqueHorario[] {
+    if (editNuevoBloqueDias.length === 0) return editHorarioBloques
+    const desde = editNuevoBloqueTodoElDia ? '00:00' : editNuevoBloqueDesde
+    const hasta = editNuevoBloqueTodoElDia ? '23:30' : editNuevoBloqueHasta
+    if (hasta <= desde) return editHorarioBloques
+    return [...editHorarioBloques, { id: `b${Date.now()}`, dias: editNuevoBloqueDias, desde, hasta, intervaloMin: editNuevoBloqueIntervalo }]
+  }
+
   function agregarBloqueAdmin() {
     if (editNuevoBloqueDias.length === 0) return
     const desde = editNuevoBloqueTodoElDia ? '00:00' : editNuevoBloqueDesde
@@ -1195,10 +1207,11 @@ export default function AdminPage() {
       const res = await fetch(`/api/profesionales/${profesionalEditandoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ horarioTurnos: { bloques: editHorarioBloques } }),
+        body: JSON.stringify({ horarioTurnos: { bloques: bloquesConPendienteAdmin() } }),
       })
       const data = await res.json()
       if (data.error) { setErrorForm(data.error); return }
+      setEditHorarioBloques(bloquesConPendienteAdmin()); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
       setHorarioAdminGuardado(true)
       cargarProfesionales()
     } finally {
@@ -2366,7 +2379,16 @@ export default function AdminPage() {
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <CampoRedes valor={redesPf} onChange={setRedesPf} className="mb-3" />
-            <CampoReservas valor={reservasPf} onChange={setReservasPf} link={linkVideoPf} onLink={setLinkVideoPf} className="mb-3" />
+            <CampoReservas valor={reservasPf} onChange={setReservasPf} link={linkVideoPf} onLink={setLinkVideoPf} className="mb-1" />
+            {(reservasPf.consultorio || reservasPf.videollamada) && (plan !== 'premium' || bloquesConPendienteAdmin().length === 0) && (
+              <div className="font-body text-[11px] text-ochre bg-ochre/10 border border-ochre/30 rounded-md px-2.5 py-1.5 mb-3">
+                ⚠️ El calendario todavía no se va a ver en su perfil:{' '}
+                {plan !== 'premium'
+                  ? 'necesita plan Premium (elegilo arriba y guardá).'
+                  : 'falta cargar sus horarios en "Agenda de turnos" de abajo (elegí los días, el horario y guardá).'}
+              </div>
+            )}
+            {!(reservasPf.consultorio || reservasPf.videollamada) && <div className="mb-3" />}
             <div className="flex gap-2 mb-4 flex-wrap">
               {ICONOS_SERVICIO.map((i) => (
                 <button
@@ -2387,6 +2409,9 @@ export default function AdminPage() {
                 <div className="font-body text-[11px] text-inksoft mb-2">
                   Bloques por día — ej. "Lunes a viernes, 19 a 21" y "Sábados, 9 a 14" son dos bloques distintos.
                 </div>
+                {editHorarioBloques.length === 0 && (
+                  <div className="font-body text-[11px] text-ochre mb-2">Todavía no tiene horarios: tocá los días que atiende, elegí el horario y guardá.</div>
+                )}
                 {editHorarioBloques.length > 0 && (
                   <div className="flex flex-col gap-1.5 mb-3">
                     {editHorarioBloques.map((b) => (
