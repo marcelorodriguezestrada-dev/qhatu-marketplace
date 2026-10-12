@@ -99,6 +99,9 @@ export default function AtencionProfesional({ profesional, onGuardado }: { profe
         </div>
       )}
       <CampoReservas valor={reservas} onChange={setReservas} link={linkVideollamada} onLink={setLinkVideollamada} premium={esPremiumVigente(profesional)} className="mt-3" />
+      {(reservas.consultorio || reservas.videollamada) && esPremiumVigente(profesional) && !(profesional.horarioTurnos?.bloques?.length > 0) && (
+        <div className="font-body text-[11px] text-ochre mt-1.5">⚠️ Para que se vea el calendario, cargá tus horarios en “Mis turnos” (más abajo) y tocá “Guardar horario”.</div>
+      )}
       <CampoRedes valor={redes} onChange={setRedes} className="mt-3" />
       <div className="flex items-center gap-3 mt-3">
         <button type="button" onClick={guardar} disabled={guardando} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold disabled:opacity-60">
