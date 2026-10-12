@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ciudadDe, sanearEnvioPropio } from '@/data/ciudades'
+import { ciudadDe, sanearEnvioPropio, sanearVisibleEn } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
 
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       ciudad: ciudadDe(data),
       envioPropio: sanearEnvioPropio(data.envioPropio, !!data.tiposVenta?.haceEnvios),
       verificado: !!data.verificado,
+      visibleEn: Array.isArray(data.visibleEn) ? data.visibleEn : [],
       plan: data.plan === 'premium' ? 'premium' : 'basico',
       planVigenciaHasta: data.planVigenciaHasta || null,
       planEstadoPago: data.planEstadoPago || 'ninguno',
@@ -83,6 +85,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const actual = (await ref.get()).data() || {}
       if (!esPremiumVigente(actual)) {
         cambios.planVigenciaHasta = calcularNuevaVigencia(actual.planVigenciaHasta)
+      }
+    }
+
+    // "🌎 También visible en" (Admin → Usuarios): la tienda y todos sus
+    // productos aparecen además en esas ciudades (para pruebas).
+    if (body.visibleEn !== undefined) {
+      await cargarCiudadesServidor().catch(() => null)
+      const actual = (await ref.get()).data() || {}
+      const visibleEn = sanearVisibleEn(body.visibleEn, ciudadDe(actual))
+      cambios.visibleEn = visibleEn
+      const productos = await getDb().collection('productos').where('vendedorId', '==', params.id).get()
+      for (let i = 0; i < productos.docs.length; i += 400) {
+        const batch = getDb().batch()
+        for (const d of productos.docs.slice(i, i + 400)) batch.update(d.ref, { visibleEn })
+        await batch.commit()
       }
     }
 

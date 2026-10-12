@@ -196,11 +196,23 @@ export function profesionalEnCiudad(p: { ciudad?: unknown; atiendeOnline?: boole
   return Array.isArray(p.viajaA) && p.viajaA.includes(sel)
 }
 
-// Producto visible para un comprador de `ciudad`: es de su ciudad o el
-// vendedor envía a todo Bolivia (enviaATodoBolivia se copia de la tienda).
-export function productoEnCiudad(p: { ciudad?: unknown; enviaATodoBolivia?: boolean }, ciudad: CiudadId): boolean {
+// Producto visible para un comprador de `ciudad`: es de su ciudad, el
+// vendedor envía a todo Bolivia (enviaATodoBolivia se copia de la tienda)
+// o el admin hizo visible la tienda también en esa ciudad (visibleEn, ej.
+// para probar Buenos Aires con tiendas de Potosí).
+export function productoEnCiudad(p: { ciudad?: unknown; enviaATodoBolivia?: boolean; visibleEn?: unknown }, ciudad: CiudadId): boolean {
   // enviaATodoBolivia = envía a todo SU país (no cruza a otro país).
-  return ciudadDe(p) === ciudad || (p.enviaATodoBolivia === true && buscarCiudad(ciudadDe(p)).pais === buscarCiudad(ciudad).pais)
+  return (
+    ciudadDe(p) === ciudad ||
+    (p.enviaATodoBolivia === true && buscarCiudad(ciudadDe(p)).pais === buscarCiudad(ciudad).pais) ||
+    (Array.isArray(p.visibleEn) && p.visibleEn.includes(ciudad))
+  )
+}
+
+// Ciudades extra donde el admin muestra una tienda (sin repetir la propia).
+export function sanearVisibleEn(v: unknown, propia?: CiudadId): CiudadId[] {
+  if (!Array.isArray(v)) return []
+  return [...new Set(v.filter((x) => typeof x === 'string' && esCiudadId(x) && x !== propia))] as CiudadId[]
 }
 
 // "abogado en La Paz" → { ciudad: 'la-paz', resto: 'abogado' }.

@@ -681,6 +681,17 @@ export default function AdminPage() {
     }).then(() => cargarUsuarios())
   }
 
+  // "🌎 También visible en": la tienda (y sus productos) aparece además en
+  // otras ciudades — ej. tiendas de Potosí en Buenos Aires para probar.
+  function cambiarVisibleEn(uid: string, visibleEn: string[]) {
+    setVendedoresAdmin((prev) => prev.map((v) => (v.id === uid ? { ...v, visibleEn } : v)))
+    fetch(`/api/vendedores/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ visibleEn }),
+    }).then(() => { cargarVendedoresAdmin(); cargarProductos() })
+  }
+
   function marcarUsuarioPrueba(uid: string, esPrueba: boolean) {
     fetch(`/api/admin/usuarios/${uid}`, {
       method: 'PATCH',
@@ -3474,6 +3485,36 @@ export default function AdminPage() {
                         <option value="">📍 Ciudad: automática</option>
                         {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>📍 Ve {c.nombre}</option>)}
                       </select>
+                      {(() => {
+                        const tienda = vendedoresAdmin.find((v) => v.id === u.uid)
+                        if (!tienda) return null
+                        const visibleEn: string[] = Array.isArray(tienda.visibleEn) ? tienda.visibleEn : []
+                        const otras = ciudadesTodas.filter((c) => c.id !== ciudadDe(tienda))
+                        return (
+                          <details className="relative">
+                            <summary
+                              title="Mostrar esta tienda y sus productos también en otras ciudades (ej. para pruebas en Argentina)"
+                              className={`list-none cursor-pointer px-2.5 py-1.5 rounded-md border font-body text-[11px] ${visibleEn.length ? 'border-teal bg-tealsoft text-teal font-semibold' : 'border-line bg-panel'}`}
+                            >
+                              🌎 {visibleEn.length ? `También en ${visibleEn.map((id) => buscarCiudad(id).nombre).join(', ')}` : 'También visible en…'}
+                            </summary>
+                            <div className="absolute right-0 z-10 mt-1 w-56 bg-panel border border-line rounded-lg shadow-lg p-2.5">
+                              <div className="font-body text-[10px] text-inksoft mb-1.5">Su tienda es de {buscarCiudad(ciudadDe(tienda)).nombre}. Mostrarla además en:</div>
+                              {otras.map((c) => (
+                                <label key={c.id} className="flex items-center gap-2 font-body text-xs text-ink py-0.5 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={visibleEn.includes(c.id)}
+                                    onChange={(e) => cambiarVisibleEn(u.uid, e.target.checked ? [...visibleEn, c.id] : visibleEn.filter((x) => x !== c.id))}
+                                    className="accent-teal"
+                                  />
+                                  {banderaDe(c.pais)} {c.nombre}{(c as any).estado === 'prueba' ? ' (en prueba)' : ''}
+                                </label>
+                              ))}
+                            </div>
+                          </details>
+                        )
+                      })()}
                       <button
                         type="button"
                         onClick={() => pausarUsuario(u.uid, !u.pausado)}
