@@ -249,6 +249,8 @@ export default function AdminPage() {
   const [idiomasCV, setIdiomasCV] = useState<Idioma[]>([])
   const [cvPublico, setCvPublico] = useState(true)
   const [zona, setZona] = useState('')
+  // Ciudad (y con ella el país) del profesional que se carga a mano.
+  const [ciudadPf, setCiudadPf] = useState('potosi')
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
@@ -1034,7 +1036,8 @@ export default function AdminPage() {
       const datos = {
         nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, direccion,
         lat: lat || null, lng: lng || null,
-        whatsapp, instagram, email: emailProfesional, icono, plan, imagenUrl,
+        whatsapp, whatsappPais: buscarCiudad(ciudadPf).pais, ciudad: ciudadPf,
+        instagram, email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
         experiencia,
         historialLaboral: deBorradores(historialCV),
@@ -1080,6 +1083,7 @@ export default function AdminPage() {
     setDondeTrabaja(p.dondeTrabaja || '')
     setEducacion(p.educacion || '')
     setZona(p.zona || '')
+    setCiudadPf(ciudadDe(p))
     setDireccion(p.direccion || '')
     setLat(p.lat != null ? String(p.lat) : '')
     setLng(p.lng != null ? String(p.lng) : '')
@@ -1103,6 +1107,7 @@ export default function AdminPage() {
     setProfesionalEditandoId(null)
     setNombre(''); setDescripcion(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
     setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null)
+    setCiudadPf('potosi')
     setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
     setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
     setErrorForm('')
@@ -2236,10 +2241,26 @@ export default function AdminPage() {
               Si dejás el precio vacío, no se muestra ningún precio (hasta que el profesional lo pase por WhatsApp).
             </div>
 
+            <label className="block font-body text-xs text-ink mb-3">
+              <span className="block font-semibold mb-1">📍 País y ciudad</span>
+              <select
+                value={ciudadPf}
+                onChange={(e) => setCiudadPf(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm bg-panel"
+              >
+                {Array.from(new Set(ciudadesTodas.map((c) => c.pais))).map((pais) => (
+                  <optgroup key={pais} label={`${banderaDe(pais)} ${buscarPaisMercado(pais).nombre}`}>
+                    {ciudadesTodas.filter((c) => c.pais === pais).map((c) => (
+                      <option key={c.id} value={c.id}>{banderaDe(c.pais)} {c.nombre}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
             <input
               value={zona}
               onChange={(e) => setZona(e.target.value)}
-              placeholder="Zona / barrio (ej: Sopocachi, La Paz)"
+              placeholder={buscarCiudad(ciudadPf).pais === 'AR' ? 'Zona / barrio (ej: Palermo)' : 'Zona / barrio (ej: Sopocachi, La Paz)'}
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <input
@@ -2278,7 +2299,7 @@ export default function AdminPage() {
             <input
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="WhatsApp (ej: 71234567, sin +591)"
+              placeholder={buscarCiudad(ciudadPf).pais === 'AR' ? 'WhatsApp (ej: 1123456789, código de área + número, sin +54)' : 'WhatsApp (ej: 71234567, sin +591)'}
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
             <input

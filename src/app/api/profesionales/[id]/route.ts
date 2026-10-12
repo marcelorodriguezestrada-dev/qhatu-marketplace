@@ -8,6 +8,8 @@ import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/li
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 import { sanearCiudad, sanearViajaA, ciudadDe } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais } from '@/data/paises'
 
 export const dynamic = 'force-dynamic'
 
@@ -133,7 +135,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (direccion !== undefined) cambios.direccion = direccion
     if (lat !== undefined) cambios.lat = lat === '' || lat === null ? null : Number(lat)
     if (lng !== undefined) cambios.lng = lng === '' || lng === null ? null : Number(lng)
-    if (whatsapp !== undefined) cambios.whatsapp = whatsapp
+    if (whatsapp !== undefined) {
+      // Con el país (Admin → Servicios), se valida y se guarda con su código (591 / 549).
+      const paisWa = bodyPermitido.whatsappPais
+      if (esAdmin && paisWa) {
+        const v = validarWhatsappPorPais(whatsapp, paisWa)
+        if (!v.valido) return NextResponse.json({ error: v.motivo }, { status: 400 })
+        cambios.whatsapp = numeroConCodigoPais(whatsapp, buscarPais(paisWa).codigo)
+        cambios.whatsappPais = buscarPais(paisWa).id
+      } else {
+        cambios.whatsapp = whatsapp
+      }
+    }
     if (instagram !== undefined) cambios.instagram = instagram
     if (email !== undefined) cambios.email = email
     // Nota interna del admin sobre qué le pidió al profesional y está
