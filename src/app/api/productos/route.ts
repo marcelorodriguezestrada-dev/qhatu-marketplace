@@ -14,6 +14,7 @@ import { PRODUCTOS_SEED } from '@/data/productos'
 import { LEGACY_CATEGORIA_A_RUBRO, RUBRO_DE_GRUPO } from '@/data/categoriasProductos'
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     }
 
     const password = req.headers.get('x-admin-password')
-    const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+    const esAdmin = (await esClaveAdmin(password))
 
     let productos = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
     // Asegurar que exista `thumbUrl` en la respuesta para optimizar listados

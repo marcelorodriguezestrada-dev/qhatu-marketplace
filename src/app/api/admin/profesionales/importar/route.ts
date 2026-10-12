@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
-  return req.headers.get('x-admin-password') === process.env.ADMIN_PASSWORD
+async function esAdmin(req: NextRequest) {
+  return (await esClaveAdmin(req.headers.get('x-admin-password')))
 }
 
 // POST { profesionales: [{ nombre, descripcion, telefono, notaAdmin }] }
@@ -21,7 +22,7 @@ function esAdmin(req: NextRequest) {
 // datos si hace falta (mismo flujo de "Pedir más info" que ya existe
 // para las solicitudes normales) y recién ahí lo apruebe.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 
   try {
     const body = await req.json()

@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
 import { priorizarAnunciosIA, textoEspera } from '@/lib/moderacionIA'
 import { labelTipoAnuncio } from '@/data/anuncios'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic'
 // sin respuesta baja el puntaje) y guarda prioridadInvitacionIA en cada uno.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!(await esClaveAdmin(password))) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'Falta configurar GROQ_API_KEY en el servidor.' }, { status: 500 })
   try {
     const db = getDb()

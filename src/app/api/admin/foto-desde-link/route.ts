@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -15,7 +16,7 @@ function linkDirecto(u: string) {
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   if (!process.env.IMGBB_API_KEY) return NextResponse.json({ error: 'Falta configurar IMGBB_API_KEY en el servidor.' }, { status: 500 })
   const { url } = await req.json().catch(() => ({}))
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) return NextResponse.json({ error: 'Link de foto inválido.' }, { status: 400 })

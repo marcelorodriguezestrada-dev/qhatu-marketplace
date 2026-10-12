@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
 // Admin → Pedidos → "🌙 Quisieron comprar fuera de horario".
 // GET → { compras } (más recientes primero, con si ya vio el aviso).
 // PATCH { id, contactado: true } → marca que le escribiste por WhatsApp.
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const db = getDb()
     const snap = await db.collection('comprasFueraHorario').get()
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   if (!b.id) return NextResponse.json({ error: 'Falta el id.' }, { status: 400 })
   await getDb().collection('comprasFueraHorario').doc(String(b.id)).update({ contactadoAt: b.contactado ? new Date().toISOString() : null })

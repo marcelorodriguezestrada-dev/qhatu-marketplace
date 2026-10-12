@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { getDb } from '@/lib/firebaseAdmin'
 import { CARPETA_CLOUDINARY } from '@/lib/medios'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,9 +15,9 @@ export const dynamic = 'force-dynamic'
 //   PATCH { id, nombre?, publicacionId? }
 //   DELETE ?id=                         → lo saca (y lo borra de Cloudinary)
 
-const esAdmin = (req: NextRequest) => {
+const esAdmin = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 const noAutorizado = () => NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 // Sin espacios, comillas ni saltos de línea (es fácil que se cuelen al
@@ -27,7 +28,7 @@ const firmar = (params: Record<string, string | number>, secret: string) =>
   createHash('sha1').update(Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join('&') + secret).digest('hex')
 
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   const c = cloud()
   const snap = await getDb().collection('mediosMarketing').get().catch(() => null)
   const medios = (snap?.docs || []).map((d) => ({ id: d.id, ...(d.data() as any) })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const body = await req.json()
     const c = cloud()
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const body = await req.json()
     const cambios: Record<string, unknown> = {}
@@ -98,7 +99,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const ref = getDb().collection('mediosMarketing').doc(req.nextUrl.searchParams.get('id') || '')
     const doc = await ref.get()

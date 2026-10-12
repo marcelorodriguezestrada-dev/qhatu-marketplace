@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,20 +13,20 @@ export const maxDuration = 60
 // GET → { total, conEtiquetas }   POST { todos?: boolean, ids?: string[] } → { procesados, fallidos, restantes }
 const LOTE = 8
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const snap = await getDb().collection('productos').get()
   const conEtiquetas = snap.docs.filter((d) => (d.data().etiquetasBusqueda || []).length > 0).length
   return NextResponse.json({ total: snap.size, conEtiquetas })
 }
 
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'Falta configurar GROQ_API_KEY en el servidor.' }, { status: 503 })
   const body = await req.json().catch(() => ({}))
   const db = getDb()

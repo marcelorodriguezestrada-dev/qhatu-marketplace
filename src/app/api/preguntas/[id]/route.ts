@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { contieneInsultos } from '@/lib/moderacionIA'
 import { MAX_RESPUESTA } from '@/lib/preguntas'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
 async function permiso(req: NextRequest, id: string) {
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(password))
   const usuario = await getUsuarioDesdeRequest(req)
   const ref = getDb().collection('preguntas').doc(id)
   const doc = await ref.get()

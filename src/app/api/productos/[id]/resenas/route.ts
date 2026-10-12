@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { contieneInsultos } from '@/lib/moderacionIA'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 // DELETE ?resenaId=<uid> — solo admin (moderación).
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   const resenaId = req.nextUrl.searchParams.get('resenaId')
   if (!resenaId) return NextResponse.json({ error: 'Falta resenaId.' }, { status: 400 })
   try {

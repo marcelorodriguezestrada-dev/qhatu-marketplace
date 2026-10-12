@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -54,7 +55,7 @@ async function sinApi(id: string): Promise<{ nombre: string; items: Item[] }> {
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const { url } = await req.json().catch(() => ({}))
   const id = String(url || '').match(/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders\/|open\?id=|embeddedfolderview\?id=)([a-zA-Z0-9_-]{10,})/)?.[1]
   if (!id) return NextResponse.json({ error: 'Pegá el link de una carpeta de Drive (drive.google.com/drive/folders/…).' }, { status: 400 })

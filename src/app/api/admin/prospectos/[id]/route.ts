@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getDb } from '@/lib/firebaseAdmin'
 import { numeroWhatsapp } from '@/lib/prospectos'
 import { leerCampana, limpiarProspecto } from '@/lib/prospectosServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,13 +11,13 @@ export const dynamic = 'force-dynamic'
 // asigna uno de los cupos de la campaña (si quedan): beneficio = true.
 // { registrar: 'texto' } suma una línea al historial de seguimiento.
 // DELETE → lo borra.
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const d = limpiarProspecto(b)
   if (d.nombre !== undefined && String(d.nombre).length < 2) return NextResponse.json({ error: 'Poné el nombre de la tienda.' }, { status: 400 })
@@ -57,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   await getDb().collection('prospectos').doc(params.id).delete()
   return NextResponse.json({ ok: true })
 }

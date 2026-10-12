@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
 import { enviarSugerenciaIAProfesional, enviarSugerenciaIAAnunciante } from '@/lib/email'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 // de la app — ninguno de los cuatro pasos frena a los demás si falla.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   }
 

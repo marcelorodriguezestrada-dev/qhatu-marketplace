@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(pw))) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
   const db = getDb()
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(pw))) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
   const { id, estado } = await req.json()

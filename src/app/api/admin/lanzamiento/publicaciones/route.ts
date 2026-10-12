@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sanearPublicacion } from '@/lib/lanzamiento'
 import { crearPublicacion } from '@/lib/lanzamientoServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-const esAdmin = (req: NextRequest) => {
+const esAdmin = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 const noAutorizado = () => NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
 
 // POST { publicaciones: [...] }: las agrega al calendario, cada una con su link rastreable.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const body = await req.json()
     const lista = (Array.isArray(body.publicaciones) ? body.publicaciones : [body.publicacion]).filter(Boolean).slice(0, 60)
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH { id, cambios }: editar o cambiar el estado (por hacer / lista / publicada).
 export async function PATCH(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const body = await req.json()
     const ref = getDb().collection('publicacionesMarketing').doc(String(body.id || ''))
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE ?id=: la saca del calendario (y su link, si nadie entró por él).
 export async function DELETE(req: NextRequest) {
-  if (!esAdmin(req)) return noAutorizado()
+  if (!(await esAdmin(req))) return noAutorizado()
   try {
     const db = getDb()
     const id = req.nextUrl.searchParams.get('id') || ''

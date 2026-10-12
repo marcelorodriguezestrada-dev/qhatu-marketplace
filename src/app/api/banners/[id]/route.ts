@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  return !!password && password === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(password))
 }
 
 // PATCH — activar/desactivar, cambiar orden, cambiar imagen o link.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const body = await req.json()
     const cambios: Record<string, unknown> = {}
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     await getDb().collection('banners').doc(params.id).delete()
     return NextResponse.json({ ok: true })

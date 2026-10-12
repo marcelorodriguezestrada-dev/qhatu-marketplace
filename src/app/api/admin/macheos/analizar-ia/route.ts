@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
 import { sugerirMatcheosIA } from '@/lib/moderacionIA'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ const MAX_PROFESIONALES = 60
 // mandar con el otro botón ("Sugerir a ambas partes").
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   }
 

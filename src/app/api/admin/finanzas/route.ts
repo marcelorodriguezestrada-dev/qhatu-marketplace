@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { mesBolivia } from '@/lib/fechaBolivia'
 import { mesDe, sumarMeses } from '@/lib/finanzas'
 import { limpiarMovimiento } from '@/lib/finanzasServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,14 +12,14 @@ export const dynamic = 'force-dynamic'
 //   (las ventas salen de los pedidos pagados/entregados, sin los de cuentas de prueba)
 // POST { tipo, fecha, monto, categoria, descripcion, metodo, recurrente } → crea
 // POST { accion: 'recurrentes', mes } → copia al mes los gastos/ingresos fijos que todavía no estén
-const autorizado = (req: NextRequest) => {
+const autorizado = async (req: NextRequest) => {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 const ESTADOS_VENTA = new Set(['pagado', 'en_preparacion', 'en_entrega', 'entregado'])
 
 export async function GET(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const hasta = req.nextUrl.searchParams.get('hasta') || mesBolivia()
   const desde = req.nextUrl.searchParams.get('desde') || sumarMeses(hasta, -11)
   try {
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!autorizado(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await autorizado(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const db = getDb()
   const ahora = new Date().toISOString()

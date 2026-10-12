@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { compactarCategoria } from '@/lib/arbolCategorias'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +18,9 @@ function slugify(texto: string) {
     .slice(0, 40)
 }
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  return !!password && password === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(password))
 }
 
 // GET: público — el árbol completo de categorías y rubros de
@@ -44,7 +45,7 @@ export async function GET() {
 // otra categoría, o renombrar una categoría. Mismo esquema de
 // acciones que /api/categorias, en colecciones separadas.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) {
+  if (!await esAdmin(req)) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {

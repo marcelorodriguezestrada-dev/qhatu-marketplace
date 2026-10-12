@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { ordenarPorCercania, calcularFranja, DEPOSITO } from '@/lib/reparto'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
 // contraseña que tipear a mano en el celular.
 export async function GET(req: NextRequest) {
   const clave = req.nextUrl.searchParams.get('clave')
-  if (!clave || clave !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(clave))) {
     return NextResponse.json({ error: 'Link inválido o vencido. Pedile al admin que te pase el link de nuevo.' }, { status: 401 })
   }
 

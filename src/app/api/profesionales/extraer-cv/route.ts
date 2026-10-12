@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { extraerDatosCV, categorizarAnuncio } from '@/lib/moderacionIA'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   const passwordAdmin = req.headers.get('x-admin-password')
-  const esAdmin = !!passwordAdmin && passwordAdmin === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(passwordAdmin))
 
   if (!usuario && !esAdmin) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión para usar esto.' }, { status: 401 })

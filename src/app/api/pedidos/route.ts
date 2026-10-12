@@ -11,6 +11,7 @@ import { buscarCuponPorCodigo, registrarUsoCupon } from '@/lib/cuponesServer'
 import { descontarStock, unidadesPorProducto, reponerStockDePedido } from '@/lib/stockServer'
 import { sumarMetricaRecuperacion } from '@/lib/recuperacionServer'
 import { registrarZonaSugerida } from '@/lib/zonasEnvioServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,7 @@ export const dynamic = 'force-dynamic'
 // los pedidos que implican a sus productos.
 export async function GET(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (password && password === process.env.ADMIN_PASSWORD) {
+  if ((await esClaveAdmin(password))) {
     try {
       const db = getDb()
       const snap = await db.collection('pedidos').get()

@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sanearCupon } from '@/lib/cupones'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 // GET — todos los cupones (admin), más nuevos primero.
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     const snap = await getDb().collection('cupones').get()
     const cupones = snap.docs
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
 
 // POST — crea un cupón. El código es único (se guarda en mayúsculas).
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     const { datos, error } = sanearCupon(await req.json())
     if (!datos) return NextResponse.json({ error }, { status: 400 })

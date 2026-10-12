@@ -6,6 +6,7 @@ import { linkParaElegirContrasena } from '@/lib/linkContrasena'
 import { sanearCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { sanearUbicacionPrueba } from '@/lib/cuentasPrueba'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic'
 // base crece más que eso, hay que encadenar con el nextPageToken.
 export async function GET(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
 // que el admin pueda cargarle productos enseguida.
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { reescribirMarketingIA } from '@/lib/moderacionIA'
 import { buscarCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const p = req.headers.get('x-admin-password')
-  if (!p || p !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(p))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const body = await req.json()
   const base = String(body.base || '').slice(0, 2000)
   if (base.length < 10) return NextResponse.json({ error: 'Falta el texto.' }, { status: 400 })

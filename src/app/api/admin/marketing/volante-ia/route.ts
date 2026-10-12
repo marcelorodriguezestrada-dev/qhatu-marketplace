@@ -3,6 +3,7 @@ import { textosVolanteIA } from '@/lib/moderacionIA'
 import { buscarCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { TEMAS_VOLANTE, sanearConfigVolante } from '@/lib/volantes'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
   const p = req.headers.get('x-admin-password')
-  if (!p || p !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(p))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const body = await req.json()
   const idea = String(body.idea || '').trim()
   if (idea.length < 8) return NextResponse.json({ error: 'Contá en una frase de qué es el volante (ej: feria de artesanía, sumar costureras, ofertas de fin de mes).' }, { status: 400 })

@@ -704,6 +704,37 @@ export default function AdminPage() {
   const [edicionUsuario, setEdicionUsuario] = useState<{ uid: string; email: string; nombre: string; whatsapp: string; nombreNegocio: string; tieneTienda: boolean } | null>(null)
   const [guardandoUsuario, setGuardandoUsuario] = useState(false)
   // Poner / cambiar contraseña de un usuario desde el admin.
+  // Admins delegados (solo los ve y maneja el admin principal; null = no sos el principal).
+  const [administradores, setAdministradores] = useState<any[] | null>(null)
+  const [claveAdminNueva, setClaveAdminNueva] = useState<{ uid: string; clave: string; email: string; whatsapp?: string } | null>(null)
+
+  function cargarAdministradores() {
+    fetch('/api/admin/administradores', { headers: { 'x-admin-password': password } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAdministradores(d ? d.administradores || [] : null))
+      .catch(() => setAdministradores(null))
+  }
+
+  async function hacerAdmin(u: any) {
+    if (!confirm(`¿Darle permisos de administrador a ${u.email || u.nombre}? Va a poder ver y cambiar todo el panel (pedidos, usuarios, pagos…), menos crear o quitar otros admins.`)) return
+    const res = await fetch('/api/admin/administradores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ uid: u.uid, email: u.email, nombre: u.nombre }),
+    })
+    const d = await res.json()
+    if (!res.ok) { alert(d.error || 'No se pudo.'); return }
+    setClaveAdminNueva({ uid: u.uid, clave: d.clave, email: u.email || '', whatsapp: u.whatsapp })
+    cargarAdministradores()
+  }
+
+  async function quitarAdmin(id: string, quien: string) {
+    if (!confirm(`¿Quitarle el acceso de administrador a ${quien}? Su clave deja de funcionar enseguida.`)) return
+    await fetch(`/api/admin/administradores?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': password } })
+    setClaveAdminNueva(null)
+    cargarAdministradores()
+  }
+
   const [passwordUsuario, setPasswordUsuario] = useState<{ uid: string; valor: string; guardada: boolean; error: string; guardando: boolean } | null>(null)
 
   async function guardarPasswordUsuario() {
@@ -1477,6 +1508,7 @@ export default function AdminPage() {
     if (!autenticado) return
     if ((tab === 'productos' || tab === 'usuarios') && vendedoresAdmin.length === 0) cargarVendedoresAdmin()
     if (tab === 'usuarios' && usuarios.length === 0) cargarUsuarios()
+    if (tab === 'usuarios' && administradores === null) cargarAdministradores()
     if (tab === 'metricas' && !metricas) cargarMetricas()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, autenticado])
@@ -3412,6 +3444,9 @@ export default function AdminPage() {
                         {u.esPrueba && (
                           <span className="inline-block bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Puede comprar sin restricciones de horario">🧪 Prueba</span>
                         )}
+                        {administradores?.some((a) => a.uid === u.uid) && (
+                          <span className="inline-block bg-ink text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Tiene clave de administrador">🛡️ Admin</span>
+                        )}
                         {u.verificado === false && (
                           <span className="inline-block bg-ochresoft text-ochre border border-ochre text-[10px] font-bold px-1.5 py-0.5 rounded-full" title="Todavía no puso el código de 6 dígitos que le mandamos por mail">⏳ Sin verificar</span>
                         )}
@@ -3522,6 +3557,18 @@ export default function AdminPage() {
                       >
                         {u.pausado ? 'Reactivar' : 'Pausar'}
                       </button>
+                      {administradores !== null && (() => {
+                        const adm = administradores.find((a) => a.uid === u.uid)
+                        return adm ? (
+                          <button type="button" onClick={() => quitarAdmin(adm.id, u.email || u.nombre || 'este usuario')} className="px-2.5 py-1.5 rounded-md border border-ink bg-ink text-white font-body text-[11px] font-semibold" title={adm.ultimoAcceso ? `Último acceso: ${new Date(adm.ultimoAcceso).toLocaleString('es-BO')}` : 'Todavía no entró'}>
+                            🛡️ Quitar admin
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => hacerAdmin(u)} disabled={u.pausado} className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px] disabled:opacity-50" title="Le crea una clave personal para entrar a /admin">
+                            🛡️ Hacer admin
+                          </button>
+                        )
+                      })()}
                       <button
                         type="button"
                         onClick={() => marcarUsuarioPrueba(u.uid, !u.esPrueba)}
@@ -3540,6 +3587,21 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {claveAdminNueva?.uid === u.uid && ((nueva: NonNullable<typeof claveAdminNueva>) => {
+                    const texto = `Hola! Te di acceso de administrador a Clasi Click.\nEntrá a ${typeof window !== 'undefined' ? window.location.origin : 'https://www.clasiclick.com'}/admin y poné esta clave:\n${nueva.clave}\n\nEs personal: no la compartas.`
+                    return (
+                      <div className="mt-3 pt-3 border-t border-line font-body text-xs text-ink">
+                        <div className="font-semibold text-teal mb-1">🛡️ Ya es admin. Esta es su clave personal (se muestra una sola vez):</div>
+                        <div className="font-mono bg-panelalt border border-line rounded-md px-2.5 py-2 mb-2 break-all select-all">{nueva.clave}</div>
+                        <div className="text-[11px] text-inksoft mb-2">Entra a /admin con esta clave en lugar de tu contraseña. Puede hacer todo menos crear o quitar admins. Si la pierde, tocá “Quitar admin” y volvé a hacerlo admin para darle una nueva.</div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => abrirWhatsapp(nueva.whatsapp || vendedoresAdmin.find((v) => v.id === u.uid)?.whatsapp, texto)} className="px-3 py-1.5 rounded-md border-none bg-[#25D366] text-white text-xs font-semibold">💬 Enviar por WhatsApp</button>
+                          <button type="button" onClick={() => navigator.clipboard?.writeText(texto).catch(() => {})} className="px-3 py-1.5 rounded-md border border-line text-xs">📋 Copiar mensaje</button>
+                          <button type="button" onClick={() => setClaveAdminNueva(null)} className="px-3 py-1.5 rounded-md border border-line text-xs">Listo</button>
+                        </div>
+                      </div>
+                    )
+                  })(claveAdminNueva!)}
                   {passwordUsuario?.uid === u.uid && (
                     <div className="mt-3 pt-3 border-t border-line">
                       {passwordUsuario!.guardada ? (

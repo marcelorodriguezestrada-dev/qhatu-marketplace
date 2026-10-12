@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { cuposRestantes, estrategiaBase, type EstrategiaProspecto, type PlanCampana } from '@/lib/prospectos'
 import { leerCampana } from '@/lib/prospectosServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +46,7 @@ const lista = (v: unknown, max = 8) => (Array.isArray(v) ? v.map((x) => String(x
 
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const b = await req.json().catch(() => ({}))
   const db = getDb()
   const campana = await leerCampana()

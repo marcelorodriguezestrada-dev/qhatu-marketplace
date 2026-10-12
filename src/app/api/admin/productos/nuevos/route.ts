@@ -4,6 +4,7 @@ import { ciudadDe } from '@/data/ciudades'
 import { sanearStock } from '@/lib/stock'
 import { sanearFotosAdicionales } from '@/lib/planPremium'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -18,7 +19,7 @@ const imgOk = (u: unknown) => (typeof u === 'string' && /^https:\/\//i.test(u) &
 
 export async function POST(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   const body = await req.json().catch(() => ({}))

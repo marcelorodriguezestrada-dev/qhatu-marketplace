@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { describirCupon, textoVencimiento, type Cupon } from '@/lib/cupones'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
 // si viene vacío armamos uno con el código y el beneficio.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const pw = req.headers.get('x-admin-password')
-  if (!pw || pw !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
 
   try {
     const body = await req.json()

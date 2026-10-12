@@ -3,17 +3,18 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, METRICAS_CAMPANA, codigoCampana } from '@/lib/campanas'
 import { sanearCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-const esAdmin = (req: NextRequest) => {
+const esAdmin = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 
 // GET (admin): campañas con sus números y las visitas de los últimos 14 días.
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const db = getDb()
     const snap = await db.collection('campanas').get()
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
 // POST (admin) { nombre, canal, objetivo, destino?, ciudad }
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esAdmin(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const body = await req.json()
     const nombre = String(body.nombre || '').trim().slice(0, 60)

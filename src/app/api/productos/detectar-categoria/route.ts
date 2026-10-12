@@ -3,6 +3,7 @@ import { getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
 import { analizarFotoProducto, LimiteIA } from '@/lib/fotoProductoIA'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   const pw = req.headers.get('x-admin-password')
-  if (!usuario && !(pw && pw === process.env.ADMIN_PASSWORD)) {
+  if (!usuario && !((await esClaveAdmin(pw)))) {
     return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
   }
   const { imagenUrl } = await req.json().catch(() => ({}))

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sanearCupon } from '@/lib/cupones'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
-  return !!pw && pw === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(pw))
 }
 
 // PATCH — { activo } para pausar/reactivar, o el cupón completo para
 // editarlo (mismo saneo que al crearlo). Los usos no se tocan.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     const body = await req.json()
     const db = getDb()
@@ -38,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'No autorizado.' }, { status: 401 })
   try {
     await getDb().collection('cupones').doc(params.id).delete()
     return NextResponse.json({ ok: true })

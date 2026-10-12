@@ -3,6 +3,7 @@ import { ciudadDe, sanearEnvioPropio, sanearVisibleEn } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // signifique algo real.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {

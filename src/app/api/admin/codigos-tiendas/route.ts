@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
 // Código de tienda de las carpetas/archivos (ej: "cachitos") → vendedor
 // de Clasi Click. Se asocia una vez y queda para las próximas
 // importaciones. Firestore config/codigosTiendas { codigos: { cachitos: uid } }.
-const ok = (req: NextRequest) => {
+const ok = async (req: NextRequest) => {
   const p = req.headers.get('x-admin-password')
-  return !!p && p === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(p))
 }
 const ref = () => getDb().collection('config').doc('codigosTiendas')
 
 export async function GET(req: NextRequest) {
-  if (!ok(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await ok(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     return NextResponse.json({ codigos: (await ref().get()).data()?.codigos || {} })
   } catch {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
 // POST { codigo, vendedorId } (vendedorId vacío = olvidar la asociación)
 export async function POST(req: NextRequest) {
-  if (!ok(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await ok(req))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   const { codigo, vendedorId } = await req.json().catch(() => ({}))
   const c = String(codigo || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40)
   if (!c) return NextResponse.json({ error: 'Código inválido.' }, { status: 400 })

@@ -12,6 +12,7 @@ import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsa
 import { buscarPais } from '@/data/paises'
 import { sanearRedes } from '@/lib/redesSociales'
 import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // y el admin lo siguen viendo para poder revisarlo y descargarlo.
     if (datos.cvPublico === false) {
       const password = req.headers.get('x-admin-password')
-      let puedeVerCV = !!password && password === process.env.ADMIN_PASSWORD
+      let puedeVerCV = (await esClaveAdmin(password))
       if (!puedeVerCV) {
         const usuario = await getUsuarioDesdeRequest(req)
         puedeVerCV = !!usuario && datos.solicitanteUid === usuario.uid
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // lo damos al reservar el turno).
     if (datos.linkVideollamada) {
       const password = req.headers.get('x-admin-password')
-      let esDueño = !!password && password === process.env.ADMIN_PASSWORD
+      let esDueño = (await esClaveAdmin(password))
       if (!esDueño) {
         const usuario = await getUsuarioDesdeRequest(req)
         esDueño = !!usuario && datos.solicitanteUid === usuario.uid
@@ -97,7 +98,7 @@ const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'exper
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  const esAdmin = !!password && password === process.env.ADMIN_PASSWORD
+  const esAdmin = (await esClaveAdmin(password))
 
   const db = getDb()
   const ref = db.collection('profesionales').doc(params.id)
@@ -262,7 +263,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 // DELETE: solo admin.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
   try {

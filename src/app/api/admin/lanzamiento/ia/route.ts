@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { calendarioPlantilla, esFecha } from '@/lib/lanzamiento'
 import { calendarioIA, leerConfigLanzamiento } from '@/lib/lanzamientoServer'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -10,7 +11,7 @@ export const maxDuration = 60
 // guarda: el admin la revisa y la agrega). Sin IA, una semana tipo.
 export async function POST(req: NextRequest) {
   const p = req.headers.get('x-admin-password')
-  if (!p || p !== process.env.ADMIN_PASSWORD) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!(await esClaveAdmin(p))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const body = await req.json()
     const cfg = await leerConfigLanzamiento()

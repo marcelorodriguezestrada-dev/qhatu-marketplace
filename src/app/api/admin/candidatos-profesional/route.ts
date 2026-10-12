@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
+import { esClaveAdmin } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
-function esAdmin(req: NextRequest) {
+async function esAdmin(req: NextRequest) {
   const password = req.headers.get('x-admin-password')
-  return !!password && password === process.env.ADMIN_PASSWORD
+  return (await esClaveAdmin(password))
 }
 
 // GET — solo admin: todos los candidatos, sin filtrar (la pantalla de
 // /admin decide cómo agruparlos por estado).
 export async function GET(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const snap = await getDb().collection('candidatosProfesional').get()
     const candidatos = snap.docs
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 // hacia los usuarios, así que cada uno pasa sí o sí por tu revisión
 // manual antes de convertirse en un profesional real.
 export async function POST(req: NextRequest) {
-  if (!esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
+  if (!await esAdmin(req)) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   try {
     const { candidatos } = await req.json()
     if (!Array.isArray(candidatos) || candidatos.length === 0) {
