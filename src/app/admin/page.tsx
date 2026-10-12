@@ -38,6 +38,9 @@ import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
 import CrearUsuario, { mensajeAcceso, abrirWhatsapp, generarPassword } from '@/components/admin/CrearUsuario'
 import CrearUsuarioPrueba from '@/components/admin/CrearUsuarioPrueba'
+import { CampoRedes } from '@/components/profesional/RedesSociales'
+import CampoReservas from '@/components/profesional/CampoReservas'
+import { reservasDe, type ReservasProfesional } from '@/lib/reservas'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
 import { useSeccionHash, SidebarSecciones, MenuCelularSecciones, VolverCelularSecciones, type ItemSeccion } from '@/components/NavSecciones'
 import FiltrosLista, { aplicarFiltros, FILTROS_INICIALES, type Filtros } from '@/components/admin/FiltrosLista'
@@ -256,6 +259,9 @@ export default function AdminPage() {
   const [lng, setLng] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState('')
+  const [redesPf, setRedesPf] = useState<string[]>([''])
+  const [reservasPf, setReservasPf] = useState<ReservasProfesional>({ consultorio: false, videollamada: false })
+  const [linkVideoPf, setLinkVideoPf] = useState('')
   const [icono, setIcono] = useState(ICONOS_SERVICIO[0])
   const [imagenUrl, setImagenUrl] = useState('')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
@@ -1037,7 +1043,8 @@ export default function AdminPage() {
         nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, direccion,
         lat: lat || null, lng: lng || null,
         whatsapp, whatsappPais: buscarCiudad(ciudadPf).pais, ciudad: ciudadPf,
-        instagram, email: emailProfesional, icono, plan, imagenUrl,
+        instagram: '', redes: redesPf.filter((r) => r.trim()), reservas: reservasPf, linkVideollamada: linkVideoPf,
+        email: emailProfesional, icono, plan, imagenUrl,
         precio: precio || null,
         experiencia,
         historialLaboral: deBorradores(historialCV),
@@ -1061,6 +1068,7 @@ export default function AdminPage() {
       setNombre(''); setDescripcion(''); setServicios([]); setDondeTrabaja(''); setZona(''); setDireccion(''); setLat(''); setLng(''); setWhatsapp('')
       setImagenUrl(''); setPrecio(''); setExperiencia(''); setInstagram(''); setEmailProfesional(''); setEspecialidad(''); setRubroSugeridoCV(null); setEducacion('')
       setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
+      setRedesPf(['']); setReservasPf({ consultorio: false, videollamada: false }); setLinkVideoPf('')
       setProfesionalEditandoId(null)
       cargarProfesionales()
     } finally {
@@ -1089,6 +1097,10 @@ export default function AdminPage() {
     setLng(p.lng != null ? String(p.lng) : '')
     setWhatsapp(p.whatsapp || '')
     setInstagram(p.instagram || '')
+    const redesGuardadas = [...(Array.isArray(p.redes) ? p.redes : []), ...(p.instagram ? [p.instagram] : [])].slice(0, 5)
+    setRedesPf(redesGuardadas.length ? redesGuardadas : [''])
+    setReservasPf(reservasDe(p))
+    setLinkVideoPf(p.linkVideollamada || '')
     setEmailProfesional(p.email || '')
     setIcono(p.icono || ICONOS_SERVICIO[0])
     setImagenUrl(p.imagenUrl || '')
@@ -1110,6 +1122,7 @@ export default function AdminPage() {
     setCiudadPf('potosi')
     setEditHorarioBloques([]); setEditNuevoBloqueDias([]); setEditNuevoBloqueTodoElDia(false)
     setHistorialCV([]); setIdiomasCV([]); setCvPublico(true)
+    setRedesPf(['']); setReservasPf({ consultorio: false, videollamada: false }); setLinkVideoPf('')
     setErrorForm('')
   }
 
@@ -2309,12 +2322,8 @@ export default function AdminPage() {
               placeholder="Email (opcional)"
               className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
             />
-            <input
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
-              placeholder="Instagram u otra red social (opcional)"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-            />
+            <CampoRedes valor={redesPf} onChange={setRedesPf} className="mb-3" />
+            <CampoReservas valor={reservasPf} onChange={setReservasPf} link={linkVideoPf} onLink={setLinkVideoPf} className="mb-3" />
             <div className="flex gap-2 mb-4 flex-wrap">
               {ICONOS_SERVICIO.map((i) => (
                 <button

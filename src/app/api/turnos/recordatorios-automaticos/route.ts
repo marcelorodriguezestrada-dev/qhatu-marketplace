@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
           profesionalNombre: turno.profesionalNombre || '',
           diaLabel: turno.diaLabel,
           hora: turno.hora,
+          linkVideollamada: turno.linkVideollamada || undefined,
         })
         await doc.ref.update({ recordatorioEnviado: true, recordatorioEnviadoEn: new Date().toISOString(), recordatorioAutomatico: true })
         enviados++

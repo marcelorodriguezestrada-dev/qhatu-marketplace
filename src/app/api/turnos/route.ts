@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { esPremiumVigente } from '@/lib/planPremium'
 import { enviarConfirmacionTurno, enviarNotificacionTurnoProfesional } from '@/lib/email'
+import { modalidadesDe, salaJitsi, type ModalidadTurno } from '@/lib/reservas'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,12 @@ export async function POST(req: NextRequest) {
     if (!esPremiumVigente(profesional)) {
       return NextResponse.json({ error: 'Este profesional no tiene la agenda de turnos activa.' }, { status: 403 })
     }
+    // Consultorio o videollamada: solo lo que el profesional marcó en "¿Cómo te reservan?".
+    const modalidades = modalidadesDe(profesional)
+    if (!modalidades.length) {
+      return NextResponse.json({ error: 'Este profesional no toma reservas: escribile por WhatsApp.' }, { status: 403 })
+    }
+    const modalidad: ModalidadTurno = modalidades.includes(body.modalidad) ? body.modalidad : modalidades[0]
 
     // Chequeo de choque: mismo profesional+fecha+hora ya reservado.
     const existente = await db
@@ -81,14 +88,19 @@ export async function POST(req: NextRequest) {
       hora,
       contacto,
       contactoTipo,
+      modalidad,
       createdAt: new Date().toISOString(),
     }
-    const ref = await db.collection('turnos').add(nuevoTurno)
+    const ref = db.collection('turnos').doc()
+    // Videollamada: el link de Meet / Zoom del profesional, o una sala de Jitsi propia del turno.
+    const linkVideollamada = modalidad === 'videollamada' ? profesional.linkVideollamada || salaJitsi(ref.id) : ''
+    await ref.set({ ...nuevoTurno, linkVideollamada })
 
     if (contactoTipo === 'mail') {
       try {
         await enviarConfirmacionTurno(contacto, {
           nombre, profesionalNombre: nuevoTurno.profesionalNombre, diaLabel: nuevoTurno.diaLabel, hora,
+          linkVideollamada: linkVideollamada || undefined,
         })
       } catch (mailErr) {
         // El turno YA se guardó — no le devolvemos error al cliente por
@@ -102,13 +114,14 @@ export async function POST(req: NextRequest) {
         await enviarNotificacionTurnoProfesional(profesional.email, {
           nombre, profesionalNombre: nuevoTurno.profesionalNombre, diaLabel: nuevoTurno.diaLabel, hora,
           contacto, contactoTipo,
+          linkVideollamada: linkVideollamada || undefined,
         })
       } catch (mailErr) {
         console.error('El turno se guardó pero la notificación al profesional falló:', mailErr)
       }
     }
 
-    return NextResponse.json({ turno: { id: ref.id, ...nuevoTurno } }, { status: 201 })
+    return NextResponse.json({ turno: { id: ref.id, ...nuevoTurno, linkVideollamada } }, { status: 201 })
   } catch (err) {
     console.error('POST /api/turnos', err)
     return NextResponse.json({ error: 'No se pudo reservar el turno.' }, { status: 500 })

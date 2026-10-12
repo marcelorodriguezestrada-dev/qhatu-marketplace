@@ -5,6 +5,10 @@ import { useAuth } from '@/lib/auth'
 import { useCiudad, useTodasLasCiudades } from '@/lib/ciudad'
 import { CampoCiudad } from '@/components/SelectorCiudad'
 import { buscarCiudad, ciudadDe, zonasDeCiudad, type CiudadId } from '@/data/ciudades'
+import { esPremiumVigente } from '@/lib/planPremium'
+import { reservasDe, sanearLinkVideollamada, type ReservasProfesional } from '@/lib/reservas'
+import { CampoRedes } from '@/components/profesional/RedesSociales'
+import CampoReservas from '@/components/profesional/CampoReservas'
 
 // Mi perfil → "📍 Dónde y cómo atendés": ciudad, zona y forma de
 // atención (presencial / online / viaja a otras ciudades). Online hace
@@ -18,6 +22,10 @@ export default function AtencionProfesional({ profesional, onGuardado }: { profe
   const [presencial, setPresencial] = useState(profesional.atiendePresencial !== false)
   const [online, setOnline] = useState(profesional.atiendeOnline === true)
   const [viajaA, setViajaA] = useState<CiudadId[]>(Array.isArray(profesional.viajaA) ? profesional.viajaA : [])
+  const redesGuardadas = [...(Array.isArray(profesional.redes) ? profesional.redes : []), ...(profesional.instagram ? [profesional.instagram] : [])].slice(0, 5)
+  const [redes, setRedes] = useState<string[]>(redesGuardadas.length ? redesGuardadas : [''])
+  const [reservas, setReservas] = useState<ReservasProfesional>(reservasDe(profesional))
+  const [linkVideollamada, setLinkVideollamada] = useState<string>(profesional.linkVideollamada || '')
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
@@ -26,11 +34,13 @@ export default function AtencionProfesional({ profesional, onGuardado }: { profe
 
   async function guardar() {
     if (!presencial && !online) { setMensaje('Marcá presencial, online o las dos.'); return }
+    if (reservas.videollamada && linkVideollamada.trim() && !sanearLinkVideollamada(linkVideollamada)) { setMensaje('Revisá el link de videollamada (Meet, Zoom, Teams o Jitsi).'); return }
     setGuardando(true)
     setMensaje('')
     try {
       const token = await obtenerToken()
-      const cambios = { ciudad, zona, atiendePresencial: presencial, atiendeOnline: online, viajaA }
+      // El `instagram` viejo pasa a la lista de redes.
+      const cambios: Record<string, any> = { ciudad, zona, atiendePresencial: presencial, atiendeOnline: online, viajaA, redes: redes.filter((r) => r.trim()), instagram: '', reservas, linkVideollamada: linkVideollamada.trim() }
       const res = await fetch(`/api/profesionales/${profesional.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -88,6 +98,8 @@ export default function AtencionProfesional({ profesional, onGuardado }: { profe
           </div>
         </div>
       )}
+      <CampoReservas valor={reservas} onChange={setReservas} link={linkVideollamada} onLink={setLinkVideollamada} premium={esPremiumVigente(profesional)} className="mt-3" />
+      <CampoRedes valor={redes} onChange={setRedes} className="mt-3" />
       <div className="flex items-center gap-3 mt-3">
         <button type="button" onClick={guardar} disabled={guardando} className="px-4 py-2 rounded-lg border-none bg-teal text-white font-body text-sm font-semibold disabled:opacity-60">
           {guardando ? 'Guardando...' : 'Guardar'}

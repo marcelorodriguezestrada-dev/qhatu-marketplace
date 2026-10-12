@@ -20,6 +20,14 @@ type DatosTurno = {
   profesionalNombre: string
   diaLabel: string
   hora: string
+  // Turno por videollamada: el link para entrar (Meet / Zoom / Jitsi).
+  linkVideollamada?: string
+}
+
+function lineaVideollamada(t: DatosTurno) {
+  return t.linkVideollamada
+    ? `<p>🎥 Es por <strong>videollamada</strong>. Entrá a la hora del turno desde este link:<br><a href="${t.linkVideollamada}">${t.linkVideollamada}</a></p>`
+    : ''
 }
 
 // Si no hay RESEND_API_KEY configurada, no rompe nada — el turno ya se
@@ -36,6 +44,7 @@ export async function enviarConfirmacionTurno(destino: string, turno: DatosTurno
         <h2 style="color:#7A2E2E;">¡Turno confirmado, ${turno.nombre}!</h2>
         <p>Tu turno con <strong>${turno.profesionalNombre}</strong> quedó reservado para el
         <strong>${turno.diaLabel}</strong> a las <strong>${turno.hora}</strong>.</p>
+        ${lineaVideollamada(turno)}
         <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
       </div>
     `,
@@ -62,6 +71,7 @@ export async function enviarNotificacionTurnoProfesional(destino: string, turno:
           <tr><td style="padding:4px 0; color:#6b5f57;">Cliente</td><td style="padding:4px 0;"><strong>${turno.nombre}</strong></td></tr>
           <tr><td style="padding:4px 0; color:#6b5f57;">Día y hora</td><td style="padding:4px 0;">${turno.diaLabel} · ${turno.hora}</td></tr>
           <tr><td style="padding:4px 0; color:#6b5f57;">Contacto</td><td style="padding:4px 0;">${turno.contacto} (${turno.contactoTipo === 'mail' ? 'mail' : 'WhatsApp'})</td></tr>
+          <tr><td style="padding:4px 0; color:#6b5f57;">Dónde</td><td style="padding:4px 0;">${turno.linkVideollamada ? `🎥 Videollamada: <a href="${turno.linkVideollamada}">${turno.linkVideollamada}</a>` : '🏢 En tu consultorio'}</td></tr>
         </table>
         <p style="margin-top:20px; font-size:13px; color:#6b5f57;">
           Ver todos tus turnos en tu perfil, sección "Mis turnos".
@@ -87,6 +97,7 @@ export async function enviarRecordatorioTurno(destino: string, turno: DatosTurno
         <h2 style="color:#7A2E2E;">Recordatorio de tu turno</h2>
         <p>Hola ${turno.nombre}, te escribimos para recordarte tu turno con <strong>${turno.profesionalNombre}</strong>:</p>
         <p style="font-size:16px;"><strong>${turno.diaLabel} a las ${turno.hora}</strong></p>
+        ${lineaVideollamada(turno)}
         <p style="margin-top:20px; font-size:13px; color:#6b5f57;">Si ya no podés asistir, avisale directamente para que pueda ofrecer ese horario a otra persona.</p>
         <p style="margin-top:24px; font-size:13px; color:#6b5f57;">Clasi Click</p>
       </div>

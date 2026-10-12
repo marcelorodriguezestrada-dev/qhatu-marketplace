@@ -188,7 +188,7 @@ export default function MiPerfilPage() {
   }
 
   function linkWhatsappRecordatorio(t: any) {
-    const texto = `Hola ${t.nombre}! Te escribo para recordarte tu turno de mañana ${t.diaLabel} a las ${t.hora}. ¿Seguís confirmado?`
+    const texto = `Hola ${t.nombre}! Te escribo para recordarte tu turno de mañana ${t.diaLabel} a las ${t.hora}.${t.linkVideollamada ? ` Es por videollamada, entrá desde acá: ${t.linkVideollamada}` : ''} ¿Seguís confirmado?`
     return `https://wa.me/${(t.contacto || '').replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`
   }
 
@@ -1081,6 +1081,13 @@ export default function MiPerfilPage() {
                     <div className="font-body text-xs text-inksoft">
                       {t.nombre} · {t.contacto} ({t.contactoTipo === 'mail' ? 'mail' : 'WhatsApp'})
                     </div>
+                    {t.modalidad === 'videollamada' ? (
+                      <div className="font-body text-[11px] text-indigo-700 mt-0.5">
+                        🎥 Videollamada{t.linkVideollamada && <> · <a href={t.linkVideollamada} target="_blank" rel="noopener noreferrer" className="underline">entrar</a></>}
+                      </div>
+                    ) : t.modalidad === 'consultorio' ? (
+                      <div className="font-body text-[11px] text-inksoft mt-0.5">🏢 En el consultorio</div>
+                    ) : null}
                     {t.recordatorioEnviadoEn && (
                       <div className="font-body text-[11px] text-inksoft mt-0.5">
                         Recordatorio enviado {t.recordatorioAutomatico ? 'automáticamente' : ''} el {new Date(t.recordatorioEnviadoEn).toLocaleDateString('es-BO')}

@@ -6,6 +6,8 @@ import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsa
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 import { calcularNuevaVigencia } from '@/lib/planPremium'
 import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
+import { sanearRedes } from '@/lib/redesSociales'
+import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
 
     if (!esAdmin) {
       profesionales = profesionales.filter((p) => !p.estado || p.estado === 'aprobado')
+      // El link de videollamada se le da solo a quien reserva un turno.
+      profesionales = profesionales.map(({ linkVideollamada, ...p }) => p)
     }
 
     return NextResponse.json({ profesionales })
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json()
-    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA } = body
+    const { nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, whatsappPais, instagram, email, icono, plan, imagenUrl, precio, experiencia, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA, redes, reservas, linkVideollamada } = body
     await cargarCiudadesServidor() // ciudades agregadas desde el admin
     const ciudadFinal = sanearCiudad(ciudad)
     if (!nombre || !rubro || !whatsapp) {
@@ -98,6 +102,9 @@ export async function POST(req: NextRequest) {
       whatsapp: whatsappCompleto,
       whatsappPais: paisId,
       instagram: instagram || '',
+      redes: sanearRedes(redes),
+      ...(reservas ? { reservas: sanearReservas(reservas) } : {}),
+      linkVideollamada: sanearLinkVideollamada(linkVideollamada),
       email: (email || '').trim(),
       icono: icono || rubro || 'otro',
       imagenUrl: imagenUrl || '',

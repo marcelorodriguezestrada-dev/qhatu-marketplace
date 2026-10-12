@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       profesionalNombre: turno.profesionalNombre || profDoc.data()!.nombre || '',
       diaLabel: turno.diaLabel,
       hora: turno.hora,
+      linkVideollamada: turno.linkVideollamada || undefined,
     })
 
     const enviadoEn = new Date().toISOString()

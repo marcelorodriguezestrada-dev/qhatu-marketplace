@@ -1,3 +1,5 @@
+import { sanearRedes } from '@/lib/redesSociales'
+import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
 import { NextRequest, NextResponse } from 'next/server'
 import { sumarCampana } from '@/lib/campanasServer'
 import { sanearCiudad, sanearViajaA } from '@/data/ciudades'
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, dondeTrabaja, educacion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios, ciudad, atiendePresencial, atiendeOnline, viajaA } = body
+    const { nombre, rubro, rubroPersonalizado, categoriaId, especialidad, descripcion, dondeTrabaja, educacion, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia, lat, lng, servicios, ciudad, atiendePresencial, atiendeOnline, viajaA, redes, reservas, linkVideollamada } = body
     await cargarCiudadesServidor() // ciudades agregadas desde el admin
     const ciudadFinal = sanearCiudad(ciudad)
     if (!nombre || !rubro || !whatsapp) {
@@ -144,6 +146,9 @@ export async function POST(req: NextRequest) {
       whatsapp: whatsappCompleto,
       whatsappPais: paisId,
       instagram: instagram || '',
+      redes: sanearRedes(redes),
+      ...(reservas ? { reservas: sanearReservas(reservas) } : {}),
+      linkVideollamada: sanearLinkVideollamada(linkVideollamada),
       email: emailLimpio,
       icono: rubroFinal,
       imagenUrl: '',
