@@ -10,6 +10,8 @@ import { sanearCiudad, sanearViajaA, ciudadDe } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
 import { buscarPais } from '@/data/paises'
+import { sanearRedes } from '@/lib/redesSociales'
+import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +61,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       }
     }
 
+    // El link de videollamada solo para el dueño y el admin (al cliente se
+    // lo damos al reservar el turno).
+    if (datos.linkVideollamada) {
+      const password = req.headers.get('x-admin-password')
+      let esDueño = !!password && password === process.env.ADMIN_PASSWORD
+      if (!esDueño) {
+        const usuario = await getUsuarioDesdeRequest(req)
+        esDueño = !!usuario && datos.solicitanteUid === usuario.uid
+      }
+      if (!esDueño) delete datos.linkVideollamada
+    }
+
     return NextResponse.json({ id: doc.id, ...datos, resenas })
   } catch (err) {
     console.error('GET /api/profesionales/[id]', err)
@@ -79,7 +93,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 //    (rubro, contacto, ubicación, plan, estado) siguen siendo territorio
 //    del admin para no abrir la puerta a que alguien se recategorice o
 //    se autoapruebe.
-const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas', 'cvPublico', 'ciudad', 'zona', 'atiendePresencial', 'atiendeOnline', 'viajaA'] as const
+const CAMPOS_EDITABLES_DUEÑO = ['nombre', 'especialidad', 'descripcion', 'experiencia', 'servicios', 'dondeTrabaja', 'educacion', 'historialLaboral', 'idiomas', 'cvPublico', 'ciudad', 'zona', 'atiendePresencial', 'atiendeOnline', 'viajaA', 'instagram', 'redes', 'reservas', 'linkVideollamada'] as const
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const password = req.headers.get('x-admin-password')
@@ -110,7 +124,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body
       : Object.fromEntries(Object.entries(body).filter(([k]) => (CAMPOS_EDITABLES_DUEÑO as readonly string[]).includes(k)))
 
-    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA } = bodyPermitido
+    const { estado, nombre, rubro, especialidad, descripcion, dondeTrabaja, educacion, zona, direccion, lat, lng, whatsapp, instagram, email, notaAdmin, icono, plan, planVigenciaHasta, planEstadoPago, fotosAdicionales, imagenUrl, precio, experiencia, horarioTurnos, servicios, historialLaboral, idiomas, cvPublico, ciudad, atiendePresencial, atiendeOnline, viajaA, redes, reservas, linkVideollamada } = bodyPermitido
     const cambios: Record<string, unknown> = {}
     // Invitación por WhatsApp desde /admin: queda registrado cuándo (y
     // cuántas veces) se le escribió, para no invitar dos veces sin querer.
@@ -148,6 +162,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
     if (instagram !== undefined) cambios.instagram = instagram
+    if (redes !== undefined) cambios.redes = sanearRedes(redes)
+    if (reservas !== undefined) cambios.reservas = sanearReservas(reservas)
+    if (linkVideollamada !== undefined) cambios.linkVideollamada = sanearLinkVideollamada(linkVideollamada)
     if (email !== undefined) cambios.email = email
     // Nota interna del admin sobre qué le pidió al profesional y está
     // esperando (ej. "le pedí una foto mejor, quedé de escribirle el viernes").

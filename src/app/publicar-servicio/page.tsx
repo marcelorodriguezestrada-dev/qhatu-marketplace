@@ -13,6 +13,9 @@ import { useCategorias, agruparRubros } from '@/lib/useCategorias'
 import { validarWhatsappBoliviano } from '@/lib/validarWhatsapp'
 import { PAISES, PAIS_FALLBACK_ID } from '@/data/paises'
 import { extraerTextoDeArchivo } from '@/lib/leerArchivoTexto'
+import { CampoRedes } from '@/components/profesional/RedesSociales'
+import CampoReservas from '@/components/profesional/CampoReservas'
+import type { ReservasProfesional } from '@/lib/reservas'
 
 // Valor especial del select de rubro: "esta categoría no tiene mi
 // profesión, quiero escribirla yo". Es distinto del "otro" que ya
@@ -53,7 +56,9 @@ export default function PublicarServicioPage() {
   const [whatsapp, setWhatsapp] = useState('')
   const [whatsappPais, setWhatsappPais] = useState(PAIS_FALLBACK_ID)
   const [email, setEmail] = useState('')
-  const [instagram, setInstagram] = useState('')
+  const [redes, setRedes] = useState<string[]>([''])
+  const [reservas, setReservas] = useState<ReservasProfesional>({ consultorio: false, videollamada: false })
+  const [linkVideollamada, setLinkVideollamada] = useState('')
   const [precio, setPrecio] = useState('')
   const [experiencia, setExperiencia] = useState('')
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
@@ -233,7 +238,7 @@ export default function PublicarServicioPage() {
           rubro: esPersonalizado ? 'otro' : rubro,
           rubroPersonalizado: esPersonalizado ? rubroPersonalizado : '',
           categoriaId: categoriaSel,
-          especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, instagram, email, precio, experiencia,
+          especialidad, descripcion, dondeTrabaja, educacion, servicios, zona, zonaPersonalizada, direccion, whatsapp, whatsappPais, redes: redes.filter((r) => r.trim()), reservas, linkVideollamada, email, precio, experiencia,
           ciudad: ciudadFinal, atiendePresencial, atiendeOnline, viajaA, campana: leerCampana(),
           lat: ubicacion?.lat ?? null,
           lng: ubicacion?.lng ?? null,
@@ -432,6 +437,7 @@ export default function PublicarServicioPage() {
             </div>
           )}
         </div>
+        <CampoReservas valor={reservas} onChange={setReservas} link={linkVideollamada} onLink={setLinkVideollamada} premium={false} className="mb-3" />
         <select
           value={zona}
           onChange={(e) => setZona(e.target.value)}
@@ -519,12 +525,7 @@ export default function PublicarServicioPage() {
         <div className="font-body text-[11px] text-inksoft mb-3">
           El WhatsApp sigue siendo el contacto principal — el email es solo por si preferimos escribirte por ahí para algo puntual.
         </div>
-        <input
-          value={instagram}
-          onChange={(e) => setInstagram(e.target.value)}
-          placeholder="Instagram u otra red social (opcional)"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-line font-body text-sm mb-3"
-        />
+        <CampoRedes valor={redes} onChange={setRedes} className="mb-3" />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <input
             value={precio}

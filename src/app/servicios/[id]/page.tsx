@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/auth'
 import { useCategorias } from '@/lib/useCategorias'
 import { esPremiumVigente } from '@/lib/planPremium'
 import { getProximosDiasSegunHorario, horasDisponiblesDia, diasConAgenda } from '@/data/turnos'
+import { redesDe } from '@/lib/redesSociales'
+import { modalidadesDe, LABEL_MODALIDAD, type ModalidadTurno } from '@/lib/reservas'
+import { IconosRedes } from '@/components/profesional/RedesSociales'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -64,6 +67,8 @@ export default function PerfilProfesionalPage() {
   const [reservando, setReservando] = useState(false)
   const [reservado, setReservado] = useState(false)
   const [errorReserva, setErrorReserva] = useState('')
+  const [modalidadSel, setModalidadSel] = useState<ModalidadTurno | null>(null)
+  const [linkTurno, setLinkTurno] = useState('')
 
   function cargar() {
     fetch(`/api/profesionales/${id}`)
@@ -111,6 +116,7 @@ export default function PerfilProfesionalPage() {
           hora: horaSel,
           contacto: contactoReserva.trim(),
           contactoTipo: contactoTipoReserva,
+          modalidad: modalidadActual,
         }),
       })
       const data = await res.json()
@@ -119,6 +125,7 @@ export default function PerfilProfesionalPage() {
         return
       }
       setReservado(true)
+      setLinkTurno(data.turno?.linkVideollamada || '')
       setOcupados((o) => [...o, `${diaSel.iso}|${horaSel}`])
     } catch {
       setErrorReserva('No se pudo reservar el turno. Probá de nuevo.')
@@ -164,7 +171,10 @@ export default function PerfilProfesionalPage() {
   // suelto en Firestore) — no alcanza con "|| {bloques:[]}" porque un
   // objeto sin esa clave sigue siendo truthy y se cuela igual.
   const horarioTurnos = Array.isArray(perfil.horarioTurnos?.bloques) ? perfil.horarioTurnos : { bloques: [] }
-  const agendaActiva = premiumVigente && diasConAgenda(horarioTurnos).length > 0
+  // Calendario solo si el profesional marcó consultorio y/o videollamada.
+  const modalidades = modalidadesDe(perfil)
+  const modalidadActual: ModalidadTurno | undefined = modalidadSel && modalidades.includes(modalidadSel) ? modalidadSel : modalidades[0]
+  const agendaActiva = premiumVigente && modalidades.length > 0 && diasConAgenda(horarioTurnos).length > 0
   const diasDisponibles = agendaActiva ? getProximosDiasSegunHorario(horarioTurnos, 10) : []
   const horasDelDiaSel = diaSel
     ? horasDisponiblesDia(horarioTurnos, new Date(diaSel.iso + 'T12:00:00').getDay()).filter((h: string) => !ocupados.includes(`${diaSel.iso}|${h}`))
@@ -348,11 +358,37 @@ export default function PerfilProfesionalPage() {
 
             {agendaActiva && (
               <div className="mt-4 pt-4 border-t border-line">
-                <div className="font-body text-sm font-semibold text-ink mb-3">Reservar turno</div>
+                <div className="font-body text-sm font-semibold text-ink mb-3">
+                  {modalidades.length === 1 && modalidadActual === 'videollamada' ? '🎥 Agendar videollamada' : '📅 Reservar turno'}
+                </div>
+                {modalidades.length > 1 && !reservado && (
+                  <div className="flex gap-1.5 mb-3">
+                    {modalidades.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setModalidadSel(m)}
+                        className={`flex-1 px-2.5 py-2 rounded-md border font-body text-xs font-semibold ${modalidadActual === m ? 'border-maroon bg-maroonsoft text-maroon' : 'border-line bg-panelalt text-inksoft'}`}
+                      >
+                        {LABEL_MODALIDAD[m]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {modalidades.length === 1 && modalidadActual === 'consultorio' && perfil.direccion && !reservado && (
+                  <div className="font-body text-[11px] text-inksoft mb-2">🏢 En {perfil.direccion}{perfil.zona ? `, ${perfil.zona}` : ''}</div>
+                )}
                 {reservado ? (
                   <div className="font-body text-sm text-teal bg-teal/10 rounded-lg p-3">
                     ¡Listo! Tu turno con {perfil.nombre} quedó para el {diaSel?.label} a las {horaSel}.
                     {contactoTipoReserva === 'mail' && ' Te mandamos la confirmación por mail.'}
+                    {linkTurno && (
+                      <div className="mt-2 text-ink">
+                        🎥 Es por videollamada. A la hora del turno entrá desde:
+                        <a href={linkTurno} target="_blank" rel="noopener noreferrer" className="block mt-1 font-semibold text-teal underline break-all">{linkTurno}</a>
+                        <span className="block text-[11px] text-inksoft mt-1">Guardá este link (sacale captura).</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <form onSubmit={reservarTurno}>
@@ -434,27 +470,7 @@ export default function PerfilProfesionalPage() {
               </div>
             )}
 
-            {perfil.instagram && (
-              // Solo el ícono de Instagram (sin el @usuario escrito): se
-              // reconoce al toque y no ocupa un botón entero.
-              <div className="flex justify-center mt-3">
-                <a
-                  href={perfil.instagram.startsWith('http') ? perfil.instagram : `https://instagram.com/${perfil.instagram.replace('@', '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  title="Instagram"
-                  className="flex items-center justify-center w-11 h-11 rounded-full text-white shadow-sm hover:opacity-90 transition"
-                  style={{ background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)' }}
-                >
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
-                    <circle cx="12" cy="12" r="4.2" />
-                    <circle cx="17.4" cy="6.6" r="0.9" fill="currentColor" stroke="none" />
-                  </svg>
-                </a>
-              </div>
-            )}
+            <IconosRedes redes={redesDe(perfil)} />
           </div>
         </div>
       </div>
