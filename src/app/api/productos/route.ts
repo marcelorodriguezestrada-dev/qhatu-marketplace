@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
     await cargarCiudadesServidor() // ciudades agregadas desde el admin
     let ciudad = sanearCiudad(body.ciudad)
     let enviaATodoBolivia = false
+    let visibleEn: string[] = []
     try {
       const vendedorDoc = await db.collection('vendedores').doc(usuario.uid).get()
       if (vendedorDoc.exists) {
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
         tiendaLogoUrl = vd.logoUrl || ''
         if (vd.ciudad) ciudad = ciudadDe(vd)
         enviaATodoBolivia = !!vd.tiposVenta?.haceEnvios && vd.envioPropio?.alcance === 'bolivia'
+        visibleEn = Array.isArray(vd.visibleEn) ? vd.visibleEn : []
       }
     } catch {
       // si falla, no bloqueamos la publicación por esto
@@ -150,6 +152,7 @@ export async function POST(req: NextRequest) {
       tiendaLogoUrl,
       ciudad,
       enviaATodoBolivia,
+      ...(visibleEn.length ? { visibleEn } : {}),
       plan: planValido,
       estado: 'activo',
       moderacionIA,

@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       tiendaLogoUrl: vd.logoUrl || '',
       ciudad: ciudadDe(vd),
       enviaATodoBolivia: !!vd.tiposVenta?.haceEnvios && vd.envioPropio?.alcance === 'bolivia',
+      ...(Array.isArray(vd.visibleEn) && vd.visibleEn.length ? { visibleEn: vd.visibleEn } : {}),
       plan: 'basico',
       estado: 'activo',
       moderacionIA: null,
