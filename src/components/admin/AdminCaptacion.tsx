@@ -6,6 +6,7 @@ import type { Caja, PuntoMapa } from '@/components/admin/MapaProspectosCliente'
 import { CIUDADES } from '@/data/ciudades'
 import { useTodasLasCiudades } from '@/lib/ciudad'
 import { generarPassword } from '@/components/admin/CrearUsuario'
+import PedirProductosIA from '@/components/admin/PedirProductosIA'
 import {
   CAMPANA_DEFECTO,
   ESTADOS_PROSPECTO,
@@ -676,6 +677,17 @@ export default function AdminCaptacion({ password }: { password: string }) {
                       <button type="button" onClick={() => borrar(p)} className="font-body text-xs text-maroon underline bg-transparent border-none">Borrar</button>
                     </div>
                     {p.estado !== 'descartado' && <TiendaProspecto p={p} password={password} onCreada={(c) => actualizar(p.id, c)} />}
+                    {p.estado !== 'nuevo' && p.estado !== 'descartado' && (
+                      <PedirProductosIA
+                        password={password}
+                        nombre={p.nombre}
+                        contacto={p.contacto}
+                        rubro={p.rubro}
+                        ciudad={p.ciudad === 'la-paz' ? 'La Paz' : 'Potosí'}
+                        whatsapp={p.whatsapp}
+                        onEnviado={() => actualizar(p.id, { registrar: '📦 Se le pidieron productos y precios (WhatsApp)' } as any)}
+                      />
+                    )}
                     {p.estado !== 'registrado' && !p.vendedorId && <GuionLlamada guion={p.estrategia?.guionLlamada?.length ? p.estrategia.guionLlamada : guionBase(p, campana, quedan)} telefono={p.whatsapp} />}
                     {!!p.historial?.length && (
                       <div className="bg-panelalt rounded-lg p-3">

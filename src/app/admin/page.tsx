@@ -38,6 +38,7 @@ import AlarmaPedidos from '@/components/admin/AlarmaPedidos'
 import PublicacionFacebook from '@/components/admin/PublicacionFacebook'
 import CrearUsuario, { mensajeAcceso, abrirWhatsapp, generarPassword } from '@/components/admin/CrearUsuario'
 import CrearUsuarioPrueba from '@/components/admin/CrearUsuarioPrueba'
+import PedirProductosIA from '@/components/admin/PedirProductosIA'
 import { CampoRedes } from '@/components/profesional/RedesSociales'
 import CampoReservas from '@/components/profesional/CampoReservas'
 import { reservasDe, type ReservasProfesional } from '@/lib/reservas'
@@ -713,6 +714,7 @@ export default function AdminPage() {
   // Poner / cambiar contraseña de un usuario desde el admin.
   // Admins delegados (solo los ve y maneja el admin principal; null = no sos el principal).
   const [administradores, setAdministradores] = useState<any[] | null>(null)
+  const [pedirProductosUid, setPedirProductosUid] = useState<string | null>(null)
   const [claveAdminNueva, setClaveAdminNueva] = useState<{ uid: string; clave: string; email: string; whatsapp?: string } | null>(null)
 
   function cargarAdministradores() {
@@ -3586,6 +3588,14 @@ export default function AdminPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => setPedirProductosUid(pedirProductosUid === u.uid ? null : u.uid)}
+                        title="La IA arma un WhatsApp para pedirle sus productos y precios"
+                        className={`px-2.5 py-1.5 rounded-md border font-body text-[11px] font-semibold ${pedirProductosUid === u.uid ? 'border-amber-400 bg-amber-100 text-amber-900' : 'border-amber-200 bg-amber-50 text-amber-800'}`}
+                      >
+                        📦 Pedir productos
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => (edicionUsuario?.uid === u.uid ? setEdicionUsuario(null) : abrirEdicionUsuario(u))}
                         className="px-2.5 py-1.5 rounded-md border border-line font-body text-[11px]"
                       >
@@ -3694,6 +3704,20 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {pedirProductosUid === u.uid && (() => {
+                    const tienda = vendedoresAdmin.find((v) => v.id === u.uid)
+                    return (
+                      <div className="mt-3 pt-3 border-t border-line">
+                        <PedirProductosIA
+                          password={password}
+                          nombre={tienda?.nombreNegocio || u.nombre}
+                          contacto={u.nombre}
+                          ciudad={tienda ? buscarCiudad(ciudadDe(tienda)).nombre : undefined}
+                          whatsapp={tienda?.whatsapp || u.whatsapp}
+                        />
+                      </div>
+                    )
+                  })()}
                   {claveAdminNueva?.uid === u.uid && ((nueva: NonNullable<typeof claveAdminNueva>) => {
                     const texto = `Hola! Te di acceso de administrador a Clasi Click.\nEntrá a ${typeof window !== 'undefined' ? window.location.origin : 'https://www.clasiclick.com'}/admin y poné esta clave:\n${nueva.clave}\n\nEs personal: no la compartas.`
                     return (
