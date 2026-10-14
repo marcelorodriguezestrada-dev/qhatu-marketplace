@@ -26,14 +26,17 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     `${p.nombre}${p.tiendaNombre ? ` de ${p.tiendaNombre}` : ''}.`
   const descripcionFinal = `${descripcion} Comprá en ${ciudad} con pago QR y envío a domicilio.`.slice(0, 200)
   const url = `${SITE_URL}/producto/${params.id}`
-  const imagen = p.imagenUrl || `${SITE_URL}/producto/${params.id}/og`
+  // Siempre la tarjeta armada en ./og (JPG 1200x630 con la foto, el nombre y
+  // el precio): las fotos se suben en WebP y Facebook / WhatsApp no siempre
+  // las muestran. ?v= cambia si se edita el producto, para que refresquen.
+  const imagen = `${SITE_URL}/producto/${params.id}/og?v=${encodeURIComponent(String(p.updatedAt || p.createdAt || '1').slice(0, 19))}`
 
   return {
     title: `${titulo} en ${ciudad} | Clasi Click`,
     description: descripcionFinal,
     ...(Array.isArray(p.etiquetasBusqueda) && p.etiquetasBusqueda.length ? { keywords: p.etiquetasBusqueda.slice(0, 15) } : {}),
     alternates: { canonical: url },
-    openGraph: { type: 'website', siteName: 'Clasi Click', locale: 'es_BO', url, title: titulo, description: descripcionFinal, images: [{ url: imagen, alt: p.nombre }] },
+    openGraph: { type: 'website', siteName: 'Clasi Click', locale: 'es_BO', url, title: titulo, description: descripcionFinal, images: [{ url: imagen, width: 1200, height: 630, alt: p.nombre, type: 'image/jpeg' }] },
     twitter: { card: 'summary_large_image', title: titulo, description: descripcionFinal, images: [imagen] },
   }
 }

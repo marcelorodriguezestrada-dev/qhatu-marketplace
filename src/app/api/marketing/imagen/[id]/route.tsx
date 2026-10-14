@@ -1,32 +1,15 @@
 import { ImageResponse } from 'next/og'
 import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/anuncioPublico'
+import { fotoComoDataUrl } from '@/lib/fotoParaImagen'
 
 export const dynamic = 'force-dynamic'
 
 // Imagen lista para redes sociales de un producto (/vender → Marketing):
 // foto, precio, descuento, tienda y el logo de Clasi Click.
 // ?formato=cuadrado (1080x1080, posts) | vertical (1080x1920, estados e
-// historias). La foto se baja acá y va embebida; si no se puede (ImgBB
-// caído, formato no soportado), sale igual sin foto.
-
-async function fotoComoDataUrl(url: string): Promise<string | null> {
-  if (!/^https:\/\//i.test(url)) return null
-  try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 6000)
-    const res = await fetch(url, { signal: ctrl.signal })
-    clearTimeout(t)
-    if (!res.ok) return null
-    const tipo = (res.headers.get('content-type') || '').split(';')[0]
-    if (!['image/jpeg', 'image/png', 'image/jpg'].includes(tipo)) return null
-    const buf = Buffer.from(await res.arrayBuffer())
-    if (buf.length > 6 * 1024 * 1024) return null
-    return `data:${tipo};base64,${buf.toString('base64')}`
-  } catch {
-    return null
-  }
-}
+// historias). La foto se baja acá (convertida a JPG: las fotos se suben
+// en WebP) y va embebida; si no se puede (ImgBB caído), sale igual sin foto.
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const vertical = new URL(req.url).searchParams.get('formato') === 'vertical'
