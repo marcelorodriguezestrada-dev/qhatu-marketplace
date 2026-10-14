@@ -22,6 +22,7 @@
     "react-leaflet": "^4.2.1",
     "read-excel-file": "^9.3.10",
     "resend": "^4.0.1",
+    "sharp": "^0.33.5",
     "tesseract.js": "^5.1.1",
     "write-excel-file": "^4.1.1"
   },
