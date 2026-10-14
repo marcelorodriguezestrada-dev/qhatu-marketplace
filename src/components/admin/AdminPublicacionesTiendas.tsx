@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { SITE_URL } from '@/lib/sitio'
+import TarjetaPublicacion from '@/components/marketing/TarjetaPublicacion'
 
 // Admin → Marketing → Campañas: "🏪 Publicaciones de las tiendas". Lo que
 // cada tienda compartió desde Vender → Marketing (cada publicación es una
@@ -81,23 +82,8 @@ export default function AdminPublicacionesTiendas({ password }: { password: stri
           </div>
 
           <div className="font-body text-xs font-semibold text-ink mb-1.5">Cada publicación</div>
-          <div className="border border-line rounded-lg overflow-hidden max-h-[420px] overflow-y-auto">
-            {filtradas.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2 border-b border-line last:border-b-0">
-                <span className="text-lg shrink-0">{ICONO_RED[p.red] || '📣'}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-body text-xs text-ink truncate"><b>{p.tiendaNombre || 'Tienda'}</b> · {(p.productos || []).map((x: any) => x.nombre).join(', ')}</div>
-                  <div className="font-body text-[10px] text-inksoft">
-                    {new Date(p.publicadaAt).toLocaleDateString('es-BO', { day: 'numeric', month: 'short' })} · código <span className="font-mono">{p.id}</span>
-                  </div>
-                </div>
-                <div className="flex gap-3 font-body text-xs shrink-0">
-                  <span>👀 {p.visitas || 0}</span>
-                  <span>🧾 {p.pedidos || 0}</span>
-                  <span className="hidden sm:inline font-semibold">{bs(p.ventasBs || 0)}</span>
-                </div>
-              </div>
-            ))}
+          <div className="border border-line rounded-lg overflow-hidden max-h-[640px] overflow-y-auto">
+            {filtradas.map((p) => <TarjetaPublicacion key={p.id} p={p} precio={bs} tienda={p.tiendaNombre || 'Tienda'} />)}
           </div>
         </>
       )}

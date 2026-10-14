@@ -4,6 +4,7 @@ import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, METRICAS_CAMPANA, codigoCampana } f
 import { sanearCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { detallePublicacion } from '@/lib/publicacionesTienda'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
         .filter((d) => d.data()?.origen === 'vendedor' && d.data()?.estado === 'publicada')
         .map((d) => {
           const x = d.data() as any
-          const base: Record<string, any> = { id: d.id, vendedorId: x.vendedorId, tiendaNombre: x.tiendaNombre || '', red: x.canal, ciudad: x.ciudad || 'potosi', productos: x.productos || [], publicadaAt: x.publicadaAt || x.createdAt, vecesCompartida: x.vecesCompartida || 0 }
+          const base: Record<string, any> = { ...detallePublicacion(d.id, x), vendedorId: x.vendedorId, tiendaNombre: x.tiendaNombre || '', ciudad: x.ciudad || 'potosi', publicadaAt: x.publicadaAt || x.createdAt }
           for (const m of METRICAS_CAMPANA) base[m] = x[m] || 0
           return base
         })

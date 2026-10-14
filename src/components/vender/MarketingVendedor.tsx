@@ -5,6 +5,7 @@ import { buscarCiudad, type CiudadId } from '@/data/ciudades'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
+import TarjetaPublicacion from '@/components/marketing/TarjetaPublicacion'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
 
 // /vender → "📣 Marketing": el vendedor arma publicaciones para sus
@@ -74,9 +75,22 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
       await fetch('/api/marketing/publicaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ campana, texto, donde }),
+        body: JSON.stringify({ campana, texto, donde, formato, imagenProductoId: principal?.id }),
       })
       cargarPublicaciones()
+    } catch {}
+  }
+
+  // Dónde la publicó (grupo / página) y el link del post, para tener la referencia.
+  async function guardarDetalle(id: string, c: { lugar: string; linkPost: string }) {
+    try {
+      const token = await obtenerToken()
+      await fetch('/api/marketing/publicaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ campana: id, accion: 'editar', ...c }),
+      })
+      await cargarPublicaciones()
     } catch {}
   }
 
@@ -366,7 +380,7 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
         )}
       </div>
 
-      <TusPublicaciones publicaciones={publicaciones} precio={(n) => formatoMoneda(n, paisDeCiudad(ciudad.id))} />
+      <TusPublicaciones publicaciones={publicaciones} precio={(n) => formatoMoneda(n, paisDeCiudad(ciudad.id))} onGuardar={guardarDetalle} />
 
       <div className="bg-panel border border-line rounded-xl p-5">
         <div className="font-body text-sm font-semibold text-ink mb-1">🛍️ Tu catálogo para WhatsApp</div>
@@ -405,11 +419,10 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
   )
 }
 
-const ICONO_RED: Record<string, string> = { facebook: '📘', instagram: '📸', whatsapp: '💬', tiktok: '🎵' }
 
 // 📊 Las publicaciones que compartió la tienda y lo que trajo cada una
 // (visitas y pedidos de ESTA tienda que entraron por sus links).
-function TusPublicaciones({ publicaciones, precio }: { publicaciones: any[] | null; precio: (n: number) => string }) {
+function TusPublicaciones({ publicaciones, precio, onGuardar }: { publicaciones: any[] | null; precio: (n: number) => string; onGuardar: (id: string, c: { lugar: string; linkPost: string }) => Promise<void> }) {
   if (!publicaciones) return null
   const tot = publicaciones.reduce((t, p) => ({ visitas: t.visitas + (p.visitas || 0), pedidos: t.pedidos + (p.pedidos || 0), ventas: t.ventas + (p.ventasBs || 0) }), { visitas: 0, pedidos: 0, ventas: 0 })
   return (
@@ -431,22 +444,7 @@ function TusPublicaciones({ publicaciones, precio }: { publicaciones: any[] | nu
             ))}
           </div>
           <div className="border border-line rounded-lg overflow-hidden">
-            {publicaciones.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 border-b border-line last:border-b-0">
-                <span className="text-xl shrink-0">{ICONO_RED[p.red] || '📣'}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-body text-sm text-ink truncate">{(p.productos || []).map((x: any) => x.nombre).join(', ') || 'Publicación'}</div>
-                  <div className="font-body text-[11px] text-inksoft">
-                    {p.publicadaAt ? new Date(p.publicadaAt).toLocaleDateString('es-BO', { day: 'numeric', month: 'short' }) : ''} · {p.red}
-                  </div>
-                </div>
-                <div className="flex gap-3 font-body text-xs text-ink shrink-0 text-right">
-                  <span title="Visitas desde esta publicación">👀 {p.visitas || 0}</span>
-                  <span title="Pedidos en tu tienda">🧾 {p.pedidos || 0}</span>
-                  <span className="hidden sm:inline font-semibold" title="Vendido">{precio(p.ventasBs || 0)}</span>
-                </div>
-              </div>
-            ))}
+            {publicaciones.map((p) => <TarjetaPublicacion key={p.id} p={p} precio={precio} onGuardar={(c) => onGuardar(p.id, c)} />)}
           </div>
           <div className="font-body text-[11px] text-inksoft mt-2">Cada visita cuenta una vez (si la misma persona vuelve otro día, suma de nuevo). Un pedido cuenta si la persona entró por tu link en los últimos 30 días.</div>
         </>
