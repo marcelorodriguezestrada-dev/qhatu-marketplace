@@ -3,6 +3,7 @@ import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/sitio'
 import { ciudadDe } from '@/data/ciudades'
 import { ciudadesAbiertas } from '@/lib/seo'
+import { landingsDeCiudad, urlLanding } from '@/lib/landing'
 
 // /sitemap.xml — la lista de páginas para Google: productos, servicios,
 // tiendas y anuncios publicados de las ciudades abiertas (las "en prueba",
@@ -53,6 +54,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const a = d.data() as any
       if (a.estado !== 'aprobado' || !visible(a)) continue
       urls.push({ url: `${SITE_URL}/anuncios/${d.id}`, lastModified: fecha(a.updatedAt || a.createdAt), changeFrequency: 'weekly', priority: 0.5 })
+    }
+    // Páginas por ciudad y rubro (etapa 2): /potosi, /potosi/servicios/electricista…
+    for (const ciudad of abiertas) {
+      const landings = await landingsDeCiudad(ciudad).catch(() => [])
+      if (!landings.length) continue
+      urls.push({ url: `${SITE_URL}/${ciudad}`, changeFrequency: 'daily', priority: 0.9 })
+      for (const l of landings) urls.push({ url: `${SITE_URL}${urlLanding(ciudad, l)}`, changeFrequency: 'daily', priority: l.nivel === 'categoria' ? 0.85 : 0.8 })
     }
     return [...fijas, ...urls]
   } catch (err) {
