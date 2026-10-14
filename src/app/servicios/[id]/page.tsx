@@ -10,6 +10,7 @@ import { getProximosDiasSegunHorario, horasDisponiblesDia, diasConAgenda } from 
 import { redesDe } from '@/lib/redesSociales'
 import { modalidadesDe, LABEL_MODALIDAD, type ModalidadTurno } from '@/lib/reservas'
 import { IconosRedes } from '@/components/profesional/RedesSociales'
+import { useDatoInicial } from '@/components/DatosIniciales'
 
 function bs(n: number) {
   return 'Bs ' + n.toLocaleString('es-BO')
@@ -50,8 +51,10 @@ export default function PerfilProfesionalPage() {
   const id = params?.id as string
   const { usuario, obtenerToken } = useAuth()
   const { buscarRubro } = useCategorias()
-  const [perfil, setPerfil] = useState<any>(null)
-  const [cargando, setCargando] = useState(true)
+  // El layout (servidor) ya trae el perfil: la página llega armada (Google).
+  const inicial = useDatoInicial<any>('profesional')
+  const [perfil, setPerfil] = useState<any>(inicial && inicial.id === id ? inicial : null)
+  const [cargando, setCargando] = useState(!(inicial && inicial.id === id))
   const [calificacion, setCalificacion] = useState(5)
   const [comentario, setComentario] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -74,9 +77,11 @@ export default function PerfilProfesionalPage() {
     fetch(`/api/profesionales/${id}`)
       .then((r) => r.json())
       .then((data) => {
-        setPerfil(data)
+        // Si falla pero el servidor ya lo había traído, se queda con ese.
+        setPerfil((prev: any) => (data && !data.error && data.id ? data : prev && !prev.error ? prev : data))
         setCargando(false)
       })
+      .catch(() => setCargando(false))
   }
 
   useEffect(() => {
@@ -160,7 +165,7 @@ export default function PerfilProfesionalPage() {
   if (cargando) return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">Cargando...</div>
   if (!perfil || perfil.error) return <div className="px-5 py-16 text-center font-body text-sm text-inksoft">No encontramos este perfil.</div>
 
-  const linkWhatsapp = `https://wa.me/${perfil.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
+  const linkWhatsapp = `https://wa.me/${String(perfil.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent(
     `Hola ${perfil.nombre}, te vi en Clasi Click y quería consultarte por tus servicios.`
   )}`
 
