@@ -2,7 +2,7 @@
 
 import { useCiudad } from '@/lib/ciudad'
 import { buscarCiudad, type CiudadId } from '@/data/ciudades'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
@@ -30,6 +30,9 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
   const [bajando, setBajando] = useState(false)
   const [error, setError] = useState('')
   const [buscar, setBuscar] = useState('')
+  // La publicación que se está armando es una campaña con links rastreados (?c= + UTM).
+  const [campana, setCampana] = useState<string | null>(null)
+  const [publicaciones, setPublicaciones] = useState<any[] | null>(null)
   const [orden, setOrden] = useState<'recientes' | 'precio-menor' | 'precio-mayor' | 'nombre'>('recientes')
 
   // En el orden en que se eligieron (el 1° es el de la imagen).
@@ -48,6 +51,34 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
   const principal = seleccion[0]
   const urlImagen = principal ? `/api/marketing/imagen/${principal.id}?formato=${formato}` : ''
   const linkTienda = usuario ? `${SITE}/tienda/${usuario.uid}?ref=whatsapp` : ''
+
+  async function cargarPublicaciones() {
+    try {
+      const token = await obtenerToken()
+      const d = await fetch('/api/marketing/publicaciones', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
+      setPublicaciones(d.publicaciones || [])
+    } catch {
+      setPublicaciones([])
+    }
+  }
+  useEffect(() => {
+    if (usuario) cargarPublicaciones()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario])
+
+  // Al copiar / compartir / descargar: queda como publicada (aparece en "Tus publicaciones").
+  async function marcarPublicada(donde: string) {
+    if (!campana) return
+    try {
+      const token = await obtenerToken()
+      await fetch('/api/marketing/publicaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ campana, texto, donde }),
+      })
+      cargarPublicaciones()
+    } catch {}
+  }
 
   function alternar(id: string) {
     setElegidos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= MAX_PRODUCTOS ? prev : [...prev, id]))
@@ -70,15 +101,16 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
       const res = await fetch('/api/marketing/texto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ productoIds: elegidos, red, tono }),
+        body: JSON.stringify({ productoIds: elegidos, red, tono, campana }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'No se pudo armar el texto.')
       setTexto(d.texto)
       setConIA(!!d.conIA)
+      if (d.campana) setCampana(d.campana)
     } catch (err: any) {
       // Sin conexión con el servidor: al menos la plantilla.
-      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE, ciudad.nombre))
+      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE, ciudad.nombre, campana))
       setConIA(false)
       setError(err?.message || '')
     } finally {
@@ -278,18 +310,18 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
               </div>
               <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={11} className="w-full px-3 py-2.5 rounded-lg border border-line bg-panelalt font-body text-sm" />
               <div className="flex flex-wrap gap-2 mt-2">
-                <button type="button" onClick={() => copiar(texto, 'texto')} className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold">
+                <button type="button" onClick={() => { copiar(texto, 'texto'); marcarPublicada('copiado') }} className="px-3.5 py-2 rounded-lg border-none bg-ink text-white font-body text-xs font-semibold">
                   {copiado === 'texto' ? '✓ Copiado' : '📋 Copiar texto'}
                 </button>
-                <a href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer" className="px-3.5 py-2 rounded-lg bg-[#25D366] text-white font-body text-xs font-semibold">
+                <a href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer" onClick={() => marcarPublicada('whatsapp')} className="px-3.5 py-2 rounded-lg bg-[#25D366] text-white font-body text-xs font-semibold">
                   💬 WhatsApp
                 </a>
                 {principal && (
                   <a
-                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(linkProducto(SITE, principal.id, 'facebook'))}`}
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(linkProducto(SITE, principal.id, 'facebook', campana))}`}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={() => copiar(texto, 'texto')}
+                    onClick={() => { copiar(texto, 'texto'); marcarPublicada('facebook') }}
                     className="px-3.5 py-2 rounded-lg bg-[#1877F2] text-white font-body text-xs font-semibold"
                     title="Se abre Facebook con el link; el texto queda copiado para pegarlo"
                   >
@@ -321,10 +353,10 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
                 </div>
                 {seleccion.length > 1 && <div className="font-body text-[10px] text-inksoft mt-1">Imagen del primer producto elegido.</div>}
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <button type="button" onClick={compartirConImagen} disabled={bajando} className="px-3 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-60">
+                  <button type="button" onClick={() => { compartirConImagen(); marcarPublicada('compartir') }} disabled={bajando} className="px-3 py-2 rounded-lg border-none bg-teal text-white font-body text-xs font-semibold disabled:opacity-60">
                     📤 Compartir
                   </button>
-                  <button type="button" onClick={descargar} disabled={bajando} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink disabled:opacity-60">
+                  <button type="button" onClick={() => { descargar(); marcarPublicada('descarga') }} disabled={bajando} className="px-3 py-2 rounded-lg border border-line font-body text-xs text-ink disabled:opacity-60">
                     {bajando ? 'Preparando...' : '⬇️ Descargar'}
                   </button>
                 </div>
@@ -333,6 +365,8 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
           </div>
         )}
       </div>
+
+      <TusPublicaciones publicaciones={publicaciones} precio={(n) => formatoMoneda(n, paisDeCiudad(ciudad.id))} />
 
       <div className="bg-panel border border-line rounded-xl p-5">
         <div className="font-body text-sm font-semibold text-ink mb-1">🛍️ Tu catálogo para WhatsApp</div>
@@ -367,6 +401,56 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+const ICONO_RED: Record<string, string> = { facebook: '📘', instagram: '📸', whatsapp: '💬', tiktok: '🎵' }
+
+// 📊 Las publicaciones que compartió la tienda y lo que trajo cada una
+// (visitas y pedidos de ESTA tienda que entraron por sus links).
+function TusPublicaciones({ publicaciones, precio }: { publicaciones: any[] | null; precio: (n: number) => string }) {
+  if (!publicaciones) return null
+  const tot = publicaciones.reduce((t, p) => ({ visitas: t.visitas + (p.visitas || 0), pedidos: t.pedidos + (p.pedidos || 0), ventas: t.ventas + (p.ventasBs || 0) }), { visitas: 0, pedidos: 0, ventas: 0 })
+  return (
+    <div className="bg-panel border border-line rounded-xl p-5">
+      <div className="font-body text-sm font-semibold text-ink mb-1">📊 Tus publicaciones</div>
+      <div className="font-body text-[12px] text-inksoft mb-3">
+        Cada publicación que armás acá lleva su propio link. Así sabés cuánta gente entró desde cada una y cuánto vendiste.
+      </div>
+      {publicaciones.length === 0 ? (
+        <div className="font-body text-xs text-inksoft bg-panelalt rounded-lg px-3 py-3">Todavía no compartiste ninguna. Armá una arriba y tocá Copiar, WhatsApp, Facebook o Compartir.</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[['👀 Visitas', tot.visitas], ['🧾 Pedidos', tot.pedidos], ['💰 Vendido', precio(tot.ventas)]].map(([l, v]) => (
+              <div key={String(l)} className="bg-panelalt rounded-lg p-2.5">
+                <div className="font-body text-[11px] text-inksoft">{l}</div>
+                <div className="font-display text-lg font-bold text-ink">{v}</div>
+              </div>
+            ))}
+          </div>
+          <div className="border border-line rounded-lg overflow-hidden">
+            {publicaciones.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 border-b border-line last:border-b-0">
+                <span className="text-xl shrink-0">{ICONO_RED[p.red] || '📣'}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-body text-sm text-ink truncate">{(p.productos || []).map((x: any) => x.nombre).join(', ') || 'Publicación'}</div>
+                  <div className="font-body text-[11px] text-inksoft">
+                    {p.publicadaAt ? new Date(p.publicadaAt).toLocaleDateString('es-BO', { day: 'numeric', month: 'short' }) : ''} · {p.red}
+                  </div>
+                </div>
+                <div className="flex gap-3 font-body text-xs text-ink shrink-0 text-right">
+                  <span title="Visitas desde esta publicación">👀 {p.visitas || 0}</span>
+                  <span title="Pedidos en tu tienda">🧾 {p.pedidos || 0}</span>
+                  <span className="hidden sm:inline font-semibold" title="Vendido">{precio(p.ventasBs || 0)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="font-body text-[11px] text-inksoft mt-2">Cada visita cuenta una vez (si la misma persona vuelve otro día, suma de nuevo). Un pedido cuenta si la persona entró por tu link en los últimos 30 días.</div>
+        </>
+      )}
     </div>
   )
 }

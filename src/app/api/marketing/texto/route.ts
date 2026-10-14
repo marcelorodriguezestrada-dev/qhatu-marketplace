@@ -5,6 +5,7 @@ import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { textoMarketingIA } from '@/lib/moderacionIA'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { linkProducto, pctDescuento, textoPlantilla, type ProductoMarketing } from '@/lib/marketing'
+import { codigoCampana } from '@/lib/campanas'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,36 @@ export async function POST(req: NextRequest) {
     const tiendaDoc = await db.collection('vendedores').doc(usuario.uid).get()
     const tienda = (tiendaDoc.data() as any)?.nombreNegocio || ''
     const ciudad = buscarCiudad(ciudadDe(tiendaDoc.data() as any)).nombre
-    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL, ciudad)
+    // La publicación es una campaña de la tienda (campanas/{código}): sus
+    // links la rastrean y lo que traiga se ve en Vender → Marketing y en
+    // Admin → Marketing. Al regenerar se reusa la misma (body.campana).
+    const ahora = new Date().toISOString()
+    let campana = typeof body.campana === 'string' && /^[a-z0-9-]{3,40}$/.test(body.campana) ? body.campana : ''
+    if (campana) {
+      const prev = await db.collection('campanas').doc(campana).get()
+      if (!prev.exists || prev.get('vendedorId') !== usuario.uid || prev.get('estado') === 'publicada') campana = ''
+    }
+    if (!campana) campana = codigoCampana(`${tienda || 'tienda'} ${red}`)
+    await db.collection('campanas').doc(campana).set(
+      {
+        nombre: `${tienda || 'Tienda'} · ${red}`,
+        canal: red,
+        objetivo: 'compradores',
+        destino: `/producto/${productos[0].id}`,
+        ciudad: ciudadDe(tiendaDoc.data() as any),
+        activa: true,
+        origen: 'vendedor',
+        vendedorId: usuario.uid,
+        tiendaNombre: tienda,
+        productoIds: productos.map((p) => p.id),
+        productos: productos.map((p) => ({ id: p.id, nombre: p.nombre, precio: p.precio })),
+        estado: 'borrador',
+        createdAt: ahora,
+        updatedAt: ahora,
+      },
+      { merge: true },
+    )
+    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL, ciudad, campana)
 
     const datos = [
       `Tienda: ${tienda || 'sin nombre'} (${ciudad})`,
@@ -48,14 +78,17 @@ export async function POST(req: NextRequest) {
           p.talles?.length && `  Talles: ${p.talles.join(', ')}`,
           p.colores?.length && `  Colores: ${p.colores.join(', ')}`,
           p.stock != null && p.stock > 0 && p.stock <= 3 && `  Quedan solo ${p.stock} unidades`,
-          `  Link: ${linkProducto(SITE_URL, p.id, red)}`,
+          `  Link (copialo tal cual, sin cambiarlo): ${linkProducto(SITE_URL, p.id, red, campana)}`,
         ].filter(Boolean).join('\n')
       }),
       `Se compra en Clasi Click y se paga con QR. La tienda está en ${ciudad}: usá hashtags de ${ciudad}.`,
     ].join('\n')
 
-    const ia = await textoMarketingIA(datos, red, tono)
-    return NextResponse.json({ texto: ia || plantilla, conIA: !!ia })
+    let ia = await textoMarketingIA(datos, red, tono)
+    // Si la IA tocó los links (perdió el código), va la plantilla: sin el
+    // código no se puede medir la publicación.
+    if (ia && !ia.includes(`c=${campana}`)) ia = null
+    return NextResponse.json({ texto: ia || plantilla, conIA: !!ia, campana })
   } catch (err) {
     console.error('POST /api/marketing/texto', err)
     return NextResponse.json({ error: 'No se pudo armar el texto.' }, { status: 500 })

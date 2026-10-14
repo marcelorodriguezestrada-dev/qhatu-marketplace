@@ -85,6 +85,20 @@ export default function EstadisticasUsuario({ inicial, solo }: { inicial?: Pesta
   const [error, setError] = useState('')
   const [pestana, setPestana] = useState<PestanaEstadisticas | null>(solo || inicial || null)
   const [metrica, setMetrica] = useState<(typeof METRICAS)[number]['id']>('vistas')
+  // Publicaciones en redes (Vender → Marketing), con su link rastreado.
+  const [redes, setRedes] = useState<{ n: number; visitas: number; pedidos: number; ventas: number } | null>(null)
+  useEffect(() => {
+    if (!usuario) return
+    obtenerToken()
+      .then((token) => fetch('/api/marketing/publicaciones', { headers: { Authorization: `Bearer ${token}` } }))
+      .then((r) => r.json())
+      .then((d) => {
+        const l: any[] = d.publicaciones || []
+        setRedes({ n: l.length, visitas: l.reduce((s, p) => s + (p.visitas || 0), 0), pedidos: l.reduce((s, p) => s + (p.pedidos || 0), 0), ventas: l.reduce((s, p) => s + (p.ventasBs || 0), 0) })
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario])
 
   useEffect(() => {
     if (!usuario) return
@@ -189,6 +203,16 @@ export default function EstadisticasUsuario({ inicial, solo }: { inicial?: Pesta
           </>
         )}
       </div>
+
+      {actual === 'productos' && redes && redes.n > 0 && (
+        <Link href="/vender#marketing" className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5 mb-3 no-underline">
+          <span className="text-xl">📣</span>
+          <span className="flex-1 min-w-0 font-body text-xs text-ink">
+            <b>{redes.n} {redes.n === 1 ? 'publicación' : 'publicaciones'} en redes</b> trajeron {redes.visitas} visitas y {redes.pedidos} {redes.pedidos === 1 ? 'pedido' : 'pedidos'} ({formatoMoneda(redes.ventas, pais)}).
+          </span>
+          <span className="font-body text-xs text-indigo-700 font-semibold shrink-0">Ver ›</span>
+        </Link>
+      )}
 
       {actual !== 'anuncios' && contactoPct !== null && (
         <div className="font-body text-xs text-ink mb-3">

@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
       }
     }
     // Compra que llegó por una campaña de marketing (no cuentan las de prueba).
-    if (body.campana && !esPrueba) await sumarCampana(body.campana, { pedidos: 1, ventasBs: Number(total) || 0 })
+    if (body.campana && !esPrueba) await sumarCampana(body.campana, { pedidos: 1, ventasBs: Number(total) || 0 }, { vendedorId: vendedorId || null })
     return NextResponse.json({ id: ref.id })
   } catch (err) {
     console.error('POST /api/pedidos', err)
