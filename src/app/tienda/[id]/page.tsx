@@ -6,6 +6,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Producto } from '@/data/productos'
 import { ProductCard } from '@/components/ProductCard'
+import { useDatoInicial } from '@/components/DatosIniciales'
 
 const MapaProfesionales = dynamic(() => import('@/components/MapaProfesionales').then((m) => m.MapaProfesionales), {
   ssr: false,
@@ -32,9 +33,12 @@ export default function TiendaPage() {
   const params = useParams()
   const vendedorId = params.id as string
 
-  const [perfil, setPerfil] = useState<PerfilTienda | null>(null)
-  const [productos, setProductos] = useState<Producto[]>([])
-  const [cargando, setCargando] = useState(true)
+  // El layout (servidor) ya trae la tienda y sus productos (Google).
+  const inicial = useDatoInicial<{ tienda: any; productos: any[] }>('tienda')
+  const conInicial = !!inicial && inicial.tienda?.id === vendedorId
+  const [perfil, setPerfil] = useState<PerfilTienda | null>(conInicial ? inicial!.tienda : null)
+  const [productos, setProductos] = useState<Producto[]>(conInicial ? inicial!.productos : [])
+  const [cargando, setCargando] = useState(!conInicial)
 
   useEffect(() => {
     if (!vendedorId) return

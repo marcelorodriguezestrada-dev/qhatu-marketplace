@@ -1,48 +1,49 @@
 import type { Metadata } from 'next'
 import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
-import { getDb } from '@/lib/firebaseAdmin'
-import { SITE_URL } from '@/lib/anuncioPublico'
+import { SITE_URL } from '@/lib/sitio'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
+import { jsonLdProducto, ldJson, leerProductoPublico, textoCorto } from '@/lib/seo'
+import { DatosIniciales } from '@/components/DatosIniciales'
 
-// Vista previa (Open Graph) al compartir el link de un producto por
-// WhatsApp/Facebook: foto, nombre, precio y descripción corta. La página
-// es un client component, por eso se arma acá del lado del servidor.
-// Sin foto, usa la imagen generada en ./og.
-async function leerProducto(id: string) {
-  try {
-    const doc = await getDb().collection('productos').doc(id).get()
-    if (!doc.exists) return null
-    const p = doc.data()!
-    if (p.estado && p.estado !== 'activo') return null
-    return { id: doc.id, ...p } as Record<string, any>
-  } catch {
-    return null
-  }
-}
-
+// La página del producto es un client component. Acá (servidor) se arma:
+// - el título y la descripción para Google y la vista previa (Open Graph)
+//   al compartir por WhatsApp/Facebook (sin foto, usa la imagen de ./og);
+// - los datos estructurados (schema.org Product: precio, stock, tienda),
+//   para que Google pueda mostrar el precio en el resultado;
+// - el producto ya leído, para que la página llegue con el contenido.
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   await cargarCiudadesServidor().catch(() => null) // nombres de las ciudades agregadas desde el admin
-  const p = await leerProducto(params.id)
-  if (!p) return { title: 'Producto | Clasi Click' }
+  const p = await leerProductoPublico(params.id)
+  if (!p) return { title: 'Producto | Clasi Click', robots: { index: false } }
 
-  const precio = p.precio ? `Bs ${Number(p.precio).toLocaleString('es-BO')}` : ''
+  const ciudad = buscarCiudad(ciudadDe(p)).nombre
+  const precio = p.precio ? formatoMoneda(Number(p.precio), paisDeCiudad(ciudadDe(p))) : ''
   const off = p.precioOriginal && p.precioOriginal > p.precio ? ` (${Math.round((1 - p.precio / p.precioOriginal) * 100)}% OFF)` : ''
   const titulo = `${p.nombre}${precio ? ` — ${precio}${off}` : ''}`
   const descripcion =
-    String(p.descripcionCorta || p.descripcionLarga || '').replace(/\s+/g, ' ').trim().slice(0, 160) ||
-    `${p.vendedor ? `${p.vendedor} · ` : ''}Comprá en Clasi Click, ${buscarCiudad(ciudadDe(p)).nombre}.`
+    textoCorto(p.descripcionCorta || p.descripcionLarga, 130) ||
+    `${p.nombre}${p.tiendaNombre ? ` de ${p.tiendaNombre}` : ''}.`
+  const descripcionFinal = `${descripcion} Comprá en ${ciudad} con pago QR y envío a domicilio.`.slice(0, 200)
   const url = `${SITE_URL}/producto/${params.id}`
   const imagen = p.imagenUrl || `${SITE_URL}/producto/${params.id}/og`
 
   return {
-    title: `${titulo} | Clasi Click`,
-    description: descripcion,
+    title: `${titulo} en ${ciudad} | Clasi Click`,
+    description: descripcionFinal,
+    ...(Array.isArray(p.etiquetasBusqueda) && p.etiquetasBusqueda.length ? { keywords: p.etiquetasBusqueda.slice(0, 15) } : {}),
     alternates: { canonical: url },
-    openGraph: { type: 'website', siteName: 'Clasi Click', locale: 'es_BO', url, title: titulo, description: descripcion, images: [{ url: imagen, alt: p.nombre }] },
-    twitter: { card: 'summary_large_image', title: titulo, description: descripcion, images: [imagen] },
+    openGraph: { type: 'website', siteName: 'Clasi Click', locale: 'es_BO', url, title: titulo, description: descripcionFinal, images: [{ url: imagen, alt: p.nombre }] },
+    twitter: { card: 'summary_large_image', title: titulo, description: descripcionFinal, images: [imagen] },
   }
 }
 
-export default function ProductoLayout({ children }: { children: React.ReactNode }) {
-  return children
+export default async function ProductoLayout({ children, params }: { children: React.ReactNode; params: { id: string } }) {
+  const p = await leerProductoPublico(params.id)
+  return (
+    <>
+      {p && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(jsonLdProducto(p)) }} />}
+      <DatosIniciales datos={p ? { producto: p } : {}}>{children}</DatosIniciales>
+    </>
+  )
 }

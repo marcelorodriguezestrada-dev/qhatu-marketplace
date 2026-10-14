@@ -15,6 +15,7 @@ import { expandirTalles } from '@/data/productos'
 import { nombreRubro } from '@/lib/arbolCategorias'
 import { useCarrito } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
+import { useDatoInicial } from '@/components/DatosIniciales'
 import { useCategoriasProductos } from '@/lib/useCategoriasProductos'
 import { CartDrawer } from '@/components/CartDrawer'
 import { track } from '@/lib/tracking'
@@ -64,11 +65,13 @@ export default function ProductoDetallePage() {
   const { usuario } = useAuth()
   const { buscarRubroProducto } = useCategoriasProductos()
 
-  const [producto, setProducto] = useState<any>(null)
+  // El layout (servidor) ya trae el producto: la página llega armada (Google).
+  const inicial = useDatoInicial<any>('producto')
+  const [producto, setProducto] = useState<any>(inicial && inicial.id === id ? inicial : null)
   const [tienda, setTienda] = useState<any>(null)
   const [relacionados, setRelacionados] = useState<any[]>([])
   const portada = usePortada()
-  const [cargando, setCargando] = useState(true)
+  const [cargando, setCargando] = useState(!(inicial && inicial.id === id))
   const [cantidad, setCantidad] = useState(1)
   const [imagenRota, setImagenRota] = useState(false)
   // Galería: foto principal + fotos extra (Premium del vendedor).
@@ -84,7 +87,7 @@ export default function ProductoDetallePage() {
 
   useEffect(() => {
     if (!id) return
-    setCargando(true)
+    setCargando(!(inicial && inicial.id === id))
     setAgregado(false)
     setCantidad(1)
     setImagenRota(false)
@@ -97,7 +100,8 @@ export default function ProductoDetallePage() {
     fetch(`/api/productos/${id}`)
       .then((r) => r.json())
       .then(async (detalle) => {
-        setProducto(detalle)
+        // Si falla pero el servidor ya lo había traído, se queda con ese.
+        setProducto((prev: any) => (detalle && !detalle.error && detalle.id ? detalle : prev && !prev.error ? prev : detalle))
         if (!detalle.error) {
           const catalogo = await fetch('/api/productos').then((r) => r.json())
           const otros = (catalogo.productos || []).filter(
