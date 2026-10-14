@@ -4,6 +4,7 @@ import { useCiudad } from '@/lib/ciudad'
 import { buscarCiudad, type CiudadId } from '@/data/ciudades'
 import { useMemo, useState } from 'react'
 import { useAuth } from '@/lib/auth'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
 
 // /vender → "📣 Marketing": el vendedor arma publicaciones para sus
@@ -28,8 +29,22 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
   const [formato, setFormato] = useState<'cuadrado' | 'vertical'>('cuadrado')
   const [bajando, setBajando] = useState(false)
   const [error, setError] = useState('')
+  const [buscar, setBuscar] = useState('')
+  const [orden, setOrden] = useState<'recientes' | 'precio-menor' | 'precio-mayor' | 'nombre'>('recientes')
 
-  const seleccion = activos.filter((p) => elegidos.includes(p.id))
+  // En el orden en que se eligieron (el 1° es el de la imagen).
+  const seleccion = elegidos.map((id) => activos.find((p) => p.id === id)).filter(Boolean) as any[]
+  const visibles = useMemo(() => {
+    const q = buscar.trim().toLowerCase()
+    return activos
+      .filter((p) => !q || String(p.nombre || '').toLowerCase().includes(q))
+      .sort((a, b) =>
+        orden === 'precio-menor' ? Number(a.precio) - Number(b.precio)
+        : orden === 'precio-mayor' ? Number(b.precio) - Number(a.precio)
+        : orden === 'nombre' ? String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es')
+        : String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+  }, [activos, buscar, orden])
+  const precio = (p: any) => formatoMoneda(Number(p.precio || 0), paisDeCiudad(ciudad.id))
   const principal = seleccion[0]
   const urlImagen = principal ? `/api/marketing/imagen/${principal.id}?formato=${formato}` : ''
   const linkTienda = usuario ? `${SITE}/tienda/${usuario.uid}?ref=whatsapp` : ''
@@ -165,23 +180,67 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
         <div className="font-body text-sm font-semibold text-ink mb-1">📣 Crear publicación para redes</div>
         <div className="font-body text-[12px] text-inksoft mb-4">Elegí hasta {MAX_PRODUCTOS} productos, la red y el estilo. Te armamos el texto y la imagen, listos para compartir.</div>
 
-        <div className="font-body text-xs font-semibold text-ink mb-2">1. Productos ({elegidos.length}/{MAX_PRODUCTOS})</div>
-        <div className="flex gap-2.5 overflow-x-auto pb-2 mb-4 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
-          {activos.map((p) => {
-            const on = elegidos.includes(p.id)
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="font-body text-xs font-semibold text-ink">1. Productos <span className={elegidos.length >= MAX_PRODUCTOS ? 'text-maroon' : 'text-inksoft'}>({elegidos.length}/{MAX_PRODUCTOS} elegidos)</span></div>
+          {elegidos.length > 0 && <button type="button" onClick={() => setElegidos([])} className="font-body text-[11px] text-inksoft underline">Quitar todos</button>}
+        </div>
+
+        {seleccion.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {seleccion.map((p, i) => (
+              <span key={p.id} className="inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-full bg-tealsoft border border-teal/40 font-body text-xs text-ink max-w-[240px]">
+                <span className="w-6 h-6 rounded-full overflow-hidden bg-panelalt shrink-0">
+                  {(p.thumbUrl || p.imagenUrl) && <img src={p.thumbUrl || p.imagenUrl} alt="" className="w-full h-full object-cover" />}
+                </span>
+                <b className="text-teal">{i + 1}</b>
+                <span className="truncate">{p.nombre}</span>
+                <button type="button" onClick={() => alternar(p.id)} aria-label={`Quitar ${p.nombre}`} className="text-inksoft hover:text-maroon">✕</button>
+              </span>
+            ))}
+            {seleccion.length > 0 && <span className="font-body text-[11px] text-inksoft self-center">El 1 sale en la imagen.</span>}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 mb-2">
+          <input
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            placeholder={`🔍 Buscar entre tus ${activos.length} productos`}
+            className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-line bg-panel font-body text-sm"
+          />
+          <select value={orden} onChange={(e) => setOrden(e.target.value as any)} className="px-2 py-2 rounded-lg border border-line bg-panel font-body text-xs" aria-label="Ordenar">
+            <option value="recientes">Más nuevos</option>
+            <option value="precio-menor">Menor precio</option>
+            <option value="precio-mayor">Mayor precio</option>
+            <option value="nombre">Nombre A-Z</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 max-h-[460px] overflow-y-auto p-1 -m-1 mb-4" style={{ scrollbarWidth: 'thin' }}>
+          {visibles.length === 0 && <div className="col-span-full font-body text-sm text-inksoft py-6 text-center">Ningún producto coincide con “{buscar}”.</div>}
+          {visibles.map((p) => {
+            const pos = elegidos.indexOf(p.id)
+            const on = pos >= 0
+            const lleno = !on && elegidos.length >= MAX_PRODUCTOS
             return (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => alternar(p.id)}
-                className={`relative w-24 shrink-0 rounded-lg border-2 p-1.5 text-left ${on ? 'border-teal bg-tealsoft' : 'border-line bg-panel'}`}
+                disabled={lleno}
+                title={lleno ? `Ya elegiste ${MAX_PRODUCTOS}: quitá uno para cambiarlo` : p.nombre}
+                className={`relative rounded-xl border-2 p-2 text-left transition ${on ? 'border-teal bg-tealsoft shadow-sm' : 'border-line bg-panel hover:border-teal/60'} ${lleno ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
-                <div className="w-full aspect-square rounded-md bg-panelalt overflow-hidden mb-1">
-                  {(p.thumbUrl || p.imagenUrl) && <img src={p.thumbUrl || p.imagenUrl} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                <div className="w-full aspect-square rounded-lg bg-panelalt overflow-hidden mb-2">
+                  {(p.thumbUrl || p.imagenUrl) ? <img src={p.thumbUrl || p.imagenUrl} alt="" loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>}
                 </div>
-                <div className="font-body text-[10px] text-ink leading-tight line-clamp-2">{p.nombre}</div>
-                <div className="font-body text-[10px] text-maroon font-semibold">Bs {Number(p.precio).toLocaleString('es-BO')}</div>
-                {on && <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-teal text-white text-[11px] flex items-center justify-center">✓</span>}
+                <div className="font-body text-xs text-ink leading-snug line-clamp-2 min-h-[2.5em]">{p.nombre}</div>
+                <div className="font-display text-sm text-maroon font-bold mt-0.5">{precio(p)}</div>
+                {on ? (
+                  <span className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-teal text-white font-body text-sm font-bold flex items-center justify-center shadow">{pos + 1}</span>
+                ) : (
+                  !lleno && <span className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/90 border border-line text-inksoft text-base flex items-center justify-center">+</span>
+                )}
               </button>
             )
           })}
