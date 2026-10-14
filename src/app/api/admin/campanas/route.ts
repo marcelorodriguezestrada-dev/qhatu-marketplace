@@ -19,9 +19,24 @@ export async function GET(req: NextRequest) {
     const db = getDb()
     const snap = await db.collection('campanas').get()
     const desde = new Date(Date.now() - 14 * 86400_000).toISOString().slice(0, 10)
-    // Las de cada publicación del plan de lanzamiento se ven en su propia pestaña.
+    // ?origen=tiendas → las publicaciones que compartieron las tiendas desde
+    // Vender → Marketing (cada una es una campaña con su link rastreado).
+    if (req.nextUrl.searchParams.get('origen') === 'tiendas') {
+      const publicaciones = snap.docs
+        .filter((d) => d.data()?.origen === 'vendedor' && d.data()?.estado === 'publicada')
+        .map((d) => {
+          const x = d.data() as any
+          const base: Record<string, any> = { id: d.id, vendedorId: x.vendedorId, tiendaNombre: x.tiendaNombre || '', red: x.canal, ciudad: x.ciudad || 'potosi', productos: x.productos || [], publicadaAt: x.publicadaAt || x.createdAt, vecesCompartida: x.vecesCompartida || 0 }
+          for (const m of METRICAS_CAMPANA) base[m] = x[m] || 0
+          return base
+        })
+        .sort((a, b) => String(b.publicadaAt).localeCompare(String(a.publicadaAt)))
+      return NextResponse.json({ publicaciones })
+    }
+    // Las de cada publicación del plan de lanzamiento se ven en su propia
+    // pestaña, y las de las tiendas en "Publicaciones de las tiendas".
     const campanas = await Promise.all(
-      snap.docs.filter((d) => !d.data()?.lanzamiento).map(async (d) => {
+      snap.docs.filter((d) => !d.data()?.lanzamiento && d.data()?.origen !== 'vendedor').map(async (d) => {
         const x = d.data() as any
         const dias = await d.ref.collection('dias').get().catch(() => null)
         const serie = (dias?.docs || []).filter((dd) => dd.id >= desde).map((dd) => ({ dia: dd.id, visitas: dd.data().visitas || 0 }))

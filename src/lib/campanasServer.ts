@@ -5,13 +5,17 @@ import { esCodigoCampana, type MetricaCampana } from '@/lib/campanas'
 
 // Suma a los contadores de una campaña (total y por día). Nunca frena
 // nada: si el código no existe o falla, se ignora.
-export async function sumarCampana(codigo: unknown, cambios: Partial<Record<MetricaCampana, number>>) {
+// `ctx.vendedorId`: en una publicación de una tienda (Vender → Marketing)
+// los pedidos solo suman si son de ESA tienda.
+export async function sumarCampana(codigo: unknown, cambios: Partial<Record<MetricaCampana, number>>, ctx?: { vendedorId?: string | null }) {
   if (!esCodigoCampana(codigo)) return
   try {
     const db = getDb()
     const ref = db.collection('campanas').doc(codigo)
     const doc = await ref.get()
     if (!doc.exists || doc.data()?.activa === false) return
+    const deTienda = doc.data()?.vendedorId
+    if (deTienda && ctx && ctx.vendedorId !== undefined && ctx.vendedorId !== deTienda) return
     const inc: Record<string, any> = {}
     for (const [k, v] of Object.entries(cambios)) if (v) inc[k] = FieldValue.increment(v)
     if (!Object.keys(inc).length) return

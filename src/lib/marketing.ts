@@ -25,8 +25,12 @@ export type ProductoMarketing = {
   stock?: number | null
 }
 
-export function linkProducto(site: string, id: string, red: string) {
-  return `${site}/producto/${id}?ref=${red}`
+// Con `campana`: el link lleva el código de la publicación (?c=, el
+// seguimiento de Clasi Click: visitas y pedidos) y los UTM estándar, para
+// que también lo vean Google Analytics y las estadísticas de la red.
+export function linkProducto(site: string, id: string, red: string, campana?: string | null) {
+  if (!campana) return `${site}/producto/${id}?ref=${red}`
+  return `${site}/producto/${id}?c=${campana}&utm_source=${red}&utm_medium=social&utm_campaign=${campana}`
 }
 
 export function pctDescuento(p: ProductoMarketing) {
@@ -35,12 +39,12 @@ export function pctDescuento(p: ProductoMarketing) {
 
 const bs = (n: number) => `Bs ${Number(n).toLocaleString('es-BO')}`
 
-export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string, ciudad = 'Potosí'): string {
+export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string, ciudad = 'Potosí', campana?: string | null): string {
   const lineas = productos.map((p) => {
     const d = pctDescuento(p)
     const precio = d ? `${bs(p.precio)} (antes ${bs(p.precioOriginal!)}, -${d}%)` : bs(p.precio)
     const extra = [p.talles?.length ? `Talles: ${p.talles.join(', ')}` : '', p.colores?.length ? `Colores: ${p.colores.join(', ')}` : ''].filter(Boolean).join(' · ')
-    return `🛍️ ${p.nombre} — ${precio}${extra ? `\n   ${extra}` : ''}\n   👉 ${linkProducto(site, p.id, red)}`
+    return `🛍️ ${p.nombre} — ${precio}${extra ? `\n   ${extra}` : ''}\n   👉 ${linkProducto(site, p.id, red, campana)}`
   })
   const cabeza = productos.length === 1 ? `✨ ¡Nuevo en ${tienda || 'nuestra tienda'}!` : `✨ Mirá lo que tenemos en ${tienda || 'nuestra tienda'}:`
   const cierre = '📦 Pedilo en Clasi Click y pagá con QR. ¡Te lo llevamos!'
