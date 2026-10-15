@@ -5,6 +5,8 @@
 //   estampamos el QR de la campaña y el link.
 // La config viaja en la URL de la imagen (?d=…, base64url) para la vista
 // previa y la descarga, y se puede guardar como plantilla.
+import { buscarCiudad } from '@/data/ciudades'
+import { gentilicio, v } from '@/lib/estiloRegional'
 
 export type CajaVolante = { titulo: string; bajada: string; items: string[] }
 export type TextosVolante = {
@@ -65,44 +67,49 @@ export function buscarTema(id: string | null | undefined): TemaVolante {
   return TEMAS_VOLANTE.find((t) => t.id === id) || TEMAS_VOLANTE[0]
 }
 
-export function textosBase(tipo: string, ciudad: string, gentilicio: string): TextosVolante {
+// Textos de arranque del volante: tuteo boliviano (con toque local) o
+// voseo argentino según la ciudad (ver src/lib/estiloRegional.ts).
+export function textosBase(tipo: string, ciudadId: string): TextosVolante {
+  const ciudad = buscarCiudad(ciudadId).nombre
+  const gent = gentilicio(ciudadId)
   const C = ciudad.toUpperCase()
+  const t = (bo: string, ar: string) => v(ciudadId, bo, ar)
   if (tipo === 'vendedores') {
     return {
-      titulo: `¿VENDÉS EN ${C}?`,
-      subtitulo: 'Publicá gratis y llegá|a más clientes',
-      bajada: `La tienda online ${gentilicio}|que trabaja por vos`,
+      titulo: t(`¿VENDES EN ${C}?`, `¿VENDÉS EN ${C}?`),
+      subtitulo: t('Publica gratis y llega|a más clientes', 'Publicá gratis y llegá|a más clientes'),
+      bajada: t(`La tienda online ${gent}|que trabaja para ti`, `La tienda online ${gent}|que trabaja por vos`),
       cajas: [
-        { titulo: 'TU TIENDA GRATIS', bajada: 'Sin comisiones para empezar', items: ['Catálogo con fotos y precios', 'Cobrás directo con tu QR', 'Publicación masiva con Excel'] },
-        { titulo: 'MÁS CLIENTES', bajada: 'Te conectamos al instante', items: ['Matcheo automático con quien busca', 'Preguntas y ventas en un lugar', 'Coordiná la entrega por WhatsApp'] },
+        { titulo: 'TU TIENDA GRATIS', bajada: 'Sin comisiones para empezar', items: ['Catálogo con fotos y precios', t('Cobras directo con tu QR', 'Cobrás directo con tu QR'), 'Publicación masiva con Excel'] },
+        { titulo: 'MÁS CLIENTES', bajada: 'Te conectamos al instante', items: ['Matcheo automático con quien busca', 'Preguntas y ventas en un lugar', t('Coordina la entrega por WhatsApp', 'Coordiná la entrega por WhatsApp')] },
       ],
-      cta: 'Registrate gratis y empezá a vender hoy',
-      pie: `Vendé en ${ciudad} — fácil, rápido y seguro`,
+      cta: t('Regístrate gratis y empieza a vender hoy', 'Registrate gratis y empezá a vender hoy'),
+      pie: t(`Vende en ${ciudad} — fácil, rápido y seguro`, `Vendé en ${ciudad} — fácil, rápido y seguro`),
     }
   }
   if (tipo === 'profesionales') {
     return {
       titulo: `¡PROFESIONALES DE ${C}!`,
       subtitulo: 'Que tus clientes|te encuentren',
-      bajada: `El directorio ${gentilicio}|de profesionales y oficios`,
+      bajada: `El directorio ${gent}|de profesionales y oficios`,
       cajas: [
-        { titulo: 'SI OFRECÉS SERVICIOS', bajada: 'Sumate gratis', items: ['Tu perfil con fotos y reseñas', 'Clientes directo a tu WhatsApp', 'Agenda de turnos online'] },
-        { titulo: 'SI BUSCÁS A ALGUIEN', bajada: 'Encontrá de confianza', items: ['Electricistas, médicos, abogados…', 'Calificaciones reales', 'Cerca de tu zona'] },
+        { titulo: t('SI OFRECES SERVICIOS', 'SI OFRECÉS SERVICIOS'), bajada: t('Súmate gratis', 'Sumate gratis'), items: ['Tu perfil con fotos y reseñas', 'Clientes directo a tu WhatsApp', 'Agenda de turnos online'] },
+        { titulo: t('SI BUSCAS A ALGUIEN', 'SI BUSCÁS A ALGUIEN'), bajada: t('Encuentra de confianza', 'Encontrá de confianza'), items: ['Electricistas, médicos, abogados…', 'Calificaciones reales', 'Cerca de tu zona'] },
       ],
-      cta: 'Anotate gratis en 2 minutos',
+      cta: t('Inscríbete gratis en 2 minutos', 'Anotate gratis en 2 minutos'),
       pie: `Profesionales de ${ciudad} en un solo lugar`,
     }
   }
   return {
     titulo: `¡ATENCIÓN ${C}!`,
     subtitulo: 'Llegó la nueva forma de|comprar y vender sin complicaciones',
-    bajada: `El primer e-commerce 100% ${gentilicio}|hecho para conectar a nuestra gente`,
+    bajada: `El primer e-commerce 100% ${gent}|hecho para conectar a nuestra gente`,
     cajas: [
-      { titulo: 'SI QUIERES COMPRAR', bajada: 'Todo lo que buscás, en un solo lugar', items: ['Productos y servicios locales', 'Pagá fácil con QR', 'Entrega a domicilio o retiro'] },
-      { titulo: 'SI QUIERES VENDER', bajada: 'Publicá y llegá a más clientes', items: ['Publicá tus productos gratis', 'Matcheo automático al instante', 'Coordiná la entrega por WhatsApp'] },
+      { titulo: t('SI QUIERES COMPRAR', 'SI QUERÉS COMPRAR'), bajada: t('Todo lo que buscas, en un solo lugar', 'Todo lo que buscás, en un solo lugar'), items: ['Productos y servicios locales', t('Paga fácil con QR', 'Pagá fácil con QR'), 'Entrega a domicilio o retiro'] },
+      { titulo: t('SI QUIERES VENDER', 'SI QUERÉS VENDER'), bajada: t('Publica y llega a más clientes', 'Publicá y llegá a más clientes'), items: [t('Publica tus productos gratis', 'Publicá tus productos gratis'), 'Matcheo automático al instante', t('Coordina la entrega por WhatsApp', 'Coordiná la entrega por WhatsApp')] },
     ],
-    cta: 'Apoyemos el comercio y el talento de nuestra tierra',
-    pie: `Comprá y vendé en ${ciudad} — fácil, rápido y seguro`,
+    cta: t('Apoyemos el comercio y el talento de nuestra tierra', 'Apoyemos el comercio y el talento de nuestra tierra'),
+    pie: t(`Compra y vende en ${ciudad} — fácil, rápido y seguro`, `Comprá y vendé en ${ciudad} — fácil, rápido y seguro`),
   }
 }
 

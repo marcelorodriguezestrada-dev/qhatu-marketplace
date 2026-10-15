@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guiaIdioma } from '@/lib/estiloRegional'
+import { todasLasCiudades } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { esClaveAdmin } from '@/lib/adminAuth'
 import { pedidoBase, camposPorRubro, type PedidoProductos } from '@/lib/pedirProductos'
 
@@ -8,6 +11,10 @@ export const dynamic = 'force-dynamic'
 // { mensaje, plantilla, consejos, ia } — mensaje de WhatsApp para pedir
 // productos y precios (ver src/lib/pedirProductos.ts). Con GROQ_API_KEY
 // lo arma la IA según el rubro y lo que escribió el admin; si no, plantilla.
+// La ciudad llega como id ("potosi") o como nombre ("Potosí").
+const sinTildes = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+const ciudadPorNombre = (x: string) => todasLasCiudades().find((c) => c.id === x || sinTildes(c.nombre) === sinTildes(x))?.id || 'potosi'
+
 const SISTEMA =
   'Sos el equipo de Clasi Click, un marketplace de Bolivia (Potosí y La Paz) donde las tiendas suben productos con foto y precio. ' +
   'Escribís mensajes de WhatsApp en español boliviano, cercanos y respetuosos (tuteo), cortos, con algún emoji y *negritas* de WhatsApp (un asterisco). ' +
@@ -15,6 +22,7 @@ const SISTEMA =
   '(una plantilla numerada, un dato por renglón, "Campo: " para que escriba al lado). No inventes precios, ofertas ni beneficios. Respondé SOLO JSON.'
 
 export async function POST(req: NextRequest) {
+  await cargarCiudadesServidor().catch(() => null) // ciudades agregadas desde el admin (Buenos Aires...)
   if (!(await esClaveAdmin(req.headers.get('x-admin-password')))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
@@ -41,7 +49,7 @@ export async function POST(req: NextRequest) {
         reasoning_effort: 'low',
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: SISTEMA },
+          { role: 'system', content: SISTEMA + guiaIdioma(ciudadPorNombre(d.ciudad)) },
           {
             role: 'user',
             content:

@@ -112,7 +112,7 @@ export default function AdminMarketing({ password }: { password: string }) {
   const campanaT = campanas?.find((c) => c.id === campanaTexto)
   const linkTexto = campanaT ? linkCampana(SITE, campanaT) : `${SITE}${tipo.destino === '/' ? '/' : tipo.destino}`
   const plantilla = useMemo(
-    () => tipo.plantilla({ ciudad: buscarCiudad(ciudadTexto).nombre, link: linkTexto, gentilicio: gentilicioDe(ciudadTexto) }),
+    () => tipo.plantilla({ ciudad: buscarCiudad(ciudadTexto).nombre, link: linkTexto, gentilicio: gentilicioDe(ciudadTexto), ciudadId: ciudadTexto }),
     [tipo, ciudadTexto, linkTexto]
   )
   useEffect(() => {

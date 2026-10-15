@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const base = String(body.base || '').slice(0, 2000)
   if (base.length < 10) return NextResponse.json({ error: 'Falta el texto.' }, { status: 400 })
   const tono = ({ cercano: 'cercano y amable', entusiasta: 'entusiasta', profesional: 'profesional y confiable', urgente: 'de oportunidad, con urgencia (sin inventar plazos)' } as Record<string, string>)[body.tono] || 'cercano y amable'
-  const texto = await reescribirMarketingIA(base, String(body.red || 'Facebook'), tono, buscarCiudad(body.ciudad).nombre)
+  const texto = await reescribirMarketingIA(base, String(body.red || 'Facebook'), tono, buscarCiudad(body.ciudad).id)
   if (!texto) return NextResponse.json({ error: 'La IA no está disponible ahora. Usá la plantilla.' }, { status: 503 })
   return NextResponse.json({ texto })
 }

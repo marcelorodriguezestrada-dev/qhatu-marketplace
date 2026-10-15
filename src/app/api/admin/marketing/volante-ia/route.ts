@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const idea = String(body.idea || '').trim()
   if (idea.length < 8) return NextResponse.json({ error: 'Contá en una frase de qué es el volante (ej: feria de artesanía, sumar costureras, ofertas de fin de mes).' }, { status: 400 })
-  const r = await textosVolanteIA(idea, buscarCiudad(body.ciudad).nombre, TEMAS_VOLANTE.map((t) => t.id))
+  const r = await textosVolanteIA(idea, buscarCiudad(body.ciudad).id, TEMAS_VOLANTE.map((t) => t.id))
   if (!r) return NextResponse.json({ error: 'La IA no está disponible ahora. Probá en un rato o editá los textos a mano.' }, { status: 503 })
   const config = sanearConfigVolante({ modo: 'diseno', tema: r.tema, destino: r.destino, textos: r })
   if (!config.textos.titulo || config.textos.cajas.length === 0) return NextResponse.json({ error: 'La IA no armó bien el volante. Probá otra vez.' }, { status: 502 })

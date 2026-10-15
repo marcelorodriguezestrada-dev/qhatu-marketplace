@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { buscarCiudad, type CiudadId } from '@/data/ciudades'
 import { useTodasLasCiudades } from '@/lib/ciudad'
-import { gentilicioDe } from '@/lib/marketingAdmin'
 import { TEMAS_VOLANTE, codificarConfig, destinoDeTipo, textosBase, type ConfigVolante, type PosQR } from '@/lib/volantes'
 
 // Admin → Marketing → "🖼️ Volantes e imágenes":
@@ -20,7 +19,7 @@ type Plantilla = { id: string; nombre: string; config: ConfigVolante }
 
 function configBase(tipo: string, ciudad: CiudadId, tema = 'rojo'): ConfigVolante {
   const c = buscarCiudad(ciudad)
-  return { modo: 'diseno', tema, destino: destinoDeTipo(tipo), textos: textosBase(tipo, c.nombre, gentilicioDe(c.id)) }
+  return { modo: 'diseno', tema, destino: destinoDeTipo(tipo), textos: textosBase(tipo, c.id) }
 }
 
 export default function EditorVolantes({ password, campanas }: { password: string; campanas: { id: string; nombre: string; activa: boolean }[] }) {

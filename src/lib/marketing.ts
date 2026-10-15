@@ -1,5 +1,8 @@
 // Marketing del vendedor: textos para redes sociales. La plantilla se usa
 // si la IA no está disponible (y la IA la usa de referencia de datos).
+import { buscarCiudad } from '@/data/ciudades'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
+import { estiloDe, v } from '@/lib/estiloRegional'
 
 export const REDES_MARKETING = [
   { id: 'facebook', label: 'Facebook', icono: '📘' },
@@ -37,18 +40,27 @@ export function pctDescuento(p: ProductoMarketing) {
   return p.precioOriginal && p.precioOriginal > p.precio ? Math.round((1 - p.precio / p.precioOriginal) * 100) : 0
 }
 
-const bs = (n: number) => `Bs ${Number(n).toLocaleString('es-BO')}`
-
-export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string, ciudad = 'Potosí', campana?: string | null): string {
+// Texto sin IA. Habla como en la ciudad de la tienda: tuteo boliviano o
+// voseo argentino (ver src/lib/estiloRegional.ts), con su moneda.
+export function textoPlantilla(productos: ProductoMarketing[], red: string, tienda: string, site: string, ciudadId = 'potosi', campana?: string | null): string {
+  const pais = paisDeCiudad(ciudadId)
+  const ciudad = buscarCiudad(ciudadId).nombre
+  const plata = (n: number) => formatoMoneda(n, pais)
   const lineas = productos.map((p) => {
     const d = pctDescuento(p)
-    const precio = d ? `${bs(p.precio)} (antes ${bs(p.precioOriginal!)}, -${d}%)` : bs(p.precio)
-    const extra = [p.talles?.length ? `Talles: ${p.talles.join(', ')}` : '', p.colores?.length ? `Colores: ${p.colores.join(', ')}` : ''].filter(Boolean).join(' · ')
+    const precio = d ? `${plata(p.precio)} (antes ${plata(p.precioOriginal!)}, -${d}%)` : plata(p.precio)
+    const extra = [p.talles?.length ? `${v(ciudadId, 'Tallas', 'Talles')}: ${p.talles.join(', ')}` : '', p.colores?.length ? `Colores: ${p.colores.join(', ')}` : ''].filter(Boolean).join(' · ')
     return `🛍️ ${p.nombre} — ${precio}${extra ? `\n   ${extra}` : ''}\n   👉 ${linkProducto(site, p.id, red, campana)}`
   })
-  const cabeza = productos.length === 1 ? `✨ ¡Nuevo en ${tienda || 'nuestra tienda'}!` : `✨ Mirá lo que tenemos en ${tienda || 'nuestra tienda'}:`
-  const cierre = '📦 Pedilo en Clasi Click y pagá con QR. ¡Te lo llevamos!'
-  const tags = red === 'instagram' || red === 'tiktok' ? `\n\n#${ciudad.replace(/\s+/g, '')} #Bolivia #ClasiClick #ComprasOnline #HechoEnBolivia` : ''
+  const estilo = estiloDe(ciudadId)
+  const cabeza = productos.length === 1 ? `✨ ¡Nuevo en ${tienda || 'nuestra tienda'}!` : `✨ ${v(ciudadId, 'Mira', 'Mirá')} lo que tenemos en ${tienda || 'nuestra tienda'}:`
+  const cierre =
+    estilo === 'argentina' ? '📦 Pedilo en Clasi Click y pagá con QR. ¡Te lo llevamos!'
+    : estilo === 'potosi' ? '📦 Pídelo en Clasi Click y paga con QR. ¡Te lo llevamos a tu casa, casero! 🏔️'
+    : '📦 Pídelo en Clasi Click y paga con QR. ¡Te lo llevamos a tu casa, casero!'
+  const tags = estilo === 'argentina'
+    ? `#${ciudad.replace(/\s+/g, '')} #Argentina #ClasiClick #ComprasOnline`
+    : `#${ciudad.replace(/\s+/g, '')} ${estilo === 'potosi' ? '#VillaImperial ' : ''}#Bolivia #ClasiClick #ComprasOnline #HechoEnBolivia`
   if (red === 'whatsapp') return `${cabeza}\n${lineas.join('\n')}\n${cierre}`
-  return `${cabeza}\n\n${lineas.join('\n\n')}\n\n${cierre}${tags}`
+  return `${cabeza}\n\n${lineas.join('\n\n')}\n\n${cierre}${red === 'instagram' || red === 'tiktok' ? `\n\n${tags}` : ''}`
 }

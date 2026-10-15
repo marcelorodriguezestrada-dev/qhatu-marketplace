@@ -3,7 +3,6 @@ import QRCode from 'qrcode'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { buscarCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
-import { gentilicioDe } from '@/lib/marketingAdmin'
 import { buscarTema, decodificarConfig, destinoDeTipo, textosBase, type ConfigVolante } from '@/lib/volantes'
 
 export const dynamic = 'force-dynamic'
@@ -47,7 +46,7 @@ export async function GET(req: Request) {
   if (!config) {
     const tipo = q.get('tipo') || 'general'
     const ciudad = buscarCiudad(q.get('ciudad'))
-    const textos = textosBase(tipo, ciudad.nombre, gentilicioDe(ciudad.id))
+    const textos = textosBase(tipo, ciudad.id)
     if (q.get('t')) textos.titulo = q.get('t')!.slice(0, 40)
     if (q.get('s')) textos.subtitulo = q.get('s')!.slice(0, 90)
     config = { modo: 'diseno', tema: buscarTema(q.get('tema')).id, destino: destinoDeTipo(tipo), textos }

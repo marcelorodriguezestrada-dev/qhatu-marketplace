@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
     ].join('\n')
 
     const ids = new Set(lista.map((p) => p.id))
-    const deIA = validar(await estrategiaMarketingIA(datos, dias), ids, dias)
+    const deIA = validar(await estrategiaMarketingIA(datos, dias, c.ciudad), ids, dias)
     const plan = deIA || planBase(lista, objetivo, dias, fecha)
     const ahora = new Date().toISOString()
     const estrategia: Estrategia = {
