@@ -38,14 +38,9 @@ export function ProductCard({ p, ciudadComprador }: { p: Producto; ciudadComprad
   const mostrarFoto = (p.thumbUrl || p.imagenUrl) && !imagenRota
   const favorito = esFavorito(p.id)
 
-  // Navegar y ver productos es libre, sin login — pero agregar al
-  // carrito sí lo requiere (evita fraudes y asocia el carrito a una
-  // cuenta real, como se definió para toda la plataforma).
+  // Navegar y armar el carrito es libre, sin cuenta (el carrito se guarda
+  // en el navegador): la cuenta se pide recién al pagar, en el checkout.
   function agregarAlCarrito() {
-    if (!usuario) {
-      router.push('/login')
-      return
-    }
     // Si tiene talles o colores para elegir, no lo agregamos a ciegas
     // desde la grilla — lo mandamos a la ficha del producto, que es
     // donde están los selectores.
