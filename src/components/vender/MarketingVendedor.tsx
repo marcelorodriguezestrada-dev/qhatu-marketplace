@@ -2,10 +2,11 @@
 
 import { useCiudad } from '@/lib/ciudad'
 import { buscarCiudad, type CiudadId } from '@/data/ciudades'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import TarjetaPublicacion from '@/components/marketing/TarjetaPublicacion'
+import EstrategiaIA, { type ArmarPublicacion } from '@/components/vender/EstrategiaIA'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
 
 // /vender → "📣 Marketing": el vendedor arma publicaciones para sus
@@ -35,6 +36,8 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
   const [campana, setCampana] = useState<string | null>(null)
   const [publicaciones, setPublicaciones] = useState<any[] | null>(null)
   const [orden, setOrden] = useState<'recientes' | 'precio-menor' | 'precio-mayor' | 'nombre'>('recientes')
+  const [desdeEstrategia, setDesdeEstrategia] = useState(false)
+  const crearRef = useRef<HTMLDivElement>(null)
 
   // En el orden en que se eligieron (el 1° es el de la imagen).
   const seleccion = elegidos.map((id) => activos.find((p) => p.id === id)).filter(Boolean) as any[]
@@ -92,6 +95,22 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
       })
       await cargarPublicaciones()
     } catch {}
+  }
+
+  // "Armar esta publicación" de un día de la estrategia: carga sus
+  // productos, red y estilo, y lleva a "Crear publicación" (publicación nueva).
+  function armarDesdeEstrategia(a: ArmarPublicacion) {
+    const ids = a.productoIds.filter((id) => activos.some((p) => p.id === id)).slice(0, MAX_PRODUCTOS)
+    if (!ids.length) return
+    setElegidos(ids)
+    if (REDES_MARKETING.some((r) => r.id === a.red)) setRed(a.red)
+    if (TONOS_MARKETING.some((t) => t.id === a.tono)) setTono(a.tono)
+    setTexto('')
+    setConIA(null)
+    setCampana(null)
+    setError('')
+    setDesdeEstrategia(true)
+    crearRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   function alternar(id: string) {
@@ -222,8 +241,13 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
 
   return (
     <div className="grid gap-5">
-      <div className="bg-panel border border-line rounded-xl p-5">
+      <EstrategiaIA productos={activos} precio={precio} onArmar={armarDesdeEstrategia} />
+
+      <div ref={crearRef} className="bg-panel border border-line rounded-xl p-5 scroll-mt-4">
         <div className="font-body text-sm font-semibold text-ink mb-1">📣 Crear publicación para redes</div>
+        {desdeEstrategia && !texto && (
+          <div className="font-body text-xs text-teal bg-tealsoft rounded-lg px-3 py-2 mb-3">🎯 Cargamos los productos, la red y el estilo de tu estrategia. Tocá “✨ Crear publicación” abajo.</div>
+        )}
         <div className="font-body text-[12px] text-inksoft mb-4">Elegí hasta {MAX_PRODUCTOS} productos, la red y el estilo. Te armamos el texto y la imagen, listos para compartir.</div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
