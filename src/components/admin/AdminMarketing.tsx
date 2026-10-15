@@ -1,6 +1,7 @@
 'use client'
 
 import AdminPublicacionesTiendas from '@/components/admin/AdminPublicacionesTiendas'
+import CatalogosFeed from '@/components/admin/CatalogosFeed'
 import { useEffect, useMemo, useState } from 'react'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, linkCampana } from '@/lib/campanas'
 import { TEXTOS_ADMIN, gentilicioDe } from '@/lib/marketingAdmin'
@@ -264,6 +265,9 @@ export default function AdminMarketing({ password }: { password: string }) {
         {errorTexto && <div className="font-body text-xs text-maroon mt-2">{errorTexto}</div>}
         <div className="font-body text-[10px] text-inksoft mt-2">Tip: mandá los mensajes directos de a pocos por día y personalizá el saludo con el nombre; así Facebook no los marca como spam.</div>
       </div>
+
+      {/* Catálogos (feeds) para Google Shopping y Meta */}
+      <CatalogosFeed />
 
       {/* Lo que compartieron las tiendas desde Vender → Marketing */}
       <AdminPublicacionesTiendas password={password} />

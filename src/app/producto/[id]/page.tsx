@@ -123,11 +123,8 @@ export default function ProductoDetallePage() {
       })
   }, [id])
 
+  // Sin cuenta también se puede: la cuenta se pide recién al pagar (checkout).
   function agregarItemsAlCarrito() {
-    if (!usuario) {
-      router.push(`/login?volver=${encodeURIComponent(`/producto/${id}`)}`)
-      return false
-    }
     if (!producto) return false
     // Si el producto tiene talles/colores cargados, no dejamos avanzar
     // sin elegir uno — si no, no hay forma de saber qué le mandan al

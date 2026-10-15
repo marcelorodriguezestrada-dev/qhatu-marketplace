@@ -915,7 +915,11 @@ function CheckoutContent() {
   useEffect(() => {
     if (authCargando) return
     if (pedidoYaCreado) return
-    if (!usuario || emailVerificado === false) router.push('/login')
+    // El carrito se arma sin cuenta; para pagar sí hace falta: va al login
+    // avisando que el carrito quedó guardado, y después vuelve acá.
+    if (!usuario || emailVerificado === false) {
+      router.push(`/login?motivo=compra&volver=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+    }
   }, [authCargando, usuario, emailVerificado, router, pedidoYaCreado])
 
   const costoEnvio =

@@ -66,6 +66,14 @@ export default function LoginPage() {
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(false)
   const [reenviando, setReenviando] = useState(false)
+  // Viene del checkout con el carrito armado: se lo decimos y arranca en "Crear cuenta".
+  const [paraComprar, setParaComprar] = useState(false)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('motivo') === 'compra') {
+      setParaComprar(true)
+      setModo('registro')
+    }
+  }, [])
   const yaMandoCodigoAlLlegar = useRef(false)
 
   // Cubre el caso de alguien que ya tiene sesión abierta (no vino de
@@ -343,15 +351,21 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-[360px] mx-auto px-5 py-20">
+      {paraComprar && modo !== 'recuperar' && (
+        <div className="bg-verdesoft border border-verde/40 rounded-xl px-3.5 py-3 mb-5">
+          <div className="font-body text-sm font-semibold text-ink">🛒 Tu carrito está guardado</div>
+          <div className="font-body text-xs text-inksoft mt-0.5">Para pagar y recibir tu pedido, {modo === 'login' ? 'entrá a tu cuenta' : 'creá tu cuenta'} (1 minuto). Después volvés directo a pagar.</div>
+        </div>
+      )}
       <div className="font-display text-xl font-bold text-ink mb-1">
         {modo === 'login' ? 'Iniciar sesión' : modo === 'recuperar' ? 'Recuperar contraseña' : 'Crear cuenta'}
       </div>
       <div className="font-body text-[13px] text-inksoft mb-6">
         {modo === 'login'
-          ? 'Para comprar y vender en Clasi Click'
+          ? paraComprar ? 'Entrá para terminar tu compra' : 'Para comprar y vender en Clasi Click'
           : modo === 'recuperar'
             ? 'Te mandamos un link a tu email para elegir una nueva'
-            : 'Con tu cuenta ya podés publicar productos'}
+            : paraComprar ? 'Con tu cuenta seguís el pedido y te avisamos cuando llega' : 'Con tu cuenta ya podés publicar productos'}
       </div>
 
       {modo !== 'recuperar' && (
