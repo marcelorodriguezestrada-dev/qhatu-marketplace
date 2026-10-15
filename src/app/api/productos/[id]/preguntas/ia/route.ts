@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       qa && `Preguntas que ya respondió el vendedor:\n${qa}`,
     ].filter(Boolean)
 
-    const r = await responderPreguntaProductoIA(lineas.join('\n'), pregunta)
+    const r = await responderPreguntaProductoIA(lineas.join('\n'), pregunta, ciudadDe(p))
     if (!r) {
       return NextResponse.json({ respuesta: null, seguro: false, error: 'La respuesta automática no está disponible ahora. Preguntale al vendedor.' })
     }

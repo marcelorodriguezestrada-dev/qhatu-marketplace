@@ -6,6 +6,7 @@ import { textoMarketingIA } from '@/lib/moderacionIA'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { linkProducto, pctDescuento, textoPlantilla, type ProductoMarketing } from '@/lib/marketing'
 import { codigoCampana } from '@/lib/campanas'
+import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,9 @@ export async function POST(req: NextRequest) {
 
     const tiendaDoc = await db.collection('vendedores').doc(usuario.uid).get()
     const tienda = (tiendaDoc.data() as any)?.nombreNegocio || ''
-    const ciudad = buscarCiudad(ciudadDe(tiendaDoc.data() as any)).nombre
+    const ciudadId = ciudadDe(tiendaDoc.data() as any)
+    const ciudad = buscarCiudad(ciudadId).nombre
+    const plata = (n: number) => formatoMoneda(n, paisDeCiudad(ciudadId))
     // La publicación es una campaña de la tienda (campanas/{código}): sus
     // links la rastrean y lo que traiga se ve en Vender → Marketing y en
     // Admin → Marketing. Al regenerar se reusa la misma (body.campana).
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest) {
       },
       { merge: true },
     )
-    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL, ciudad, campana)
+    const plantilla = textoPlantilla(productos, red, tienda, SITE_URL, ciudadId, campana)
 
     const datos = [
       `Tienda: ${tienda || 'sin nombre'} (${ciudad})`,
@@ -73,7 +76,7 @@ export async function POST(req: NextRequest) {
         const d = pctDescuento(p)
         return [
           `- Producto: ${p.nombre}`,
-          `  Precio: Bs ${p.precio}${d ? ` (antes Bs ${p.precioOriginal}, ${d}% de descuento)` : ''}`,
+          `  Precio: ${plata(p.precio)}${d ? ` (antes ${plata(p.precioOriginal!)}, ${d}% de descuento)` : ''}`,
           p.descripcionCorta && `  Descripción: ${p.descripcionCorta}`,
           p.talles?.length && `  Talles: ${p.talles.join(', ')}`,
           p.colores?.length && `  Colores: ${p.colores.join(', ')}`,
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
       `Se compra en Clasi Click y se paga con QR. La tienda está en ${ciudad}: usá hashtags de ${ciudad}.`,
     ].join('\n')
 
-    let ia = await textoMarketingIA(datos, red, tono)
+    let ia = await textoMarketingIA(datos, red, tono, ciudadId)
     // Si la IA tocó los links (perdió el código), va la plantilla: sin el
     // código no se puede medir la publicación.
     if (ia && !ia.includes(`c=${campana}`)) ia = null

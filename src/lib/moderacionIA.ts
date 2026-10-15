@@ -1,3 +1,5 @@
+import { buscarCiudad } from '@/data/ciudades'
+import { guiaIdioma } from '@/lib/estiloRegional'
 import { sanearHistorialLaboral, sanearIdiomas, type PuestoLaboral, type Idioma } from '@/lib/cvEstandar'
 
 // Pre-filtro de moderación con IA (API de Groq, gratis — mismo
@@ -578,7 +580,8 @@ export function textoEspera(invitadoEn?: string | null, invitaciones?: number | 
 // vendedor (seguro: false). Devuelve null si no hay IA disponible.
 export async function responderPreguntaProductoIA(
   datosProducto: string,
-  pregunta: string
+  pregunta: string,
+  ciudadId?: string
 ): Promise<{ respuesta: string; seguro: boolean } | null> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
@@ -596,11 +599,12 @@ export async function responderPreguntaProductoIA(
             role: 'system',
             content:
               'Sos el asistente de Clasi Click, un marketplace de Bolivia (Potosí, La Paz). Un comprador pregunta sobre un producto. ' +
-              'Respondé en español boliviano, amable y breve (máximo 2 oraciones), usando ÚNICAMENTE los datos del producto y la tienda que te paso. ' +
+              'Respondé amable y breve (máximo 2 oraciones), usando ÚNICAMENTE los datos del producto y la tienda que te paso. ' +
               'Nunca inventes talles, colores, stock, medidas, materiales, precios ni plazos que no estén en los datos. ' +
               'Si la respuesta no está en los datos (o depende del vendedor: descuentos, reservas, fotos extra, medidas exactas), decilo con honestidad y sugerí preguntarle al vendedor. ' +
               'Si la pregunta no tiene que ver con el producto o es ofensiva, respondé cortésmente que solo podés ayudar con este producto. ' +
-              'Respondé SOLO JSON: {"respuesta": "texto", "seguro": true si la respuesta sale claramente de los datos, false si no}',
+              'Respondé SOLO JSON: {"respuesta": "texto", "seguro": true si la respuesta sale claramente de los datos, false si no}' +
+              guiaIdioma(ciudadId),
           },
           { role: 'user', content: `DATOS:\n${datosProducto}\n\nPREGUNTA: ${pregunta}` },
         ],
@@ -624,7 +628,7 @@ export async function responderPreguntaProductoIA(
 // Marketing del vendedor (/vender → Marketing): texto listo para pegar
 // en una red social a partir de sus productos. Solo usa los datos
 // publicados (no inventa descuentos ni stock). null si no hay IA.
-export async function textoMarketingIA(datos: string, red: string, tono: string): Promise<string | null> {
+export async function textoMarketingIA(datos: string, red: string, tono: string, ciudadId?: string): Promise<string | null> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
   const guia: Record<string, string> = {
@@ -646,12 +650,13 @@ export async function textoMarketingIA(datos: string, red: string, tono: string)
           {
             role: 'system',
             content:
-              'Sos community manager de pequeños negocios de Bolivia que venden en Clasi Click (marketplace boliviano). ' +
-              'Escribí UNA publicación en español boliviano (tuteo o voseo neutro, cercano). ' +
+              'Sos community manager de pequeños negocios de Bolivia y Argentina que venden en Clasi Click. ' +
+              'Escribí UNA publicación cercana. ' +
               `${guia[red] || guia.facebook} Tono: ${tono}. ` +
               'Usá SOLO los datos que te paso: no inventes descuentos, stock, talles, colores ni envíos que no estén. ' +
               'Incluí cada link exactamente como viene. Si son varios productos, listalos con precio y link cada uno. ' +
-              'Respondé SOLO JSON: {"texto": "..."}',
+              'Respondé SOLO JSON: {"texto": "..."}' +
+              guiaIdioma(ciudadId),
           },
           { role: 'user', content: datos },
         ],
@@ -673,7 +678,8 @@ export async function textoMarketingIA(datos: string, red: string, tono: string)
 
 // Admin → Marketing: reescribe un texto de marketing (mensaje directo o
 // post) manteniendo los datos y el link. null si no hay IA.
-export async function reescribirMarketingIA(base: string, red: string, tono: string, ciudad: string): Promise<string | null> {
+export async function reescribirMarketingIA(base: string, red: string, tono: string, ciudadId: string): Promise<string | null> {
+  const ciudad = buscarCiudad(ciudadId)
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
   try {
@@ -689,10 +695,11 @@ export async function reescribirMarketingIA(base: string, red: string, tono: str
           {
             role: 'system',
             content:
-              `Sos el community manager de Clasi Click, un marketplace de ${ciudad}, Bolivia (gratis para vendedores y profesionales). ` +
-              `Reescribí el texto que te paso para ${red}, con tono ${tono}, en español boliviano cercano, con emojis moderados. ` +
+              `Sos el community manager de Clasi Click, un marketplace de ${ciudad.nombre}, ${ciudad.pais === 'AR' ? 'Argentina' : 'Bolivia'} (gratis para vendedores y profesionales). ` +
+              `Reescribí el texto que te paso para ${red}, con tono ${tono}, cercano, con emojis moderados. ` +
               'Mantené el sentido, NO inventes precios, descuentos, premios ni datos que no estén, y conservá cada link EXACTAMENTE igual. ' +
-              'Si es un mensaje directo, que sea corto y personal (máx. 5 líneas). Respondé SOLO JSON: {"texto": "..."}',
+              'Si es un mensaje directo, que sea corto y personal (máx. 5 líneas). Respondé SOLO JSON: {"texto": "..."}' +
+              guiaIdioma(ciudadId),
           },
           { role: 'user', content: base },
         ],
@@ -712,7 +719,8 @@ export async function reescribirMarketingIA(base: string, red: string, tono: str
 // Admin → Marketing → Volantes: a partir de una idea, los textos del
 // volante (título, subtítulo, dos columnas con 3 puntos, llamado a la
 // acción y pie) + un tema de colores sugerido. null si no hay IA.
-export async function textosVolanteIA(idea: string, ciudad: string, temas: string[]): Promise<any | null> {
+export async function textosVolanteIA(idea: string, ciudadId: string, temas: string[]): Promise<any | null> {
+  const ciudad = buscarCiudad(ciudadId)
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
   try {
@@ -728,8 +736,8 @@ export async function textosVolanteIA(idea: string, ciudad: string, temas: strin
           {
             role: 'system',
             content:
-              `Sos diseñador publicitario de Clasi Click, marketplace gratuito de ${ciudad}, Bolivia (productos, servicios profesionales y anuncios; pago con QR; envío o retiro; matcheo automático entre quien busca y quien ofrece). ` +
-              'Armá los textos de UN volante a partir de la idea del usuario, en español boliviano, cortos y con gancho. ' +
+              `Sos diseñador publicitario de Clasi Click, marketplace gratuito de ${ciudad.nombre}, ${ciudad.pais === 'AR' ? 'Argentina' : 'Bolivia'} (productos, servicios profesionales y anuncios; pago con QR; envío o retiro; matcheo automático entre quien busca y quien ofrece). ` +
+              'Armá los textos de UN volante a partir de la idea del usuario, cortos y con gancho.' + guiaIdioma(ciudadId) + ' ' +
               'No inventes precios, premios, sorteos ni descuentos que la idea no mencione. ' +
               `Respondé SOLO JSON con esta forma exacta: {"titulo": "máx 28 caracteres, en mayúsculas", "subtitulo": "máx 70 caracteres, usá | para cortar en 2 líneas", "bajada": "máx 70, usá | para 2 líneas", ` +
               '"cajas": [{"titulo": "máx 24, mayúsculas", "bajada": "máx 40", "items": ["máx 32", "máx 32", "máx 32"]}, {…igual…}], "cta": "máx 55", "pie": "máx 60", ' +
@@ -819,7 +827,7 @@ export async function generarEtiquetasBusquedaIA(p: {
 // para los productos de una tienda, según su objetivo y sus números
 // reales. Devuelve el JSON crudo (lo valida /api/marketing/estrategia) o
 // null si no hay IA.
-export async function estrategiaMarketingIA(datos: string, dias: number): Promise<Record<string, any> | null> {
+export async function estrategiaMarketingIA(datos: string, dias: number, ciudadId?: string): Promise<Record<string, any> | null> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return null
   try {
@@ -837,7 +845,7 @@ export async function estrategiaMarketingIA(datos: string, dias: number): Promis
             content:
               'Sos consultor de marketing para pequeñas tiendas de Bolivia y Argentina que venden en Clasi Click (marketplace con pago QR y envío a domicilio). ' +
               'Te paso el objetivo de la tienda y sus productos con sus números de los últimos 30 días (vistas, agregados al carrito, unidades vendidas). ' +
-              `Armá una estrategia concreta y realista de ${dias} día(s) para lograr el objetivo, en español boliviano cercano (voseo o tuteo neutro), simple, sin tecnicismos. ` +
+              `Armá una estrategia concreta y realista de ${dias} día(s) para lograr el objetivo, cercana, simple, sin tecnicismos.` + guiaIdioma(ciudadId) + ' ' +
               'Reglas: elegí de 3 a 5 productos SOLO de la lista (usá sus id exactos) y explicá por qué con sus números; ' +
               'la oferta es una SUGERENCIA para que el vendedor decida (descuento, combo, regalo, envío gratis): nunca afirmes que ya existe; ' +
               'no inventes stock, talles ni colores; ' +

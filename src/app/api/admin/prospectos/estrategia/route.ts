@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guiaIdioma } from '@/lib/estiloRegional'
 import { getDb } from '@/lib/firebaseAdmin'
 import { SITE_URL } from '@/lib/anuncioPublico'
 import { cuposRestantes, estrategiaBase, type EstrategiaProspecto, type PlanCampana } from '@/lib/prospectos'
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (!p) return NextResponse.json({ error: 'Prospecto no encontrado.' }, { status: 404 })
   const base = estrategiaBase(p, campana, quedan, sitio)
   const r = await groqJSON(
-    SISTEMA,
+    SISTEMA + guiaIdioma(p.ciudad || 'potosi'),
     `Estrategia para convencer a esta tienda de sumarse a Clasi Click.\nTienda: ${p.nombre}\nRubro: ${p.rubro || 'sin dato'}\nCiudad: ${p.ciudad === 'la-paz' ? 'La Paz' : 'Potosí'}\n` +
       `Dirección: ${p.direccion || 'sin dato'}\nPersona de contacto: ${p.contacto || 'sin dato'}\nRedes: ${p.redes || 'sin dato'}\nEstado: ${p.estado}\nNotas del admin: ${p.notas || 'ninguna'}\n` +
       `Oferta: ${campana.oferta} para las ${campana.cupos} primeras tiendas (quedan ${quedan}).\nLink: ${sitio}\n` +

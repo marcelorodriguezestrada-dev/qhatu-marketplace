@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import TarjetaPublicacion from '@/components/marketing/TarjetaPublicacion'
 import EstrategiaIA, { type ArmarPublicacion } from '@/components/vender/EstrategiaIA'
+import { v } from '@/lib/estiloRegional'
 import { REDES_MARKETING, TONOS_MARKETING, linkProducto, pctDescuento, textoPlantilla } from '@/lib/marketing'
 
 // /vender → "📣 Marketing": el vendedor arma publicaciones para sus
@@ -143,7 +144,7 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
       if (d.campana) setCampana(d.campana)
     } catch (err: any) {
       // Sin conexión con el servidor: al menos la plantilla.
-      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE, ciudad.nombre, campana))
+      setTexto(textoPlantilla(seleccion as any, red, tienda, SITE, ciudad.id, campana))
       setConIA(false)
       setError(err?.message || '')
     } finally {
@@ -193,13 +194,15 @@ export default function MarketingVendedor({ misProductos, tienda, irA, ciudadTie
     }
   }
 
+  // Para los clientes: tuteo boliviano o voseo argentino según la ciudad de la tienda.
   const mensajeCatalogo =
     `¡Hola! 👋 Te comparto el catálogo de ${tienda || 'mi tienda'} en Clasi Click 🛍️\n\n` +
     activos
       .slice(0, 5)
-      .map((p) => `• ${p.nombre} — Bs ${Number(p.precio).toLocaleString('es-BO')}`)
+      .map((p) => `• ${p.nombre} — ${precio(p)}`)
       .join('\n') +
-    `${activos.length > 5 ? `\n…y ${activos.length - 5} productos más` : ''}\n\n👉 Mirá todo y pedí acá: ${linkTienda}\nPagás con QR y te lo llevamos 🚚`
+    `${activos.length > 5 ? `\n…y ${activos.length - 5} productos más` : ''}\n\n` +
+    v(ciudad.id, `👉 Mira todo y pide aquí: ${linkTienda}\nPagas con QR y te lo llevamos 🚚`, `👉 Mirá todo y pedí acá: ${linkTienda}\nPagás con QR y te lo llevamos 🚚`)
 
   const ideas = [
     activos.filter((p) => !p.imagenUrl).length > 0 && {
