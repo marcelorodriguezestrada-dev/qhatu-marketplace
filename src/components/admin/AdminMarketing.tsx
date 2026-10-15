@@ -2,6 +2,7 @@
 
 import AdminPublicacionesTiendas from '@/components/admin/AdminPublicacionesTiendas'
 import CatalogosFeed from '@/components/admin/CatalogosFeed'
+import FechasEspecialesAdmin from '@/components/admin/FechasEspecialesAdmin'
 import { useEffect, useMemo, useState } from 'react'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, linkCampana } from '@/lib/campanas'
 import { TEXTOS_ADMIN, gentilicioDe } from '@/lib/marketingAdmin'
@@ -271,6 +272,9 @@ export default function AdminMarketing({ password }: { password: string }) {
 
       {/* Lo que compartieron las tiendas desde Vender → Marketing */}
       <AdminPublicacionesTiendas password={password} />
+
+      {/* Fechas especiales para la "Estrategia con IA" de las tiendas */}
+      <FechasEspecialesAdmin password={password} />
 
       {/* 3. Volantes */}
       <EditorVolantes password={password} campanas={campanas || []} />

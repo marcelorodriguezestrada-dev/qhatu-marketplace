@@ -814,3 +814,52 @@ export async function generarEtiquetasBusquedaIA(p: {
     clearTimeout(t)
   }
 }
+
+// Vender → Marketing → "Estrategia con IA": plan de promoción de N días
+// para los productos de una tienda, según su objetivo y sus números
+// reales. Devuelve el JSON crudo (lo valida /api/marketing/estrategia) o
+// null si no hay IA.
+export async function estrategiaMarketingIA(datos: string, dias: number): Promise<Record<string, any> | null> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) return null
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b', // planificar y razonar con números: el grande
+        max_completion_tokens: 5000,
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Sos consultor de marketing para pequeñas tiendas de Bolivia y Argentina que venden en Clasi Click (marketplace con pago QR y envío a domicilio). ' +
+              'Te paso el objetivo de la tienda y sus productos con sus números de los últimos 30 días (vistas, agregados al carrito, unidades vendidas). ' +
+              `Armá una estrategia concreta y realista de ${dias} día(s) para lograr el objetivo, en español boliviano cercano (voseo o tuteo neutro), simple, sin tecnicismos. ` +
+              'Reglas: elegí de 3 a 5 productos SOLO de la lista (usá sus id exactos) y explicá por qué con sus números; ' +
+              'la oferta es una SUGERENCIA para que el vendedor decida (descuento, combo, regalo, envío gratis): nunca afirmes que ya existe; ' +
+              'no inventes stock, talles ni colores; ' +
+              'redes posibles: whatsapp (estados y grupos), facebook (página, grupos de compra-venta, Marketplace), instagram, tiktok; ' +
+              'horarios que mejor funcionan: 12:00–13:30 y 19:00–21:30; ' +
+              'cada día: 1 acción (qué publicar, dónde y con qué gancho), con 1 a 3 productos; ' +
+              'tono por día: "cercano", "oferta" (urgencia) o "elegante". ' +
+              'Respondé SOLO JSON: {"titulo":"…(máx 60 caracteres)","resumen":"…(2-3 frases)","productos":[{"id":"…","porque":"…","accion":"…"}],' +
+              '"oferta":"…","dias":[{"dia":1,"red":"whatsapp","hora":"19:30","idea":"…","productoIds":["…"],"tono":"cercano"}],"consejos":["…","…","…"]}',
+          },
+          { role: 'user', content: datos },
+        ],
+      }),
+    })
+    if (!res.ok) {
+      console.error('estrategiaMarketingIA: Groq respondió', res.status)
+      return null
+    }
+    const data = await res.json()
+    return JSON.parse(String(data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim())
+  } catch (err) {
+    console.error('estrategiaMarketingIA', err)
+    return null
+  }
+}
