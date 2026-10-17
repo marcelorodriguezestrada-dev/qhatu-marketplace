@@ -17,6 +17,10 @@ const norm = (t: string) => String(t || '').toLowerCase().normalize('NFD').repla
 
 export class LimiteIA extends Error {}
 export class ErrorIA extends Error {}
+// Ni Gemini (sin GEMINI_API_KEY) ni Groq (sin modelos de visión) pueden
+// mirar fotos: las capturas se leen en el navegador (Tesseract) y la
+// categoría sale del nombre.
+export class SinVision extends ErrorIA {}
 
 const URL_GROQ = 'https://api.groq.com/openai/v1/chat/completions'
 // Modelos con visión: Groq los da de baja seguido (llama-4-scout ya no
@@ -94,10 +98,11 @@ async function groq(cuerpo: Record<string, unknown>): Promise<any> {
   }
 }
 
-async function vision(imagen: string, texto: string, maxTokens: number): Promise<any> {
+async function visionGroq(imagen: string, texto: string, maxTokens: number): Promise<any> {
+  if (!process.env.GROQ_API_KEY) throw new SinVision('Falta GROQ_API_KEY en el servidor.')
   const { modelos, todos } = await modelosVision()
   if (!modelos.length) {
-    throw new ErrorIA(`Groq no tiene modelos que miren fotos para esta cuenta. Modelos disponibles: ${(todos || []).slice(0, 12).join(', ') || 'ninguno'}.`)
+    throw new SinVision(`Groq no tiene modelos que miren fotos para esta cuenta. Modelos disponibles: ${(todos || []).slice(0, 12).join(', ') || 'ninguno'}.`)
   }
   let ultimo: unknown = null
   const probados: string[] = []
@@ -128,20 +133,136 @@ async function vision(imagen: string, texto: string, maxTokens: number): Promise
   throw new ErrorIA(`Ningún modelo de Groq pudo mirar la foto (probé: ${probados.join(', ')}). Modelos de tu cuenta: ${disponibles.slice(0, 15).join(', ') || 'no se pudo leer la lista'}. ${ultimo instanceof Error ? ultimo.message : ''}`.slice(0, 600))
 }
 
+
+// ── Google Gemini (GEMINI_API_KEY, plan gratis de aistudio.google.com) ──
+// Va primero si está la clave: mira fotos mejor que Groq y Groq los da de
+// baja seguido. Igual que con Groq, se le pregunta qué modelos tiene la
+// cuenta y se recuerda el que anduvo. GEMINI_MODEL (opcional) va primero.
+const URL_GEMINI = 'https://generativelanguage.googleapis.com/v1beta'
+const GEMINI_CONOCIDOS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash']
+let geminiQueAnda: string | null = null
+let geminiCache: { at: number; ids: string[] } | null = null
+
+async function modelosGemini(): Promise<string[]> {
+  const env = process.env.GEMINI_MODEL
+  let ids: string[] | null = geminiCache && Date.now() - geminiCache.at < 10 * 60 * 1000 ? geminiCache.ids : null
+  if (!ids) {
+    try {
+      const r = await fetch(`${URL_GEMINI}/models?pageSize=200`, { headers: { 'x-goog-api-key': String(process.env.GEMINI_API_KEY) } })
+      if (r.ok) {
+        const d = await r.json()
+        ids = (d.models || [])
+          .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
+          .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+          .filter((id: string) => /^gemini/.test(id) && /flash/.test(id) && !/tts|image|audio|live|embedding|thinking|robotics|computer/.test(id))
+        geminiCache = { at: Date.now(), ids: ids || [] }
+      }
+    } catch {}
+  }
+  // Preferidos: el configurado, el que anduvo, "flash" estable (no lite ni preview), el resto.
+  const version = (id: string) => Number(id.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || 0)
+  const peso = (id: string) => (id === env ? -100 : id === geminiQueAnda ? -50 : 0) + (/lite/.test(id) ? 5 : 0) + (/preview|exp/.test(id) ? 3 : 0) + (/latest/.test(id) ? 1 : 0) - version(id)
+  const lista = ids && ids.length ? ids : GEMINI_CONOCIDOS
+  return Array.from(new Set([...(env ? [env] : []), ...lista])).sort((a, b) => peso(a) - peso(b)).slice(0, 5)
+}
+
+async function aInline(imagen: string): Promise<{ mime_type: string; data: string }> {
+  const m = imagen.match(/^data:([^;]+);base64,(.+)$/)
+  if (m) return { mime_type: m[1], data: m[2] }
+  const r = await fetch(imagen, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (ClasiClick)' } })
+  const tipo = (r.headers.get('content-type') || '').split(';')[0]
+  if (!r.ok || !tipo.startsWith('image/')) throw new ErrorIA(`No se pudo abrir la foto (${r.status}).`)
+  return { mime_type: tipo, data: Buffer.from(await r.arrayBuffer()).toString('base64') }
+}
+
+async function visionGemini(imagen: string, texto: string, maxTokens: number): Promise<any> {
+  const key = process.env.GEMINI_API_KEY
+  if (!key) throw new SinVision('Falta GEMINI_API_KEY.')
+  const foto = await aInline(imagen)
+  let ultimo = ''
+  for (const model of await modelosGemini()) {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 40000)
+    try {
+      const res = await fetch(`${URL_GEMINI}/models/${model}:generateContent`, {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: texto }, { inline_data: foto }] }],
+          // Los modelos que "piensan" gastan tokens antes de responder: margen de sobra.
+          generationConfig: { temperature: 0.1, maxOutputTokens: Math.max(maxTokens * 4, 4096), responseMimeType: 'application/json' },
+        }),
+      })
+      if (res.status === 429) throw new LimiteIA('Límite de Gemini por minuto')
+      if (!res.ok) {
+        const txt = (await res.text()).slice(0, 300)
+        console.error('fotoProductoIA: Gemini respondió', model, res.status, txt)
+        ultimo = `Gemini respondió ${res.status}: ${txt.replace(/[{}"\n]/g, ' ').replace(/\s+/g, ' ').slice(0, 160)}`
+        if (res.status === 400 && /API key|API_KEY/i.test(txt)) throw new ErrorIA('La clave GEMINI_API_KEY no es válida.')
+        if (res.status === 403) throw new ErrorIA('La clave de Gemini no tiene permiso (¿la API "Generative Language" está activada?).')
+        continue // modelo inexistente o que no acepta esto → el siguiente
+      }
+      const d = await res.json()
+      const txt = (d.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
+      geminiQueAnda = model
+      return JSON.parse(txt.replace(/```json|```/g, '').trim() || '{}')
+    } catch (err) {
+      if (err instanceof LimiteIA || err instanceof ErrorIA) throw err
+      ultimo = (err as any)?.name === 'AbortError' ? 'Gemini tardó demasiado.' : 'Gemini no devolvió una respuesta válida.'
+    } finally {
+      clearTimeout(t)
+    }
+  }
+  throw new ErrorIA(ultimo || 'Gemini no pudo mirar la foto.')
+}
+
+// Mira una foto: Gemini si hay clave; si no (o si falla), Groq.
+async function vision(imagen: string, texto: string, maxTokens: number): Promise<any> {
+  let errorGemini: unknown = null
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await visionGemini(imagen, texto, maxTokens)
+    } catch (err) {
+      if (err instanceof LimiteIA) throw err
+      errorGemini = err
+    }
+  }
+  try {
+    return await visionGroq(imagen, texto, maxTokens)
+  } catch (err) {
+    // Groq no puede: el error que importa es el de Gemini (si se probó).
+    if (err instanceof SinVision && errorGemini instanceof Error) throw new ErrorIA(errorGemini.message)
+    if (err instanceof SinVision) throw new SinVision(`${err.message} Para leer fotos cargá GEMINI_API_KEY (gratis en aistudio.google.com).`)
+    throw err
+  }
+}
+
 export type AnalisisFoto = { rubroId: string | null; nombre: string; publico: string | null; colores: string[]; descripcion: string }
 
 export async function analizarFotoProducto(imagenUrl: string, categorias: CategoriaProducto[], pista?: string): Promise<AnalisisFoto> {
   const imagen = await aDataUrl(imagenUrl)
   const pistaTxt = pista ? `\nEl archivo se llama "${pista}" (puede traer el nombre del producto).` : ''
-  const r1 = await vision(
-    imagen,
-    'Sos el catalogador de Clasi Click, un marketplace de Bolivia. Mirá la foto del producto que se vende.' + pistaTxt +
-      '\nRespondé SOLO JSON: {"nombre": "<nombre comercial corto en español, máx 7 palabras, ej: Sandalia de taco con tiras>", ' +
-      '"tipo": "<qué es en 1-3 palabras genéricas, ej: sandalia, zapato de vestir, blusa, banquito, celular>", ' +
-      '"publico": "mujer" | "hombre" | "ninos" | "unisex", "colores": ["<colores visibles, máx 3>"], ' +
-      '"descripcion": "<1 frase de venta, máx 25 palabras, sin inventar materiales ni marcas>"}',
-    300
-  )
+  const formato =
+    '\nRespondé SOLO JSON: {"nombre": "<nombre comercial corto en español, máx 7 palabras, ej: Sandalia de taco con tiras>", ' +
+    '"tipo": "<qué es en 1-3 palabras genéricas, ej: sandalia, zapato de vestir, blusa, banquito, celular>", ' +
+    '"publico": "mujer" | "hombre" | "ninos" | "unisex", "colores": ["<colores, máx 3>"], ' +
+    '"descripcion": "<1 frase de venta, máx 25 palabras, sin inventar materiales ni marcas>"}'
+  let r1: any
+  try {
+    r1 = await vision(imagen, 'Sos el catalogador de Clasi Click, un marketplace de Bolivia. Mirá la foto del producto que se vende.' + pistaTxt + formato, 300)
+  } catch (err) {
+    // Nadie puede mirar la foto: si hay un nombre, la categoría sale de ahí
+    // (con la IA de texto). Sin nombre no hay de dónde sacarla.
+    if (!(err instanceof SinVision) || !pista || pista.replace(/[^a-záéíóúñ]/gi, '').length < 3) throw err
+    r1 = await groq({
+      model: 'openai/gpt-oss-20b',
+      max_completion_tokens: 600,
+      reasoning_effort: 'low',
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: `Sos el catalogador de Clasi Click, un marketplace. Un producto se llama "${pista}" (puede ser un nombre de archivo: guiones = espacios, puede traer público, precio o talles). Sin ver la foto, deducí lo que puedas del nombre (colores solo si el nombre los dice).` + formato }],
+    })
+  }
   const nombre = String(r1.nombre || '').trim().slice(0, 80)
   const tipo = String(r1.tipo || '').trim().slice(0, 60)
   const publico = ['mujer', 'hombre', 'ninos', 'unisex'].includes(r1.publico) ? r1.publico : null
@@ -216,12 +337,17 @@ export function leerPrecio(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+// La caja de la foto: [ymin, xmin, ymax, xmax] de 0 a 1000 (lo que mejor
+// sabe dar Gemini) o {x, y, ancho, alto}; en fracción, porcentaje o milésimas.
 function leerCaja(c: any): CajaFoto | null {
   if (!c || typeof c !== 'object') return null
-  let [x, y, ancho, alto] = [c.x, c.y, c.ancho ?? c.w ?? c.width, c.alto ?? c.h ?? c.height].map(Number)
+  let [x, y, ancho, alto] = Array.isArray(c) && c.length === 4
+    ? [Number(c[1]), Number(c[0]), Number(c[3]) - Number(c[1]), Number(c[2]) - Number(c[0])]
+    : [c.x, c.y, c.ancho ?? c.w ?? c.width, c.alto ?? c.h ?? c.height].map(Number)
   if (![x, y, ancho, alto].every(Number.isFinite)) return null
-  // Algunos modelos responden en porcentaje (0-100) en vez de fracción.
-  if (Math.max(x, y, ancho, alto) > 1.5) [x, y, ancho, alto] = [x, y, ancho, alto].map((n) => n / 100)
+  const max = Math.max(x, y, x + ancho, y + alto)
+  if (max > 100.5) [x, y, ancho, alto] = [x, y, ancho, alto].map((n) => n / 1000)
+  else if (max > 1.5) [x, y, ancho, alto] = [x, y, ancho, alto].map((n) => n / 100)
   x = Math.min(Math.max(x, 0), 1)
   y = Math.min(Math.max(y, 0), 1)
   ancho = Math.min(ancho, 1 - x)
@@ -238,8 +364,8 @@ export async function leerCapturaCatalogo(imagen: string): Promise<{ vista: 'det
       'Ignorá la barra de estado del celular, el encabezado, el nombre del negocio y botones como "Agregar al carrito", "Mensaje" o "Compartir". ' +
       'Para cada producto: "nombre" tal cual aparece; "precio" como número sin símbolo de moneda ni separador de miles (ej: "$ 15.000" → 15000, "$ 1.250,50" → 1250.5), null si no se ve; ' +
       '"precioAntes" si hay un precio tachado (número) o null; "descripcion" el texto que se vea (máx 300 caracteres, vacío si no hay); ' +
-      '"caja": el rectángulo de la FOTO del producto (solo la foto, sin textos ni botones) en fracciones de la captura: {"x": borde izquierdo, "y": borde de arriba, "ancho", "alto"}, valores entre 0 y 1. ' +
-      'Respondé SOLO JSON: {"vista": "detalle" | "lista", "productos": [{"nombre": "...", "precio": 15000, "precioAntes": null, "descripcion": "...", "caja": {"x": 0, "y": 0.1, "ancho": 1, "alto": 0.45}}]}',
+      '"box_2d": el rectángulo de la FOTO del producto (solo la foto, sin textos ni botones) como [ymin, xmin, ymax, xmax] normalizados de 0 a 1000. ' +
+      'Respondé SOLO JSON: {"vista": "detalle" | "lista", "productos": [{"nombre": "...", "precio": 15000, "precioAntes": null, "descripcion": "...", "box_2d": [90, 0, 560, 1000]}]}',
     1800
   )
   const productos: ProductoCaptura[] = (Array.isArray(r?.productos) ? r.productos : [])
@@ -248,9 +374,48 @@ export async function leerCapturaCatalogo(imagen: string): Promise<{ vista: 'det
       precio: leerPrecio(p?.precio),
       precioAntes: leerPrecio(p?.precioAntes),
       descripcion: String(p?.descripcion || '').replace(/[ \t]+/g, ' ').trim().slice(0, 400),
-      caja: leerCaja(p?.caja),
+      caja: leerCaja(p?.box_2d ?? p?.caja),
     }))
     .filter((p: ProductoCaptura) => p.nombre.length >= 2)
     .slice(0, 20)
   return { vista: r?.vista === 'lista' ? 'lista' : productos.length > 1 ? 'lista' : 'detalle', productos }
+}
+
+// Sin IA que mire fotos: el texto de la captura lo lee el navegador
+// (Tesseract, con la posición de cada renglón) y la IA de texto lo ordena
+// en productos. La foto la ubica el navegador (src/lib/capturaSinVision.ts).
+export type RenglonCaptura = { texto: string; y: number; x: number } // y, x: fracción de la captura
+export type ProductoTexto = { nombre: string; precio: number | null; precioAntes: number | null; descripcion: string; renglon: number }
+
+export async function ordenarTextoCaptura(renglones: RenglonCaptura[]): Promise<{ vista: 'detalle' | 'lista'; productos: ProductoTexto[] }> {
+  const lista = renglones.slice(0, 120).map((r, i) => `${i} | y=${r.y.toFixed(3)} x=${r.x.toFixed(2)} | ${r.texto.slice(0, 160)}`).join('\n')
+  const r = await groq({
+    model: 'openai/gpt-oss-120b',
+    max_completion_tokens: 3000,
+    reasoning_effort: 'low',
+    response_format: { type: 'json_object' },
+    messages: [{
+      role: 'user',
+      content:
+        'Este es el texto (leído con OCR, puede tener errores) de una captura de pantalla de un catálogo de WhatsApp Business / Instagram / Facebook. ' +
+        'Cada renglón: número | posición vertical y horizontal (0 a 1) | texto. ' +
+        'Puede ser la vista de UN producto (foto arriba, después nombre, precio y descripción) o una LISTA (cada producto: nombre y precio al lado de su miniatura). ' +
+        'Ignorá la hora, batería, el encabezado, el nombre del negocio y botones ("Agregar al carrito", "Mensaje", "Compartir", "Ver carrito"). ' +
+        'Para cada producto: "nombre" (corregí errores obvios del OCR, sin inventar), "precio" como número (ej: "$ 15.000" → 15000, "$1.250,50" → 1250.5) o null, ' +
+        '"precioAntes" si hay un segundo precio mayor (tachado) o null, "descripcion" (renglones de descripción unidos, máx 300 caracteres, vacío si no hay), ' +
+        '"renglon": el número del renglón donde está el nombre. ' +
+        'Respondé SOLO JSON: {"vista": "detalle" | "lista", "productos": [{"nombre": "...", "precio": 15000, "precioAntes": null, "descripcion": "...", "renglon": 7}]}\n\n' + lista,
+    }],
+  })
+  const productos: ProductoTexto[] = (Array.isArray(r?.productos) ? r.productos : [])
+    .map((p: any) => ({
+      nombre: String(p?.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+      precio: leerPrecio(p?.precio),
+      precioAntes: leerPrecio(p?.precioAntes),
+      descripcion: String(p?.descripcion || '').replace(/[ \t]+/g, ' ').trim().slice(0, 400),
+      renglon: Math.min(Math.max(Math.round(Number(p?.renglon) || 0), 0), Math.max(renglones.length - 1, 0)),
+    }))
+    .filter((p: ProductoTexto) => p.nombre.length >= 2)
+    .slice(0, 20)
+  return { vista: r?.vista === 'lista' || productos.length > 1 ? 'lista' : 'detalle', productos }
 }

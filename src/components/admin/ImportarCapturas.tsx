@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { codigoTienda } from '@/lib/importarCarpeta'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
+import { afinarBordes, cajaDetalle, cajaLista, leerTextoCaptura, type Renglon } from '@/lib/capturaSinVision'
 import type { NuevoImportado } from '@/components/admin/EdicionRapidaProductos'
 
 // Importar → "📲 Capturas de catálogo": para pasar a Clasi Click el
@@ -175,20 +176,63 @@ export default function ImportarCapturas({
     setCapturas((prev) => [...prev, ...nuevas])
   }
 
-  async function leerUna(c: Captura): Promise<{ vista: string; productos: any[] } | { error: string }> {
-    const imagen = await capturaParaIA(c)
+  // Sin IA que mire fotos en el servidor: el resto de las capturas se leen acá.
+  const enNavegador = useRef(false)
+  const [modoLocal, setModoLocal] = useState(false)
+
+  async function pedir(body: unknown): Promise<any> {
     for (let intento = 0; intento < 6; intento++) {
-      const r = await fetch('/api/admin/productos/leer-captura', { method: 'POST', headers, body: JSON.stringify({ imagen }) })
+      const r = await fetch('/api/admin/productos/leer-captura', { method: 'POST', headers, body: JSON.stringify(body) })
       if (r.status === 429) {
         setAvance((a) => ({ ...a, etapa: '⏳ La IA gratis pide una pausa (límite por minuto), sigo en unos segundos…' }))
         await esperar(15000 + intento * 5000)
         continue
       }
       const d = await r.json().catch(() => null)
+      if (d?.sinVision) return { sinVision: true }
       if (!r.ok || !d) return { error: d?.error || `error ${r.status}` }
       return d
     }
     return { error: 'la IA gratis siguió ocupada; probá de nuevo en un rato' }
+  }
+
+  // Devuelve los productos con su caja (null = no se sabe dónde está la foto).
+  async function leerUna(c: Captura): Promise<{ vista: string; productos: any[]; local?: boolean } | { error: string }> {
+    if (!enNavegador.current) {
+      const d = await pedir({ imagen: await capturaParaIA(c) })
+      if (!d.sinVision) return d
+      enNavegador.current = true
+      setModoLocal(true)
+    }
+    // Plan B: el texto lo lee el navegador y la IA de texto lo ordena.
+    setAvance((a) => ({ ...a, etapa: `Leyendo el texto de “${c.nombre}” (en tu navegador)…` }))
+    let renglones: Renglon[]
+    try {
+      renglones = await leerTextoCaptura(c.url, c.ancho, c.alto)
+    } catch {
+      return { error: 'No se pudo leer el texto de la captura en el navegador.' }
+    }
+    if (!renglones.length) return { vista: 'detalle', productos: [], local: true }
+    setAvance((a) => ({ ...a, etapa: `Ordenando los datos de “${c.nombre}”…` }))
+    const d = await pedir({ renglones: renglones.map((r) => ({ texto: r.texto, y: r.y, x: r.x })) })
+    if (d.error || d.sinVision) return { error: d.error || 'No se pudo ordenar el texto.' }
+    const prods: any[] = d.productos || []
+    const inicios = prods.map((p) => p.renglon).sort((a, b) => a - b)
+    const r = {
+      vista: d.vista,
+      local: true,
+      productos: prods.map((p) => {
+        if (d.vista === 'lista' && prods.length > 1) {
+          const siguiente = inicios.find((i) => i > p.renglon) ?? renglones.length
+          return { ...p, caja: cajaLista(renglones, p.renglon, siguiente, c.ancho, c.alto), segura: false }
+        }
+        const { caja, segura } = cajaDetalle(renglones, c.ancho, c.alto, renglones[p.renglon]?.y ?? 1)
+        return { ...p, caja, segura }
+      }),
+    }
+    // En la vista de un producto, la franja se afina al borde real de la foto.
+    if (!(d.vista === 'lista' && prods.length > 1)) for (const p of r.productos) p.caja = await afinarBordes(c.url, p.caja)
+    return r
   }
 
   async function leerTodas() {
@@ -219,7 +263,8 @@ export default function ImportarCapturas({
             precioAntes: p.precioAntes != null ? String(p.precioAntes) : '',
             descripcion: p.descripcion || '',
             caja,
-            cajaDudosa: !p.caja,
+            // Adivinada: sin caja de la IA, o ubicada por el texto sin seguridad.
+            cajaDudosa: !p.caja || (r.local === true && !p.segura),
             incluir: true,
           })
         }
@@ -352,6 +397,11 @@ export default function ImportarCapturas({
         </button>
       )}
       {error && <div className="font-body text-xs text-maroon mb-2">{error}</div>}
+      {modoLocal && (
+        <div className="font-body text-[11px] text-ink bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 mb-3">
+          La IA del servidor no puede mirar fotos, así que el texto se lee en tu navegador y la foto se ubica sola (revisá los recortes ⚠️). Para que la IA lea y recorte mejor, cargá <code>GEMINI_API_KEY</code> en Vercel (gratis en aistudio.google.com).
+        </div>
+      )}
 
       {(estado === 'leyendo' || estado === 'subiendo') && (
         <div className="bg-white rounded-lg border border-indigo-100 p-3 mb-3">

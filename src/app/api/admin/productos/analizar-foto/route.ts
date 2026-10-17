@@ -12,7 +12,7 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   const pw = req.headers.get('x-admin-password')
   if (!(await esClaveAdmin(pw))) return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
-  if (!process.env.GROQ_API_KEY) return NextResponse.json({ error: 'Falta configurar GROQ_API_KEY en el servidor.' }, { status: 503 })
+  if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) return NextResponse.json({ error: 'Falta configurar GEMINI_API_KEY (o GROQ_API_KEY) en el servidor.' }, { status: 503 })
   const { imagenUrl, pista } = await req.json().catch(() => ({}))
   if (typeof imagenUrl !== 'string' || !/^https:\/\//.test(imagenUrl)) return NextResponse.json({ error: 'Imagen inválida.' }, { status: 400 })
   // Foto de Drive (Armar planilla): la IA no puede abrir el link de Drive,
