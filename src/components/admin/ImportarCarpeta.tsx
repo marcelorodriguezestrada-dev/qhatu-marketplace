@@ -10,6 +10,7 @@ import type { CategoriaProducto } from '@/lib/arbolCategorias'
 import { subirFotoAdmin } from '@/lib/subirFotoAdmin'
 import type { NuevoImportado } from '@/components/admin/EdicionRapidaProductos'
 import ArmarPlanilla from '@/components/admin/ArmarPlanilla'
+import ImportarCapturas from '@/components/admin/ImportarCapturas'
 
 // Admin → Productos → Edición rápida → "📁 Importar carpeta".
 // 1. Elegís una carpeta (de la compu, o de Google Drive para escritorio)
@@ -52,7 +53,7 @@ export default function ImportarCarpeta({
   const ciudadesTodas = useTodasLasCiudades()
   const headers = { 'Content-Type': 'application/json', 'x-admin-password': password }
   const [estado, setEstado] = useState<Estado>('elegir')
-  const [modo, setModo] = useState<'carpeta' | 'sheet' | 'armar'>('carpeta')
+  const [modo, setModo] = useState<'carpeta' | 'sheet' | 'armar' | 'capturas'>('carpeta')
   const [linkSheet, setLinkSheet] = useState('')
   const [filasSheet, setFilasSheet] = useState<string[][] | null>(null)
   const [leyendoSheet, setLeyendoSheet] = useState(false)
@@ -316,7 +317,7 @@ export default function ImportarCarpeta({
   return (
     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3.5 mb-3">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="font-body text-sm font-semibold text-ink">{modo === 'sheet' ? '📊 Importar productos desde Google Sheets' : modo === 'armar' ? '🧾 Armar la planilla desde una carpeta de fotos' : '📁 Importar productos desde una carpeta'}</div>
+        <div className="font-body text-sm font-semibold text-ink">{modo === 'sheet' ? '📊 Importar productos desde Google Sheets' : modo === 'capturas' ? '📲 Importar el catálogo de WhatsApp desde capturas' : modo === 'armar' ? '🧾 Armar la planilla desde una carpeta de fotos' : '📁 Importar productos desde una carpeta'}</div>
         {estado !== 'procesando' && <button type="button" onClick={onCerrar} className="font-body text-xs text-inksoft underline bg-transparent border-none">Cerrar</button>}
       </div>
 
@@ -326,8 +327,11 @@ export default function ImportarCarpeta({
             <button type="button" onClick={() => { setModo('carpeta'); setNombreIA(true) }} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'carpeta' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>📁 Carpeta de fotos</button>
             <button type="button" onClick={() => { setModo('sheet'); setNombreIA(false) }} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'sheet' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>📊 Google Sheet</button>
             <button type="button" onClick={() => setModo('armar')} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'armar' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>🧾 Armar planilla</button>
+            <button type="button" onClick={() => setModo('capturas')} className={`px-3 py-1.5 rounded-md font-body text-xs font-semibold border-none ${modo === 'capturas' ? 'bg-indigo-600 text-white' : 'bg-transparent text-inksoft'}`}>📲 Capturas de catálogo</button>
           </div>
-          {modo === 'armar' ? (
+          {modo === 'capturas' ? (
+            <ImportarCapturas password={password} vendedores={todosVendedores} existentes={existentes} analizar={analizar} onListo={(filas) => onListo(filas, [])} />
+          ) : modo === 'armar' ? (
             <ArmarPlanilla password={password} rubros={rubrosFlat} onUsarSheet={() => { setModo('sheet'); setNombreIA(false) }} />
           ) : modo === 'carpeta' ? (
             <>
