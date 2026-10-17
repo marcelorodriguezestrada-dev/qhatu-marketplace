@@ -195,3 +195,62 @@ export async function analizarFotoProducto(imagenUrl: string, categorias: Catego
     descripcion: String(r1.descripcion || '').trim().slice(0, 250),
   }
 }
+
+// "📲 Capturas de catálogo": la IA lee una captura de pantalla de un
+// catálogo de WhatsApp Business (o Instagram / Facebook) y devuelve los
+// productos que se ven, con la caja donde está la foto de cada uno (en
+// fracciones de la imagen, para recortarla en el navegador).
+export type CajaFoto = { x: number; y: number; ancho: number; alto: number }
+export type ProductoCaptura = { nombre: string; precio: number | null; precioAntes: number | null; descripcion: string; caja: CajaFoto | null }
+
+// "$ 15.000" → 15000 · "1.250,50" → 1250.5 · "1,250.50" → 1250.5 · 15000 → 15000
+export function leerPrecio(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : null
+  let t = String(v ?? '').replace(/[^\d.,]/g, '')
+  if (!t) return null
+  const ultimoSep = Math.max(t.lastIndexOf('.'), t.lastIndexOf(','))
+  // Separador decimal = el último, si tiene 1 o 2 dígitos después.
+  if (ultimoSep >= 0 && t.length - ultimoSep - 1 <= 2) t = t.slice(0, ultimoSep).replace(/[.,]/g, '') + '.' + t.slice(ultimoSep + 1)
+  else t = t.replace(/[.,]/g, '')
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function leerCaja(c: any): CajaFoto | null {
+  if (!c || typeof c !== 'object') return null
+  let [x, y, ancho, alto] = [c.x, c.y, c.ancho ?? c.w ?? c.width, c.alto ?? c.h ?? c.height].map(Number)
+  if (![x, y, ancho, alto].every(Number.isFinite)) return null
+  // Algunos modelos responden en porcentaje (0-100) en vez de fracción.
+  if (Math.max(x, y, ancho, alto) > 1.5) [x, y, ancho, alto] = [x, y, ancho, alto].map((n) => n / 100)
+  x = Math.min(Math.max(x, 0), 1)
+  y = Math.min(Math.max(y, 0), 1)
+  ancho = Math.min(ancho, 1 - x)
+  alto = Math.min(alto, 1 - y)
+  return ancho > 0.04 && alto > 0.02 ? { x, y, ancho, alto } : null
+}
+
+export async function leerCapturaCatalogo(imagen: string): Promise<{ vista: 'detalle' | 'lista'; productos: ProductoCaptura[] }> {
+  const r = await vision(
+    imagen,
+    'Esta es una captura de pantalla de un catálogo de productos de WhatsApp Business (o de Instagram / Facebook). ' +
+      'Puede ser la vista de UN producto (foto grande arriba, nombre, precio y descripción) o una LISTA (miniatura de cada producto con su nombre y precio). ' +
+      'Extraé cada producto que se vea con su nombre completo (ignorá los cortados arriba o abajo sin nombre). ' +
+      'Ignorá la barra de estado del celular, el encabezado, el nombre del negocio y botones como "Agregar al carrito", "Mensaje" o "Compartir". ' +
+      'Para cada producto: "nombre" tal cual aparece; "precio" como número sin símbolo de moneda ni separador de miles (ej: "$ 15.000" → 15000, "$ 1.250,50" → 1250.5), null si no se ve; ' +
+      '"precioAntes" si hay un precio tachado (número) o null; "descripcion" el texto que se vea (máx 300 caracteres, vacío si no hay); ' +
+      '"caja": el rectángulo de la FOTO del producto (solo la foto, sin textos ni botones) en fracciones de la captura: {"x": borde izquierdo, "y": borde de arriba, "ancho", "alto"}, valores entre 0 y 1. ' +
+      'Respondé SOLO JSON: {"vista": "detalle" | "lista", "productos": [{"nombre": "...", "precio": 15000, "precioAntes": null, "descripcion": "...", "caja": {"x": 0, "y": 0.1, "ancho": 1, "alto": 0.45}}]}',
+    1800
+  )
+  const productos: ProductoCaptura[] = (Array.isArray(r?.productos) ? r.productos : [])
+    .map((p: any) => ({
+      nombre: String(p?.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+      precio: leerPrecio(p?.precio),
+      precioAntes: leerPrecio(p?.precioAntes),
+      descripcion: String(p?.descripcion || '').replace(/[ \t]+/g, ' ').trim().slice(0, 400),
+      caja: leerCaja(p?.caja),
+    }))
+    .filter((p: ProductoCaptura) => p.nombre.length >= 2)
+    .slice(0, 20)
+  return { vista: r?.vista === 'lista' ? 'lista' : productos.length > 1 ? 'lista' : 'detalle', productos }
+}
