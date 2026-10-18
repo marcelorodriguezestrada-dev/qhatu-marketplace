@@ -2,7 +2,8 @@
 
 import { nombreRubro } from '@/lib/arbolCategorias'
 import { useTodasLasCiudades } from '@/lib/ciudad'
-import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
+import { buscarPaisMercado, formatoMoneda, paisDeCiudad } from '@/lib/mercado'
+import { PAISES } from '@/data/paises'
 import { banderaDe } from '@/data/paisesMercado'
 import { useEffect, useMemo, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
@@ -691,6 +692,27 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
       body: JSON.stringify({ ciudadAsignada: ciudad || null }),
     }).then(() => cargarUsuarios())
+    // "Ve X" solo cambia lo que ve. Si tiene tienda en otra ciudad, se
+    // ofrece moverla también (si no, sus productos siguen con la moneda vieja).
+    const tienda = vendedoresAdmin.find((v) => v.id === uid)
+    if (ciudad && tienda && ciudadDe(tienda) !== ciudad) {
+      const n = productos.filter((p) => p.vendedorId === uid).length
+      if (confirm(`Su tienda está en ${buscarCiudad(ciudadDe(tienda)).nombre}. ¿Mover también la tienda y sus ${n} producto(s) a ${buscarCiudad(ciudad).nombre}? (precios en ${paisDeCiudad(ciudad).simboloMoneda})`)) cambiarCiudadTienda(uid, ciudad, false)
+    }
+  }
+
+  // Ciudad de la tienda: se copia a todos sus productos (país, moneda y dónde aparecen).
+  function cambiarCiudadTienda(uid: string, ciudad: string, preguntar = true) {
+    const tienda = vendedoresAdmin.find((v) => v.id === uid)
+    if (!tienda || !ciudad || ciudadDe(tienda) === ciudad) return
+    const n = productos.filter((p) => p.vendedorId === uid).length
+    if (preguntar && !confirm(`¿Mover la tienda y sus ${n} producto(s) a ${buscarCiudad(ciudad).nombre}? Los precios pasan a ${paisDeCiudad(ciudad).simboloMoneda} (los números no cambian).`)) return
+    setVendedoresAdmin((prev) => prev.map((v) => (v.id === uid ? { ...v, ciudad } : v)))
+    fetch(`/api/vendedores/${uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      body: JSON.stringify({ ciudad }),
+    }).then(() => { cargarVendedoresAdmin(); cargarProductos() })
   }
 
   // "🌎 También visible en": la tienda (y sus productos) aparece además en
@@ -713,7 +735,7 @@ export default function AdminPage() {
   }
 
   const [vendedorParaCargar, setVendedorParaCargar] = useState('')
-  const [edicionUsuario, setEdicionUsuario] = useState<{ uid: string; email: string; nombre: string; whatsapp: string; nombreNegocio: string; tieneTienda: boolean } | null>(null)
+  const [edicionUsuario, setEdicionUsuario] = useState<{ uid: string; email: string; nombre: string; whatsapp: string; whatsappPais: string; nombreNegocio: string; tieneTienda: boolean } | null>(null)
   const [guardandoUsuario, setGuardandoUsuario] = useState(false)
   // Poner / cambiar contraseña de un usuario desde el admin.
   // Admins delegados (solo los ve y maneja el admin principal; null = no sos el principal).
@@ -772,12 +794,15 @@ export default function AdminPage() {
   function abrirEdicionUsuario(u: any) {
     const vendedor = vendedoresAdmin.find((v) => v.id === u.uid)
     const w = String(u.whatsapp || vendedor?.whatsapp || '')
+    // País del número: el guardado, o el que dice su código (54 = Argentina).
+    const whatsappPais = vendedor?.whatsappPais === 'AR' || u.whatsappPais === 'AR' || (/^54/.test(w) && w.length >= 12) ? 'AR' : 'BO'
     setErrorEdicionUsuario('')
     setEdicionUsuario({
       uid: u.uid,
       email: u.email || '',
       nombre: u.nombre || '',
-      whatsapp: w.startsWith('591') ? w.slice(3) : w,
+      whatsapp: whatsappPais === 'AR' ? w.replace(/^549?/, '') : w.startsWith('591') ? w.slice(3) : w,
+      whatsappPais,
       nombreNegocio: vendedor?.nombreNegocio || '',
       tieneTienda: !!vendedor,
     })
@@ -3603,6 +3628,20 @@ export default function AdminPage() {
                       {(() => {
                         const tienda = vendedoresAdmin.find((v) => v.id === u.uid)
                         if (!tienda) return null
+                        return (
+                          <select
+                            value={ciudadDe(tienda)}
+                            onChange={(e) => cambiarCiudadTienda(u.uid, e.target.value)}
+                            title="Ciudad de la tienda: define el país, la moneda de sus precios y dónde aparecen sus productos"
+                            className="px-2 py-1.5 rounded-md border border-line bg-panel font-body text-[11px]"
+                          >
+                            {ciudadesTodas.map((c) => <option key={c.id} value={c.id}>🏪 Tienda en {c.nombre}</option>)}
+                          </select>
+                        )
+                      })()}
+                      {(() => {
+                        const tienda = vendedoresAdmin.find((v) => v.id === u.uid)
+                        if (!tienda) return null
                         const visibleEn: string[] = Array.isArray(tienda.visibleEn) ? tienda.visibleEn : []
                         const otras = ciudadesTodas.filter((c) => c.id !== ciudadDe(tienda))
                         return (
@@ -3744,7 +3783,7 @@ export default function AdminPage() {
                       {[
                         { k: 'email', label: 'Email', type: 'email', ph: 'vendedor@gmail.com' },
                         { k: 'nombre', label: 'Nombre', type: 'text', ph: 'Nombre' },
-                        { k: 'whatsapp', label: 'WhatsApp', type: 'tel', ph: '71234567' },
+                        { k: 'whatsapp', label: `WhatsApp (${edicionUsuario?.whatsappPais === 'AR' ? '🇦🇷 +54' : '🇧🇴 +591'})`, type: 'tel', ph: edicionUsuario?.whatsappPais === 'AR' ? '1123456789' : '71234567' },
                         { k: 'nombreNegocio', label: edicionUsuario?.tieneTienda ? 'Nombre de la tienda' : 'Nombre de la tienda (la crea)', type: 'text', ph: 'Sin tienda' },
                       ].map((c) => (
                         <label key={c.k} className="font-body text-[11px] text-ink">
@@ -3758,6 +3797,16 @@ export default function AdminPage() {
                           />
                         </label>
                       ))}
+                      <label className="font-body text-[11px] text-ink">
+                        <span className="block font-semibold mb-1">País del WhatsApp</span>
+                        <select
+                          value={edicionUsuario?.whatsappPais || 'BO'}
+                          onChange={(e) => { const v = e.target.value; setEdicionUsuario((prev) => (prev ? { ...prev, whatsappPais: v } : prev)) }}
+                          className="w-full px-2.5 py-1.5 rounded-md border border-line bg-panel font-body text-xs"
+                        >
+                          {PAISES.map((p) => <option key={p.id} value={p.id}>{p.bandera} {p.nombre} (+{p.codigo})</option>)}
+                        </select>
+                      </label>
                       <div className="sm:col-span-2 font-body text-[10px] text-inksoft">
                         Si cambiás el email, la persona entra con el nuevo (misma contraseña) y se actualiza en sus productos y anuncios. QR, dirección y horarios de la tienda se editan con 🛍️ Cargar productos → Mi tienda.
                       </div>

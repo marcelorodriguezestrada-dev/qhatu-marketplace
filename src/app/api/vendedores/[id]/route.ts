@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ciudadDe, sanearEnvioPropio, sanearVisibleEn } from '@/data/ciudades'
+import { ciudadDe, sanearCiudad, sanearEnvioPropio, sanearVisibleEn } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esPremiumVigente, calcularNuevaVigencia, PRECIO_PREMIUM_BS } from '@/lib/planPremium'
@@ -86,6 +86,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const actual = (await ref.get()).data() || {}
       if (!esPremiumVigente(actual)) {
         cambios.planVigenciaHasta = calcularNuevaVigencia(actual.planVigenciaHasta)
+      }
+    }
+
+    // Ciudad de la tienda (Admin → Usuarios): se copia a todos sus productos,
+    // y con ella el país, la moneda (Bs / $) y dónde aparecen.
+    if (body.ciudad !== undefined) {
+      await cargarCiudadesServidor().catch(() => null)
+      const ciudad = sanearCiudad(body.ciudad)
+      const actual = (await ref.get()).data() || {}
+      cambios.ciudad = ciudad
+      const visibleEn = (Array.isArray(actual.visibleEn) ? actual.visibleEn : []).filter((c: string) => c !== ciudad)
+      cambios.visibleEn = visibleEn
+      const productos = await getDb().collection('productos').where('vendedorId', '==', params.id).get()
+      for (let i = 0; i < productos.docs.length; i += 400) {
+        const batch = getDb().batch()
+        for (const d of productos.docs.slice(i, i + 400)) batch.update(d.ref, { ciudad, visibleEn })
+        await batch.commit()
       }
     }
 
