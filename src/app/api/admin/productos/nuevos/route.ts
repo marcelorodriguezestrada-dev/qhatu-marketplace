@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
 import { ciudadDe } from '@/data/ciudades'
+import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { sanearStock } from '@/lib/stock'
 import { sanearFotosAdicionales } from '@/lib/planPremium'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
   if (!(await esClaveAdmin(password))) {
     return NextResponse.json({ error: 'Contraseña de administrador inválida.' }, { status: 401 })
   }
+  // Sin esto, una ciudad agregada desde el admin (ej. Buenos Aires) no se
+  // reconoce y los productos quedaban en Potosí (en Bs).
+  await cargarCiudadesServidor().catch(() => null)
   const body = await req.json().catch(() => ({}))
   const vendedorId = typeof body.vendedorId === 'string' ? body.vendedorId : ''
   const entradas: any[] = Array.isArray(body.productos) ? body.productos.slice(0, 300) : []

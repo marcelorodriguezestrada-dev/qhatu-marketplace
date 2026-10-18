@@ -83,6 +83,17 @@ export default function ProductosDeTienda({
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
   }, [deTienda, buscar, filtroEstado, rubroLabel])
   const cuenta = (e: string) => deTienda.filter((p) => estadoDe(p) === e).length
+  // Productos guardados con otra ciudad que la de su tienda (ej. quedaron en
+  // Potosí / Bs con la tienda en Buenos Aires): se corrigen copiándoles la de la tienda.
+  const desfasados = tienda ? deTienda.filter((p) => ciudadDe(p) !== ciudadDe(tienda)).length : 0
+  const [corrigiendo, setCorrigiendo] = useState(false)
+  async function corregirCiudad() {
+    if (!tienda) return
+    setCorrigiendo(true)
+    await fetch(`/api/vendedores/${tienda.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify({ ciudad: ciudadDe(tienda) }) }).catch(() => null)
+    setCorrigiendo(false)
+    onCambio()
+  }
   const plata = (n: number, p: Producto) => formatoMoneda(Number(n || 0), paisDeCiudad(ciudadDe(p)))
 
   async function patch(id: string, cambios: Record<string, unknown>) {
@@ -139,6 +150,15 @@ export default function ProductosDeTienda({
             <a href={`/tienda/${tienda.id}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg border border-line bg-panel font-body text-xs text-ink no-underline">Ver tienda ↗</a>
             <button type="button" onClick={() => onEntrarComo(tienda.id)} className="px-3 py-1.5 rounded-lg border-none bg-indigo-600 text-white font-body text-xs font-semibold">🛍️ Cargar productos como esta tienda</button>
           </div>
+
+          {desfasados > 0 && (
+            <div className="flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+              <span className="font-body text-xs text-ink flex-1 min-w-[200px]">⚠️ {desfasados} producto{desfasados === 1 ? '' : 's'} quedaron en otra ciudad que la tienda (por eso pueden salir con otra moneda).</span>
+              <button type="button" onClick={corregirCiudad} disabled={corrigiendo} className="px-3 py-1.5 rounded-lg border-none bg-amber-600 text-white font-body text-xs font-semibold disabled:opacity-50">
+                {corrigiendo ? 'Corrigiendo…' : `Pasarlos a ${buscarCiudad(ciudadDe(tienda)).nombre}`}
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-1.5 mb-3">
             {[{ id: '', label: `Todos (${deTienda.length})` }, ...ESTADOS.map((e) => ({ id: e.id, label: `${e.label} (${cuenta(e.id)})` }))].map((e) => (
