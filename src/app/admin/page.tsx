@@ -4,7 +4,7 @@ import { nombreRubro } from '@/lib/arbolCategorias'
 import { useTodasLasCiudades } from '@/lib/ciudad'
 import { buscarPaisMercado, formatoMoneda } from '@/lib/mercado'
 import { banderaDe } from '@/data/paisesMercado'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ServiceIcon } from '@/components/ServiceIcon'
 import { GraficoBarras } from '@/components/GraficoBarras'
 import { useCategorias } from '@/lib/useCategorias'
@@ -21,6 +21,7 @@ import type { Idioma } from '@/lib/cvEstandar'
 import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
+import ProductosDeTienda from '@/components/admin/ProductosDeTienda'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminCaptacion from '@/components/admin/AdminCaptacion'
 import AdminFinanzas from '@/components/admin/AdminFinanzas'
@@ -151,6 +152,9 @@ export default function AdminPage() {
   const [pedidos, setPedidos] = useState<any[]>([])
   const [subiendoFotoEntregaId, setSubiendoFotoEntregaId] = useState<string | null>(null)
   const [productos, setProductos] = useState<any[]>([])
+  // Productos → "🏪 Productos por tienda": la tienda elegida ('' = todas) filtra toda la pestaña.
+  const [tiendaProductos, setTiendaProductos] = useState('')
+  const productosVista = useMemo(() => (tiendaProductos ? productos.filter((p) => p.vendedorId === tiendaProductos) : productos), [productos, tiendaProductos])
   const [categoriaProductoExpandida, setCategoriaProductoExpandida] = useState<string | null>(null)
   const [profesionales, setProfesionales] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -907,61 +911,6 @@ export default function AdminPage() {
       headers: { 'x-admin-password': password },
     }).then(() => entrar(password))
   }
-
-  const [productoEditando, setProductoEditando] = useState<any>(null)
-  const [editNombre, setEditNombre] = useState('')
-  const [editPrecio, setEditPrecio] = useState('')
-  const [editPrecioOriginal, setEditPrecioOriginal] = useState('')
-  const [editCategoria, setEditCategoria] = useState('')
-  const [editDescCorta, setEditDescCorta] = useState('')
-  const [editDescLarga, setEditDescLarga] = useState('')
-  const [editTalles, setEditTalles] = useState('')
-  const [editColores, setEditColores] = useState('')
-  const [editMateriales, setEditMateriales] = useState('')
-  const [editEstado, setEditEstado] = useState('')
-  const [guardandoEdit, setGuardandoEdit] = useState(false)
-
-  function abrirEditarProducto(p: any) {
-    setProductoEditando(p)
-    setEditNombre(p.nombre || '')
-    setEditPrecio(String(p.precio || ''))
-    setEditPrecioOriginal(String(p.precioOriginal || ''))
-    setEditCategoria(p.rubro || p.categoria || '')
-    setEditDescCorta(p.descripcionCorta || '')
-    setEditDescLarga(p.descripcionLarga || '')
-    setEditTalles(Array.isArray(p.talles) ? p.talles.join(', ') : (p.talles || ''))
-    setEditColores(Array.isArray(p.colores) ? p.colores.join(', ') : (p.colores || ''))
-    setEditMateriales(p.materiales || '')
-    setEditEstado(p.estado || 'activo')
-  }
-
-  async function guardarEditProducto() {
-    if (!productoEditando) return
-    setGuardandoEdit(true)
-    const tallesArr = editTalles.split(',').map(s => s.trim()).filter(Boolean)
-    const coloresArr = editColores.split(',').map(s => s.trim()).filter(Boolean)
-    await fetch(`/api/productos/${productoEditando.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-      body: JSON.stringify({
-        nombre: editNombre,
-        precio: Number(editPrecio),
-        precioOriginal: editPrecioOriginal ? Number(editPrecioOriginal) : null,
-        rubro: editCategoria,
-        descripcionCorta: editDescCorta,
-        descripcionLarga: editDescLarga,
-        talles: tallesArr,
-        colores: coloresArr,
-        materiales: editMateriales,
-        estado: editEstado,
-      }),
-    })
-    setGuardandoEdit(false)
-    setProductoEditando(null)
-    cargarProductos(password)
-  }
-
-
 
   // Mismo endpoint que usan los vendedores en /vender, pero acá nos
   // autenticamos con la contraseña de admin en vez de un login de
@@ -2010,6 +1959,19 @@ export default function AdminPage() {
             </div>
           )}
 
+          <ProductosDeTienda
+            password={password}
+            productos={productos}
+            tiendas={vendedoresAdmin}
+            categorias={categoriasProductos}
+            rubroLabel={(id) => nombreRubro(buscarRubroProducto(id)) || undefined}
+            tiendaId={tiendaProductos}
+            onTienda={(id) => { setTiendaProductos(id); if (id) setVendedorParaCargar(id) }}
+            onCambio={() => cargarProductos()}
+            onEntrarComo={(id) => cargarProductosComo(id)}
+          />
+
+          {!tiendaProductos && (
           <div className="bg-panel border border-indigo-200 rounded-xl p-3.5 mb-5">
             <div className="font-body text-sm font-semibold text-ink mb-1">➕ Publicar productos para un vendedor</div>
             <div className="font-body text-[11px] text-inksoft mb-2">
@@ -2046,12 +2008,13 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+          )}
 
           <EtiquetasBusquedaIA password={password} />
 
           <EdicionRapidaProductos
             password={password}
-            productos={productos}
+            productos={productosVista}
             categorias={categoriasProductos}
             rubroLabel={(id) => nombreRubro(buscarRubroProducto(id)) || undefined}
             onGuardado={() => cargarProductos()}
@@ -2061,9 +2024,9 @@ export default function AdminPage() {
             onVendedorCreado={() => { cargarVendedoresAdmin(); cargarUsuarios() }}
           />
 
-          <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos</div>
-          {productos.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
-          {[...productos]
+          <div className="font-body text-sm font-semibold text-ink mb-3">Moderación de productos{tiendaProductos ? ' (de la tienda elegida)' : ''}</div>
+          {productosVista.length === 0 && <div className="font-body text-sm text-inksoft">Todavía no hay productos.</div>}
+          {[...productosVista]
             .sort((a, b) => {
               const orden: Record<string, number> = { alto: 0, medio: 1, bajo: 2 }
               const oa = orden[a.moderacionIA?.riesgo] ?? 3
