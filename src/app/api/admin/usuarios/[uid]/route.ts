@@ -3,7 +3,8 @@ import { getAuthAdmin } from '@/lib/firebaseAdmin'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
 import { getDb } from '@/lib/firebaseAdmin'
 import { sincronizarDatosCuenta } from '@/lib/datosCuentaServer'
-import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais } from '@/data/paises'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sanearCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
@@ -49,13 +50,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return NextResponse.json({ error: 'Poné un email válido.' }, { status: 400 })
       }
+      const vRef = db.collection('vendedores').doc(params.uid)
+      const vDoc = await vRef.get()
+      // País del WhatsApp: el elegido, o el que ya tenía la tienda (Bolivia si no).
+      const whatsappPais = body.whatsappPais === 'AR' || body.whatsappPais === 'BO' ? body.whatsappPais : vDoc.data()?.whatsappPais === 'AR' ? 'AR' : 'BO'
       let whatsapp: string | undefined
       if (typeof body.whatsapp === 'string') {
         const w = body.whatsapp.trim()
         if (w) {
-          const v = validarWhatsappBoliviano(w)
+          const v = validarWhatsappPorPais(w, whatsappPais)
           if (!v.valido) return NextResponse.json({ error: v.motivo }, { status: 400 })
-          whatsapp = numeroLocalABolivia(w)
+          whatsapp = numeroConCodigoPais(w, buscarPais(whatsappPais).codigo)
         } else whatsapp = ''
       }
       const emailCambio = email !== (u.email || '').toLowerCase()
@@ -71,17 +76,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { uid: strin
         throw err
       }
       await db.collection('usuarios').doc(params.uid).set(
-        { nombre, ...(whatsapp !== undefined ? { whatsapp } : {}), updatedAt: new Date().toISOString() },
+        { nombre, ...(whatsapp !== undefined ? { whatsapp, whatsappPais: whatsapp ? whatsappPais : '' } : {}), updatedAt: new Date().toISOString() },
         { merge: true }
       )
-      const vRef = db.collection('vendedores').doc(params.uid)
-      const vDoc = await vRef.get()
       const tiendaNombre = typeof body.nombreNegocio === 'string' ? body.nombreNegocio.trim().slice(0, 80) : undefined
       const cambiosTienda: Record<string, any> = {}
       if (tiendaNombre !== undefined && tiendaNombre !== (vDoc.data()?.nombreNegocio || '')) cambiosTienda.nombreNegocio = tiendaNombre
-      if (whatsapp !== undefined && whatsapp !== (vDoc.data()?.whatsapp || '')) {
+      if (whatsapp !== undefined && (whatsapp !== (vDoc.data()?.whatsapp || '') || (whatsapp && whatsappPais !== vDoc.data()?.whatsappPais))) {
         cambiosTienda.whatsapp = whatsapp
-        cambiosTienda.whatsappPais = whatsapp ? 'BO' : ''
+        cambiosTienda.whatsappPais = whatsapp ? whatsappPais : ''
       }
       if (Object.keys(cambiosTienda).length && (vDoc.exists || cambiosTienda.nombreNegocio)) {
         await vRef.set({ ...cambiosTienda, email, updatedAt: new Date().toISOString() }, { merge: true })

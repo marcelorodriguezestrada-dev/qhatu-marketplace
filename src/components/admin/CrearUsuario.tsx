@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { entrarComoUsuario } from '@/lib/modoAdmin'
 import { CampoCiudad } from '@/components/SelectorCiudad'
-import type { CiudadId } from '@/data/ciudades'
+import { buscarCiudad, type CiudadId } from '@/data/ciudades'
+import { PAISES } from '@/data/paises'
 
 // Admin → Usuarios → "➕ Crear usuario": da de alta una cuenta (sin
 // contraseña), le arma la tienda si se completa, y devuelve un link para
@@ -61,6 +62,12 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
   const [whatsapp, setWhatsapp] = useState('')
   const [negocio, setNegocio] = useState('')
   const [ciudad, setCiudad] = useState<CiudadId>('potosi')
+  // País del WhatsApp: sigue a la ciudad de la tienda (se puede cambiar a mano).
+  const [whatsappPais, setWhatsappPais] = useState('BO')
+  const elegirCiudad = (c: CiudadId) => {
+    setCiudad(c)
+    setWhatsappPais(buscarCiudad(c).pais === 'AR' ? 'AR' : 'BO')
+  }
   const [passwordNueva, setPasswordNueva] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -76,7 +83,7 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
       const res = await fetch('/api/admin/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
-        body: JSON.stringify({ email, nombre, whatsapp, nombreNegocio: negocio, password: passwordNueva, ciudad }),
+        body: JSON.stringify({ email, nombre, whatsapp, whatsappPais, nombreNegocio: negocio, password: passwordNueva, ciudad }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'No se pudo crear el usuario.')
@@ -168,13 +175,18 @@ export default function CrearUsuario({ password, onCreado }: { password: string;
           </label>
           <label className="font-body text-xs text-ink">
             <span className="block font-semibold mb-1">WhatsApp</span>
-            <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="71234567" inputMode="tel" className={input} />
+            <div className="flex gap-1.5">
+              <select value={whatsappPais} onChange={(e) => setWhatsappPais(e.target.value)} aria-label="País del WhatsApp" className={input + ' !w-[104px] shrink-0'}>
+                {PAISES.map((p) => <option key={p.id} value={p.id}>{p.bandera} +{p.codigo}</option>)}
+              </select>
+              <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder={whatsappPais === 'AR' ? '1123456789' : '71234567'} inputMode="tel" className={input} />
+            </div>
           </label>
           <label className="font-body text-xs text-ink">
             <span className="block font-semibold mb-1">Nombre de la tienda (opcional)</span>
             <input value={negocio} onChange={(e) => setNegocio(e.target.value)} placeholder="Zapatería Doña Rosa" className={input} />
           </label>
-          <CampoCiudad value={ciudad} onChange={setCiudad} todas etiqueta="Ciudad de la tienda" />
+          <CampoCiudad value={ciudad} onChange={elegirCiudad} todas etiqueta="Ciudad de la tienda" />
           <label className="font-body text-xs text-ink sm:col-span-2">
             <span className="block font-semibold mb-1">Contraseña (opcional — si la dejás vacía, la elige la persona con un link)</span>
             <div className="flex gap-2">

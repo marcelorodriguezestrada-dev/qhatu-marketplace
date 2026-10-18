@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { estaVerificada } from '@/lib/verificacion'
 import { getDb, getAuthAdmin } from '@/lib/firebaseAdmin'
-import { validarWhatsappBoliviano, numeroLocalABolivia } from '@/lib/validarWhatsapp'
+import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsapp'
+import { buscarPais } from '@/data/paises'
 import { linkParaElegirContrasena } from '@/lib/linkContrasena'
-import { sanearCiudad } from '@/data/ciudades'
+import { buscarCiudad, sanearCiudad } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { sanearUbicacionPrueba } from '@/lib/cuentasPrueba'
 import { esClaveAdmin } from '@/lib/adminAuth'
@@ -105,11 +106,13 @@ export async function POST(req: NextRequest) {
     if (passwordInicial && passwordInicial.length < 6) {
       return NextResponse.json({ error: 'La contraseña tiene que tener al menos 6 caracteres.' }, { status: 400 })
     }
+    // País del WhatsApp: el que eligió el admin, o el de la ciudad de la tienda.
+    const whatsappPais = body.whatsappPais === 'AR' || body.whatsappPais === 'BO' ? body.whatsappPais : buscarCiudad(ciudad).pais === 'AR' ? 'AR' : 'BO'
     let whatsapp = ''
     if (whatsappLocal) {
-      const v = validarWhatsappBoliviano(whatsappLocal)
+      const v = validarWhatsappPorPais(whatsappLocal, whatsappPais)
       if (!v.valido) return NextResponse.json({ error: v.motivo }, { status: 400 })
-      whatsapp = numeroLocalABolivia(whatsappLocal)
+      whatsapp = numeroConCodigoPais(whatsappLocal, buscarPais(whatsappPais).codigo)
     }
 
     const authAdmin = getAuthAdmin()
@@ -130,12 +133,12 @@ export async function POST(req: NextRequest) {
     const db = getDb()
     const ahora = new Date().toISOString()
     await db.collection('usuarios').doc(uid).set(
-      { email, nombre, whatsapp, ciudad, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora, ...(ubicacionPrueba ? { ubicacionPrueba } : {}) },
+      { email, nombre, whatsapp, ...(whatsapp ? { whatsappPais } : {}), ciudad, emailVerificado: true, creadoPorAdmin: true, createdAt: ahora, ...(ubicacionPrueba ? { ubicacionPrueba } : {}) },
       { merge: true }
     )
     if (nombreNegocio || whatsapp || (ciudad !== 'potosi' && !esPrueba)) {
       await db.collection('vendedores').doc(uid).set(
-        { nombreNegocio, whatsapp, whatsappPais: whatsapp ? 'BO' : '', ciudad, email, creadoPorAdmin: true, updatedAt: ahora },
+        { nombreNegocio, whatsapp, whatsappPais: whatsapp ? whatsappPais : '', ciudad, email, creadoPorAdmin: true, updatedAt: ahora },
         { merge: true }
       )
     }
