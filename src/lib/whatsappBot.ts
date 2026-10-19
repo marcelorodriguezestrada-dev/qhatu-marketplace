@@ -3,7 +3,7 @@ import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
-import { analizarFotoProducto } from '@/lib/fotoProductoIA'
+import { analizarFotoProducto, leerPrecio } from '@/lib/fotoProductoIA'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
@@ -103,9 +103,11 @@ async function groqJSON(prompt: string, max = 1500): Promise<any | null> {
   }
 }
 
-const numero = (v: unknown) => {
-  const n = Number(String(v ?? '').replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'))
-  return Number.isFinite(n) && n >= 0 ? n : null
+// "8000", "$ 8.000", "ARS 8,000.00", "15,50" → número (0 vale: "sin stock" = 0).
+const numero = (v: unknown): number | null => {
+  if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null
+  if (/^\s*0+([.,]0+)?\s*$/.test(String(v ?? ''))) return 0
+  return leerPrecio(v)
 }
 const lista = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 30) : typeof v === 'string' ? v.split(/[,/]+/).map((x) => x.trim()).filter(Boolean) : [])
 
@@ -345,9 +347,9 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   if (pendiente && esSi(texto)) {
     await guardarSesion(de, { pendiente: null })
     if (pendiente.tipo === 'crear') {
-      if (!pendiente.datos.precio) {
+      if (!pendiente.datos.nombre || !pendiente.datos.precio) {
         await guardarSesion(de, { pendiente })
-        return enviarTexto(de, '⚠️ Falta el precio. Escribilo, ej: *15000*')
+        return enviarTexto(de, !pendiente.datos.nombre ? '⚠️ Falta el nombre. Escribilo, ej: *Conjunto de keten frizado*' : '⚠️ Falta el precio. Escribilo, ej: *15000*')
       }
       const id = await crearProducto(tienda, pendiente.datos, de)
       return enviarTexto(de, `✅ ${pendiente.datos.rubro ? 'Publicado' : 'Guardado (pendiente: falta la categoría, la elegís en la web)'}: *${pendiente.datos.nombre}*\n${SITE_URL}/producto/${id}`)
@@ -368,6 +370,9 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   }
   const pedirConfirmacion = async (p: Pendiente, cuerpo: string) => {
     await guardarSesion(de, { pendiente: p })
+    // A un producto nuevo sin nombre o sin precio se le pide lo que falta antes de ofrecer guardarlo.
+    if (p.tipo === 'crear' && !p.datos.nombre) return enviarTexto(de, `${cuerpo}\n\n✍️ ¿Cómo se llama el producto? ${v(ciudadId, 'Escríbelo', 'Escribilo')}, ej: *Conjunto de keten frizado*`)
+    if (p.tipo === 'crear' && !p.datos.precio) return enviarTexto(de, `${cuerpo}\n\n💰 ¿Cuánto cuesta? ${v(ciudadId, 'Responde', 'Respondé')} solo con el precio, ej: *8000*`)
     return enviarBotones(de, `${cuerpo}\n\n¿Lo guardo?`, [{ id: 'si', titulo: '✅ Sí' }, { id: 'no', titulo: '❌ No' }])
   }
 
@@ -398,11 +403,9 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       imagenUrl: foto.url,
       thumbUrl: foto.thumbUrl,
     }
-    if (!datos.nombre) {
-      await guardarSesion(de, { pendiente: { tipo: 'crear', datos } })
-      return enviarTexto(de, '¿Cómo se llama el producto y cuánto cuesta? Ej: *Remera oversize 15000*')
-    }
-    return pedirConfirmacion({ tipo: 'crear', datos }, `Producto nuevo en *${tienda.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(datos, ciudadId, etiquetaRubro(datos.rubro))}`)
+    const resumen = `Producto nuevo en *${tienda.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(datos, ciudadId, etiquetaRubro(datos.rubro))}`
+    // Sin precio (ej. un producto reenviado del catálogo: el precio no viene en la foto) lo pide primero.
+    return pedirConfirmacion({ tipo: 'crear', datos }, resumen)
   }
 
   if (!texto) return enviarTexto(de, ayuda(ciudadId, admin))
@@ -411,6 +414,14 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   const productos = await productosDe(tienda.id)
   if (/^(lista|mis productos|productos|ver productos)\b/i.test(texto)) return enviarTexto(de, listaProductos(tienda, productos, ciudadId))
 
+  // Solo un número con un producto nuevo pendiente = su precio (sin gastar IA).
+  if (pendiente?.tipo === 'crear' && /^\s*(bs\.?|ars|\$)?\s*\d[\d.,]*\s*(bs|ars|pesos|\$)?\s*$/i.test(texto)) {
+    const precio = numero(texto.replace(/[^\d.,]/g, ''))
+    if (precio) {
+      const datos = { ...pendiente.datos, precio }
+      return pedirConfirmacion({ tipo: 'crear', datos }, `Producto nuevo en *${tienda.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(datos, ciudadId, etiquetaRubro(datos.rubro))}`)
+    }
+  }
   const r = await interpretar(texto, productos, pendiente, ciudadId)
   if (r.accion === 'ayuda') return enviarTexto(de, ayuda(ciudadId, admin))
   if (r.accion === 'listar') return enviarTexto(de, listaProductos(tienda, productos, ciudadId))
