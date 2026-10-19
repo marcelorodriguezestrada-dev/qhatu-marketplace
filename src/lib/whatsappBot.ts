@@ -9,7 +9,7 @@ import { evaluarConIA } from '@/lib/moderacionIA'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { guiaIdioma, v } from '@/lib/estiloRegional'
 import { SITE_URL } from '@/lib/sitio'
-import { bajarMedia, enviarBotones, enviarTexto, esAdminWhatsapp, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
+import { bajarMedia, enviarBotones, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
 
 // Bot de WhatsApp de Clasi Click: el vendedor (o el admin) le escribe al
 // número del bot y se cargan o cambian productos en su tienda.
@@ -379,6 +379,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       const { buf } = await bajarMedia(m.image.id)
       foto = await subirAImgbb(buf)
     } catch (err: any) {
+      await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Foto: ${err?.message || 'error'}` } })
       return enviarTexto(de, `No pude guardar la foto: ${err?.message || 'error'}. Probá de nuevo.`)
     }
     const leido = texto ? await leerProductoNuevo(texto, ciudadId) : {}
