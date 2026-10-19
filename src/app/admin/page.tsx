@@ -24,6 +24,7 @@ import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import ProductosDeTienda from '@/components/admin/ProductosDeTienda'
 import BotWhatsapp from '@/components/admin/BotWhatsapp'
+import ConsumoBase from '@/components/admin/ConsumoBase'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminCaptacion from '@/components/admin/AdminCaptacion'
 import AdminFinanzas from '@/components/admin/AdminFinanzas'
@@ -113,7 +114,7 @@ function BadgePrioridad({ pr }: { pr: { puntaje: number; motivo?: string } }) {
   )
 }
 
-type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas' | 'captacion' | 'finanzas'
+type TabAdmin = 'inicio' | 'pedidos' | 'productos' | 'servicios' | 'anuncios' | 'usuarios' | 'reparto' | 'banners' | 'categorias' | 'categorias-productos' | 'metricas' | 'cupones' | 'analitica' | 'marketing' | 'zonas' | 'captacion' | 'finanzas' | 'consumo'
 
 const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'inicio', icono: '🏠', label: 'Inicio', ayuda: 'Resumen y QR de cobro', grupo: 'General' },
@@ -133,6 +134,7 @@ const SECCIONES_ADMIN: ItemSeccion<TabAdmin>[] = [
   { id: 'finanzas', icono: '💰', label: 'Finanzas', ayuda: 'Ingresos, gastos y reporte', grupo: 'Números' },
   { id: 'metricas', icono: '📊', label: 'Métricas', ayuda: 'Números del sitio', grupo: 'Números' },
   { id: 'analitica', icono: '📈', label: 'Analítica', ayuda: 'Eventos y recuperación de compras', grupo: 'Números' },
+  { id: 'consumo', icono: '🔋', label: 'Consumo de la base', ayuda: 'Qué gasta las lecturas gratis y pausar', grupo: 'Números' },
 ]
 const IDS_ADMIN = SECCIONES_ADMIN.map((s) => s.id)
 
@@ -344,13 +346,15 @@ export default function AdminPage() {
     setCargando(true)
     fetch('/api/pedidos', { headers: { 'x-admin-password': pw } })
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).error || 'Contraseña incorrecta.')
-        return r.json()
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok && !d.sinCuota) throw new Error(d.error || 'Contraseña incorrecta.')
+        return d
       })
       .then((data) => {
         setPedidos(data.pedidos || [])
         setAutenticado(true)
-        setError('')
+        setError(data.sinCuota ? data.error : '')
+        if (data.sinCuota) setTab('consumo')
         localStorage.setItem('clasiclick_admin_pw', pw)
         // Importante: le pasamos "pw" explícito acá, no dependemos del
         // estado "password" — en el login automático (contraseña
@@ -432,7 +436,7 @@ export default function AdminPage() {
   }
 
   function cargarProfesionales(pw?: string) {
-    fetch('/api/profesionales', { headers: { 'x-admin-password': pw ?? password } })
+    fetch('/api/profesionales?admin=1', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
   }
@@ -473,13 +477,13 @@ export default function AdminPage() {
   }
 
   function cargarProductos(pw?: string) {
-    fetch('/api/productos', { headers: { 'x-admin-password': pw ?? password } })
+    fetch('/api/productos?admin=1', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setProductos(data.productos || []))
   }
 
   function cargarAnuncios(pw?: string) {
-    fetch('/api/anuncios', { headers: { 'x-admin-password': pw ?? password } })
+    fetch('/api/anuncios?admin=1', { headers: { 'x-admin-password': pw ?? password } })
       .then((r) => r.json())
       .then((data) => setAnuncios(data.anuncios || []))
   }
@@ -4088,6 +4092,8 @@ export default function AdminPage() {
           ))}
         </div>
       )}
+
+      {tab === 'consumo' && <ConsumoBase password={password} />}
 
       {tab === 'metricas' && (
         <div>

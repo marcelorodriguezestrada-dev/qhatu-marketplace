@@ -85,8 +85,9 @@ export default function SeguimientoPedidoPage() {
     // El estado puede cambiar del lado del vendedor (en /vender o
     // /admin) mientras el comprador tiene esta pantalla abierta — un
     // sondeo simple cada 15s alcanza para que se vea "solo", sin tener
-    // que refrescar a mano, y sin necesitar nada en tiempo real.
-    const intervalo = setInterval(cargar, 15000)
+    // que refrescar a mano, y sin necesitar nada en tiempo real. Cada 30s
+    // y solo con la pestaña a la vista (cada consulta gasta lecturas).
+    const intervalo = setInterval(() => { if (!document.hidden) cargar() }, 30000)
     return () => {
       activo = false
       clearInterval(intervalo)

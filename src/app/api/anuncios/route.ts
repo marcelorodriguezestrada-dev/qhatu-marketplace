@@ -8,6 +8,7 @@ import { validarWhatsappPorPais, numeroConCodigoPais } from '@/lib/validarWhatsa
 import { buscarPais, PAIS_FALLBACK_ID } from '@/data/paises'
 import { construirArbolCategorias } from '@/lib/categoriasServer'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { cabeceraCDN, enCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,11 +19,13 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDb()
     const esAdmin = (await esClaveAdmin(req.headers.get('x-admin-password')))
-    const snap = await db.collection('anuncios').get()
-    let anuncios = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
+    // Para el público: 1 minuto en memoria y en el CDN (ver /api/productos).
+    const fresco = esAdmin || req.nextUrl.searchParams.has('fresco')
+    const leer = async () => (await db.collection('anuncios').get()).docs.map((d) => ({ id: d.id, ...d.data() }))
+    let anuncios = [...(fresco ? await leer() : await enCache('anuncios', 60_000, leer))] as any[]
     if (!esAdmin) anuncios = anuncios.filter((a) => a.estado === 'aprobado')
     anuncios.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-    return NextResponse.json({ anuncios })
+    return NextResponse.json({ anuncios }, { headers: fresco || req.headers.get('x-admin-password') ? { 'Cache-Control': 'no-store' } : cabeceraCDN(60) })
   } catch (err) {
     console.error('GET /api/anuncios', err)
     return NextResponse.json({ error: 'No se pudieron cargar los anuncios.' }, { status: 500 })

@@ -2,6 +2,7 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { NextRequest } from 'next/server'
+import { instalarMedidor } from '@/lib/consumoFirestore'
 
 // Mismo patrón que la app de consultorio: una sola instancia reutilizada
 // entre invocaciones de funciones serverless en Vercel.
@@ -25,7 +26,10 @@ function getApp(): App {
 }
 
 export function getDb(): Firestore {
-  if (!db) db = getFirestore(getApp())
+  if (!db) {
+    db = getFirestore(getApp())
+    instalarMedidor(db) // cuenta qué página/API gasta las lecturas (ver consumoFirestore.ts)
+  }
   return db
 }
 

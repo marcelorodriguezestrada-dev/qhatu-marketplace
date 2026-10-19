@@ -31,6 +31,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ pedidos })
     } catch (err) {
       console.error('GET /api/pedidos admin', err)
+      // Sin cuota de la base: la clave es válida, se deja entrar igual (ver Admin → Consumo de la base).
+      if (/RESOURCE_EXHAUSTED|Quota exceeded/i.test(String((err as any)?.message || err))) {
+        return NextResponse.json({ error: 'Se acabaron las lecturas gratis de la base por hoy: casi nada va a cargar hasta que se reinicie (medianoche de EE.UU., 03:00–04:00 en Bolivia). Mirá Números → 🔋 Consumo de la base.', sinCuota: true, pedidos: [] }, { status: 503 })
+      }
       return NextResponse.json({ error: 'No se pudieron cargar los pedidos.' }, { status: 500 })
     }
   }
@@ -42,15 +46,23 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = getDb()
-    const snap = await db.collection('pedidos').get()
-    const pedidos = snap.docs
+    // Solo los pedidos de esta persona (como comprador o como tienda), no
+    // todos: leer la colección entera en cada visita gastaba la cuota.
+    const email = typeof usuario.email === 'string' ? usuario.email : ''
+    const consultas = [db.collection('pedidos').where('vendedorId', '==', usuario.uid).get()]
+    for (const e of Array.from(new Set([email, email.toLowerCase()].filter(Boolean)))) {
+      consultas.push(db.collection('pedidos').where('comprador', '==', e).get())
+    }
+    const unicos = new Map<string, any>()
+    for (const snap of await Promise.all(consultas)) for (const doc of snap.docs) unicos.set(doc.id, doc)
+    const pedidos = Array.from(unicos.values())
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .filter((pedido: any) => {
         const comprador = typeof pedido.comprador === 'string' ? pedido.comprador.toLowerCase() : ''
         const email = typeof usuario.email === 'string' ? usuario.email.toLowerCase() : ''
         const items = Array.isArray(pedido.items) ? pedido.items : []
         const esComprador = comprador === email
-        const esVendedor = items.some((item: any) => item?.vendedorId === usuario.uid || item?.vendedor === usuario.email)
+        const esVendedor = pedido.vendedorId === usuario.uid || items.some((item: any) => item?.vendedorId === usuario.uid || item?.vendedor === usuario.email)
         return esComprador || esVendedor
       })
       .sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''))
