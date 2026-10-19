@@ -10,7 +10,7 @@ import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { guiaIdioma, v } from '@/lib/estiloRegional'
 import { SITE_URL } from '@/lib/sitio'
 import { datosDeTienda, responderConsulta } from '@/lib/whatsappConsultas'
-import { bajarMedia, enviarBotones, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
+import { achicarParaIA, bajarMedia, enviarBotones, recortarFoto, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
 
 // Bot de WhatsApp de Clasi Click: el vendedor (o el admin) le escribe al
 // número del bot y se cargan o cambian productos en su tienda.
@@ -382,31 +382,32 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   // 📷 Foto → producto nuevo.
   if (m.type === 'image' && m.image?.id) {
     await enviarTexto(de, '📷 Recibí la foto, la estoy preparando…')
+    const leido: Partial<Nuevo> = texto ? await leerProductoNuevo(texto, ciudadId) : {}
     let foto: { url: string; thumbUrl: string }
-    let bufFoto: Buffer | null = null
     try {
-      const { buf } = await bajarMedia(m.image.id)
-      bufFoto = buf
+      let { buf } = await bajarMedia(m.image.id)
+      // Sin texto (o sin precio en el texto): la IA lee lo que esté escrito en
+      // la imagen. Si es una captura (catálogo, publicación…) con el nombre y
+      // el precio escritos, se recorta solo la foto del producto, sin letras.
+      if (!leido.nombre || !leido.precio) {
+        try {
+          const enImagen = (await leerCapturaCatalogo(`data:image/jpeg;base64,${(await achicarParaIA(buf)).toString('base64')}`)).productos[0]
+          if (enImagen) {
+            if (!leido.nombre) leido.nombre = enImagen.nombre
+            if (!leido.precio && enImagen.precio) leido.precio = enImagen.precio
+            if (!leido.precioOriginal && enImagen.precioAntes) leido.precioOriginal = enImagen.precioAntes
+            if (!leido.descripcionCorta && enImagen.descripcion) leido.descripcionCorta = enImagen.descripcion.slice(0, 300)
+            const c = enImagen.caja
+            if ((enImagen.precio || enImagen.nombre) && c && c.ancho * c.alto < 0.85) buf = await recortarFoto(buf, c)
+          }
+        } catch {
+          // sin IA que mire fotos o no había texto: sigue con la foto entera
+        }
+      }
       foto = await subirAImgbb(buf)
     } catch (err: any) {
       await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Foto: ${err?.message || 'error'}` } })
       return enviarTexto(de, `No pude guardar la foto: ${err?.message || 'error'}. Probá de nuevo.`)
-    }
-    const leido: Partial<Nuevo> = texto ? await leerProductoNuevo(texto, ciudadId) : {}
-    // Sin texto (o sin precio en el texto): la IA lee lo que esté escrito en la
-    // imagen (captura de un catálogo, foto con el precio encima…).
-    if (bufFoto && (!leido.nombre || !leido.precio)) {
-      try {
-        const enImagen = (await leerCapturaCatalogo(`data:image/jpeg;base64,${bufFoto.toString('base64')}`)).productos[0]
-        if (enImagen) {
-          if (!leido.nombre) leido.nombre = enImagen.nombre
-          if (!leido.precio && enImagen.precio) leido.precio = enImagen.precio
-          if (!leido.precioOriginal && enImagen.precioAntes) leido.precioOriginal = enImagen.precioAntes
-          if (!leido.descripcionCorta && enImagen.descripcion) leido.descripcionCorta = enImagen.descripcion.slice(0, 300)
-        }
-      } catch {
-        // sin IA que mire fotos o no había texto: sigue con lo que hay
-      }
     }
     // Categoría, público y colores: la IA mira la foto (o el nombre si no puede).
     const ia = await analizarFotoProducto(foto.url, categorias, leido.nombre || texto || undefined).catch(() => null)
