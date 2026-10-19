@@ -29,7 +29,18 @@ export function esAdminWhatsapp(numero: string) {
   return (process.env.WHATSAPP_ADMINS || '').split(/[,\s]+/).map(soloDigitos).filter(Boolean).includes(soloDigitos(numero))
 }
 
+// Argentina y México: WhatsApp manda el número con un 9 / 1 extra
+// (549… / 521…), pero para responder Meta lo quiere sin él (es como lo
+// guarda en la lista de destinatarios del número de prueba).
+export function destinoParaEnviar(numero: string) {
+  const n = soloDigitos(numero)
+  if (/^549\d{10}$/.test(n)) return `54${n.slice(3)}`
+  if (/^521\d{10}$/.test(n)) return `52${n.slice(3)}`
+  return n
+}
+
 async function enviar(cuerpo: Record<string, unknown>) {
+  if (typeof cuerpo.to === 'string') cuerpo = { ...cuerpo, to: destinoParaEnviar(cuerpo.to) }
   try {
     const r = await fetch(`${graph()}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
       method: 'POST',
