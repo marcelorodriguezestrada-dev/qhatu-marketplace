@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { getDb } from '@/lib/firebaseAdmin'
 
 // API oficial de WhatsApp (WhatsApp Cloud API, de Meta) para el bot de
 // Clasi Click (ver src/lib/whatsappBot.ts). Variables del servidor:
@@ -21,6 +22,14 @@ export function firmaValida(cuerpo: string, firma: string | null): boolean {
   const a = Buffer.from(firma.slice(7), 'hex')
   const b = Buffer.from(esperada, 'hex')
   return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+// Diagnóstico para Admin → Productos → "📲 Bot de WhatsApp": lo último que
+// pasó (aviso de Meta, rechazo, error al responder) en config/whatsappBot.
+export async function registrarEstadoBot(campos: Record<string, unknown>) {
+  try {
+    await getDb().collection('config').doc('whatsappBot').set(campos, { merge: true })
+  } catch {}
 }
 
 export const soloDigitos = (n: unknown) => String(n || '').replace(/\D/g, '')
@@ -47,7 +56,11 @@ async function enviar(cuerpo: Record<string, unknown>) {
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` },
       body: JSON.stringify({ messaging_product: 'whatsapp', ...cuerpo }),
     })
-    if (!r.ok) console.error('whatsapp: enviar', r.status, (await r.text()).slice(0, 300))
+    if (!r.ok) {
+      const texto = (await r.text()).slice(0, 400)
+      console.error('whatsapp: enviar', r.status, texto)
+      await registrarEstadoBot({ ultimoErrorEnvio: { at: new Date().toISOString(), a: cuerpo.to, status: r.status, texto } })
+    }
   } catch (err) {
     console.error('whatsapp: enviar', err)
   }

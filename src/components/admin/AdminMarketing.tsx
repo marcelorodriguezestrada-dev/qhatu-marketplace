@@ -2,7 +2,6 @@
 
 import AdminPublicacionesTiendas from '@/components/admin/AdminPublicacionesTiendas'
 import CatalogosFeed from '@/components/admin/CatalogosFeed'
-import BotWhatsapp from '@/components/admin/BotWhatsapp'
 import FechasEspecialesAdmin from '@/components/admin/FechasEspecialesAdmin'
 import { useEffect, useMemo, useState } from 'react'
 import { CANALES_CAMPANA, OBJETIVOS_CAMPANA, linkCampana } from '@/lib/campanas'
@@ -270,9 +269,6 @@ export default function AdminMarketing({ password }: { password: string }) {
 
       {/* Catálogos (feeds) para Google Shopping y Meta */}
       <CatalogosFeed />
-
-      {/* Bot de WhatsApp para cargar productos */}
-      <BotWhatsapp password={password} />
 
       {/* Lo que compartieron las tiendas desde Vender → Marketing */}
       <AdminPublicacionesTiendas password={password} />

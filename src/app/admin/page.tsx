@@ -23,6 +23,7 @@ import AdminCupones from '@/components/admin/AdminCupones'
 import AdminCiudades from '@/components/admin/AdminCiudades'
 import EtiquetasBusquedaIA from '@/components/admin/EtiquetasBusquedaIA'
 import ProductosDeTienda from '@/components/admin/ProductosDeTienda'
+import BotWhatsapp from '@/components/admin/BotWhatsapp'
 import EdicionRapidaProductos from '@/components/admin/EdicionRapidaProductos'
 import AdminCaptacion from '@/components/admin/AdminCaptacion'
 import AdminFinanzas from '@/components/admin/AdminFinanzas'
@@ -2034,6 +2035,8 @@ export default function AdminPage() {
             </div>
           </div>
           )}
+
+          <BotWhatsapp password={password} />
 
           <EtiquetasBusquedaIA password={password} />
 
