@@ -76,6 +76,12 @@ export default function BotWhatsapp({ password }: { password: string }) {
           {estado.ultimoAviso && <div>✅ Último aviso de Meta: <b>{cuando(estado.ultimoAviso.at)}</b>{estado.ultimoAviso.de ? ` · mensaje de +${estado.ultimoAviso.de}` : ' · (sin mensaje: aviso de entregado/leído)'}</div>}
           {estado.ultimoRechazo && <div className="text-maroon">⛔ Rechazado {cuando(estado.ultimoRechazo.at)}: {estado.ultimoRechazo.motivo}</div>}
           {estado.ultimoErrorProceso && <div className="text-maroon">⚠️ Error al procesar ({cuando(estado.ultimoErrorProceso.at)}): {estado.ultimoErrorProceso.texto}</div>}
+          {estado.ultimoMensajeCrudo && (
+            <details>
+              <summary className="cursor-pointer text-inksoft">🔧 Último mensaje tal como lo mandó WhatsApp ({cuando(estado.ultimoMensajeCrudo.at)})</summary>
+              <pre className="whitespace-pre-wrap break-all text-[10px] bg-panel rounded p-2 mt-1">{estado.ultimoMensajeCrudo.json}</pre>
+            </details>
+          )}
           {estado.ultimoErrorEnvio && <div className="text-maroon">📵 No se pudo responder a +{estado.ultimoErrorEnvio.a} ({cuando(estado.ultimoErrorEnvio.at)}): {estado.ultimoErrorEnvio.status} {estado.ultimoErrorEnvio.texto}</div>}
         </div>
       )}

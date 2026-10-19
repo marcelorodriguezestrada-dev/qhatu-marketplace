@@ -3,12 +3,13 @@ import { buscarCiudad, ciudadDe } from '@/data/ciudades'
 import { cargarCiudadesServidor } from '@/lib/ciudadesServer'
 import { construirArbolCategoriasProductos } from '@/lib/categoriasProductosServer'
 import { CATEGORIAS_PRODUCTOS_BASE } from '@/data/categoriasProductos'
-import { analizarFotoProducto, leerPrecio } from '@/lib/fotoProductoIA'
+import { analizarFotoProducto, leerCapturaCatalogo, leerPrecio } from '@/lib/fotoProductoIA'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { guiaIdioma, v } from '@/lib/estiloRegional'
 import { SITE_URL } from '@/lib/sitio'
+import { datosDeTienda, responderConsulta } from '@/lib/whatsappConsultas'
 import { bajarMedia, enviarBotones, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
 
 // Bot de WhatsApp de Clasi Click: el vendedor (o el admin) le escribe al
@@ -141,7 +142,7 @@ type Intencion =
   | { accion: 'modificar'; productoId: string; cambios: Cambios }
   | { accion: 'crear'; datos: Partial<Nuevo> }
   | { accion: 'corregir'; cambios: Partial<Nuevo> }
-  | { accion: 'listar' | 'ayuda' }
+  | { accion: 'listar' | 'ayuda' | 'consulta' }
   | { accion: 'otro'; respuesta?: string }
 
 async function interpretar(texto: string, productos: Producto[], pendiente: Pendiente | null | undefined, ciudadId: string): Promise<Intencion> {
@@ -156,7 +157,8 @@ async function interpretar(texto: string, productos: Producto[], pendiente: Pend
       '{"precio": número, "precioOriginal": número (precio tachado; si pide "oferta X%" poné el precio actual como precioOriginal y el nuevo precio con el descuento), "stock": número ("sin stock" = 0), "estado": "oculto" | "activo" (ocultar/pausar = oculto; publicar/mostrar = activo), "nombre", "descripcionCorta", "talles": [], "colores": []}\n' +
       '- "crear": publicar un producto nuevo sin foto ("datos": {"nombre","precio","precioAntes","stock","talles","colores","descripcion"})\n' +
       '- "corregir": corrige el producto nuevo pendiente ("cambios" con los mismos campos que "datos")\n' +
-      '- "listar": quiere ver sus productos · "ayuda": pregunta cómo se usa\n' +
+      '- "consulta": pregunta algo sobre su tienda sin pedir un cambio (stock de un producto, resumen, cómo le va, ventas, pedidos, visitas, qué se vende más, marketing o publicaciones)\n' +
+      '- "listar": quiere ver la lista de sus productos · "ayuda": pregunta cómo se usa el asistente\n' +
       '- "otro": cualquier otra cosa; poné en "respuesta" una respuesta corta y amable.\n' +
       'Precios: "15.000" o "15 mil" = 15000. Respondé SOLO JSON: {"accion": "...", "productoId": "...", "cambios": {...}, "datos": {...}, "respuesta": "..."}' +
       guiaIdioma(ciudadId),
@@ -165,7 +167,7 @@ async function interpretar(texto: string, productos: Producto[], pendiente: Pend
   if (r.accion === 'modificar' && productos.some((p) => p.id === r.productoId)) return { accion: 'modificar', productoId: r.productoId, cambios: sanearCambios(r.cambios) }
   if (r.accion === 'crear') return { accion: 'crear', datos: { ...r.datos, precio: numero(r.datos?.precio), precioOriginal: numero(r.datos?.precioAntes), talles: lista(r.datos?.talles), colores: lista(r.datos?.colores), descripcionCorta: String(r.datos?.descripcion || '') } }
   if (r.accion === 'corregir' && pendiente?.tipo === 'crear') return { accion: 'corregir', cambios: { ...sanearCambios(r.cambios), ...(r.cambios?.precioAntes != null ? { precioOriginal: numero(r.cambios.precioAntes) } : {}) } as Partial<Nuevo> }
-  if (r.accion === 'listar' || r.accion === 'ayuda') return { accion: r.accion }
+  if (r.accion === 'listar' || r.accion === 'ayuda' || r.accion === 'consulta') return { accion: r.accion }
   return { accion: 'otro', respuesta: typeof r.respuesta === 'string' ? r.respuesta.slice(0, 500) : undefined }
 }
 
@@ -222,6 +224,7 @@ const ayuda = (ciudadId: string, admin: boolean) =>
     '📦 *Stock:* _stock jean mom 3_ o _sin stock jean mom_',
     '🙈 *Ocultar / publicar:* _ocultar remera_ · _publicar remera_',
     '📋 *Ver tus productos:* _lista_',
+    '📊 *Preguntame lo que quieras:* _resumen_ · _¿cuánto stock tengo del buzo?_ · _¿cómo me fue esta semana?_ · _¿qué pedidos tengo?_ · _¿cómo van mis publicaciones?_',
     admin ? '🛠️ *Admin:* _tienda Creaciones Liz_ para elegir en qué tienda trabajás' : '',
     '',
     'Siempre te muestro el cambio y espero tu ✅ antes de guardar.',
@@ -380,14 +383,31 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   if (m.type === 'image' && m.image?.id) {
     await enviarTexto(de, '📷 Recibí la foto, la estoy preparando…')
     let foto: { url: string; thumbUrl: string }
+    let bufFoto: Buffer | null = null
     try {
       const { buf } = await bajarMedia(m.image.id)
+      bufFoto = buf
       foto = await subirAImgbb(buf)
     } catch (err: any) {
       await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Foto: ${err?.message || 'error'}` } })
       return enviarTexto(de, `No pude guardar la foto: ${err?.message || 'error'}. Probá de nuevo.`)
     }
-    const leido = texto ? await leerProductoNuevo(texto, ciudadId) : {}
+    const leido: Partial<Nuevo> = texto ? await leerProductoNuevo(texto, ciudadId) : {}
+    // Sin texto (o sin precio en el texto): la IA lee lo que esté escrito en la
+    // imagen (captura de un catálogo, foto con el precio encima…).
+    if (bufFoto && (!leido.nombre || !leido.precio)) {
+      try {
+        const enImagen = (await leerCapturaCatalogo(`data:image/jpeg;base64,${bufFoto.toString('base64')}`)).productos[0]
+        if (enImagen) {
+          if (!leido.nombre) leido.nombre = enImagen.nombre
+          if (!leido.precio && enImagen.precio) leido.precio = enImagen.precio
+          if (!leido.precioOriginal && enImagen.precioAntes) leido.precioOriginal = enImagen.precioAntes
+          if (!leido.descripcionCorta && enImagen.descripcion) leido.descripcionCorta = enImagen.descripcion.slice(0, 300)
+        }
+      } catch {
+        // sin IA que mire fotos o no había texto: sigue con lo que hay
+      }
+    }
     // Categoría, público y colores: la IA mira la foto (o el nombre si no puede).
     const ia = await analizarFotoProducto(foto.url, categorias, leido.nombre || texto || undefined).catch(() => null)
     const datos: Nuevo = {
@@ -422,7 +442,15 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       return pedirConfirmacion({ tipo: 'crear', datos }, `Producto nuevo en *${tienda.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(datos, ciudadId, etiquetaRubro(datos.rubro))}`)
     }
   }
+  // Preguntas sobre la tienda: se responden con sus números reales.
+  const consultar = async () => {
+    const datos = await datosDeTienda(tienda!, productos, ciudadId)
+    const respuesta = await responderConsulta(texto, datos, ciudadId)
+    return enviarTexto(de, respuesta || 'Ahora no puedo armar la respuesta (la IA no responde). Probá en un rato.')
+  }
+  if (/^(resumen|reporte|informe|estad[ií]sticas|c[oó]mo (me )?(fue|va)|c[oó]mo vamos|ventas|mis ventas|pedidos|mis pedidos)\b/i.test(texto)) return consultar()
   const r = await interpretar(texto, productos, pendiente, ciudadId)
+  if (r.accion === 'consulta') return consultar()
   if (r.accion === 'ayuda') return enviarTexto(de, ayuda(ciudadId, admin))
   if (r.accion === 'listar') return enviarTexto(de, listaProductos(tienda, productos, ciudadId))
   if (r.accion === 'corregir' && pendiente?.tipo === 'crear') {

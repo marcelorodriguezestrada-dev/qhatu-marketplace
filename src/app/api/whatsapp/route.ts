@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     }
   }
   await registrarEstadoBot({ ultimoAviso: { at: ahora, mensajes: mensajes.length, de: mensajes[0]?.from || null } })
+  // Cómo llegó el último mensaje (tipo y campos), para ver qué manda WhatsApp
+  // en casos raros (ej. un producto reenviado del catálogo).
+  if (mensajes[0]) await registrarEstadoBot({ ultimoMensajeCrudo: { at: ahora, json: JSON.stringify(mensajes[0]).slice(0, 1500) } })
   // Uno por uno (del mismo número, en orden). Los avisos de "leído" / "entregado" no traen mensajes.
   for (const m of mensajes.slice(0, 10)) {
     try {
