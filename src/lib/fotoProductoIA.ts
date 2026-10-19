@@ -240,8 +240,9 @@ async function vision(imagen: string, texto: string, maxTokens: number): Promise
 
 export type AnalisisFoto = { rubroId: string | null; nombre: string; publico: string | null; colores: string[]; descripcion: string }
 
+// imagenUrl vacío = sin foto: todo sale del nombre (`pista`), con la IA de texto.
 export async function analizarFotoProducto(imagenUrl: string, categorias: CategoriaProducto[], pista?: string): Promise<AnalisisFoto> {
-  const imagen = await aDataUrl(imagenUrl)
+  const imagen = imagenUrl ? await aDataUrl(imagenUrl) : ''
   const pistaTxt = pista ? `\nEl archivo se llama "${pista}" (puede traer el nombre del producto).` : ''
   const formato =
     '\nRespondé SOLO JSON: {"nombre": "<nombre comercial corto en español, máx 7 palabras, ej: Sandalia de taco con tiras>", ' +
@@ -250,6 +251,7 @@ export async function analizarFotoProducto(imagenUrl: string, categorias: Catego
     '"descripcion": "<1 frase de venta, máx 25 palabras, sin inventar materiales ni marcas>"}'
   let r1: any
   try {
+    if (!imagen) throw new SinVision('Sin foto.')
     r1 = await vision(imagen, 'Sos el catalogador de Clasi Click, un marketplace de Bolivia. Mirá la foto del producto que se vende.' + pistaTxt + formato, 300)
   } catch (err) {
     // Nadie puede mirar la foto: si hay un nombre, la categoría sale de ahí
