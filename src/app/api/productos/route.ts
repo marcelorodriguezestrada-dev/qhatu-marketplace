@@ -15,6 +15,7 @@ import { LEGACY_CATEGORIA_A_RUBRO, RUBRO_DE_GRUPO } from '@/data/categoriasProdu
 import { evaluarConIA } from '@/lib/moderacionIA'
 import { etiquetasParaProducto } from '@/lib/etiquetasProducto'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { cabeceraCDN, enCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,18 +24,24 @@ export const dynamic = 'force-dynamic'
 // panel /admin puede seguir viendo y gestionando un producto después de
 // rechazarlo u ocultarlo, en vez de que desaparezca de su propia lista
 // de moderación.
+//
+// Es lo que más lecturas gasta (lo pide el inicio, cada tienda, cada
+// producto y categorías, y lee TODOS los productos): para el público se
+// guarda 1 minuto en memoria y en el CDN. El admin (?admin=1 + clave) y
+// el vendedor (?fresco=1) lo leen siempre al día.
 export async function GET(req: NextRequest) {
   try {
     const db = getDb()
-    const snap = await db.collection('productos').get()
-    if (snap.empty) {
+    const password = req.headers.get('x-admin-password')
+    const esAdmin = (await esClaveAdmin(password))
+    const fresco = esAdmin || req.nextUrl.searchParams.has('fresco')
+    const leer = async () => (await db.collection('productos').get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    const docs = fresco ? await leer() : await enCache('productos', 60_000, leer)
+    if (!docs.length) {
       return NextResponse.json({ productos: PRODUCTOS_SEED, fuente: 'seed' })
     }
 
-    const password = req.headers.get('x-admin-password')
-    const esAdmin = (await esClaveAdmin(password))
-
-    let productos = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
+    let productos = docs as any[]
     // Asegurar que exista `thumbUrl` en la respuesta para optimizar listados
     productos = productos.map((p) => ({ ...p, thumbUrl: p.thumbUrl || p.imagenUrl || '' }))
     // Compatibilidad: productos publicados antes de la clasificación por
@@ -56,7 +63,7 @@ export async function GET(req: NextRequest) {
       return (b.createdAt || '').localeCompare(a.createdAt || '')
     })
 
-    return NextResponse.json({ productos, fuente: 'firestore' })
+    return NextResponse.json({ productos, fuente: 'firestore' }, { headers: fresco || password ? { 'Cache-Control': 'no-store' } : cabeceraCDN(60) })
   } catch (err) {
     console.error('GET /api/productos', err)
     return NextResponse.json({ productos: PRODUCTOS_SEED, fuente: 'seed-fallback' })

@@ -47,7 +47,7 @@ export default function MisAnunciosPage() {
     // Lista pública de profesionales aprobados — se usa para armar,
     // por cada anuncio de tipo "Busco X", quiénes podrían resolverlo
     // (mismo rubro). Se trae una sola vez para todos los anuncios.
-    fetch('/api/profesionales')
+    fetch('/api/profesionales?fresco=1')
       .then((r) => r.json())
       .then((data) => setProfesionales(data.profesionales || []))
       .catch(() => {})

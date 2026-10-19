@@ -315,7 +315,7 @@ export default function VenderPage() {
   }
 
   async function cargarMisProductos() {
-    const res = await fetch('/api/productos')
+    const res = await fetch('/api/productos?fresco=1')
     const data = await res.json()
     const propios = (data.productos || []).filter((p: any) => p.vendedorId === usuario?.uid)
     setMisProductos(propios)

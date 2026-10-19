@@ -45,8 +45,9 @@ export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' 
     cargar()
     // Refresca cada 2 minutos mientras la pestaña está abierta — no
     // hace falta algo en tiempo real para esto, con que aparezca al
-    // rato de que llegue alcanza.
-    const interval = setInterval(cargar, 120000)
+    // rato de que llegue alcanza. Con la pestaña en segundo plano no se
+    // pregunta (cada consulta gasta lecturas de la base).
+    const interval = setInterval(() => { if (!document.hidden) cargar() }, 120000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario])

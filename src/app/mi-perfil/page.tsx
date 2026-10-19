@@ -156,7 +156,7 @@ export default function MiPerfilPage() {
   useEffect(() => {
     if (!profesional?.rubro) return
     setCargandoOportunidades(true)
-    fetch('/api/anuncios')
+    fetch('/api/anuncios?fresco=1')
       .then((r) => r.json())
       .then((data) => {
         const anuncios = (data.anuncios || []) as any[]

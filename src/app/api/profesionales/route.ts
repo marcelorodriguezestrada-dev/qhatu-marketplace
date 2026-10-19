@@ -9,6 +9,7 @@ import { sanearHistorialLaboral, sanearIdiomas } from '@/lib/cvEstandar'
 import { sanearRedes } from '@/lib/redesSociales'
 import { sanearReservas, sanearLinkVideollamada } from '@/lib/reservas'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { cabeceraCDN, enCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +20,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   try {
     const db = getDb()
-    const snap = await db.collection('profesionales').get()
-    let profesionales = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[]
-
     const password = req.headers.get('x-admin-password')
     const esAdmin = (await esClaveAdmin(password))
+    // Para el público: 1 minuto en memoria y en el CDN (ver /api/productos).
+    const fresco = esAdmin || req.nextUrl.searchParams.has('fresco')
+    const leer = async () => (await db.collection('profesionales').get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    let profesionales = [...(fresco ? await leer() : await enCache('profesionales', 60_000, leer))] as any[]
 
     if (!esAdmin) {
       profesionales = profesionales.filter((p) => !p.estado || p.estado === 'aprobado')
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
       profesionales = profesionales.map(({ linkVideollamada, ...p }) => p)
     }
 
-    return NextResponse.json({ profesionales })
+    return NextResponse.json({ profesionales }, { headers: fresco || password ? { 'Cache-Control': 'no-store' } : cabeceraCDN(60) })
   } catch (err) {
     console.error('GET /api/profesionales', err)
     return NextResponse.json({ profesionales: [] })
