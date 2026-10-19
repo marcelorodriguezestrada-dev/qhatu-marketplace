@@ -124,6 +124,37 @@ async function achicar(buf: Buffer): Promise<Buffer> {
   }
 }
 
+// Para mandarle la foto a la IA (más liviana).
+export async function achicarParaIA(buf: Buffer): Promise<Buffer> {
+  try {
+    const sharp = (await import('sharp')).default
+    return await sharp(buf).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+  } catch {
+    return buf
+  }
+}
+
+// Recorta la foto del producto de una captura (caja en fracciones, de la IA),
+// un poquito hacia adentro para no llevarse bordes ni letras. (Sin "trim":
+// se comería también el fondo de la foto del producto.)
+export async function recortarFoto(buf: Buffer, caja: { x: number; y: number; ancho: number; alto: number }): Promise<Buffer> {
+  try {
+    const sharp = (await import('sharp')).default
+    const derecha = await sharp(buf).rotate().toBuffer() // girada según el celular, antes de medir
+    const { width = 0, height = 0 } = await sharp(derecha).metadata()
+    if (!width || !height) return buf
+    const dentro = 0.01
+    const left = Math.max(0, Math.round((caja.x + caja.ancho * dentro) * width))
+    const top = Math.max(0, Math.round((caja.y + caja.alto * dentro) * height))
+    const w = Math.min(width - left, Math.round(caja.ancho * (1 - 2 * dentro) * width))
+    const h = Math.min(height - top, Math.round(caja.alto * (1 - 2 * dentro) * height))
+    if (w < 80 || h < 80) return buf
+    return await sharp(derecha).extract({ left, top, width: w, height: h }).toBuffer()
+  } catch {
+    return buf
+  }
+}
+
 export async function subirAImgbb(original: Buffer): Promise<{ url: string; thumbUrl: string }> {
   if (!process.env.IMGBB_API_KEY) throw new Error('Falta IMGBB_API_KEY.')
   const buf = await achicar(original)
