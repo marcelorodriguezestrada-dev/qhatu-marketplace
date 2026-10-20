@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { enCache, olvidarCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,9 +11,9 @@ export const dynamic = 'force-dynamic'
 // se rompe nada mientras tanto).
 export async function GET() {
   try {
-    const doc = await getDb().collection('configuracion').doc('pagos').get()
-    if (!doc.exists) return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '', whatsapp: '' })
-    const data = doc.data()!
+    // Casi nunca cambia y se pide en cada checkout: 1 minuto en memoria.
+    const data = await enCache('configuracion/pagos', 60_000, async () => (await getDb().collection('configuracion').doc('pagos').get()).data() || null)
+    if (!data) return NextResponse.json({ qrImageUrl: '', cbu: '', banco: '', titular: '', whatsapp: '' })
     return NextResponse.json({
       qrImageUrl: data.qrImageUrl || '',
       cbu: data.cbu || '',
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
       },
       { merge: true }
     )
+    olvidarCache('configuracion/pagos')
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('POST /api/configuracion/pagos', err)
