@@ -195,7 +195,7 @@ function sanearCambios(c: any): Cambios {
 
 // ── Alta de tiendas (solo admin) ──
 
-const PIDE_ALTA = /^(nuevo usuario|nueva tienda|crear usuario|crear tienda|crear vendedor|nuevo vendedor|alta( de)?( usuario| tienda| vendedor)?|registrar (tienda|usuario|vendedor))\b/i
+const PIDE_ALTA = /^\s*((crear|creá|crea|agregar|agregá|registrar|dar de alta|alta( de)?)( una| un| la| el)?( nueva| nuevo)? (tienda|usuario|vendedor|vendedora|cuenta)|(nueva|nuevo|otra|otro) (tienda|usuario|vendedor|vendedora|cuenta)|(tienda|usuario|vendedor|vendedora|cuenta) (nueva|nuevo)|alta)\b[\s:,.-]*/i
 
 // Saca los datos de la tienda del mensaje (y los suma a los que ya había).
 async function leerAlta(texto: string, previo: Alta | null): Promise<Alta> {
@@ -212,7 +212,10 @@ async function leerAlta(texto: string, previo: Alta | null): Promise<Alta> {
   const email = String(ia?.email || texto.match(/[^\s@,;]+@[^\s@,;]+\.[a-z]{2,}/i)?.[0] || '').trim().toLowerCase()
   const whatsapp = soloDigitos(ia?.whatsapp || texto.replace(/\S+@\S+/g, ' ').match(/\+?\d[\d\s()-]{7,}\d/)?.[0] || '')
   const ciudad = ciudades.some((c) => c.id === ia?.ciudad) ? String(ia.ciudad) : ''
-  const nuevo: Alta = { nombreNegocio: String(ia?.nombreNegocio || '').trim().slice(0, 80), nombre: String(ia?.nombre || '').trim().slice(0, 80), email, whatsapp, ciudad }
+  // Sin IA: en "nueva tienda Potoco, …" el nombre es lo primero después del pedido.
+  const primero = previo ? '' : texto.replace(PIDE_ALTA, '').split(/[,;\n]/)[0].trim()
+  const nombreSinIA = primero && !/@|\d{6,}/.test(primero) ? primero : ''
+  const nuevo: Alta = { nombreNegocio: String(ia?.nombreNegocio || nombreSinIA).trim().slice(0, 80), nombre: String(ia?.nombre || '').trim().slice(0, 80), email, whatsapp, ciudad }
   return {
     nombreNegocio: nuevo.nombreNegocio || previo?.nombreNegocio || '',
     nombre: nuevo.nombre || previo?.nombre || '',
@@ -267,7 +270,7 @@ async function manejarAlta(de: string, texto: string, sesion: Sesion): Promise<u
     }
   }
   if (!pend && !PIDE_ALTA.test(texto)) return null
-  const datos = await leerAlta(texto.replace(PIDE_ALTA, '').trim() || texto, pend)
+  const datos = await leerAlta(texto, pend)
   await guardarSesion(de, { pendiente: { tipo: 'alta', datos } })
   const falta = !datos.nombreNegocio ? '✍️ ¿Cómo se llama la tienda?' : !datos.email ? '📧 ¿Qué email va a usar para entrar? (si no tiene, creale uno de Gmail)' : ''
   if (falta) return enviarTexto(de, `${resumenAlta(datos)}\n\n${falta}`)
@@ -406,10 +409,11 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   // ¿En qué tienda trabaja?
   let tienda: Tienda | null = null
   const propias = await tiendasDelNumero(de)
-  const pideTienda = texto.match(/^tienda\s*:?\s+(.+)$/i)
+  // "tienda nueva X" es un alta, no elegir la tienda "nueva X".
+  const pideTienda = PIDE_ALTA.test(texto) ? null : texto.match(/^tienda\s*:?\s+(.+)$/i)
   if (admin && pideTienda) {
     const t = await buscarTienda(pideTienda[1])
-    if (!t) return enviarTexto(de, `No encontré la tienda “${pideTienda[1]}”. Escribí el nombre como figura en Clasi Click.`)
+    if (!t) return enviarTexto(de, `No encontré la tienda “${pideTienda[1]}”. Escribí el nombre como figura en Clasi Click.\n🆕 Si es nueva: *nueva tienda ${pideTienda[1]}, su email, su WhatsApp, ciudad*`)
     await guardarSesion(de, { tiendaId: t.id, pendiente: null })
     const n = (await productosDe(t.id)).length
     return enviarTexto(de, `🏪 Listo, trabajás en *${t.nombreNegocio || t.email}* (${buscarCiudad(ciudadDe(t)).nombre}, ${n} productos).\nMandá una foto con su texto o escribí lo que querés cambiar.`)
