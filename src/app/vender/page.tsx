@@ -538,85 +538,16 @@ export default function VenderPage() {
     }
   }
 
-  // removeBgClient: ejecuta segmentación con BodyPix y compone la persona
+  // removeBgClient: quita el fondo con la IA (Gemini, en el servidor) y
+  // deja el producto sobre blanco. Devuelve la foto como data URL.
   async function removeBgClient(file: File): Promise<string> {
-    // Carga de TF.js + BodyPix desde CDN en tiempo de ejecución para evitar
-    // que el builder intente resolver dependencias en el servidor.
-    function loadScript(src: string, globalName?: string) {
-      return new Promise<void>((resolve, reject) => {
-        if (globalName && (window as any)[globalName]) return resolve()
-        const s = document.createElement('script')
-        s.src = src
-        s.async = true
-        s.onload = () => resolve()
-        s.onerror = () => reject(new Error('Error cargando ' + src))
-        document.head.appendChild(s)
-      })
-    }
-
-    // Versiones estables en CDN; podés ajustar si necesitás otra.
-    await loadScript('https://unpkg.com/@tensorflow/tfjs@4.9.0/dist/tf.min.js', 'tf')
-    await loadScript('https://unpkg.com/@tensorflow-models/body-pix@2.0.5/dist/body-pix.min.js', 'bodyPix')
-
-    const tf = (window as any).tf
-    const bodyPix = (window as any).bodyPix
-    if (!tf || !bodyPix) throw new Error('No se pudieron cargar las librerías de segmentación')
-    await tf.setBackend('webgl')
-    await tf.ready()
-
-    // Cargar imagen en elemento HTMLImageElement
-    const img = document.createElement('img')
-    img.src = URL.createObjectURL(file)
-    await new Promise((r, rej) => { img.onload = r; img.onerror = rej })
-
-    const net = await bodyPix.load()
-    const segmentation = await net.segmentPerson(img, { internalResolution: 'medium' })
-
-    const w = img.naturalWidth
-    const h = img.naturalHeight
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')!
-
-    // Si la máscara detecta casi nada (p. ej. no es una persona), devolvemos
-    // la imagen original sin aplicar la eliminación de fondo para evitar "desaparecer" el objeto.
-    const segData = (segmentation as any).data as Uint8Array
-    let fgCount = 0
-    for (let i = 0; i < segData.length; i++) if (segData[i]) fgCount++
-    const fgRatio = fgCount / (w * h)
-    if (fgRatio < 0.01) {
-      // Fallback: devolver la imagen original (dibujada sobre blanco)
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, w, h)
-      ctx.drawImage(img, 0, 0)
-      const dataUrl = canvas.toDataURL('image/png')
-      URL.revokeObjectURL(img.src)
-      return dataUrl
-    }
-
-    // Crear máscara e incorporar la persona sobre el fondo blanco correctamente
-    const mask = bodyPix.toMask(segmentation)
-    const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = w
-    maskCanvas.height = h
-    const mctx = maskCanvas.getContext('2d')!
-    mctx.putImageData(mask, 0, 0)
-
-    // Dibujar la imagen original
-    ctx.drawImage(img, 0, 0)
-    // Usar la máscara para recortar la imagen (mantener sólo la persona)
-    ctx.globalCompositeOperation = 'destination-in'
-    ctx.drawImage(maskCanvas, 0, 0)
-    // Dibujar fondo blanco debajo
-    ctx.globalCompositeOperation = 'destination-over'
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, w, h)
-    ctx.globalCompositeOperation = 'source-over'
-
-    const dataUrl = canvas.toDataURL('image/png')
-    URL.revokeObjectURL(img.src)
-    return dataUrl
+    const token = await obtenerToken()
+    const formData = new FormData()
+    formData.append('image', file)
+    const res = await fetch('/api/productos/quitar-fondo', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.dataUrl) throw new Error(data.error || 'No se pudo quitar el fondo.')
+    return data.dataUrl
   }
 
   // compressImage: redimensiona la imagen manteniendo proporción y reduce calidad
@@ -1168,14 +1099,14 @@ export default function VenderPage() {
                 disabled={!lastFile || processingPreview}
                 className="px-3 py-1 rounded-md border font-body text-xs"
               >
-                {processingPreview ? 'Procesando...' : 'Sacar fondo (previsualizar)'}
+                {processingPreview ? '🪄 Quitando el fondo…' : '🪄 Quitar fondo con IA (ver antes)'}
               </button>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-2">
             <label className="font-body text-[13px] flex items-center gap-2">
               <input type="checkbox" checked={removerFondo} onChange={(e) => setRemoverFondo(e.target.checked)} />
-              <span className="font-body text-[11px] text-inksoft">Remover fondo (cliente, puede fallar con objetos)</span>
+              <span className="font-body text-[11px] text-inksoft">Quitar el fondo con IA al subir (fondo blanco)</span>
             </label>
           </div>
           <div className="font-body text-[11px] text-inksoft mt-1.5">

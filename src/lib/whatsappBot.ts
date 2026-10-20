@@ -10,19 +10,21 @@ import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
 import { guiaIdioma, v } from '@/lib/estiloRegional'
 import { SITE_URL } from '@/lib/sitio'
 import { datosDeTienda, responderConsulta } from '@/lib/whatsappConsultas'
-import { achicarParaIA, bajarMedia, enviarBotones, recortarFoto, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
+import { achicarParaIA, bajarMedia, enviarBotones, enviarImagen, recortarFoto, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
+import { fondoBlanco } from '@/lib/fondoBlancoIA'
 
 // Bot de WhatsApp de Clasi Click: el vendedor (o el admin) le escribe al
 // número del bot y se cargan o cambian productos en su tienda.
 //   📷 Foto + texto ("Remera oversize 15000 talles S M L stock 5") → producto nuevo
 //   ✍️ "precio buzo 14000", "sin stock jean", "ocultar remera", "oferta campera 20%"
 //   📋 "lista" → sus productos · "ayuda" → cómo se usa
+//   🪄 Producto nuevo con foto: botón "Quitar fondo" (Gemini lo pone sobre blanco)
 //   🛠️ Admin: "tienda Creaciones Liz" elige en qué tienda trabaja
 // Nada se guarda sin confirmar: el bot muestra el resumen y espera ✅ Sí.
 // Estado de cada conversación: whatsappSesiones/{número}.
 
 type Producto = { id: string; nombre: string; precio: number; precioOriginal?: number | null; stock?: number | null; estado?: string; rubro?: string; descripcionCorta?: string; talles?: string[]; colores?: string[] }
-type Nuevo = { nombre: string; precio: number | null; precioOriginal: number | null; stock: number | null; talles: string[]; colores: string[]; descripcionCorta: string; publico: string; rubro: string; imagenUrl: string; thumbUrl: string }
+type Nuevo = { nombre: string; precio: number | null; precioOriginal: number | null; stock: number | null; talles: string[]; colores: string[]; descripcionCorta: string; publico: string; rubro: string; imagenUrl: string; thumbUrl: string; fondoQuitado?: boolean }
 type Cambios = Partial<Pick<Producto, 'nombre' | 'precio' | 'precioOriginal' | 'stock' | 'descripcionCorta' | 'talles' | 'colores'>> & { estado?: 'activo' | 'oculto' }
 type Pendiente = { tipo: 'crear'; datos: Nuevo } | { tipo: 'modificar'; productoId: string; nombre: string; cambios: Cambios }
 type Sesion = { tiendaId?: string; pendiente?: Pendiente | null }
@@ -35,6 +37,9 @@ const SIS = new Set(['si', 'sii', 'siii', 'si si', 'ok', 'okay', 'dale', 'listo'
 const NOS = new Set(['no', 'nop', 'cancelar', 'cancela', 'descartar', 'nada', 'no gracias', 'mejor no'])
 const esSi = (t: string) => SIS.has(limpiar(t)) || /^(✅|👍)\s*$/u.test(t.trim())
 const esNo = (t: string) => NOS.has(limpiar(t)) || /^❌\s*$/u.test(t.trim())
+const pideFondo = (t: string) => /^(fondo|quitar fondo|quita(r|le)? el fondo|sin fondo|fondo blanco|sacar fondo|saca(r|le)? el fondo)$/.test(limpiar(t)) || t.trim() === '🪄'
+// Nombres que no dicen nada: mejor preguntarlo.
+const nombreGenerico = (n: string | undefined) => !n || /^(producto|productos|articulo|item|foto|imagen|sin nombre|nuevo producto|producto nuevo)$/.test(limpiar(n))
 
 const db = () => getDb()
 const sesionRef = (numero: string) => db().collection('whatsappSesiones').doc(numero)
@@ -376,7 +381,25 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
     // A un producto nuevo sin nombre o sin precio se le pide lo que falta antes de ofrecer guardarlo.
     if (p.tipo === 'crear' && !p.datos.nombre) return enviarTexto(de, `${cuerpo}\n\n✍️ ¿Cómo se llama el producto? ${v(ciudadId, 'Escríbelo', 'Escribilo')}, ej: *Conjunto de keten frizado*`)
     if (p.tipo === 'crear' && !p.datos.precio) return enviarTexto(de, `${cuerpo}\n\n💰 ¿Cuánto cuesta? ${v(ciudadId, 'Responde', 'Respondé')} solo con el precio, ej: *8000*`)
-    return enviarBotones(de, `${cuerpo}\n\n¿Lo guardo?`, [{ id: 'si', titulo: '✅ Sí' }, { id: 'no', titulo: '❌ No' }])
+    const conFondo = p.tipo === 'crear' && p.datos.imagenUrl && !p.datos.fondoQuitado && process.env.GEMINI_API_KEY
+    return enviarBotones(de, `${cuerpo}\n\n¿Lo guardo?`, [{ id: 'si', titulo: '✅ Sí' }, ...(conFondo ? [{ id: 'fondo', titulo: '🪄 Quitar fondo' }] : []), { id: 'no', titulo: '❌ No' }])
+  }
+  const resumenPendiente = (d: Nuevo) => `Producto nuevo en *${tienda!.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(d, ciudadId, etiquetaRubro(d.rubro))}`
+
+  // 🪄 Quitar el fondo de la foto del producto pendiente.
+  if (pendiente?.tipo === 'crear' && pendiente.datos.imagenUrl && pideFondo(texto)) {
+    await enviarTexto(de, '🪄 Quitando el fondo, dame unos segundos…')
+    try {
+      const r = await fetch(pendiente.datos.imagenUrl)
+      if (!r.ok) throw new Error(`no pude abrir la foto (${r.status})`)
+      const foto = await subirAImgbb(await fondoBlanco(Buffer.from(await r.arrayBuffer())))
+      const datos: Nuevo = { ...pendiente.datos, imagenUrl: foto.url, thumbUrl: foto.thumbUrl, fondoQuitado: true }
+      await enviarImagen(de, foto.url, '✨ Así queda sin fondo')
+      return pedirConfirmacion({ tipo: 'crear', datos }, `${resumenPendiente(datos)}\n\n(Si no te gusta cómo quedó, ${v(ciudadId, 'manda', 'mandá')} la foto de nuevo y ${v(ciudadId, 'elige', 'elegí')} ✅ sin quitar el fondo.)`)
+    } catch (err: any) {
+      await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Quitar fondo: ${err?.message || 'error'}` } })
+      return pedirConfirmacion({ ...pendiente, datos: { ...pendiente.datos, fondoQuitado: true } }, `No pude quitar el fondo: ${err?.message || 'error'}. Queda con la foto original.\n\n${resumenPendiente(pendiente.datos)}`)
+    }
   }
 
   // 📷 Foto → producto nuevo.
@@ -412,7 +435,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
     // Categoría, público y colores: la IA mira la foto (o el nombre si no puede).
     const ia = await analizarFotoProducto(foto.url, categorias, leido.nombre || texto || undefined).catch(() => null)
     const datos: Nuevo = {
-      nombre: leido.nombre || ia?.nombre || '',
+      nombre: [leido.nombre, ia?.nombre].find((n) => !nombreGenerico(n)) || '',
       precio: leido.precio ?? null,
       precioOriginal: leido.precioOriginal ?? null,
       stock: leido.stock ?? null,
@@ -424,7 +447,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       imagenUrl: foto.url,
       thumbUrl: foto.thumbUrl,
     }
-    const resumen = `Producto nuevo en *${tienda.nombreNegocio || 'tu tienda'}*:\n\n${resumenNuevo(datos, ciudadId, etiquetaRubro(datos.rubro))}`
+    const resumen = resumenPendiente(datos)
     // Sin precio (ej. un producto reenviado del catálogo: el precio no viene en la foto) lo pide primero.
     return pedirConfirmacion({ tipo: 'crear', datos }, resumen)
   }
