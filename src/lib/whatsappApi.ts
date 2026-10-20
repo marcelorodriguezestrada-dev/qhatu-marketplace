@@ -68,6 +68,9 @@ async function enviar(cuerpo: Record<string, unknown>) {
 
 export const enviarTexto = (to: string, texto: string) => enviar({ to, type: 'text', text: { body: texto.slice(0, 4000), preview_url: false } })
 
+// Foto (por link público, ej. la de ImgBB) con un texto debajo.
+export const enviarImagen = (to: string, link: string, texto = '') => enviar({ to, type: 'image', image: { link, ...(texto ? { caption: texto.slice(0, 1000) } : {}) } })
+
 // Mensaje con botones de respuesta rápida (máx. 3, título de hasta 20 caracteres).
 export function enviarBotones(to: string, texto: string, botones: { id: string; titulo: string }[]) {
   return enviar({
