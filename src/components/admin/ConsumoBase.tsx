@@ -49,6 +49,32 @@ function horaBolivia(horaPacifico: number) {
   return (horaPacifico + h('America/La_Paz') - h('America/Los_Angeles') + 24) % 24
 }
 
+// Hora actual "del Pacífico" en horas con decimales (ej. 7.5 = 07:30).
+function horaPacificoAhora() {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number)
+  return h + m / 60
+}
+
+// Proyección del día: al ritmo de las últimas ~3 horas, cuánto se va a
+// gastar hasta que se reinicie la cuota, y a qué hora se llegaría al límite.
+function proyectar(total: number, horas: Record<string, number>, limite: number) {
+  const ahora = horaPacificoAhora()
+  const h = Math.floor(ahora)
+  const desde = Math.max(0, h - 2)
+  let reciente = 0
+  for (let i = desde; i <= h; i++) reciente += Number(horas[String(i).padStart(2, '0')] || 0)
+  const ventana = Math.max(0.25, ahora - desde) // horas que cubre "reciente"
+  const porHora = ahora < 1 ? total / Math.max(0.25, ahora) : reciente / ventana
+  const fin = Math.round(total + porHora * (24 - ahora))
+  let llegaA: string | null = null
+  if (total >= limite) llegaA = 'ya'
+  else if (fin > limite && porHora > 0) {
+    const cuando = new Date(Date.now() + ((limite - total) / porHora) * 3_600_000)
+    llegaA = cuando.toLocaleTimeString('es-BO', { timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit' })
+  }
+  return { porHora: Math.round(porHora), fin, llegaA }
+}
+
 // Cuánto falta para que Firebase reinicie la cuota (medianoche del Pacífico).
 function faltaReinicio() {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date())
@@ -104,6 +130,7 @@ export default function ConsumoBase({ password }: { password: string }) {
   const nivel = pct >= 90 ? { txt: 'Casi sin cuota', color: 'bg-maroon', icono: '⛔' } : pct >= 60 ? { txt: 'Consumo alto', color: 'bg-amber-500', icono: '⚠️' } : { txt: 'Normal', color: 'bg-teal', icono: '✅' }
   const horas = Array.from({ length: 24 }, (_, h) => ({ h, n: Number(hoy?.horas?.[String(h).padStart(2, '0')] || 0) }))
   const maxHora = Math.max(1, ...horas.map((x) => x.n))
+  const proy = datos && hoy ? proyectar(total, hoy.horas || {}, limite) : null
   const rutas = hoy?.rutas || []
   // Las pausadas siempre se ven, aunque hoy no hayan leído nada.
   const pausadasSinUso = (datos?.pausadas || []).filter((r) => !rutas.some((x) => x.ruta === r)).map((ruta) => ({ ruta, lecturas: 0 }))
@@ -140,6 +167,24 @@ export default function ConsumoBase({ password }: { password: string }) {
               {hoy?.actualizado && <> Último dato: {new Date(hoy.actualizado).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}.</>}
             </div>
           </div>
+
+          {proy && (
+            <div className={`font-body text-sm rounded-lg border p-3 mb-4 ${proy.llegaA ? 'border-maroon bg-panelalt' : proy.fin > limite * 0.6 ? 'border-amber-200 bg-amber-50' : 'border-line bg-panelalt'}`}>
+              <div className="font-semibold text-ink">
+                {proy.llegaA ? '⛔' : proy.fin > limite * 0.6 ? '⚠️' : '✅'} Proyección del día: ~{num(proy.fin)} lecturas ({Math.round((proy.fin / limite) * 100)}% del límite)
+              </div>
+              <div className="text-xs text-inksoft mt-0.5">
+                Ritmo de las últimas horas: ~{num(proy.porHora)} por hora.{' '}
+                {proy.llegaA === 'ya'
+                  ? 'Ya se llegó al límite de hoy.'
+                  : proy.llegaA
+                    ? <>A este ritmo se llega al límite cerca de las <b>{proy.llegaA}</b> (hora de Bolivia). {datos.ahorro ? 'El modo ahorro ya está activo: conviene pasar a Blaze en Firebase.' : 'Activá el modo ahorro.'}</>
+                    : proy.fin > limite * 0.6
+                      ? datos.ahorro ? 'Va alto aun con modo ahorro: si se repite varios días, pasá a Blaze.' : 'Va alto: si se repite, activá el modo ahorro.'
+                      : 'Tranquilo: a este ritmo no se llega al límite.'}
+              </div>
+            </div>
+          )}
 
           <label className="flex items-start gap-3 bg-panelalt border border-line rounded-lg p-3 mb-4 cursor-pointer">
             <input type="checkbox" className="mt-1" checked={datos.ahorro} disabled={guardando} onChange={(e) => guardar({ ahorro: e.target.checked })} />

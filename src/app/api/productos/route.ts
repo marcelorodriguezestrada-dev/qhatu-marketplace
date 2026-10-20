@@ -35,9 +35,12 @@ export async function GET(req: NextRequest) {
     const password = req.headers.get('x-admin-password')
     const esAdmin = (await esClaveAdmin(password))
     const fresco = esAdmin || req.nextUrl.searchParams.has('fresco')
-    const leer = async () => (await db.collection('productos').get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    const docs = fresco ? await leer() : await enCache('productos', 60_000, leer)
+    // ?vendedor=uid: solo los de esa tienda (panel del vendedor), sin leer todo el catálogo.
+    const vendedor = req.nextUrl.searchParams.get('vendedor')
+    const leer = async () => (await (vendedor ? db.collection('productos').where('vendedorId', '==', vendedor) : db.collection('productos')).get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    const docs = fresco || vendedor ? await leer() : await enCache('productos', 60_000, leer)
     if (!docs.length) {
+      if (vendedor) return NextResponse.json({ productos: [], fuente: 'firestore' }, { headers: { 'Cache-Control': 'no-store' } })
       return NextResponse.json({ productos: PRODUCTOS_SEED, fuente: 'seed' })
     }
 
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest) {
       return (b.createdAt || '').localeCompare(a.createdAt || '')
     })
 
-    return NextResponse.json({ productos, fuente: 'firestore' }, { headers: fresco || password ? { 'Cache-Control': 'no-store' } : cabeceraCDN(60) })
+    return NextResponse.json({ productos, fuente: 'firestore' }, { headers: fresco || vendedor || password ? { 'Cache-Control': 'no-store' } : cabeceraCDN(60) })
   } catch (err) {
     console.error('GET /api/productos', err)
     return NextResponse.json({ productos: PRODUCTOS_SEED, fuente: 'seed-fallback' })

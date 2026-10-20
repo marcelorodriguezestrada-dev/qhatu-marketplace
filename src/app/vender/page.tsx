@@ -315,7 +315,8 @@ export default function VenderPage() {
   }
 
   async function cargarMisProductos() {
-    const res = await fetch('/api/productos?fresco=1')
+    // Solo los de su tienda (antes leía todo el catálogo en cada apertura del panel).
+    const res = await fetch(`/api/productos?fresco=1&vendedor=${encodeURIComponent(usuario?.uid || '')}`)
     const data = await res.json()
     const propios = (data.productos || []).filter((p: any) => p.vendedorId === usuario?.uid)
     setMisProductos(propios)
