@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { esClaveAdmin } from '@/lib/adminAuth'
 import { getDb } from '@/lib/firebaseAdmin'
 import { LIMITE_GRATIS_DIA, RUTAS_SIN_PAUSA, aplicarConfig, diaCuota, guardarConsumoAhora } from '@/lib/consumoFirestore'
+import { AJUSTES, IDS_AJUSTES, valorAjuste } from '@/lib/ajustesConsumo'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
       }),
       pausadas: Array.isArray(c.pausadas) ? c.pausadas : [],
       ahorro: c.ahorro === true,
+      intervalos: Object.fromEntries(IDS_AJUSTES.map((id) => [id, valorAjuste(id, c.intervalos)])),
       sinPausa: RUTAS_SIN_PAUSA,
     })
   } catch (err: any) {
@@ -41,17 +43,27 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST (admin) { pausadas?: string[], ahorro?: boolean }
+// POST (admin) { pausadas?: string[], ahorro?: boolean, intervalos?: { campanita: 300, ... } }
 export async function POST(req: NextRequest) {
   if (!(await esClaveAdmin(req.headers.get('x-admin-password')))) return noAutorizado()
   const body = await req.json().catch(() => ({}))
-  const cambios: { pausadas?: string[]; ahorro?: boolean } = {}
+  const cambios: { pausadas?: string[]; ahorro?: boolean; intervalos?: Record<string, number> } = {}
   if (Array.isArray(body.pausadas)) {
     cambios.pausadas = Array.from(new Set(body.pausadas.map((r: unknown) => String(r).slice(0, 120)).filter((r: string) => r && !RUTAS_SIN_PAUSA.includes(r)))).slice(0, 50) as string[]
   }
   if (typeof body.ahorro === 'boolean') cambios.ahorro = body.ahorro
+  if (body.intervalos && typeof body.intervalos === 'object') {
+    // Solo valores de la lista de opciones de cada ajuste.
+    cambios.intervalos = Object.fromEntries(IDS_AJUSTES.filter((id) => AJUSTES[id].opciones.includes(Number(body.intervalos[id]))).map((id) => [id, Number(body.intervalos[id])]))
+  }
   try {
-    await getDb().collection('config').doc('consumoFirestore').set({ ...cambios, actualizado: new Date().toISOString() }, { merge: true })
+    const ref = getDb().collection('config').doc('consumoFirestore')
+    if (cambios.intervalos) {
+      // Se combinan con los guardados (cambiar uno no borra los otros).
+      const previos = (await ref.get()).data()?.intervalos || {}
+      cambios.intervalos = { ...previos, ...cambios.intervalos }
+    }
+    await ref.set({ ...cambios, actualizado: new Date().toISOString() }, { merge: true })
     aplicarConfig(cambios)
     return NextResponse.json({ ok: true, ...cambios })
   } catch {

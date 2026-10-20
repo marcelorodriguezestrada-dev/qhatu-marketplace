@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useAjusteConsumo } from '@/lib/useAjusteConsumo'
 
 // Alarma de pedidos para /admin: cada 20 s pregunta qué pedidos se
 // crearon o cambiaron desde la última vez (/api/pedidos/novedades — solo
@@ -52,6 +53,7 @@ export default function AlarmaPedidos({
 }) {
   const [activa, setActiva] = useState(false)
   const [conPago, setConPago] = useState(true)
+  const cadaCuanto = useAjusteConsumo('alarma') // Admin → Consumo de la base
   const [horario, setHorario] = useState<Horario>(HORARIO_DEFECTO)
   const [editandoHorario, setEditandoHorario] = useState(false)
   const horarioRef = useRef<Horario>(HORARIO_DEFECTO)
@@ -169,10 +171,10 @@ export default function AlarmaPedidos({
         notificar(nuevos.length ? `Nuevo pedido de ${quien(nuevos[0])}` : `${quien(pagos[0])} avisó que pagó`, nuevosAvisos.map((x) => x.texto).join('\n'))
       } catch {}
     }
-    const t = setInterval(revisar, 20_000)
+    const t = setInterval(revisar, cadaCuanto)
     return () => { cancelado = true; clearInterval(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password, activa, conPago])
+  }, [password, activa, conPago, cadaCuanto])
 
   function activar() {
     try { if (!audioRef.current) audioRef.current = new AudioContext(); audioRef.current.resume() } catch {}

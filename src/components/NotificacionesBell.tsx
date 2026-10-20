@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { track } from '@/lib/tracking'
+import { useAjusteConsumo } from '@/lib/useAjusteConsumo'
 
 type Notificacion = {
   id: string
@@ -24,6 +25,7 @@ type Notificacion = {
 export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' | 'oscura' }) {
   const { usuario, obtenerToken } = useAuth()
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([])
+  const cadaCuanto = useAjusteConsumo('campanita') // Admin → Consumo de la base
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
 
@@ -43,14 +45,14 @@ export function NotificacionesBell({ variante = 'clara' }: { variante?: 'clara' 
   useEffect(() => {
     if (!usuario) return
     cargar()
-    // Refresca cada 2 minutos mientras la pestaña está abierta — no
+    // Refresca cada `cadaCuanto` (2 min por defecto) mientras la pestaña está abierta — no
     // hace falta algo en tiempo real para esto, con que aparezca al
     // rato de que llegue alcanza. Con la pestaña en segundo plano no se
     // pregunta (cada consulta gasta lecturas de la base).
-    const interval = setInterval(() => { if (!document.hidden) cargar() }, 120000)
+    const interval = setInterval(() => { if (!document.hidden) cargar() }, cadaCuanto)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario])
+  }, [usuario, cadaCuanto])
 
   async function marcarLeida(id: string) {
     const n = notificaciones.find((x) => x.id === id) as any

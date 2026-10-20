@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AJUSTES, IDS_AJUSTES, textoSegundos, type IdAjuste } from '@/lib/ajustesConsumo'
 
 // Admin → Números → "🔋 Consumo de la base": qué páginas/APIs gastan las
 // lecturas de Firestore (50.000 gratis por día), y botones para pausar una
@@ -8,15 +9,15 @@ import { useEffect, useState } from 'react'
 
 type Ruta = { ruta: string; lecturas: number }
 type Dia = { dia: string; total: number; horas: Record<string, number>; rutas: Ruta[]; actualizado: string | null }
-type Datos = { limite: number; hoy: string; dias: Dia[]; pausadas: string[]; ahorro: boolean; sinPausa: string[]; error?: string }
+type Datos = { limite: number; hoy: string; dias: Dia[]; pausadas: string[]; ahorro: boolean; intervalos: Record<IdAjuste, number>; sinPausa: string[]; error?: string }
 
 // Nombre entendible de cada ruta (lo que no está acá se muestra tal cual).
 const NOMBRES: Record<string, string> = {
   'api/productos': 'Lista de todos los productos (inicio, tiendas, producto, categorías)',
   'api/pedidos': 'Pedidos (entrar al admin, Mis pedidos, Vender, checkout)',
   'api/pedidos/[id]': 'Seguimiento de un pedido (se actualiza solo)',
-  'api/pedidos/novedades': 'Alarma de pedidos del admin (cada 20 s)',
-  'api/notificaciones': 'Campanita de notificaciones (cada 2 min)',
+  'api/pedidos/novedades': 'Alarma de pedidos del admin',
+  'api/notificaciones': 'Campanita de notificaciones',
   'api/anuncios': 'Lista de anuncios',
   'api/profesionales': 'Lista de servicios profesionales',
   'api/whatsapp': 'Bot de WhatsApp',
@@ -105,13 +106,13 @@ export default function ConsumoBase({ password }: { password: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password])
 
-  async function guardar(cambios: { pausadas?: string[]; ahorro?: boolean }) {
+  async function guardar(cambios: { pausadas?: string[]; ahorro?: boolean; intervalos?: Partial<Record<IdAjuste, number>> }) {
     setGuardando(true)
     try {
       const r = await fetch('/api/admin/consumo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': password }, body: JSON.stringify(cambios) })
       const d = await r.json()
       if (d.error) setError(d.error)
-      else setDatos((x) => (x ? { ...x, ...cambios } : x))
+      else setDatos((x) => (x ? { ...x, ...cambios, intervalos: { ...x.intervalos, ...(cambios.intervalos || {}) } } : x))
     } finally {
       setGuardando(false)
     }
@@ -193,6 +194,60 @@ export default function ConsumoBase({ password }: { password: string }) {
               <span className="block text-xs text-inksoft">Las listas de productos, anuncios y servicios se guardan 10 minutos en vez de 1 (un producto nuevo tarda más en aparecer, pero se gasta mucho menos).</span>
             </span>
           </label>
+
+          <details className="bg-panelalt border border-line rounded-lg p-3 mb-4">
+            <summary className="font-body text-sm font-semibold text-ink cursor-pointer">⚙️ Ajustes de frecuencia y caché</summary>
+            <div className="font-body text-xs text-inksoft mt-1 mb-3">
+              Más tiempo = menos lecturas, pero lo nuevo tarda más en verse. Los cambios llegan a todo el sitio en unos minutos.
+              {datos.ahorro && <> Con el modo ahorro, los cachés del servidor duran 10 veces lo que diga acá.</>}
+            </div>
+            {(['cliente', 'servidor'] as const).map((lado) => (
+              <div key={lado} className="mb-3 last:mb-0">
+                <div className="font-body text-[11px] uppercase tracking-wide text-inksoft mb-1.5">{lado === 'cliente' ? 'Cada cuánto pregunta el navegador' : 'Cuánto se guarda en el servidor'}</div>
+                {IDS_AJUSTES.filter((id) => AJUSTES[id].lado === lado).map((id) => {
+                  const a = AJUSTES[id]
+                  const actual = datos.intervalos?.[id] ?? a.defecto
+                  return (
+                    <div key={id} className="flex items-start justify-between gap-3 py-2 border-b border-line last:border-0 flex-wrap">
+                      <div className="min-w-0 flex-1" style={{ minWidth: 200 }}>
+                        <div className="font-body text-sm text-ink">{a.nombre}</div>
+                        <div className="font-body text-[11px] text-inksoft">{a.ayuda}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={actual}
+                          disabled={guardando}
+                          onChange={(e) => guardar({ intervalos: { [id]: Number(e.target.value) } })}
+                          className="font-body text-sm border border-line rounded-md px-2 py-1 bg-panel text-ink"
+                          aria-label={a.nombre}
+                        >
+                          {a.opciones.map((o) => (
+                            <option key={o} value={o}>
+                              {textoSegundos(o)}{o === a.recomendado ? ' (recomendado)' : ''}{o === a.defecto ? ' (de fábrica)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {actual !== a.recomendado && (
+                          <button disabled={guardando} onClick={() => guardar({ intervalos: { [id]: a.recomendado } })} className="font-body text-[11px] underline text-inksoft whitespace-nowrap">
+                            usar {textoSegundos(a.recomendado)}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+            {IDS_AJUSTES.some((id) => (datos.intervalos?.[id] ?? AJUSTES[id].defecto) !== AJUSTES[id].recomendado) && (
+              <button
+                disabled={guardando}
+                onClick={() => guardar({ intervalos: Object.fromEntries(IDS_AJUSTES.map((id) => [id, AJUSTES[id].recomendado])) })}
+                className="font-body text-xs px-3 py-1.5 rounded-lg border border-teal text-teal bg-tealsoft mt-2"
+              >
+                ✨ Usar todos los recomendados
+              </button>
+            )}
+          </details>
 
           <div className="font-body text-sm font-semibold text-ink mb-2">Qué está gastando hoy</div>
           {rutas.length + pausadasSinUso.length === 0 ? (

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { fechaLegibleBolivia } from '@/lib/fechaBolivia'
 import { FRANJA_LABEL } from '@/components/SelectorHorarioEntrega'
 import { fechaEntregaDefault } from '@/lib/entregaDias'
+import { useAjusteConsumo } from '@/lib/useAjusteConsumo'
 
 // En la moneda del país del pedido (los de antes no tienen país: Bolivia).
 function bs(n: number, pais?: string) {
@@ -62,6 +63,7 @@ export default function SeguimientoPedidoPage() {
   const [pedido, setPedido] = useState<any>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const cadaCuanto = useAjusteConsumo('seguimiento') // Admin → Consumo de la base
 
   useEffect(() => {
     let activo = true
@@ -85,14 +87,14 @@ export default function SeguimientoPedidoPage() {
     // El estado puede cambiar del lado del vendedor (en /vender o
     // /admin) mientras el comprador tiene esta pantalla abierta — un
     // sondeo simple cada 15s alcanza para que se vea "solo", sin tener
-    // que refrescar a mano, y sin necesitar nada en tiempo real. Cada 30s
+    // que refrescar a mano, y sin necesitar nada en tiempo real. Cada 30s por defecto
     // y solo con la pestaña a la vista (cada consulta gasta lecturas).
-    const intervalo = setInterval(() => { if (!document.hidden) cargar() }, 30000)
+    const intervalo = setInterval(() => { if (!document.hidden) cargar() }, cadaCuanto)
     return () => {
       activo = false
       clearInterval(intervalo)
     }
-  }, [id])
+  }, [id, cadaCuanto])
 
   if (cargando) {
     return <div className="max-w-[560px] mx-auto px-5 py-16 text-center font-body text-sm text-inksoft">Cargando tu pedido...</div>
