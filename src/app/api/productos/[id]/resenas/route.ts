@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getDb, getUsuarioDesdeRequest } from '@/lib/firebaseAdmin'
 import { contieneInsultos } from '@/lib/moderacionIA'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { enCache, olvidarCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,12 +24,13 @@ function nombreCorto(nombre: string | null | undefined): string {
 // Pedido entregado de este usuario que incluya el producto (o null).
 async function compraEntregada(email: string | null, productoId: string) {
   if (!email) return null
-  const snap = await getDb().collection('pedidos').where('comprador', '==', email).get()
-  const doc = snap.docs.find((d) => {
-    const p = d.data()
-    return p.estado === 'entregado' && Array.isArray(p.items) && p.items.some((it: any) => String(it?.id) === productoId)
-  })
-  return doc ? { id: doc.id, ...doc.data() } as Record<string, any> : null
+  // Sus pedidos entregados, 2 min en memoria: si abre varios productos no se releen todos sus pedidos cada vez.
+  const entregados = await enCache(`entregados:${email}`, 120_000, async () =>
+    (await getDb().collection('pedidos').where('comprador', '==', email).get()).docs
+      .map((d) => ({ id: d.id, ...d.data() }) as Record<string, any>)
+      .filter((p) => p.estado === 'entregado')
+  )
+  return entregados.find((p) => Array.isArray(p.items) && p.items.some((it: any) => String(it?.id) === productoId)) || null
 }
 
 // GET — reseñas públicas del producto (más nuevas primero). Con sesión
@@ -36,8 +38,11 @@ async function compraEntregada(email: string | null, productoId: string) {
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getDb()
-    const snap = await db.collection('productos').doc(params.id).collection('resenas').get()
-    const resenas = snap.docs
+    // Se leen en cada visita a un producto: 2 min en memoria (se borra al dejar una reseña).
+    const docs = await enCache(`resenas:${params.id}`, 120_000, async () =>
+      (await db.collection('productos').doc(params.id).collection('resenas').get()).docs.map((d) => ({ id: d.id, data: () => d.data() }))
+    )
+    const resenas = docs
       .map((d) => {
         const r = d.data()
         return { id: d.id, autorNombre: r.autorNombre, calificacion: r.calificacion, comentario: r.comentario, detalle: r.detalle || '', createdAt: r.createdAt }
@@ -113,6 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         ratingPromedio: nuevaCantidad > 0 ? Math.round((nuevaSuma / nuevaCantidad) * 10) / 10 : 0,
       })
     })
+    olvidarCache(`resenas:${params.id}`)
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     if (err?.message === 'no-existe') return NextResponse.json({ error: 'El producto ya no existe.' }, { status: 404 })

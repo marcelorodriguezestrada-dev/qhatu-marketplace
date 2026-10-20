@@ -20,6 +20,8 @@ const NOMBRES: Record<string, string> = {
   'api/anuncios': 'Lista de anuncios',
   'api/profesionales': 'Lista de servicios profesionales',
   'api/whatsapp': 'Bot de WhatsApp',
+  'api/productos/[id]/resenas': 'Reseñas de un producto (al abrirlo)',
+  'api/usuarios/estado': 'Estado de la cuenta (cada carga con sesión iniciada)',
   'api/configuracion/pagos': 'Datos de cobro (QR/cuenta) del checkout',
   'api/portada': 'Secciones de la portada (inicio)',
   'api/banners': 'Banners de la portada',

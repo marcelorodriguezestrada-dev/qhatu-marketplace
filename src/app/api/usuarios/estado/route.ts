@@ -3,6 +3,12 @@ import { getDb, getUsuarioDesdeRequest, getAuthAdmin } from '@/lib/firebaseAdmin
 import { sincronizarDatosCuenta } from '@/lib/datosCuentaServer'
 import { entroConGoogle, estaVerificada } from '@/lib/verificacion'
 
+// Se consulta en cada carga de página con sesión iniciada. Cuando la cuenta
+// ya está completa (verificada y con celular) la respuesta casi no cambia:
+// se guarda 5 min por usuario. Mientras falte algo, se lee siempre (el
+// /login espera ver el cambio enseguida al verificar el código).
+const completas = new Map<string, { hasta: number; datos: Record<string, unknown> }>()
+
 export const dynamic = 'force-dynamic'
 
 // Lo consulta /login justo después de iniciar sesión (no solo al
@@ -11,6 +17,9 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ error: 'Necesitás iniciar sesión.' }, { status: 401 })
+
+  const guardada = completas.get(usuario.uid)
+  if (guardada && guardada.hasta > Date.now() && !usuario.cargaAdmin) return NextResponse.json(guardada.datos)
 
   try {
     // Ojo con esto: antes decidíamos "verificado" solo mirando si
@@ -55,7 +64,9 @@ export async function GET(req: NextRequest) {
     // Con Google no pasó por el formulario de registro: le falta el
     // celular (obligatorio), que se le pide una sola vez en /login.
     const faltaCelular = entroConGoogle(registro) && !datos?.celular && !datos?.whatsapp
-    return NextResponse.json({ emailVerificado, esPrueba, faltaCelular, ...prueba })
+    const respuesta = { emailVerificado, esPrueba, faltaCelular, ...prueba }
+    if (emailVerificado && !faltaCelular) completas.set(usuario.uid, { hasta: Date.now() + 5 * 60_000, datos: respuesta })
+    return NextResponse.json(respuesta)
   } catch (err) {
     console.error('GET /api/usuarios/estado', err)
     // Si falla la consulta, dejamos pasar — mejor no bloquear a nadie
