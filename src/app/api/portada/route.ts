@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/firebaseAdmin'
 import { esClaveAdmin } from '@/lib/adminAuth'
+import { enCache, olvidarCache } from '@/lib/cacheLecturas'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,8 @@ async function leer(): Promise<Record<string, boolean>> {
 
 export async function GET() {
   // Cache corto: al apagar algo desde el admin, se nota en menos de un minuto.
-  return NextResponse.json({ portada: await leer() }, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=60' } })
+  // Y 30 s en memoria del servidor (el CDN no siempre alcanza: cada región tiene el suyo).
+  return NextResponse.json({ portada: await enCache('portada', 30_000, leer) }, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=60' } })
 }
 
 // POST (admin) { secciones: { ofertas: false, ... } }
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest) {
     const actual = await leer()
     for (const id of IDS) if (typeof body.secciones?.[id] === 'boolean') actual[id] = body.secciones[id]
     await getDb().collection('config').doc('portada').set({ secciones: actual, updatedAt: new Date().toISOString() })
+    olvidarCache('portada')
     return NextResponse.json({ ok: true, portada: actual })
   } catch (err) {
     console.error('POST /api/portada', err)
