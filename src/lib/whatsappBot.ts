@@ -12,6 +12,7 @@ import { SITE_URL } from '@/lib/sitio'
 import { datosDeTienda, responderConsulta } from '@/lib/whatsappConsultas'
 import { achicarParaIA, bajarMedia, enviarBotones, enviarImagen, recortarFoto, enviarTexto, esAdminWhatsapp, registrarEstadoBot, soloDigitos, subirAImgbb } from '@/lib/whatsappApi'
 import { fondoBlanco } from '@/lib/fondoBlancoIA'
+import { crearUsuarioAdmin, ErrorAlta } from '@/lib/crearUsuarioAdmin'
 
 // Bot de WhatsApp de Clasi Click: el vendedor (o el admin) le escribe al
 // número del bot y se cargan o cambian productos en su tienda.
@@ -20,13 +21,15 @@ import { fondoBlanco } from '@/lib/fondoBlancoIA'
 //   📋 "lista" → sus productos · "ayuda" → cómo se usa
 //   🪄 Producto nuevo con foto: botón "Quitar fondo" (Gemini lo pone sobre blanco)
 //   🛠️ Admin: "tienda Creaciones Liz" elige en qué tienda trabaja
+//   🆕 Admin: "nueva tienda Creaciones Liz, liz@gmail.com, 1125952486, Buenos Aires" la da de alta
 // Nada se guarda sin confirmar: el bot muestra el resumen y espera ✅ Sí.
 // Estado de cada conversación: whatsappSesiones/{número}.
 
 type Producto = { id: string; nombre: string; precio: number; precioOriginal?: number | null; stock?: number | null; estado?: string; rubro?: string; descripcionCorta?: string; talles?: string[]; colores?: string[] }
 type Nuevo = { nombre: string; precio: number | null; precioOriginal: number | null; stock: number | null; talles: string[]; colores: string[]; descripcionCorta: string; publico: string; rubro: string; imagenUrl: string; thumbUrl: string; fondoQuitado?: boolean }
 type Cambios = Partial<Pick<Producto, 'nombre' | 'precio' | 'precioOriginal' | 'stock' | 'descripcionCorta' | 'talles' | 'colores'>> & { estado?: 'activo' | 'oculto' }
-type Pendiente = { tipo: 'crear'; datos: Nuevo } | { tipo: 'modificar'; productoId: string; nombre: string; cambios: Cambios }
+type Alta = { nombreNegocio: string; nombre: string; email: string; whatsapp: string; ciudad: string }
+type Pendiente = { tipo: 'crear'; datos: Nuevo } | { tipo: 'modificar'; productoId: string; nombre: string; cambios: Cambios } | { tipo: 'alta'; datos: Alta }
 type Sesion = { tiendaId?: string; pendiente?: Pendiente | null }
 type Tienda = { id: string; nombreNegocio?: string; ciudad?: string; email?: string; logoUrl?: string; tiposVenta?: any; envioPropio?: any; visibleEn?: string[] }
 
@@ -190,6 +193,87 @@ function sanearCambios(c: any): Cambios {
   return out
 }
 
+// ── Alta de tiendas (solo admin) ──
+
+const PIDE_ALTA = /^(nuevo usuario|nueva tienda|crear usuario|crear tienda|crear vendedor|nuevo vendedor|alta( de)?( usuario| tienda| vendedor)?|registrar (tienda|usuario|vendedor))\b/i
+
+// Saca los datos de la tienda del mensaje (y los suma a los que ya había).
+async function leerAlta(texto: string, previo: Alta | null): Promise<Alta> {
+  const { ciudades } = await cargarCiudadesServidor()
+  const lista = ciudades.filter((c) => c.estado !== 'cerrada').map((c) => `${c.id} = ${c.nombre} (${c.pais})`).join('\n')
+  const ia = await groqJSON(
+    'El administrador de Clasi Click (marketplace) quiere dar de alta una tienda nueva. Sacá del mensaje los datos que diga (los que no diga, null). ' +
+      'Ciudades posibles (devolvé el id):\n' + lista + '\n' +
+      (previo ? `Datos que ya tenemos (el mensaje puede corregirlos o completarlos): ${JSON.stringify(previo)}\n` : '') +
+      `Mensaje: «${texto.slice(0, 800)}»\n` +
+      'Respondé SOLO JSON: {"nombreNegocio": "nombre de la tienda o null", "nombre": "nombre de la persona o null", "email": "email o null", "whatsapp": "número tal cual, solo dígitos, o null", "ciudad": "id de la lista o null"}',
+    600
+  )
+  const email = String(ia?.email || texto.match(/[^\s@,;]+@[^\s@,;]+\.[a-z]{2,}/i)?.[0] || '').trim().toLowerCase()
+  const whatsapp = soloDigitos(ia?.whatsapp || texto.replace(/\S+@\S+/g, ' ').match(/\+?\d[\d\s()-]{7,}\d/)?.[0] || '')
+  const ciudad = ciudades.some((c) => c.id === ia?.ciudad) ? String(ia.ciudad) : ''
+  const nuevo: Alta = { nombreNegocio: String(ia?.nombreNegocio || '').trim().slice(0, 80), nombre: String(ia?.nombre || '').trim().slice(0, 80), email, whatsapp, ciudad }
+  return {
+    nombreNegocio: nuevo.nombreNegocio || previo?.nombreNegocio || '',
+    nombre: nuevo.nombre || previo?.nombre || '',
+    email: nuevo.email || previo?.email || '',
+    whatsapp: nuevo.whatsapp || previo?.whatsapp || '',
+    ciudad: nuevo.ciudad || previo?.ciudad || '',
+  }
+}
+
+const resumenAlta = (a: Alta) =>
+  [
+    '🆕 *Tienda nueva*',
+    `🏪 Nombre: ${a.nombreNegocio || '⚠️ falta'}`,
+    a.nombre ? `👤 Persona: ${a.nombre}` : '',
+    `📧 Email (para entrar): ${a.email || '⚠️ falta'}`,
+    `📱 WhatsApp: ${a.whatsapp ? `+${a.whatsapp}` : 'sin número (no va a poder usar el bot)'}`,
+    `📍 Ciudad: ${a.ciudad ? buscarCiudad(a.ciudad).nombre : 'Potosí (no dijiste otra)'}`,
+  ].filter(Boolean).join('\n')
+
+// Devuelve la respuesta, o null si el mensaje no es parte de un alta.
+async function manejarAlta(de: string, texto: string, sesion: Sesion): Promise<unknown> {
+  const pend = sesion.pendiente?.tipo === 'alta' ? sesion.pendiente.datos : null
+  if (pend && esNo(texto)) {
+    await guardarSesion(de, { pendiente: null })
+    return enviarTexto(de, '👌 Cancelado, no creé ninguna tienda.')
+  }
+  if (pend && esSi(texto)) {
+    if (!pend.nombreNegocio || !pend.email) return enviarTexto(de, `⚠️ Falta ${!pend.nombreNegocio ? 'el nombre de la tienda' : 'el email'}. Escribilo y te muestro el resumen de nuevo.`)
+    try {
+      // País del número: por su código; si no tiene, el de la ciudad.
+      const pais = pend.whatsapp.startsWith('54') ? 'AR' : pend.whatsapp.startsWith('591') ? 'BO' : undefined
+      const r = await crearUsuarioAdmin({ email: pend.email, nombre: pend.nombre, nombreNegocio: pend.nombreNegocio, whatsapp: pend.whatsapp, whatsappPais: pais, ciudad: pend.ciudad || undefined })
+      await guardarSesion(de, { tiendaId: r.uid, pendiente: null })
+      await enviarTexto(
+        de,
+        `✅ Creada *${pend.nombreNegocio}* (${buscarCiudad(r.ciudad).nombre}).\n\n🏪 Ya estás trabajando en esta tienda: mandá las fotos de sus productos (con nombre y precio) y las cargo.\nPara volver a otra: *tienda Nombre*.\n\n👇 Este mensaje es para reenviarle al vendedor:`
+      )
+      return enviarTexto(
+        de,
+        [
+          `👋 ¡Hola${pend.nombre ? ` ${pend.nombre.split(' ')[0]}` : ''}! Ya está creada tu tienda *${pend.nombreNegocio}* en Clasi Click.`,
+          `🔗 Tu tienda: ${SITE_URL}/tienda/${r.uid}`,
+          `📧 Tu usuario: ${r.email}`,
+          r.link ? `🔑 Elegí tu contraseña acá: ${r.link}` : `🔑 Entrá en ${SITE_URL}/login`,
+          r.whatsapp ? '📲 También podés cargar productos mandando la foto con nombre y precio a este mismo número de WhatsApp.' : '',
+        ].filter(Boolean).join('\n')
+      )
+    } catch (err) {
+      if (err instanceof ErrorAlta) return enviarTexto(de, `⚠️ ${err.message}\nCorregilo escribiendo el dato (ej. otro email) o *cancelar*.`)
+      await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Alta: ${(err as any)?.message || err}` } })
+      return enviarTexto(de, 'No pude crear la tienda (error del servidor). Probá de nuevo en un rato o creala desde Admin → Usuarios.')
+    }
+  }
+  if (!pend && !PIDE_ALTA.test(texto)) return null
+  const datos = await leerAlta(texto.replace(PIDE_ALTA, '').trim() || texto, pend)
+  await guardarSesion(de, { pendiente: { tipo: 'alta', datos } })
+  const falta = !datos.nombreNegocio ? '✍️ ¿Cómo se llama la tienda?' : !datos.email ? '📧 ¿Qué email va a usar para entrar? (si no tiene, creale uno de Gmail)' : ''
+  if (falta) return enviarTexto(de, `${resumenAlta(datos)}\n\n${falta}`)
+  return enviarBotones(de, `${resumenAlta(datos)}\n\n¿La creo? (podés corregir escribiendo, ej: _ciudad La Paz_)`, [{ id: 'si', titulo: '✅ Crear' }, { id: 'no', titulo: '❌ Cancelar' }])
+}
+
 // ── Textos ──
 
 const plata = (n: number | null | undefined, ciudadId: string) => formatoMoneda(Number(n || 0), paisDeCiudad(ciudadId))
@@ -231,6 +315,7 @@ const ayuda = (ciudadId: string, admin: boolean) =>
     '📋 *Ver tus productos:* _lista_',
     '📊 *Preguntame lo que quieras:* _resumen_ · _¿cuánto stock tengo del buzo?_ · _¿cómo me fue esta semana?_ · _¿qué pedidos tengo?_ · _¿cómo van mis publicaciones?_',
     admin ? '🛠️ *Admin:* _tienda Creaciones Liz_ para elegir en qué tienda trabajás' : '',
+    admin ? '🆕 *Admin, tienda nueva:* _nueva tienda Creaciones Liz, liz@gmail.com, 1125952486, Buenos Aires_' : '',
     '',
     'Siempre te muestro el cambio y espero tu ✅ antes de guardar.',
   ].filter((x) => x !== '').join('\n')
@@ -329,13 +414,18 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
     const n = (await productosDe(t.id)).length
     return enviarTexto(de, `🏪 Listo, trabajás en *${t.nombreNegocio || t.email}* (${buscarCiudad(ciudadDe(t)).nombre}, ${n} productos).\nMandá una foto con su texto o escribí lo que querés cambiar.`)
   }
+  // 🆕 Admin: alta de una tienda nueva (y después sus productos).
+  if (admin && m.type !== 'image' && texto && (PIDE_ALTA.test(texto) || sesion.pendiente?.tipo === 'alta')) {
+    const respuesta = await manejarAlta(de, texto, sesion)
+    if (respuesta !== null) return respuesta
+  }
   if (sesion.tiendaId && (admin || propias.some((t) => t.id === sesion.tiendaId))) {
     const d = await db().collection('vendedores').doc(sesion.tiendaId).get()
     if (d.exists) tienda = { id: d.id, ...(d.data() as any) }
   }
   if (!tienda && propias.length === 1) tienda = propias[0]
   if (!tienda) {
-    if (admin) return enviarTexto(de, '🛠️ Sos admin: primero elegí la tienda, ej: *tienda Creaciones Liz*')
+    if (admin) return enviarTexto(de, '🛠️ Sos admin: primero elegí la tienda, ej: *tienda Creaciones Liz*\n🆕 O creá una nueva: *nueva tienda Creaciones Liz, liz@gmail.com, 1125952486, Buenos Aires*')
     if (propias.length > 1) {
       // Varias tiendas con el mismo número: se elige escribiendo su nombre.
       const elegida = propias.find((t) => texto && normal(t.nombreNegocio || '').includes(normal(texto)))
@@ -362,6 +452,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       const id = await crearProducto(tienda, pendiente.datos, de)
       return enviarTexto(de, `✅ ${pendiente.datos.rubro ? 'Publicado' : 'Guardado (pendiente: falta la categoría, la elegís en la web)'}: *${pendiente.datos.nombre}*\n${SITE_URL}/producto/${id}`)
     }
+    if (pendiente.tipo !== 'modificar') return enviarTexto(de, ayuda(ciudadId, admin))
     await modificarProducto(pendiente.productoId, pendiente.cambios)
     return enviarTexto(de, `✅ Listo, actualicé *${pendiente.nombre}*.\n${SITE_URL}/producto/${pendiente.productoId}`)
   }
