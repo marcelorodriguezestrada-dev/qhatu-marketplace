@@ -1,4 +1,5 @@
-import { duracionCache } from '@/lib/consumoFirestore'
+import { duracionCache, segundosAjuste } from '@/lib/consumoFirestore'
+import type { IdAjuste } from '@/lib/ajustesConsumo'
 
 // Caché en memoria del servidor para lecturas grandes que se repiten en
 // cada visita (ej. todos los productos). Cada instancia de Vercel guarda la
@@ -6,7 +7,19 @@ import { duracionCache } from '@/lib/consumoFirestore'
 // si llegan varias visitas juntas, hacen UNA sola lectura.
 const memo = new Map<string, { hasta: number; datos?: unknown; leyendo?: Promise<unknown> }>()
 
-export async function enCache<T>(clave: string, ms: number, leer: () => Promise<T>): Promise<T> {
+// Qué ajuste del tablero manda en cada caché (por el comienzo de la clave).
+function ajusteDe(clave: string): IdAjuste | null {
+  if (clave === 'productos' || clave === 'anuncios' || clave === 'profesionales') return 'cacheListas'
+  if (clave.startsWith('notificaciones:')) return 'cacheNotificaciones'
+  if (clave === 'configuracion/pagos' || clave === 'portada') return 'cacheConfig'
+  if (clave.startsWith('resenas:') || clave.startsWith('entregados:')) return 'cacheResenas'
+  return null
+}
+
+// `ms`: duración si el admin no la cambió desde el tablero.
+export async function enCache<T>(clave: string, msPorDefecto: number, leer: () => Promise<T>): Promise<T> {
+  const ajuste = ajusteDe(clave)
+  const ms = ajuste ? segundosAjuste(ajuste) * 1000 : msPorDefecto
   const e = memo.get(clave)
   if (e && 'datos' in e && e.hasta > Date.now()) return e.datos as T
   if (e?.leyendo) return e.leyendo as Promise<T>
@@ -35,4 +48,6 @@ export function olvidarCache(clave: string) {
 
 // Cabecera para que el CDN de Vercel guarde la respuesta pública y la
 // comparta entre todas las visitas (no llega ni a la función).
-export const cabeceraCDN = (segundos: number) => ({ 'Cache-Control': `public, s-maxage=${duracionCache(segundos * 1000) / 1000}, stale-while-revalidate=600` })
+export const cabeceraCDN = (segundosPorDefecto: number, ajuste: IdAjuste = 'cacheListas') => ({
+  'Cache-Control': `public, s-maxage=${duracionCache((segundosAjuste(ajuste) || segundosPorDefecto) * 1000) / 1000}, stale-while-revalidate=600`,
+})

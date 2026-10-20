@@ -1,4 +1,5 @@
 import { FieldValue, Firestore, Query } from 'firebase-admin/firestore'
+import { IDS_AJUSTES, valorAjuste, type IdAjuste } from '@/lib/ajustesConsumo'
 
 // Medidor de lecturas de Firestore (Admin → Números → "🔋 Consumo de la base").
 // El plan gratis da 50.000 lecturas por día; cuando se acaban, todo lo que
@@ -19,10 +20,10 @@ export const LIMITE_GRATIS_DIA = 50_000
 // Rutas que nunca se pausan: sin ellas no se puede comprar ni entrar al admin.
 export const RUTAS_SIN_PAUSA = ['api/pedidos', 'api/admin/consumo']
 
-type Config = { pausadas: string[]; ahorro: boolean }
-let config: Config = { pausadas: [], ahorro: false }
+type Config = { pausadas: string[]; ahorro: boolean; intervalos: Record<string, number> }
+let config: Config = { pausadas: [], ahorro: false, intervalos: {} }
 let configHasta = 0
-let leyendoConfig = false
+let leyendoConfig: Promise<void> | null = null
 
 let pendientes = new Map<string, number>()
 let pendienteTotal = 0
@@ -65,21 +66,37 @@ export const modoAhorro = () => config.ahorro
 // Duración de un caché según el modo ahorro (10 veces más si está activo).
 export const duracionCache = (ms: number) => (config.ahorro ? ms * 10 : ms)
 
-function refrescarConfig() {
-  if (!base || leyendoConfig || Date.now() < configHasta) return
-  leyendoConfig = true
+// Segundos de un ajuste del tablero (ver src/lib/ajustesConsumo.ts).
+export const segundosAjuste = (id: IdAjuste) => valorAjuste(id, config.intervalos)
+export const ajustesActuales = () => Object.fromEntries(IDS_AJUSTES.map((id) => [id, segundosAjuste(id)])) as Record<IdAjuste, number>
+
+function refrescarConfig(): Promise<void> {
+  if (leyendoConfig) return leyendoConfig
+  if (!base || Date.now() < configHasta) return Promise.resolve()
   interno++
   const p = base.collection('config').doc('consumoFirestore').get()
   interno--
-  p.then((d) => {
-    const x = d.data() || {}
-    config = { pausadas: Array.isArray(x.pausadas) ? x.pausadas.map(String) : [], ahorro: x.ahorro === true }
-  })
+  leyendoConfig = p
+    .then((d) => {
+      const x = d.data() || {}
+      config = {
+        pausadas: Array.isArray(x.pausadas) ? x.pausadas.map(String) : [],
+        ahorro: x.ahorro === true,
+        intervalos: x.intervalos && typeof x.intervalos === 'object' ? x.intervalos : {},
+      }
+    })
     .catch(() => {})
     .finally(() => {
       configHasta = Date.now() + 60_000
-      leyendoConfig = false
+      leyendoConfig = null
     })
+  return leyendoConfig
+}
+
+// Para quien necesita la config al día antes de responder (ej. /api/ajustes-consumo).
+export const cargarConfigConsumo = (db: Firestore) => {
+  base = base || db
+  return refrescarConfig()
 }
 
 // Para que el tablero aplique un cambio enseguida en esta instancia.
