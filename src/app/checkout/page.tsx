@@ -238,7 +238,7 @@ function CheckoutContent() {
   // Cupones que este usuario puede usar ya (los del banner y los que le
   // avisaron por la campanita) — se muestran como botones para tocar y
   // aplicar sin escribir el código.
-  const [cuponesDisponibles, setCuponesDisponibles] = useState<{ codigo: string; campana: string; tipo: string; descripcion: string; vence: string }[]>([])
+  const [cuponesDisponibles, setCuponesDisponibles] = useState<{ codigo: string; campana: string; tipo: string; descripcion: string; vence: string; pais: string }[]>([])
 
   // El express solo se ofrece antes de las 17:00 (y nunca domingo). Lo
   // recalculamos cada minuto por si la pantalla quedó abierta y pasó la
@@ -933,7 +933,7 @@ function CheckoutContent() {
   const subtotalCarrito = items.reduce((s, i) => s + i.precio * i.cantidad, 0)
   const extraExpress = metodoEntrega === 'envio' && envioExpress ? COSTO_ENVIO_EXPRESS_EXTRA : 0
   const resultadoCupon = cuponAplicado
-    ? evaluarCupon(cuponAplicado, { subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega: metodoCupon })
+    ? evaluarCupon(cuponAplicado, { subtotal: subtotalCarrito, pais: paisCompra.id, costoEnvio, extraExpress, metodoEntrega: metodoCupon })
     : null
   const descuentoCupon = resultadoCupon?.ok ? resultadoCupon.descuentoProductos : 0
   const descuentoEnvioCupon = resultadoCupon?.ok ? resultadoCupon.descuentoEnvio : 0
@@ -954,7 +954,7 @@ function CheckoutContent() {
       const res = await fetch('/api/cupones/validar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ codigo, subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega: metodoCupon }),
+        body: JSON.stringify({ codigo, ciudadCompra: ciudadTiendaCompra || ciudadComprador, subtotal: subtotalCarrito, costoEnvio, extraExpress, metodoEntrega: metodoCupon }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -997,11 +997,11 @@ function CheckoutContent() {
     obtenerToken()
       .then((token) => (token ? fetch('/api/cupones/disponibles', { headers: { Authorization: `Bearer ${token}` } }) : null))
       .then((r) => r?.json())
-      .then((d) => { if (!cancelado && d?.cupones) setCuponesDisponibles(d.cupones) })
+      .then((d) => { if (!cancelado && d?.cupones) setCuponesDisponibles(d.cupones.filter((c: { pais?: string }) => !c.pais || c.pais === paisCompra.id)) })
       .catch(() => {})
     return () => { cancelado = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usuario?.uid])
+  }, [usuario?.uid, paisCompra.id])
 
   function quitarCupon() {
     setCuponAplicado(null)

@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const usuario = await getUsuarioDesdeRequest(req)
   if (!usuario) return NextResponse.json({ cupones: [] })
   try {
+    const pais = (req.nextUrl.searchParams.get('pais') || '').toUpperCase()
     const db = getDb()
     const [destacados, avisos] = await Promise.all([
       db.collection('cupones').where('destacado', '==', true).get(),
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     const hoy = hoyBolivia()
     const todos = [...destacados.docs, ...avisadosDocs.filter((d) => d.exists)]
       .map((d) => ({ id: d.id, ...d.data() }) as Cupon)
-      .filter((c) => c.activo && (!c.desde || hoy >= c.desde) && !cuponVencido(c) && !(c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos))
+      .filter((c) => (!pais || !c.pais || c.pais === pais) && c.activo && (!c.desde || hoy >= c.desde) && !cuponVencido(c) && !(c.limiteUsos > 0 && (c.usosCount || 0) >= c.limiteUsos))
 
     const usados = await Promise.all(
       todos.map(async (c) =>
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     const cupones = todos
       .filter((_, i) => !usados[i])
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-      .map((c) => ({ codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descripcion: describirCupon(c), vence: textoVencimiento(c) }))
+      .map((c) => ({ codigo: c.codigo, campana: c.campana || '', tipo: c.tipo, descripcion: describirCupon(c), vence: textoVencimiento(c), pais: c.pais || '' }))
     return NextResponse.json({ cupones })
   } catch (err) {
     console.error('GET /api/cupones/disponibles', err)

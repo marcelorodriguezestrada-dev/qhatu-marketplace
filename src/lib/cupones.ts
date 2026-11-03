@@ -19,6 +19,8 @@ export type Cupon = {
   id: string
   codigo: string
   campana: string
+  // País ISO (AR, BO); vacío = todos los países. Los cupones anteriores no tienen este campo.
+  pais: string
   tipo: TipoCupon
   // % (1-100) para 'porcentaje', Bs para 'monto'. Sin uso en envío gratis.
   valor: number
@@ -85,6 +87,7 @@ export function describirCupon(c: Pick<Cupon, 'tipo' | 'valor' | 'compraMinima' 
 
 export type ContextoCompra = {
   subtotal: number
+  pais?: string
   // Costo de envío total sin cupón (0 si es retiro), y cuánto de eso es
   // el extra del express.
   costoEnvio: number
@@ -100,6 +103,10 @@ export type ResultadoCupon =
 // es el único que sabe cuántas veces se usó y por quién).
 export function evaluarCupon(c: Cupon, compra: ContextoCompra, ahora = Date.now()): ResultadoCupon {
   if (!c.activo) return { ok: false, error: 'Este cupón está pausado.' }
+  if (c.pais && c.pais !== compra.pais) {
+    const nombrePais = c.pais === 'AR' ? 'Argentina' : c.pais === 'BO' ? 'Bolivia' : c.pais
+    return { ok: false, error: `Este cupón es válido solo para ${nombrePais}.` }
+  }
   const hoy = hoyBolivia(ahora)
   if (c.desde && hoy < c.desde) return { ok: false, error: 'Este cupón todavía no está vigente.' }
   if (cuponVencido(c, ahora)) return { ok: false, error: 'Este cupón ya venció.' }
@@ -128,6 +135,8 @@ export function evaluarCupon(c: Cupon, compra: ContextoCompra, ahora = Date.now(
 export function sanearCupon(body: any): { datos?: Omit<Cupon, 'id' | 'usosCount' | 'createdAt'>; error?: string } {
   const codigo = normalizarCodigo(body?.codigo)
   if (codigo.length < 3) return { error: 'El código tiene que tener al menos 3 letras o números.' }
+  const pais = body?.pais == null ? '' : String(body.pais).toUpperCase()
+  if (pais && pais !== 'AR' && pais !== 'BO') return { error: 'Elegí un país válido para el cupón.' }
   const tipo: TipoCupon = TIPOS_CUPON.some((t) => t.id === body?.tipo) ? body.tipo : 'envio_gratis'
   const num = (v: unknown) => {
     const n = Number(v)
@@ -144,6 +153,7 @@ export function sanearCupon(body: any): { datos?: Omit<Cupon, 'id' | 'usosCount'
     datos: {
       codigo,
       campana: String(body?.campana || '').trim().slice(0, 80),
+      pais,
       tipo,
       valor,
       descuentoMaximo: tipo === 'porcentaje' ? num(body?.descuentoMaximo) : 0,

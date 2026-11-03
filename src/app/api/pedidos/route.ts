@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
       if (!c) return NextResponse.json({ error: 'El cupón ya no existe. Sacalo y volvé a intentar.' }, { status: 400 })
       const resultado = evaluarCupon(c, {
         subtotal: Number(cupon.subtotalCarrito) || 0,
+        pais: pais.id,
         costoEnvio: Number(cupon.costoEnvioCarrito) || 0,
         extraExpress: Number(cupon.extraExpressCarrito) || 0,
         metodoEntrega: metodoEntrega === 'envio' ? 'envio' : 'retiro',

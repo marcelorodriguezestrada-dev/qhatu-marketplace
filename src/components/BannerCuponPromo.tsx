@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useCiudad } from '@/lib/ciudad'
 
 type CuponDestacado = { codigo: string; campana: string; tipo: string; descripcion: string; hasta: string; vence?: string }
 
@@ -9,13 +10,14 @@ type CuponDestacado = { codigo: string; campana: string; tipo: string; descripci
 // usa en el checkout, escribiéndolo o tocándolo en "Cupones disponibles".
 export default function BannerCuponPromo() {
   const [cupon, setCupon] = useState<CuponDestacado | null>(null)
+  const { ciudad } = useCiudad()
 
   useEffect(() => {
-    fetch('/api/cupones/destacado')
+    fetch(`/api/cupones/destacado?pais=${encodeURIComponent(ciudad.pais)}`)
       .then((r) => r.json())
       .then((d) => setCupon(d.cupon || null))
       .catch(() => {})
-  }, [])
+  }, [ciudad.pais])
 
   if (!cupon) return null
 

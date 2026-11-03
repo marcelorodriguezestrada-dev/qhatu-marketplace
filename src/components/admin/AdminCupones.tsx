@@ -12,6 +12,7 @@ type Usuario = { uid: string; email: string | null; nombre: string | null; pausa
 const FORM_VACIO = {
   codigo: '',
   campana: '',
+  pais: '',
   tipo: 'envio_gratis' as TipoCupon,
   valor: '',
   descuentoMaximo: '',
@@ -120,6 +121,7 @@ export default function AdminCupones({ password }: { password: string }) {
     setForm({
       codigo: c.codigo,
       campana: c.campana || '',
+      pais: c.pais || '',
       tipo: c.tipo,
       valor: c.valor ? String(c.valor) : '',
       descuentoMaximo: c.descuentoMaximo ? String(c.descuentoMaximo) : '',
@@ -219,6 +221,14 @@ export default function AdminCupones({ password }: { password: string }) {
           <label>
             <span className={etiqueta}>Campaña (opcional)</span>
             <input value={form.campana} onChange={(e) => campo('campana', e.target.value)} placeholder="Fiestas de agosto" className={input} />
+          </label>
+          <label>
+            <span className={etiqueta}>País válido</span>
+            <select value={form.pais} onChange={(e) => campo('pais', e.target.value)} className={input}>
+              <option value="">Todos los países</option>
+              <option value="AR">Solo Argentina</option>
+              <option value="BO">Solo Bolivia</option>
+            </select>
           </label>
         </div>
 
@@ -328,6 +338,7 @@ export default function AdminCupones({ password }: { password: string }) {
               <span className="font-display text-base font-bold text-ink tracking-wide">🎟️ {c.codigo}</span>
               <span className={`border rounded-full px-2 py-0.5 font-body text-[10px] font-semibold ${estado.clase}`}>{estado.label}</span>
               {c.destacado && <span className="border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold">📣 Banner</span>}
+              {c.pais && <span className="border border-line bg-panelalt text-inksoft rounded-full px-2 py-0.5 font-body text-[10px] font-semibold">Solo {c.pais === 'AR' ? 'Argentina' : c.pais === 'BO' ? 'Bolivia' : c.pais}</span>}
               {c.campana && <span className="font-body text-xs text-inksoft">· {c.campana}</span>}
             </div>
             <div className="font-body text-xs text-ink">
