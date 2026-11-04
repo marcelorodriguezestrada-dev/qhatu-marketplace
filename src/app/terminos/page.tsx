@@ -10,7 +10,7 @@ const SECCIONES = [
   {
     titulo: '1. Qué es Clasi Click',
     parrafos: [
-      'Clasi Click es una plataforma que conecta a vendedores con compradores en Bolivia y Argentina. Clasi Click actúa como intermediario tecnológico: no fabrica ni posee los productos publicados. La operación de compraventa se realiza entre el comprador y el vendedor correspondiente.',
+      'Clasi Click es una plataforma para publicar productos, servicios y anuncios y conectar a usuarios en Bolivia y Argentina. Clasi Click no fabrica ni posee los productos publicados. La Plataforma ofrece funciones de publicación, checkout y seguimiento; las opciones de pago y entrega dependen del país, ciudad y vendedor.',
     ],
   },
   {
@@ -50,7 +50,7 @@ const SECCIONES = [
   {
     titulo: '7. Disponibilidad y responsabilidad',
     parrafos: [
-      'Clasi Click no garantiza la disponibilidad ininterrumpida de la Plataforma. En su carácter de intermediario tecnológico, no es parte de la compraventa entre comprador y vendedor ni responde por incumplimientos atribuibles a esas partes.',
+      'Los vendedores publican y administran sus productos, precios, stock y condiciones de venta. Clasi Click proporciona las funciones disponibles en la Plataforma para publicar, realizar pedidos y consultar su estado. Los medios de pago, las entregas y el seguimiento que aparecen pueden variar según el país, la ciudad y el vendedor.',
     ],
   },
   {

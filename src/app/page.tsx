@@ -23,6 +23,7 @@ import { SelectorCiudad } from '@/components/SelectorCiudad'
 import { useCiudad } from '@/lib/ciudad'
 import { productoEnCiudad } from '@/data/ciudades'
 import { LogoClasiClick } from '@/components/LogoClasiClick'
+import FooterLegal from '@/components/FooterLegal'
 import { AccesosInicio, BarraInferiorCelular, CarruselProductos, CategoriasInicio, HeroInicio, TarjetasInicio } from '@/components/inicio/BloquesInicio'
 import { leerVistos } from '@/lib/vistos'
 import { formatoMoneda, paisDeCiudad } from '@/lib/mercado'
@@ -470,6 +471,7 @@ export default function CatalogoPage() {
 
       <BarraInferiorCelular cantidadCarrito={cantidadCarrito} onCarrito={() => setCarritoAbierto(true)} logueado={!!usuario} />
       {carritoAbierto && <CartDrawer onClose={() => setCarritoAbierto(false)} />}
+      <FooterLegal />
     </div>
   )
 }

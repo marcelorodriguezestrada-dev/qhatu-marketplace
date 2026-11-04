@@ -24,7 +24,7 @@ const SECCIONES: Seccion[] = [
       {
         pregunta: '¿Qué formas de entrega hay?',
         respuesta:
-          'Envío a domicilio (el vendedor confirma que tiene stock antes de mostrarte el QR, y el pago va a la cuenta de Clasi Click hasta que se confirma la entrega) o Retiro en tienda (coordinás vos directo con el vendedor).',
+          'Las opciones dependen de la ciudad y de cada tienda: puede haber envío de Clasi Click, envío del vendedor o retiro en tienda. En los pedidos con envío de Clasi Click, el vendedor confirma el stock antes de que se habilite el pago.',
       },
       {
         pregunta: '¿Puedo pagar en efectivo?',
@@ -34,7 +34,17 @@ const SECCIONES: Seccion[] = [
       {
         pregunta: '¿Y si pago por QR?',
         respuesta:
-          'Con envío, el QR es siempre de Clasi Click (no del vendedor) — así protegemos tu compra hasta que se confirma que te llegó todo bien. Con retiro en tienda, en cambio, pagás directo al vendedor.',
+          'El checkout te muestra los medios de pago disponibles para esa compra. Según la entrega y la configuración del vendedor, podés pagar al QR de Clasi Click o al del vendedor. Revisá los datos que aparecen antes de pagar.',
+      },
+      {
+        pregunta: '¿Qué hago si tengo un problema con mi pedido?',
+        respuesta:
+          'Contactá al vendedor usando los datos de contacto de su tienda o perfil. Si necesitás ayuda de Clasi Click, escribinos desde este Centro de Ayuda. La Plataforma no tiene chat interno ni un sistema de disputas.',
+      },
+      {
+        pregunta: '¿Cómo funcionan las cancelaciones y devoluciones?',
+        respuesta:
+          'El checkout permite anular pedidos que todavía están pendientes de pago o confirmación de stock. La Plataforma no procesa devoluciones automáticas; para pedidos pagados o productos con problemas, contactá al vendedor y consultá la Política de Devoluciones en /devoluciones.',
       },
     ],
   },
@@ -60,7 +70,7 @@ const SECCIONES: Seccion[] = [
       {
         pregunta: '¿Cómo cobro mis ventas?',
         respuesta:
-          'Con retiro en tienda, cobrás directo del comprador. Con envío, la plata primero entra a la cuenta de Clasi Click como garantía, y se te transfiere una vez confirmada la entrega.',
+          'Depende de la forma de entrega y del medio de pago configurado. En los pedidos con envío de Clasi Click, el pago se recibe en la cuenta de la plataforma y el administrador registra el pago al vendedor después de confirmarse la entrega. En envío del vendedor o retiro, el pago se coordina directamente con él.',
       },
     ],
   },
