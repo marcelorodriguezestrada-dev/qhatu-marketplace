@@ -443,6 +443,9 @@ export default function LoginPage() {
       <Link href="/ayuda" className="block w-full text-center font-body text-[11px] text-inksoft underline mt-4">
         Centro de ayuda
       </Link>
+      <Link href="/terminos" className="block w-full text-center font-body text-[11px] text-inksoft underline mt-2">
+        Términos y Condiciones
+      </Link>
     </div>
   )
 }

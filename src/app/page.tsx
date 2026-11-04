@@ -287,6 +287,7 @@ export default function CatalogoPage() {
               <Link href="/anuncios" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Anuncios</Link>
               <Link href="/vender" className="text-white/85 font-body text-[13px] shrink-0 whitespace-nowrap">Vender</Link>
               <Link href="/ayuda" className="text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">Ayuda</Link>
+              <Link href="/terminos" className="text-white/60 font-body text-[13px] shrink-0 whitespace-nowrap">Términos</Link>
               <span className="flex-1 hidden sm:block" />
               {usuario ? (
                 <>
