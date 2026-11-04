@@ -3,14 +3,14 @@ import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Términos y Condiciones | Clasi Click',
-  description: 'Términos y condiciones de uso de Clasi Click para Argentina.',
+  description: 'Términos y condiciones de uso de Clasi Click en Bolivia y Argentina.',
 }
 
 const SECCIONES = [
   {
     titulo: '1. Qué es Clasi Click',
     parrafos: [
-      'Clasi Click es una plataforma que conecta a vendedores con compradores en Argentina. Clasi Click actúa como intermediario tecnológico: no fabrica ni posee los productos publicados. La operación de compraventa se realiza entre el comprador y el vendedor correspondiente.',
+      'Clasi Click es una plataforma que conecta a vendedores con compradores en Bolivia y Argentina. Clasi Click actúa como intermediario tecnológico: no fabrica ni posee los productos publicados. La operación de compraventa se realiza entre el comprador y el vendedor correspondiente.',
     ],
   },
   {
@@ -31,8 +31,8 @@ const SECCIONES = [
   {
     titulo: '4. Compras y pagos',
     parrafos: [
-      'Los medios de pago habilitados para Argentina se informan en el checkout antes de confirmar la compra. Los pagos y las actualizaciones del pedido siguen el flujo disponible en la Plataforma.',
-      'Los precios se muestran en pesos argentinos (ARS).',
+      'Los medios de pago habilitados para cada país se informan en el checkout antes de confirmar la compra. Los pagos y las actualizaciones del pedido siguen el flujo disponible en la Plataforma.',
+      'Los precios se muestran en la moneda correspondiente al país seleccionado en la Plataforma.',
     ],
   },
   {
@@ -72,7 +72,7 @@ export default function TerminosPage() {
         Términos y Condiciones de Clasi Click
       </h1>
       <p className="font-body text-sm text-inksoft mb-2">
-        Aplicables al uso de la Plataforma en Argentina.
+        Aplicables al uso de la Plataforma en Bolivia y Argentina.
       </p>
       <p className="font-body text-xs text-inksoft mb-8">
         Última actualización: 4 de noviembre de 2026
@@ -80,8 +80,8 @@ export default function TerminosPage() {
 
       <div className="rounded-xl border border-line bg-panel p-5 mb-8 font-body text-sm text-ink">
         Estos términos regulan el uso de Clasi Click, operada por Marcelo Rodriguez Estrada
-        (CUIT 20-19045419-4). Al registrarte o utilizar la Plataforma en Argentina, aceptás
-        estos términos.
+        (CUIT 20-19045419-4). Al registrarte o utilizar la Plataforma en Bolivia o Argentina,
+        aceptás estos términos.
       </div>
 
       <div className="space-y-7">
