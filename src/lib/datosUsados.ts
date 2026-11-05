@@ -45,8 +45,7 @@ export function mezclarConCuenta(d: DatosUsados, cuenta: any): DatosUsados {
   return out
 }
 
-// ¿La opción sirve para lo que lleva escrito? ("m" → "Marcelo Rodríguez",
-// "rodr" → "Marcelo Rodríguez", "748" → "74859641").
+// ¿La opción sirve para lo que lleva escrito? ("ca" → "calle...", "748" → "74859641").
 export function coincideInicio(opcion: string, escrito: string) {
   const q = norm(escrito)
   const o = norm(opcion)

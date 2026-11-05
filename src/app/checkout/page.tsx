@@ -772,7 +772,7 @@ function CheckoutContent() {
 
   // Datos de compras anteriores (nombre, WhatsApp, direcciones con su
   // zona y entre calles): ya NO se precargan; se sugieren mientras escribe
-  // ("m" → "Marcelo Rodríguez"). Del navegador + lo guardado en su cuenta.
+  // (por ejemplo, "ca" → "calle..."). Del navegador + lo guardado en su cuenta.
   const [datosUsados, setDatosUsados] = useState<DatosUsados>({ nombres: [], whatsapps: [], direcciones: [] })
   useEffect(() => {
     if (restaurando || !usuario) return

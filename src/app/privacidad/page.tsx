@@ -61,7 +61,7 @@ export default function PrivacidadPage() {
       <p className="font-body text-xs text-inksoft mb-8">Última actualización: 4 de noviembre de 2026</p>
 
       <div className="rounded-xl border border-line bg-panel p-5 mb-8 font-body text-sm leading-6 text-ink">
-        Clasi Click es operado por Marcelo Rodriguez Estrada (CUIT 20-19045419-4). Esta política explica qué datos se usan en el sitio y la aplicación.
+        Esta política explica qué datos se usan en el sitio y la aplicación de Clasi Click.
       </div>
 
       <div className="space-y-7">

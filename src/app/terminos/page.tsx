@@ -79,9 +79,8 @@ export default function TerminosPage() {
       </p>
 
       <div className="rounded-xl border border-line bg-panel p-5 mb-8 font-body text-sm text-ink">
-        Estos términos regulan el uso de Clasi Click, operada por Marcelo Rodriguez Estrada
-        (CUIT 20-19045419-4). Al registrarte o utilizar la Plataforma en Bolivia o Argentina,
-        aceptás estos términos.
+        Estos términos regulan el uso de Clasi Click. Al registrarte o utilizar la Plataforma
+        en Bolivia o Argentina, aceptás estos términos.
       </div>
 
       <div className="space-y-7">
