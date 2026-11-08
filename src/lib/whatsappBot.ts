@@ -98,9 +98,12 @@ async function buscarTienda(texto: string): Promise<Tienda | null> {
 
 async function groqJSON(prompt: string, max = 1500): Promise<any | null> {
   if (!process.env.GROQ_API_KEY) return null
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 8000)
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: ctrl.signal,
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
       body: JSON.stringify({ model: 'openai/gpt-oss-120b', max_completion_tokens: max, reasoning_effort: 'low', response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] }),
     })
@@ -109,6 +112,20 @@ async function groqJSON(prompt: string, max = 1500): Promise<any | null> {
     return JSON.parse(String(d.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim())
   } catch {
     return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function conTiempo<T>(trabajo: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      trabajo,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms) }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 
@@ -500,43 +517,44 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   // 📷 Foto → producto nuevo.
   if (m.type === 'image' && m.image?.id) {
     await enviarTexto(de, '📷 Recibí la foto, la estoy preparando…')
-    const leido: Partial<Nuevo> = texto ? await leerProductoNuevo(texto, ciudadId) : {}
+    const lecturaTexto: Promise<Partial<Nuevo>> = texto ? leerProductoNuevo(texto, ciudadId) : Promise.resolve({})
     let foto: { url: string; thumbUrl: string }
+    let datosCaptura: Partial<Nuevo> = {}
     try {
       let { buf } = await bajarMedia(m.image.id)
-      // Sin texto (o sin precio en el texto): la IA lee lo que esté escrito en
-      // la imagen. Si es una captura (catálogo, publicación…) con el nombre y
-      // el precio escritos, se recorta solo la foto del producto, sin letras.
+      const leido = await lecturaTexto
       if (!leido.nombre || !leido.precio) {
-        try {
-          const enImagen = (await leerCapturaCatalogo(`data:image/jpeg;base64,${(await achicarParaIA(buf)).toString('base64')}`)).productos[0]
-          if (enImagen) {
-            if (!leido.nombre) leido.nombre = enImagen.nombre
-            if (!leido.precio && enImagen.precio) leido.precio = enImagen.precio
-            if (!leido.precioOriginal && enImagen.precioAntes) leido.precioOriginal = enImagen.precioAntes
-            if (!leido.descripcionCorta && enImagen.descripcion) leido.descripcionCorta = enImagen.descripcion.slice(0, 300)
-            const c = enImagen.caja
-            if ((enImagen.precio || enImagen.nombre) && c && c.ancho * c.alto < 0.85) buf = await recortarFoto(buf, c)
+        const captura = await conTiempo(
+          leerCapturaCatalogo(`data:image/jpeg;base64,${(await achicarParaIA(buf)).toString('base64')}`),
+          5000,
+        ).catch(() => null)
+        const enImagen = captura?.productos[0]
+        if (enImagen) {
+          datosCaptura = {
+            nombre: enImagen.nombre,
+            precio: enImagen.precio,
+            precioOriginal: enImagen.precioAntes,
+            descripcionCorta: enImagen.descripcion.slice(0, 300),
           }
-        } catch {
-          // sin IA que mire fotos o no había texto: sigue con la foto entera
+          const c = enImagen.caja
+          if ((enImagen.precio || enImagen.nombre) && c && c.ancho * c.alto < 0.85) buf = await recortarFoto(buf, c)
         }
       }
-      foto = await subirAImgbb(buf)
+      foto = await subirAImgbb(buf, 6000)
     } catch (err: any) {
       await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Foto: ${err?.message || 'error'}` } })
       return enviarTexto(de, `No pude guardar la foto: ${err?.message || 'error'}. Probá de nuevo.`)
     }
-    // Categoría, público y colores: la IA mira la foto (o el nombre si no puede).
-    const ia = await analizarFotoProducto(foto.url, categorias, leido.nombre || texto || undefined).catch(() => null)
+    const leido = await lecturaTexto
+    const ia = await conTiempo(analizarFotoProducto(foto.url, categorias, texto || datosCaptura.nombre || undefined), 7000).catch(() => null)
     const datos: Nuevo = {
-      nombre: [leido.nombre, ia?.nombre].find((n) => !nombreGenerico(n)) || '',
-      precio: leido.precio ?? null,
-      precioOriginal: leido.precioOriginal ?? null,
+      nombre: [leido.nombre, datosCaptura.nombre, ia?.nombre].find((n) => !nombreGenerico(n)) || '',
+      precio: leido.precio ?? datosCaptura.precio ?? null,
+      precioOriginal: leido.precioOriginal ?? datosCaptura.precioOriginal ?? null,
       stock: leido.stock ?? null,
       talles: leido.talles || [],
       colores: leido.colores?.length ? leido.colores : ia?.colores || [],
-      descripcionCorta: leido.descripcionCorta || ia?.descripcion || '',
+      descripcionCorta: leido.descripcionCorta || datosCaptura.descripcionCorta || ia?.descripcion || '',
       publico: ia?.publico || 'unisex',
       rubro: ia?.rubroId || '',
       imagenUrl: foto.url,

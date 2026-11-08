@@ -86,12 +86,12 @@ export function enviarBotones(to: string, texto: string, botones: { id: string; 
 
 // fetch con 1 reintento y un error que dice qué paso falló y por qué
 // ("fetch failed" solo no ayuda: el motivo real viene en err.cause).
-async function traer(paso: string, url: string, init?: RequestInit): Promise<Response> {
+async function traer(paso: string, url: string, init?: RequestInit, timeoutMs = 25000): Promise<Response> {
   let ultimo: any = null
   for (let intento = 0; intento < 2; intento++) {
     try {
       const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 25000)
+      const t = setTimeout(() => ctrl.abort(), timeoutMs)
       try {
         return await fetch(url, { ...init, signal: ctrl.signal })
       } finally {
@@ -110,9 +110,9 @@ async function traer(paso: string, url: string, init?: RequestInit): Promise<Res
 // se baja con el token. El servidor de fotos de Meta pide un User-Agent.
 export async function bajarMedia(mediaId: string): Promise<{ buf: Buffer; tipo: string }> {
   const auth = { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, 'User-Agent': 'Mozilla/5.0 (compatible; ClasiClickBot/1.0)' }
-  const info = await traer('pedir la foto a WhatsApp', `${graph()}/${mediaId}`, { headers: auth }).then((r) => r.json())
+  const info = await traer('pedir la foto a WhatsApp', `${graph()}/${mediaId}`, { headers: auth }, 6000).then((r) => r.json())
   if (!info?.url) throw new Error(`WhatsApp no dio el link de la foto${info?.error?.message ? ` (${info.error.message})` : ''}.`)
-  const r = await traer('bajar la foto de WhatsApp', info.url, { headers: auth })
+  const r = await traer('bajar la foto de WhatsApp', info.url, { headers: auth }, 6000)
   if (!r.ok) throw new Error(`bajar la foto de WhatsApp: respondió ${r.status}`)
   return { buf: Buffer.from(await r.arrayBuffer()), tipo: String(info.mime_type || r.headers.get('content-type') || 'image/jpeg') }
 }
@@ -158,13 +158,13 @@ export async function recortarFoto(buf: Buffer, caja: { x: number; y: number; an
   }
 }
 
-export async function subirAImgbb(original: Buffer): Promise<{ url: string; thumbUrl: string }> {
+export async function subirAImgbb(original: Buffer, timeoutMs = 25000): Promise<{ url: string; thumbUrl: string }> {
   if (!process.env.IMGBB_API_KEY) throw new Error('Falta IMGBB_API_KEY.')
   const buf = await achicar(original)
   const body = new URLSearchParams()
   body.append('key', process.env.IMGBB_API_KEY)
   body.append('image', buf.toString('base64'))
-  const d = await traer('subir la foto a ImgBB', 'https://api.imgbb.com/1/upload', { method: 'POST', body }).then((r) => r.json()).catch((e) => { throw e })
+  const d = await traer('subir la foto a ImgBB', 'https://api.imgbb.com/1/upload', { method: 'POST', body }, timeoutMs).then((r) => r.json()).catch((e) => { throw e })
   if (!d?.success) throw new Error(`ImgBB: ${d?.error?.message || 'rechazó la foto'}`)
   return { url: d.data.url, thumbUrl: d.data.medium?.url || d.data.thumb?.url || d.data.url }
 }
