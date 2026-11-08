@@ -3,6 +3,18 @@
 import { useEffect, useState } from 'react'
 import { SITE_URL } from '@/lib/sitio'
 
+type ActividadWhatsapp = {
+  id: string
+  numero?: string
+  esAdmin?: boolean
+  estado?: string
+  at?: string | null
+  productoId?: string
+  productoNombre?: string
+  tiendaNombre?: string
+  error?: string
+}
+
 // Admin → Productos: estado, diagnóstico y pasos para conectar el bot de WhatsApp
 // (src/lib/whatsappBot.ts) con la API oficial de Meta.
 const VARIABLES = [
@@ -19,21 +31,53 @@ const VARIABLES = [
 export default function BotWhatsapp({ password }: { password: string }) {
   const [vars, setVars] = useState<Record<string, boolean> | null>(null)
   const [estado, setEstado] = useState<Record<string, any>>({})
+  const [admins, setAdmins] = useState<string[]>([])
+  const [actividad, setActividad] = useState<ActividadWhatsapp[]>([])
+  const [errorCarga, setErrorCarga] = useState('')
   const [abierto, setAbierto] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const webhook = `${SITE_URL}/api/whatsapp`
 
-  const cargar = () =>
-    fetch('/api/admin/whatsapp', { headers: { 'x-admin-password': password } })
-      .then((r) => r.json())
-      .then((d) => { setVars(d.variables || {}); setEstado(d.estado || {}) })
-      .catch(() => setVars({}))
+  const cargar = async () => {
+    try {
+      const r = await fetch('/api/admin/whatsapp', { headers: { 'x-admin-password': password } })
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'No se pudo cargar el estado de WhatsApp.')
+      setVars(d.variables || {})
+      setEstado(d.estado || {})
+      setAdmins(Array.isArray(d.admins) ? d.admins : [])
+      setActividad(Array.isArray(d.actividad) ? d.actividad : [])
+      setErrorCarga('')
+    } catch (err) {
+      setErrorCarga(err instanceof Error ? err.message : 'No se pudo cargar el estado de WhatsApp.')
+    }
+  }
   useEffect(() => {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password])
-  const cuando = (iso?: string) => (iso ? new Date(iso).toLocaleString('es-BO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '')
+  const cuando = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('es-BO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '')
   const sinAvisos = !estado.ultimoAviso && !estado.ultimoRechazo
+  const porNumero = new Map<string, { esAdmin: boolean; cantidad: number; ultima: string; tienda?: string }>()
+  for (const fila of actividad) {
+    if (!fila.numero) continue
+    const previo = porNumero.get(fila.numero)
+    if (previo) {
+      previo.cantidad += 1
+      if (!previo.ultima || String(fila.at || '') > previo.ultima) previo.ultima = String(fila.at || '')
+      previo.tienda ||= fila.tiendaNombre
+    } else {
+      porNumero.set(fila.numero, { esAdmin: !!fila.esAdmin, cantidad: 1, ultima: String(fila.at || ''), tienda: fila.tiendaNombre })
+    }
+  }
+  const estadoActividad: Record<string, string> = {
+    recibida: 'Foto recibida',
+    procesando: 'Procesando foto',
+    sin_tienda: 'Sin tienda asociada',
+    error: 'Error al guardar',
+    cancelado: 'Cancelado',
+    producto_creado: 'Producto creado',
+  }
 
   const listo = vars && VARIABLES.filter((v) => v.obligatoria).every((v) => vars[v.id])
   return (
@@ -62,6 +106,57 @@ export default function BotWhatsapp({ password }: { password: string }) {
             </div>
           ))}
         </div>
+      )}
+
+      {vars && (
+        <section className="bg-panelalt rounded-lg p-3 mt-3 font-body text-[12px]">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="font-semibold text-ink">👥 Números y actividad de carga</span>
+            <button type="button" onClick={cargar} className="font-body text-[11px] text-teal underline bg-transparent border-none">Actualizar actividad</button>
+          </div>
+          <p className="text-inksoft mb-3">Los administradores salen de <code>WHATSAPP_ADMINS</code>. El registro muestra quién envió fotos y qué productos llegaron a crearse.</p>
+          {errorCarga && <p className="text-maroon mb-2">No se pudo cargar el registro: {errorCarga}</p>}
+
+          <div className="mb-3">
+            <div className="font-semibold text-ink mb-1">Administradores autorizados ({admins.length})</div>
+            {admins.length
+              ? <div className="flex flex-wrap gap-1.5">{admins.map((n) => <span key={n} className="rounded-full border border-line bg-panel px-2 py-1 font-mono">+{n}</span>)}</div>
+              : <span className="text-amber-700">No hay números en WHATSAPP_ADMINS.</span>}
+          </div>
+
+          <div className="font-semibold text-ink mb-1">Números que usaron el bot</div>
+          {porNumero.size
+            ? <div className="grid gap-1 mb-3">{Array.from(porNumero.entries()).map(([numero, info]) => (
+              <div key={numero} className="flex flex-wrap gap-x-2">
+                <span>{info.esAdmin ? '🛠️ Admin' : '🧑‍💼 Vendedor/cliente'}</span>
+                <span className="font-mono">+{numero}</span>
+                <span className="text-inksoft">· {info.cantidad} carga(s) · última: {cuando(info.ultima)}{info.tienda ? ` · ${info.tienda}` : ''}</span>
+              </div>
+            ))}</div>
+            : <p className="text-inksoft mb-3">Todavía no hay fotos registradas.</p>}
+
+          <div className="font-semibold text-ink mb-1">Actividad reciente</div>
+          {actividad.length
+            ? <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left">
+                <thead><tr className="text-inksoft border-b border-line"><th className="py-1 pr-3">Fecha</th><th className="py-1 pr-3">Quién</th><th className="py-1 pr-3">Tienda</th><th className="py-1 pr-3">Resultado</th></tr></thead>
+                <tbody>{actividad.map((fila) => (
+                  <tr key={fila.id} className="border-b border-line/60 align-top">
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{cuando(fila.at)}</td>
+                    <td className="py-1.5 pr-3"><span>{fila.esAdmin ? '🛠️ Admin' : 'Vendedor/cliente'}</span><br /><span className="font-mono">+{fila.numero || '—'}</span></td>
+                    <td className="py-1.5 pr-3">{fila.tiendaNombre || '—'}</td>
+                    <td className="py-1.5 pr-3">
+                      {fila.productoId
+                        ? <a className="text-teal underline" href={`${SITE_URL}/producto/${fila.productoId}`} target="_blank" rel="noreferrer">{fila.productoNombre || 'Producto creado'}</a>
+                        : estadoActividad[fila.estado || ''] || fila.estado || '—'}
+                      {fila.error && <div className="text-maroon">{fila.error}</div>}
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            : <p className="text-inksoft">Las fotos nuevas y los productos que ya se cargaron por WhatsApp aparecerán acá.</p>}
+        </section>
       )}
 
       {vars && (

@@ -26,7 +26,7 @@ import { crearUsuarioAdmin, ErrorAlta } from '@/lib/crearUsuarioAdmin'
 // Estado de cada conversación: whatsappSesiones/{número}.
 
 type Producto = { id: string; nombre: string; precio: number; precioOriginal?: number | null; stock?: number | null; estado?: string; rubro?: string; descripcionCorta?: string; talles?: string[]; colores?: string[] }
-type Nuevo = { nombre: string; precio: number | null; precioOriginal: number | null; stock: number | null; talles: string[]; colores: string[]; descripcionCorta: string; publico: string; rubro: string; imagenUrl: string; thumbUrl: string; fondoQuitado?: boolean }
+type Nuevo = { nombre: string; precio: number | null; precioOriginal: number | null; stock: number | null; talles: string[]; colores: string[]; descripcionCorta: string; publico: string; rubro: string; imagenUrl: string; thumbUrl: string; whatsappMensajeId?: string; fondoQuitado?: boolean }
 type Cambios = Partial<Pick<Producto, 'nombre' | 'precio' | 'precioOriginal' | 'stock' | 'descripcionCorta' | 'talles' | 'colores'>> & { estado?: 'activo' | 'oculto' }
 type Alta = { nombreNegocio: string; nombre: string; email: string; whatsapp: string; ciudad: string }
 type Pendiente = { tipo: 'crear'; datos: Nuevo } | { tipo: 'modificar'; productoId: string; nombre: string; cambios: Cambios } | { tipo: 'alta'; datos: Alta }
@@ -52,6 +52,17 @@ async function leerSesion(numero: string): Promise<Sesion> {
 }
 async function guardarSesion(numero: string, s: Partial<Sesion>) {
   await sesionRef(numero).set({ ...s, updatedAt: new Date().toISOString() }, { merge: true })
+}
+
+async function registrarActividadWhatsapp(mensajeId: string, campos: Record<string, unknown>) {
+  try {
+    await db().collection('whatsappActividad').doc(mensajeId).set(
+      { ...campos, actualizadoAt: new Date().toISOString() },
+      { merge: true },
+    )
+  } catch (err) {
+    console.error('whatsapp: registrar actividad', err)
+  }
 }
 
 // Tiendas cuyo WhatsApp (o el celular de la cuenta) es este número.
@@ -367,6 +378,8 @@ async function crearProducto(t: Tienda, d: Nuevo, numeroWa: string): Promise<str
     vendedorId: t.id,
     vendedor: t.email || '',
     cargadoPorWhatsapp: soloDigitos(numeroWa),
+    cargadoPorWhatsappAdmin: esAdminWhatsapp(numeroWa),
+    ...(d.whatsappMensajeId ? { whatsappMensajeId: d.whatsappMensajeId } : {}),
     tiendaNombre: t.nombreNegocio || '',
     tiendaLogoUrl: t.logoUrl || '',
     ciudad,
@@ -379,6 +392,14 @@ async function crearProducto(t: Tienda, d: Nuevo, numeroWa: string): Promise<str
     createdAt: ahora,
     updatedAt: ahora,
   })
+  if (d.whatsappMensajeId) {
+    await registrarActividadWhatsapp(d.whatsappMensajeId, {
+      estado: 'producto_creado',
+      productoId: ref.id,
+      productoNombre: d.nombre,
+      productoCreadoAt: ahora,
+    })
+  }
   const etiquetasBusqueda = await etiquetasParaProducto({ nombre: d.nombre, rubro: d.rubro, publico: d.publico, descripcionCorta: d.descripcionCorta, colores: d.colores }).catch(() => [])
   if (etiquetasBusqueda.length) await ref.update({ etiquetasBusqueda }).catch(() => {})
   return ref.id
@@ -418,8 +439,18 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   } catch {
     return
   }
-  await cargarCiudadesServidor().catch(() => null)
   const admin = esAdminWhatsapp(de)
+  if (m.type === 'image') {
+    await registrarActividadWhatsapp(m.id, {
+      mensajeId: m.id,
+      numero: de,
+      esAdmin: admin,
+      tipo: 'foto',
+      estado: 'recibida',
+      at: new Date().toISOString(),
+    })
+  }
+  await cargarCiudadesServidor().catch(() => null)
   const texto = String(m.text?.body || m.image?.caption || m.interactive?.button_reply?.id || m.button?.payload || m.button?.text || '').trim()
   const sesion = await leerSesion(de)
 
@@ -445,6 +476,13 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
     if (d.exists) tienda = { id: d.id, ...(d.data() as any) }
   }
   if (!tienda && propias.length === 1) tienda = propias[0]
+  if (m.type === 'image') {
+    await registrarActividadWhatsapp(m.id, {
+      estado: tienda ? 'procesando' : 'sin_tienda',
+      tiendaId: tienda?.id || null,
+      tiendaNombre: tienda?.nombreNegocio || tienda?.email || null,
+    })
+  }
   if (!tienda) {
     if (admin) return enviarTexto(de, '🛠️ Sos admin: primero elegí la tienda, ej: *tienda Creaciones Liz*\n🆕 O creá una nueva: *nueva tienda Creaciones Liz, liz@gmail.com, 1125952486, Buenos Aires*')
     if (propias.length > 1) {
@@ -479,6 +517,9 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
   }
   if (pendiente && esNo(texto)) {
     await guardarSesion(de, { pendiente: null })
+    if (pendiente.tipo === 'crear' && pendiente.datos.whatsappMensajeId) {
+      await registrarActividadWhatsapp(pendiente.datos.whatsappMensajeId, { estado: 'cancelado' })
+    }
     return enviarTexto(de, '👌 Descartado, no guardé nada.')
   }
 
@@ -542,6 +583,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       }
       foto = await subirAImgbb(buf, 6000)
     } catch (err: any) {
+      await registrarActividadWhatsapp(m.id, { estado: 'error', error: String(err?.message || err).slice(0, 300) })
       await registrarEstadoBot({ ultimoErrorProceso: { at: new Date().toISOString(), de, texto: `Foto: ${err?.message || 'error'}` } })
       return enviarTexto(de, `No pude guardar la foto: ${err?.message || 'error'}. Probá de nuevo.`)
     }
@@ -559,6 +601,7 @@ export async function procesarMensaje(m: MensajeWhatsapp) {
       rubro: ia?.rubroId || '',
       imagenUrl: foto.url,
       thumbUrl: foto.thumbUrl,
+      whatsappMensajeId: m.id,
     }
     const resumen = resumenPendiente(datos)
     // Sin precio (ej. un producto reenviado del catálogo: el precio no viene en la foto) lo pide primero.
